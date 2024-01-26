@@ -4,12 +4,12 @@
   "theme_color": "#12affa",
   "background_color": "#424242",
   "display": "standalone",
-  "scope": "https://imroc.cc/kubernetes/",
-  "start_url": "https://imroc.cc/kubernetes/",
+  "scope": "https://imroc.cc/tke/",
+  "start_url": "https://imroc.cc/tke/",
   "related_applications": [
     {
       "platform": "webapp",
-      "url": "https://imroc.cc/kubernetes/manifest.json"
+      "url": "https://imroc.cc/tke/manifest.json"
     }
   ],
   "icons": [
