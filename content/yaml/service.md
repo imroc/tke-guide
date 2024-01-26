@@ -1,5 +1,9 @@
 # Service
 
+## 测试 nginx service
+
+<FileBlock file="nginx-service.yaml" showLineNumbers />
+
 ## CLB 直连 Pod
 
 <FileBlock file="nginx-service-direct-access.yaml" showLineNumbers />
@@ -20,12 +24,23 @@
 
 </Tabs>
 
-## 多可用区
+## 指定 CLB 属性
 
-<FileBlock file="nginx-service-multi-zone.yaml" showLineNumbers />
+<Tabs>
 
-## 内网 CLB
+  <TabItem value="subnet" label="内网 CLB">
+    默认创建的 CLB 是公网类型，如果要内网类型，需传入子网 ID：
+    <FileBlock file="nginx-service-subnet.yaml" showLineNumbers />
+  </TabItem>
 
-默认创建的 CLB 是公网类型，如果要内网类型，需传入子网 ID：
+  <TabItem value="multi-zone" label="多可用区">
+    <FileBlock file="nginx-service-multi-zone.yaml" showLineNumbers />
+  </TabItem>
 
-<FileBlock file="nginx-service-subnet.yaml" showLineNumbers />
+  <TabItem value="vip" label="指定 VIP">
+    指定 CLB 要使用的 VIP（误删恢复时很有用），前提是 VIP 还没有被占用:
+    <FileBlock file="nginx-service-vip.yaml" showLineNumbers />
+  </TabItem>
+
+</Tabs>
+

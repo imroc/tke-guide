@@ -4,6 +4,16 @@
 
 <FileBlock file="nginx.yaml" showLineNumbers />
 
+<Tabs>
+  <TabItem value="without-service" label="Deployment">
+    <FileBlock file="nginx.yaml" showLineNumbers />
+  </TabItem>
+
+  <TabItem value="with-service" label="Deployment+Service">
+    <FileBlock file="nginx-with-service" showLineNumbers />
+  </TabItem>
+</Tabs>
+
 ## 调度
 
 <Tabs>
@@ -16,7 +26,7 @@
   </TabItem>
 </Tabs>
 
-## 网络模式
+## 弹性网卡
 
 如果集群网络模式是 Global Router，且启用了 VPC-CNI (两种模式混用)，Pod 调度到普通节点默认使用 Global Router 模式，如需使用 VPC-CNI (弹性网卡)，需显式指定：
 
