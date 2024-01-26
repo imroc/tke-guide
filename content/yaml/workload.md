@@ -21,3 +21,15 @@
 如果集群网络模式是 Global Router，且启用了 VPC-CNI (两种模式混用)，Pod 调度到普通节点默认使用 Global Router 模式，如需使用 VPC-CNI (弹性网卡)，需显式指定：
 
 <FileBlock file="nginx-eni.yaml" showLineNumbers />
+
+## EIP (弹性公网IP)
+
+<Tabs>
+  <TabItem value="eip" label="声明使用 EIP">
+    <FileBlock file="nginx-eip.yaml" showLineNumbers />
+  </TabItem>
+
+  <TabItem value="retain" label="保留 EIP">
+    <FileBlock file="nginx-retain-eip.yaml" showLineNumbers />
+  </TabItem>
+</Tabs>

@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: nginx
+  name: nginx
+spec:
+  serviceName: ""
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      annotations:
+        # highlight-start
+        eks.tke.cloud.tencent.com/eip-attributes: "{}" # 指定 Pod 使用 EIP （仅在超级节点支持）
+        eks.tke.cloud.tencent.com/eip-claim-delete-policy: "Never" # 声明要保留 EIP（Pod 重建后保持 EIP 不变），仅支持 StatefulSet
+        # highlight-end
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          command:
+            - sleep
+            - infinity
