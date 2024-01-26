@@ -2,8 +2,6 @@
 
 ## 测试 nginx 服务
 
-<FileBlock file="nginx.yaml" showLineNumbers />
-
 <Tabs>
   <TabItem value="without-service" label="Deployment">
     <FileBlock file="nginx.yaml" showLineNumbers />
