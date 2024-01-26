@@ -20,3 +20,12 @@
 
 </Tabs>
 
+## 多可用区
+
+<FileBlock file="nginx-service-multi-zone.yaml" showLineNumbers />
+
+## 内网 CLB
+
+默认创建的 CLB 是公网类型，如果要内网类型，需传入子网 ID：
+
+<FileBlock file="nginx-service-subnet.yaml" showLineNumbers />
