@@ -89,7 +89,7 @@ const config: Config = {
       // algolia 搜索功能
       algolia: {
         appId: 'PMI694UTDL',
-        apiKey: 'aa3783e39857078d1b6b5fabcb2943f9',
+        apiKey: '70252d611402a606b9b6827a1303d486',
         indexName: 'imroc_cc',
         contextualSearch: false,
       },
