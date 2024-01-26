@@ -11,8 +11,9 @@ metadata:
 spec:
   type: LoadBalancer
   ports:
+    # highlight-next-line
     - port: 8080
       protocol: TCP
-      targetPort: 8080
+      targetPort: 80
   selector:
     app: nginx2
