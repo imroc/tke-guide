@@ -21,13 +21,11 @@
     <FileBlock file="nginx-service-reuse.yaml" showLineNumbers />
     <FileBlock file="nginx2-service-reuse.yaml" showLineNumbers />
   </TabItem>
-
 </Tabs>
 
 ## 指定 CLB 属性
 
 <Tabs>
-
   <TabItem value="subnet" label="内网 CLB">
     默认创建的 CLB 是公网类型，如果要内网类型，需传入子网 ID：
     <FileBlock file="nginx-service-subnet.yaml" showLineNumbers />
@@ -41,6 +39,5 @@
     指定 CLB 要使用的 VIP（误删恢复时很有用），前提是 VIP 还没有被占用:
     <FileBlock file="nginx-service-vip.yaml" showLineNumbers />
   </TabItem>
-
 </Tabs>
 
