@@ -135,6 +135,18 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: '常用 YAML',
+      collapsed: true,
+      link: {
+        type: 'generated-index',
+        slug: '/yaml'
+      },
+      items: [
+        'yaml/service',
+      ],
+    },
+    {
+      type: 'category',
       label: '附录',
       collapsed: true,
       link: {

@@ -6,7 +6,7 @@ metadata:
     app: nginx
   annotations:
     # 指定要已有的 CLB ID
-    # highlight-nextline
+    # highlight-next-line
     service.kubernetes.io/tke-existed-lbid: "lb-********"
 spec:
   type: LoadBalancer

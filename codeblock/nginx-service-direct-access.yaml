@@ -6,7 +6,7 @@ metadata:
     app: nginx
   annotations:
     # 显式声明使用直连
-    # highlight-nextline
+    # highlight-next-line
     service.cloud.tencent.com/direct-access: "true"
 spec:
   type: LoadBalancer

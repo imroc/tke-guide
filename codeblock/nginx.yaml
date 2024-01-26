@@ -12,11 +12,6 @@ spec:
       labels:
         app: nginx
     spec:
-      # highlight-start
-      # 使用  nodeSelector 显式指定调度到超级节点
-      nodeSelector:
-        node.kubernetes.io/instance-type: eklet
-      # highlight-end
       containers:
         - name: nginx
           image: nginx:latest

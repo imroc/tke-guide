@@ -12,7 +12,7 @@ spec:
       labels:
         app: nginx
       annotations:
-        # highlight-nextline
+        # highlight-next-line
         tke.cloud.tencent.com/networks: tke-route-eni
     spec:
       containers:

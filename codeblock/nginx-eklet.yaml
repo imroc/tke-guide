@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      # 使用  nodeSelector 显式指定调度到超级节点
+      # highlight-start
+      nodeSelector:
+        node.kubernetes.io/instance-type: eklet
+      # highlight-end
+      containers:
+        - name: nginx
+          image: nginx:latest
