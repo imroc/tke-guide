@@ -1,6 +1,6 @@
 # Service
 
-## 测试 nginx service
+## 测试 Service
 
 <FileBlock file="nginx-service.yaml" showLineNumbers />
 
