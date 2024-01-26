@@ -8,7 +8,7 @@
   </TabItem>
 
   <TabItem value="with-service" label="Deployment+Service">
-    <FileBlock file="nginx-with-service" showLineNumbers />
+    <FileBlock file="nginx-with-service.yaml" showLineNumbers />
   </TabItem>
 </Tabs>
 
