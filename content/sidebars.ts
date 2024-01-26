@@ -143,6 +143,8 @@ const sidebars: SidebarsConfig = {
       },
       items: [
         'yaml/service',
+        'yaml/ingress',
+        'yaml/workload',
       ],
     },
     {
