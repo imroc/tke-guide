@@ -174,7 +174,7 @@ controller:
       service.cloud.tencent.com/direct-access: "true" # 启用 CLB 直通
 ```
 
-## VPC-CNI 网络模式启用直连
+### VPC-CNI 网络模式启用直连
 
 如果集群网络本身就是 VPC-CNI，那就比较简单了，直接配置 `values.yaml` 启用 CLB 直连即可：
 
