@@ -48,7 +48,7 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   -f values.yaml
 ```
 
-查看流量入口(CLB VIP)：
+查看流量入口(CLB VIP 或域名)：
 
 ```bash
 $ kubectl get services -n ingress-nginx
