@@ -34,6 +34,18 @@ const sidebars: SidebarsConfig = {
         slug: '/networking'
       },
       items: [
+        {
+          type: 'category',
+          label: 'Nginx Ingress',
+          collapsed: true,
+          link: {
+            type: 'generated-index',
+            slug: '/networking/ingress-nginx',
+          },
+          items: [
+            'networking/ingress-nginx/install',
+          ],
+        },
         'networking/clb-to-pod-directly',
         'networking/how-to-use-eip',
         'networking/install-localdns-with-ipvs',
