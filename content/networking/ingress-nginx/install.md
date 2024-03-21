@@ -1,5 +1,10 @@
 # 在 TKE 自建 Nginx Ingress
 
+## 前提条件
+
+* 已经安装好了 [helm](https://helm.sh/)。
+* 配置好了 kubeconfig，且有权限操作 TKE 集群（参考 [连接集群](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)）。
+
 ## 使用 helm 安装
 
 添加 helm repo:
