@@ -76,7 +76,7 @@ ingress-nginx/ingress-nginx     4.7.1           1.8.1           Ingress controll
 ingress-nginx/ingress-nginx     4.7.0           1.8.0           Ingress controller for Kubernetes using NGINX a...
 ```
 
-可以看到 `4.7.*` 版本最高是 `4.7.5`，安装的时候我们加上版本：
+可以看到 `4.7.*` 版本最高是 `4.7.5`，安装的时候我们加上版本号：
 
 ```bash
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
@@ -85,6 +85,8 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   --namespace ingress-nginx --create-namespace \
   -f values.yaml
 ```
+
+**注意：** TKE 集群升级前，先检查下当前 Nginx Ingress 版本能否兼容升级后的集群版本，如果不能兼容，先升级下 Nginx Ingress（用上面的命令指定 chart 版本号）。
 
 ## 自定义 CLB
 
