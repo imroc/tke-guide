@@ -14,6 +14,8 @@ helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm show values ingress-nginx/ingress-nginx
 ```
 
+Nginx Ingress 依赖的镜像在 `registry.k8s.io` 这个 registry 下，国内网络环境无法拉取，可替换为 docker hub 中的 mirror 镜像。
+
 准备 `values.yaml`:
 
 ```yaml showLineNumbers title="values.yaml"
@@ -35,6 +37,8 @@ controller: # 默认的镜像在境内无法拉取，可替换为 docker hub 上
       registry: docker.io
       image: k8smirror/ingress-nginx-opentelemetry
 ```
+
+> 配置中的 mirror 镜像均使用 [image-porter](https://github.com/imroc/image-porter) 长期自动同步，可放心安装和升级。
 
 安装：
 
