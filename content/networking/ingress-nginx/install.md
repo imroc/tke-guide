@@ -83,6 +83,10 @@ controller:
 >
 > **注意:** 在 CLB 控制台创建 CLB 实例时，选择的 VPC 需与集群一致。
 
+## 启用 CLB 直连 Nginx Ingress
+
+TODO
+
 ## 高并发场景优化
 
 TODO
