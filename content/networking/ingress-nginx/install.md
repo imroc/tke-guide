@@ -48,6 +48,8 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   -f values.yaml
 ```
 
+> 后续如果需要修改 values 配置，或者升级版本，都可以用个命令。
+
 查看流量入口(CLB VIP 或域名)：
 
 ```bash
@@ -58,6 +60,31 @@ ingress-nginx-controller-admission   ClusterIP      172.16.166.237   <none>     
 ```
 
 > `LoadBalancer` 类型 Service 的 `EXTERNAL-IP` 就是 CLB 的 VIP 或域名，可以配置下 DNS 解析。如果是 VIP，就配 A 记录；如果是 CLB 域名，就配置 CNAME 记录。
+
+## 版本与升级
+
+Nginx Ingress 的版本需要与 Kubernetes 集群版本能够兼容，可参考官方 [Supported Versions table](https://github.com/kubernetes/ingress-nginx?tab=readme-ov-file#supported-versions-table) 确认下当前集群版本能否支持最新的 nginx ingress，如果不支持，安装的时候指定下 chart 版本。
+
+比如当前的 TKE 集群版本是 1.24，chart 版本最高只能到 `4.7.*`，检查下有哪些可用版本：
+
+```bash
+$ helm search repo ingress-nginx/ingress-nginx --versions | grep 4.7.
+ingress-nginx/ingress-nginx     4.7.5           1.8.5           Ingress controller for Kubernetes using NGINX a...
+ingress-nginx/ingress-nginx     4.7.3           1.8.4           Ingress controller for Kubernetes using NGINX a...
+ingress-nginx/ingress-nginx     4.7.2           1.8.2           Ingress controller for Kubernetes using NGINX a...
+ingress-nginx/ingress-nginx     4.7.1           1.8.1           Ingress controller for Kubernetes using NGINX a...
+ingress-nginx/ingress-nginx     4.7.0           1.8.0           Ingress controller for Kubernetes using NGINX a...
+```
+
+可以看到 `4.7.*` 版本最高是 `4.7.5`，安装的时候我们加上版本：
+
+```bash
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  # highlight-next-line
+  --version 4.7.5 \
+  --namespace ingress-nginx --create-namespace \
+  -f values.yaml
+```
 
 ## 自定义 CLB
 
