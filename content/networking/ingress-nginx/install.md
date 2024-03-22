@@ -93,9 +93,9 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
 
 **注意：** TKE 集群升级前，先检查下当前 Nginx Ingress 版本能否兼容升级后的集群版本，如果不能兼容，先升级下 Nginx Ingress（用上面的命令指定 chart 版本号）。
 
-## 自定义 CLB
+## 自定义负载均衡器(CLB)
 
-默认安装会自动创建出一个公网来 CLB 接入流量，你可以利用 Service 注解对 Nginx Ingress Controller 的 CLB 进行自定义，比如改成内网 CLB，在 `values.yaml` 中这样定义:
+默认安装会自动创建出一个公网 CLB 来接入流量，你可以利用 Service 注解对 Nginx Ingress Controller 的 CLB 进行自定义，比如改成内网 CLB，在 `values.yaml` 中这样定义:
 
 ```yaml
 controller:
