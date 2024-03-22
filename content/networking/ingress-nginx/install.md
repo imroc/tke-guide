@@ -187,11 +187,47 @@ controller:
 
 ## 高并发场景优化
 
-TODO
+针对高并发场景调优内核参数和 nginx 自身的配置，`values.yaml` 配置方法:
+
+```yaml
+controller:
+  extraInitContainers:
+    - name: sysctl
+      image: busybox
+      imagePullPolicy: IfNotPresent
+      command:
+        - sh
+        - -c
+        - |
+          sysctl -w net.core.somaxconn=65535 # 调大链接队列，防止队列溢出
+          sysctl -w net.ipv4.ip_local_port_range="1024 65535" # 扩大源端口范围，防止端口耗尽
+          sysctl -w net.ipv4.tcp_tw_reuse=1 # TIME_WAIT 复用，避免端口耗尽后无法新建连接
+          sysctl -w fs.file-max=1048576 # 调大文件句柄数，防止连接过多导致文件句柄耗尽
+  config:
+    # nginx 与 client 保持的一个长连接能处理的请求数量，默认100，高并发场景建议调高，但过高也可能导致 nginx ingress 扩容后负载不均。
+    # 参考: https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/#keep-alive-requests
+    keep-alive-requests: "1000"
+    # nginx 与 upstream 保持长连接的最大空闲连接数 (不是最大连接数)，默认 320，在高并发下场景下调大，避免频繁建联导致 TIME_WAIT 飙升。
+    # 参考: https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/#upstream-keepalive-connections
+    upstream-keepalive-connections: "2000"
+    # 每个 worker 进程可以打开的最大连接数，默认 16384。
+    # 参考: https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/#max-worker-connections
+    max-worker-connections: "65536"
+```
+
+> 参考 [Nginx Ingress 高并发实践](https://cloud.tencent.com/document/product/457/48142)。
 
 ## 集成 Prometheus 监控
 
-TODO
+如果你使用了 [腾讯云 Prometheus 监控服务关联 TKE 集群](https://cloud.tencent.com/document/product/1416/72037)，或者是自己安装 Prometheus Operator 来监控集群，都可以启用 ServiceMonitor 来采集 Nginx Ingress 的监控数据，只需在 `values.yaml` 中打开这个开关即可：
+
+```yaml
+controller:
+  metrics:
+    enabled: true # 专门创建一个 service 给 Prometheus 用作 Nginx Ingress 的服务发现
+    serviceMonitor:
+      enabled: true # 下发 ServiceMonitor 自定义资源，启用监控采集规则
+```
 
 ## 集成 Grafana 监控面板
 
