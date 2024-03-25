@@ -187,6 +187,8 @@ controller:
 
 ## 高并发场景优化
 
+### 调优内核参数与 Nginx 配置
+
 针对高并发场景调优内核参数和 nginx 自身的配置，`values.yaml` 配置方法:
 
 ```yaml
@@ -216,6 +218,14 @@ controller:
 ```
 
 > 参考 [Nginx Ingress 高并发实践](https://cloud.tencent.com/document/product/457/48142)。
+
+### 日志轮转
+
+Nginx Ingress 默认会将日志打印到容器标准输出，日志由容器运行时自动管理，在高并发场景可能会导致 CPU 占用较高。
+
+解决方案是将 Nginx Ingress 日志输出到日志文件中，然后用 sidecar 对日志文件做自动轮转避免日志打满磁盘空间。
+
+TODO
 
 ## 集成 Prometheus 监控
 
