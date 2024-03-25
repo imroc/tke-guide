@@ -225,7 +225,40 @@ Nginx Ingress 默认会将日志打印到容器标准输出，日志由容器运
 
 解决方案是将 Nginx Ingress 日志输出到日志文件中，然后用 sidecar 对日志文件做自动轮转避免日志打满磁盘空间。
 
-TODO
+`values.yaml` 配置方法：
+
+```yaml
+controller:
+  config:
+    # nginx 日志落盘到日志文件，避免高并发下占用过多 CPU
+    access-log-path: /var/log/nginx/nginx_access.log
+    error-log-path: /var/log/nginx/nginx_error.log
+  extraVolumes:
+    - name: log # controller 挂载日志目录
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: log # logratote 与 controller 共享日志目录
+      mountPath: /var/log/nginx
+  extraContainers: # logrotate sidecar 容器，用于轮转日志
+    - name: logrotate
+      image: imroc/logrotate:latest # https://github.com/imroc/docker-logrotate
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: LOGROTATE_FILE_PATTERN # 轮转的日志文件pattern，与 nginx 配置的日志文件路径相匹配
+          value: "/var/log/nginx/nginx_*.log"
+        - name: LOGROTATE_FILESIZE # 日志文件超过多大后轮转
+          value: "1M"
+        - name: LOGROTATE_FILENUM # 每个日志文件轮转的数量
+          value: "3"
+        - name: CRON_EXPR # logrotate 周期性运行的 crontab 表达式，这里每分钟一次
+          value: "*/1 * * * *"
+        - name: CROND_LOGLEVEL # crond 日志级别，0~8，越小越详细
+          value: "8"
+      volumeMounts:
+        - name: log
+          mountPath: /var/log/nginx
+
+```
 
 ## 集成 Prometheus 监控
 
