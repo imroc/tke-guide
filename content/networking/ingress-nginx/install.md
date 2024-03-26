@@ -437,7 +437,6 @@ controller:
     <FileBlock file="nginx-ingress-logconfig-files.yaml" showLineNumbers />
   </TabItem>
 </Tabs>
-
     * 必须替换的配置是 `topicId`，即日志主题 ID，表示采集的日志将会吐到该 CLS 日志主题里。
     * 根据自己实际情况选择配置采集标准输出还是日志文件，nginx ingress 默认是将日志输出到标准输出，但也可以像 [日志轮转](#日志轮转) 这里介绍的一样将日志落盘到日志文件。
 
