@@ -193,7 +193,7 @@ controller:
 
 高并发场景的流量吞吐需求较高，对 CLB 的转发性能要求也较高，可以在 [CLB 控制台](https://console.cloud.tencent.com/clb/instance) 手动创建一个 CLB，实例规格选择性能容量型，型号根据自己需求来选，另外也将带宽上限调高（注意 VPC 要与 TKE 集群一致）。
 
-CLB 创建好后，用 [自定义负载均衡器(CLB)](#自定义负载均衡器(CLB)) 中的方法让 nginx ingress 复用这个 CLB 作为流量入口。
+CLB 创建好后，用 [自定义负载均衡器(CLB)](#自定义负载均衡器clb) 中的方法让 nginx ingress 复用这个 CLB 作为流量入口。
 
 ### 调优内核参数与 Nginx 配置
 
