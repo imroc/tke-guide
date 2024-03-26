@@ -58,7 +58,7 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   -f values.yaml
 ```
 
-> 后续如果需要修改 values 配置，或者升级版本，都可以用个命令。
+> 后续如果需要修改 values 配置，或者升级版本，都可以通过执行用个命令来更新 Nginx Ingress Controller。
 
 查看流量入口(CLB VIP 或域名)：
 
@@ -259,7 +259,7 @@ controller:
         - name: LOGROTATE_FILE_PATTERN # 轮转的日志文件pattern，与 nginx 配置的日志文件路径相匹配
           value: "/var/log/nginx/nginx_*.log"
         - name: LOGROTATE_FILESIZE # 日志文件超过多大后轮转
-          value: "1M"
+          value: "100M"
         - name: LOGROTATE_FILENUM # 每个日志文件轮转的数量
           value: "3"
         - name: CRON_EXPR # logrotate 周期性运行的 crontab 表达式，这里每分钟一次
@@ -395,6 +395,6 @@ controller:
 
 TODO
 
-## 完整配置示例
+## values.yaml 完整配置示例
 
 <FileBlock file="nginx-ingress-values.yaml" showLineNumbers title="values.yaml" />
