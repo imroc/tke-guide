@@ -283,6 +283,8 @@ controller:
     enabled: true
     minReplicas: 10
     maxReplicas: 100
+    targetCPUUtilizationPercentage: 50
+    targetMemoryUtilizationPercentage: 50
     behavior: # 快速扩容应对流量洪峰，缓慢缩容预留 buffer 避免流量异常
       scaleDown:
         stabilizationWindowSeconds: 300
