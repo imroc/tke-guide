@@ -397,7 +397,7 @@ controller:
 
 下面介绍如何将 Nginx Ingress Controller 的 access log 采集到 CLS，并结合 CLS 的仪表盘分析日志。
 
-1. 在 `values.yaml` 中配一下 nginx 访问日志的格式：
+1. 在 `values.yaml` 中配一下 nginx 访问日志的格式，也设置下时区以便时间戳能展示当地时间（增强可读性）：
 
 ```yaml
 controller:
@@ -407,6 +407,9 @@ controller:
       $status $body_bytes_sent "$http_referer" "$http_user_agent"
       $request_length $request_time [$proxy_upstream_name] [$proxy_alternative_upstream_name] $upstream_addr
       $upstream_response_length $upstream_response_time $upstream_status $req_id $host
+  extraEnvs:
+    - name: TZ
+      value: Asia/Shanghai
 ```
 
 2. 确保集群启用了日志采集功能，参考官方文档 [开启日志采集](https://cloud.tencent.com/document/product/457/83871#.E5.BC.80.E5.90.AF.E6.97.A5.E5.BF.97.E9.87.87.E9.9B.86)。

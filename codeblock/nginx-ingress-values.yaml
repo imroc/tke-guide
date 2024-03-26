@@ -1,4 +1,4 @@
-controller:
+controller: # 默认的镜像在境内无法拉取，可替换为 docker hub 上的 mirror 镜像
   extraInitContainers:
     - name: sysctl
       image: busybox
@@ -23,9 +23,16 @@ controller:
     # 每个 worker 进程可以打开的最大连接数，默认 16384。
     # 参考: https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/#max-worker-connections
     max-worker-connections: "65536"
+    log-format-upstream: $remote_addr - $remote_user [$time_local] "$request"
+      $status $body_bytes_sent "$http_referer" "$http_user_agent"
+      $request_length $request_time [$proxy_upstream_name] [$proxy_alternative_upstream_name] $upstream_addr
+      $upstream_response_length $upstream_response_time $upstream_status $req_id $host
     # nginx 日志落盘到日志文件，避免高并发下占用过多 CPU
     access-log-path: /var/log/nginx/nginx_access.log
     error-log-path: /var/log/nginx/nginx_error.log
+  extraEnvs:
+    - name: TZ
+      value: Asia/Shanghai
   extraVolumes:
     - name: log
       emptyDir: {}
@@ -96,19 +103,19 @@ controller:
       topologyKey: kubernetes.io/hostname
       maxSkew: 1
       whenUnsatisfiable: ScheduleAnyway
-  image: # 默认的镜像在境内无法拉取，替换为 docker hub 上的 mirror 镜像
+  image:
     registry: docker.io
     image: k8smirror/ingress-nginx-controller
   admissionWebhooks:
     patch:
-      image: # 默认的镜像在境内无法拉取，替换为 docker hub 上的 mirror 镜像
+      image:
         registry: docker.io
         image: k8smirror/ingress-nginx-kube-webhook-certgen
   defaultBackend:
-    image: # 默认的镜像在境内无法拉取，替换为 docker hub 上的 mirror 镜像
+    image:
       registry: docker.io
       image: k8smirror/defaultbackend-amd64
   opentelemetry:
-    image: # 默认的镜像在境内无法拉取，替换为 docker hub 上的 mirror 镜像
+    image:
       registry: docker.io
       image: k8smirror/ingress-nginx-opentelemetry
