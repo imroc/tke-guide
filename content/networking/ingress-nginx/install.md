@@ -442,7 +442,7 @@ controller:
 
 6. 测试一波 Ingress 请求，产生日志数据。
 7. 进入日志服务控制台的 [检索分析](https://console.cloud.tencent.com/cls/search) 页面，选择 nginx ingress 所使用的日志主题，确认日志能够被正常检索。
-8. 如果一切正常，可以使用日志服务的 [Nginx 访问大盘](https://console.cloud.tencent.com/cls/dashboard/d?templateId=nginx-ingress-access-dashboard&var-ds=&time=now-d,now) 和 [Nginx 监控大盘](https://console.cloud.tencent.com/cls/dashboard/d?templateId=nginx-ingress-monitor-dashboard&var-ds=&time=now-d,now) 两个预置仪表盘并选择 nginx ingress 所使用的日志主题来展示日志的分析面板:
+8. 如果一切正常，可以使用日志服务的 [Nginx 访问大盘](https://console.cloud.tencent.com/cls/dashboard/d?templateId=nginx-ingress-access-dashboard&var-ds=&time=now-d,now) 和 [Nginx 监控大盘](https://console.cloud.tencent.com/cls/dashboard/d?templateId=nginx-ingress-monitor-dashboard&var-ds=&time=now-d,now) 两个预置仪表盘并选择 nginx ingress 所使用的日志主题来展示nginx访问日志的分析面板:
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F26%2F20240326203343.png)
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F26%2F20240326203353.png)
