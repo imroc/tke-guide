@@ -1,11 +1,14 @@
-# 在 TKE 自建 Nginx Ingress
+# 在 TKE 自建 Nginx Ingress Controller
 
-## 
+## 概述
+
+[Nginx Ingress Controller](https://github.com/kubernetes/ingress-nginx) 是基于高性能 NGINX 反向代理实现的 Kubernetes Ingress 控制器，也是最常用的开源 Ingress 实现。本文介绍如何在 TKE 环境中自建 Nginx Ingress Controller，主要使用 helm 进行安装，提供一些 `values.yaml` 配置指引，可根据自己需求合并下配置，文末也会提供合并后的 `values.yaml` 完整配置示例。
 
 ## 前提条件
 
-* 已经安装好了 [helm](https://helm.sh/)。
-* 配置好了 kubeconfig，且有权限操作 TKE 集群（参考 [连接集群](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)）。
+* 创建了 TKE 集群。
+* 安装了 [helm](https://helm.sh/)。
+* 配置了 TKE 集群的 kubeconfig，且有权限操作 TKE 集群（参考 [连接集群](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)）。
 
 ## 使用 helm 安装
 
@@ -268,7 +271,107 @@ controller:
           mountPath: /var/log/nginx
 ```
 
-## 集成 Prometheus 监控
+## 高可用配置优化
+
+### 调高副本数
+
+配置自动扩缩容：
+
+```yaml
+controller:
+  autoscaling:
+    enabled: true
+    minReplicas: 10
+    maxReplicas: 100
+    behavior: # 快速扩容应对流量洪峰，缓慢缩容预留 buffer 避免流量异常
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Percent
+            value: 900
+            periodSeconds: 15 # 每 15s 最多允许扩容 9 倍于当前副本数
+      scaleUp:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Pods
+            value: 1
+            periodSeconds: 600 # 每 10 分钟最多只允许缩掉 1 个 Pod
+```
+
+如果希望固定副本数，直接配置 `replicaCount`:
+
+```yaml
+controller:
+  replicaCount: 50
+```
+
+### 打散调度
+
+使用拓扑分布约束将 Pod 打散以支持容灾，避免单点故障：
+
+```yaml
+controller:
+  topologySpreadConstraints: # 尽量打散的策略
+    - labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: '{{ include "ingress-nginx.name" . }}'
+          app.kubernetes.io/instance: '{{ .Release.Name }}'
+          app.kubernetes.io/component: controller
+      topologyKey: topology.kubernetes.io/zone
+      maxSkew: 1
+      whenUnsatisfiable: ScheduleAnyway
+    - labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: '{{ include "ingress-nginx.name" . }}'
+          app.kubernetes.io/instance: '{{ .Release.Name }}'
+          app.kubernetes.io/component: controller
+      topologyKey: kubernetes.io/hostname
+      maxSkew: 1
+      whenUnsatisfiable: ScheduleAnyway
+```
+
+### 调度专用节点
+
+通常 Nginx Ingress Controller 的负载跟流量成正比，而 Nginx Ingress Controller 作为网关又特别重要，可以考虑将其调度到专用的节点或者超级节点，避免干扰业务 Pod 或被业务 Pod 干扰。
+
+调度到指定节点池：
+
+```yaml
+controller:
+  nodeSelector:
+    tke.cloud.tencent.com/nodepool-id: np-********
+```
+
+> 超级节点的效果更好，所有 Pod 独占虚拟机，不会相互干扰。
+
+### 合理设置 request limit
+
+如果 Nginx Ingress 不是调度到超级节点，需合理设置下 request 和 limit，保证有足够的资源的同时，也保证不要用太多的资源导致节点负载过高:
+
+```yaml
+controller:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+```
+
+如果是用的超级节点，只需要定义下 requests，即声明每个 Pod 的虚拟机规格：
+
+```yaml
+controller:
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+```
+
+## 可观测性集成
+
+### 集成 Prometheus 监控
 
 如果你使用了 [腾讯云 Prometheus 监控服务关联 TKE 集群](https://cloud.tencent.com/document/product/1416/72037)，或者是自己安装了 Prometheus Operator 来监控集群，都可以启用 ServiceMonitor 来采集 Nginx Ingress 的监控数据，只需在 `values.yaml` 中打开这个开关即可：
 
@@ -280,7 +383,7 @@ controller:
       enabled: true # 下发 ServiceMonitor 自定义资源，启用监控采集规则
 ```
 
-## 集成 Grafana 监控面板
+### 集成 Grafana 监控面板
 
 如果你使用了 [腾讯云 Prometheus 监控服务关联 TKE 集群](https://cloud.tencent.com/document/product/1416/72037) 且关联了 [腾讯云 Grafana 服务](https://cloud.tencent.com/product/tcmg) ，可以直接在 Prometheus 集成中心安装 Nginx Ingress 的监控面板：
 
@@ -288,6 +391,10 @@ controller:
 
 如果是自建的 Grafana，直接将 Nginx Ingress 官方提供的 [Grafana Dashboards](https://github.com/kubernetes/ingress-nginx/tree/main/deploy/grafana/dashboards) 中两个监控面板 (json文件) 导入 Grafana 即可。
 
-## 集成 CLS 日志服务
+### 集成 CLS 日志服务
 
 TODO
+
+## 完整配置示例
+
+<FileBlock file="nginx-ingress-values.yaml" showLineNumbers title="values.yaml" />
