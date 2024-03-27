@@ -494,4 +494,21 @@ helm upgrade --install prod ingress-nginx/ingress-nginx \
 
 ## 从 TKE Nginx Ingress 插件迁移到自建 Nginx Ingress
 
-TODO
+确认已安装的 Nginx Ingress 实例的 Deployment 名称和命名空间，比如：
+
+```yaml
+$ kubectl get deploy -A | grep nginx
+kube-system            extranet-ingress-nginx-controller           1/1     1            1           216d
+```
+
+本例子中：
+* 只有一个实例。
+* 在 `kube-system` 命名空间下。
+* Deployment 名称是 `extranet-ingress-nginx-controller`。
+
+卸载 Nginx Ingress 插件的 Operator（避免后面被 helm 安装覆盖后又被 Operator 覆盖回去）：
+
+```yaml
+kubectl -n kube-system delete deploy tke-ingress-nginx-controller-operator
+```
+
