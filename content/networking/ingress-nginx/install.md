@@ -200,7 +200,6 @@ CLB 创建好后，用 [自定义负载均衡器(CLB)](#自定义负载均衡器
 
 ### 调优内核参数与 Nginx 配置
 
-
 针对高并发场景调优内核参数和 nginx 自身的配置，`values.yaml` 配置方法:
 
 ```yaml
@@ -450,7 +449,49 @@ controller:
 你甚至还可以直接通过面板来设置告警规则：
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F26%2F20240326203154.png)
 
+## IngressClass 与多实例 NginxIngress
+
+如果没有显式配置，安装的 NginxIngress 的 IngressClass 名称为 `nginx`，在创建 Ingress 资源时需要指定 `ingressClassName` 为 `nginx` 才会生效：
+
+```yaml showLineNumbers
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx
+spec:
+  # highlight-next-line
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nginx
+                port:
+                  number: 80
+```
+
+如果要安装多个 Nginx Ingress Controller 实例，需要在 `values.yaml` 指定下：
+
+```yaml
+controller:
+  ingressClassName: prod
+```
+
+另外多实例的 release 名称也不能与已安装的相同，示例：
+
+```yaml
+helm upgrade --install prod ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace \
+  -f values.yaml
+```
 
 ## values.yaml 完整配置示例
 
 <FileBlock file="nginx-ingress-values.yaml" showLineNumbers title="values.yaml" />
+
+## 从 TKE Nginx Ingress 插件迁移到自建 Nginx Ingress
+
+TODO

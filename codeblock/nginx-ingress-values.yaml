@@ -1,4 +1,4 @@
-controller: # 默认的镜像在境内无法拉取，可替换为 docker hub 上的 mirror 镜像
+controller:
   extraInitContainers:
     - name: sysctl
       image: busybox
@@ -108,14 +108,14 @@ controller: # 默认的镜像在境内无法拉取，可替换为 docker hub 上
     image: k8smirror/ingress-nginx-controller
   admissionWebhooks:
     patch:
-      image:
+      image: # 默认的镜像在境内无法拉取，可替换为 docker hub 上的 mirror 镜像
         registry: docker.io
         image: k8smirror/ingress-nginx-kube-webhook-certgen
   defaultBackend:
-    image:
+    image: # 默认的镜像在境内无法拉取，可替换为 docker hub 上的 mirror 镜像
       registry: docker.io
       image: k8smirror/defaultbackend-amd64
   opentelemetry:
-    image:
+    image: # 默认的镜像在境内无法拉取，可替换为 docker hub 上的 mirror 镜像
       registry: docker.io
       image: k8smirror/ingress-nginx-opentelemetry

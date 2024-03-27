@@ -7,8 +7,8 @@ spec:
     topicId: "********-****-****-****-************" # 替换日志主题的 ID
     logType: fullregex_log
     extractRule:
-      beginningRegex: (\S+)\s-\s(\S+)\s\[(\S+)\]\s(\S+)\s\"(\w+)\s(\S+)\s([^\"]+)\"\s(\S+)\s(\S+)\s\"([^\"]*)\"\s\"([^\"]*)\"\s(\S+)\s(\S+)\s\[([^\]]*)\]\s\[([^\]]*)\]\s\[([^\]]*)\]\s\[([^\]]*)\]\s\[([^\]]*)\]\s\[([^\]]*)\]\s(\S+)
-      logRegex: (\S+)\s-\s(\S+)\s\[(\S+)\]\s(\S+)\s\"(\w+)\s(\S+)\s([^\"]+)\"\s(\S+)\s(\S+)\s\"([^\"]*)\"\s\"([^\"]*)\"\s(\S+)\s(\S+)\s\[([^\]]*)\]\s\[([^\]]*)\]\s\[([^\]]*)\]\s\[([^\]]*)\]\s\[([^\]]*)\]\s\[([^\]]*)\]\s(\S+)
+      beginningRegex: (\S+)\s-\s(\S+)\s\[([^\]]+)\]\s\"(\w+)\s(\S+)\s([^\"]+)\"\s(\S+)\s(\S+)\s\"([^\"]*)\"\s\"([^\"]*)\"\s(\S+)\s(\S+)\s\[([^\]]*)\]\s\[([^\]]*)\]\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)
+      logRegex: (\S+)\s-\s(\S+)\s\[([^\]]+)\]\s\"(\w+)\s(\S+)\s([^\"]+)\"\s(\S+)\s(\S+)\s\"([^\"]*)\"\s\"([^\"]*)\"\s(\S+)\s(\S+)\s\[([^\]]*)\]\s\[([^\]]*)\]\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)\s(\S+)
       keys:
         - remote_addr
         - remote_user
@@ -30,6 +30,7 @@ spec:
         - upstream_response_time
         - upstream_status
         - req_id
+        - sys_address
   inputDetail:
     type: container_stdout
     containerStdout:
