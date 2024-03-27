@@ -478,7 +478,11 @@ spec:
 ```yaml
 controller:
   ingressClassName: prod
+  ingressClassResource:
+    name: prod
 ```
+
+> 两个字段需同时改。
 
 另外多实例的 release 名称也不能与已安装的相同，示例：
 
