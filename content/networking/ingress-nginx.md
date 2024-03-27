@@ -482,7 +482,7 @@ controller:
 
 另外多实例的 release 名称也不能与已安装的相同，示例：
 
-```yaml
+```bash
 helm upgrade --install prod ingress-nginx/ingress-nginx \
   --namespace ingress-nginx --create-namespace \
   -f values.yaml
@@ -494,21 +494,107 @@ helm upgrade --install prod ingress-nginx/ingress-nginx \
 
 ## 从 TKE Nginx Ingress 插件迁移到自建 Nginx Ingress
 
-确认已安装的 Nginx Ingress 实例的 Deployment 名称和命名空间，比如：
+迁移到自建 Nginx Ingress 有什么好处？Nginx Ingress 提供的功能和配置都是非常多和灵活，可以满足各种使用场景，自建可以解锁 Nginx Ingress 的全部功能，可以根据自己需求，对配置进行自定义，还能够及时更新版本。
 
-```yaml
+### 确认已安装的 Nginx Ingress 相关信息
+
+确认已安装的 Nginx Ingress 实例的 IngressClass 名称，比如：
+
+```bash
 $ kubectl get deploy -A | grep nginx
 kube-system            extranet-ingress-nginx-controller           1/1     1            1           216d
 ```
 
-本例子中：
-* 只有一个实例。
-* 在 `kube-system` 命名空间下。
-* Deployment 名称是 `extranet-ingress-nginx-controller`。
+本例子中只有一个实例，Deployment 名称是 `extranet-ingress-nginx-controller`，IngressClass 是 `-ingress-nginx-controller` 之前的部分，这里是 `extranet`。
+
+另外再检查下当前使用的 nginx ingress 的镜像版本：
+
+```yaml
+$ kubectl -n kube-system get deploy extranet-ingress-nginx-controller -o yaml | grep image:
+        image: ccr.ccs.tencentyun.com/tkeimages/nginx-ingress-controller:v1.9.5
+```
+
+本例中版本是 `v1.9.5`，看下对应哪个 chart 版本：
+
+```bash
+$ helm search repo ingress-nginx/ingress-nginx --versions  | grep 1.9.5
+ingress-nginx/ingress-nginx     4.9.0           1.9.5           Ingress controller for Kubernetes using NGINX a...
+```
+
+这里看到是 `4.9.0`，记住这个版本，后面用 helm 安装新版渲染时需要指定这个 chart 版本。
+
+### 卸载 Operator
 
 卸载 Nginx Ingress 插件的 Operator（避免后面被 helm 安装覆盖后又被 Operator 覆盖回去）：
 
-```yaml
+```bash
 kubectl -n kube-system delete deploy tke-ingress-nginx-controller-operator
 ```
 
+### 准备 values.yaml
+
+主要需要保证 helm 新创建的 Nginx Ingress 实例和 TKE 插件创建 Nginx Ingress 实例共用一个 IngressClass，即让 Ingress 规则在两边同时生效。
+
+看下当前的 IngressClass 定义：
+
+```yaml
+$ kubectl get ingressclass extranet -o yaml
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  creationTimestamp: "2024-03-27T10:47:49Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/component: controller
+  name: extranet
+  resourceVersion: "27703380423"
+  uid: 5e2de0d1-8eae-4b55-afde-25c8fe37d478
+spec:
+  controller: k8s.io/extranet
+```
+
+拿到 controller 的值 `k8s.io/extranet`，和 IngressClass 名称一起，配到 `values.yaml` 中：
+
+```yaml
+controller:
+  ingressClassName: extranet # IngressClass 名称
+  ingressClassResource:
+    enabled: false # 不自动创建 IngressClass 资源，避免冲突
+    controllerValue: k8s.io/extranet # 新 Nginx Ingress 复用已有的 IngressClass
+```
+
+### 安装新的 Nginx Ingress Controller
+
+```bash
+helm upgrade --install new-extranet-ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace \
+  --version 4.9.0 \
+  -f values.yaml
+```
+
+* 避免 release 名称加上 `-controller`  后缀后与已有的 Nginx Ingress Deployment 名称相同，主要是会有同名的 ClusterRole 存在导致 helm 安装失败。
+* version 指定前面步骤得到的 chart 版本（当前 nginx ingress 实例版本对应的 chart 版本）。
+
+拿到新的 Nginx Ingress 的流量入口：
+
+```yaml
+$ kubectl -n ingress-nginx get svc
+NAME                                              TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)                      AGE
+new-extranet-ingress-nginx-controller             LoadBalancer   172.16.165.100   43.136.214.239   80:31507/TCP,443:31116/TCP   9m37s
+```
+
+`EXTERNAL-IP` 是新的流量入口，验证确认下能够正常转发。
+
+### 切换 DNS
+
+至此，新旧 Nginx Ingress 共存，不管走哪个流量入口都能正常转发。
+
+接下来修改域名的 DNS 解析，指向新 Nginx Ingress 流量入口，在 DNS 解析完全生效前，两边流量入口均能正常转发，不管走哪边都没问题，所以这个过程会非常平滑，生产环境的流量不受影响。
+
+最后等旧的 Nginx Ingress 实例完全没有流量的时候，再去 TKE 控制台删除 Nginx Ingress 实例，彻底完成迁移。
+
+## Ingress 用法
+
+Nginx Ingress 实现了 Kubernetes 的 Ingress API 定义的标准能力，Ingress 的基础用法可参考 [Kubernetes 官方文档](https://kubernetes.io/docs/concepts/services-networking/ingress/)。
+
+除此之外，Nginx Ingress 还有很多其它特有的功能，通过 Ingress 注解来扩展 Ingress 的功能，参考 [Nginx Ingress Annotations](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/) 。
