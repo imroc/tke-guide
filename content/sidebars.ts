@@ -11,22 +11,6 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: 'Serverless 集群与超级节点',
-      collapsed: true,
-      link: {
-        type: 'generated-index',
-        slug: '/serverless'
-      },
-      items: [
-        'serverless/precautions',
-        'serverless/why-tke-supernode-rocks',
-        'serverless/supernode-case-online',
-        'serverless/supernode-case-offline',
-        'serverless/large-image-solution',
-      ],
-    },
-    {
-      type: 'category',
       label: '网络指南',
       collapsed: true,
       link: {
@@ -160,6 +144,22 @@ const sidebars: SidebarsConfig = {
         'appendix/useful-kubectl-for-tencent-cloud',
         'appendix/eks-annotations',
         'appendix/ingress-error-code',
+        {
+          type: 'category',
+          label: 'Serverless 集群与超级节点',
+          collapsed: true,
+          link: {
+            type: 'generated-index',
+            slug: '/serverless'
+          },
+          items: [
+            'serverless/precautions',
+            'serverless/why-tke-supernode-rocks',
+            'serverless/supernode-case-online',
+            'serverless/supernode-case-offline',
+            'serverless/large-image-solution',
+          ],
+        },
       ],
     },
   ]
