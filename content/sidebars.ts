@@ -150,14 +150,14 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           link: {
             type: 'generated-index',
-            slug: '/serverless'
+            slug: '/appendix/serverless'
           },
           items: [
-            'serverless/precautions',
-            'serverless/why-tke-supernode-rocks',
-            'serverless/supernode-case-online',
-            'serverless/supernode-case-offline',
-            'serverless/large-image-solution',
+            'appendix/serverless/precautions',
+            'appendix/serverless/why-tke-supernode-rocks',
+            'appendix/serverless/supernode-case-online',
+            'appendix/serverless/supernode-case-offline',
+            'appendix/serverless/large-image-solution',
           ],
         },
       ],
