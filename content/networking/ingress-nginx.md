@@ -473,7 +473,7 @@ spec:
                   number: 80
 ```
 
-如果要安装多个 Nginx Ingress Controller 实例，需要在 `values.yaml` 指定下：
+如果要安装多个 Nginx Ingress Controller 实例，需要在 `values.yaml` 指定下 `ingressClassName` (注意不要冲突)：
 
 ```yaml
 controller:
