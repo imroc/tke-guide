@@ -488,10 +488,6 @@ helm upgrade --install prod ingress-nginx/ingress-nginx \
   -f values.yaml
 ```
 
-## values.yaml 完整配置示例
-
-<FileBlock file="nginx-ingress-values.yaml" showLineNumbers title="values.yaml" />
-
 ## 从 TKE Nginx Ingress 插件迁移到自建 Nginx Ingress
 
 迁移到自建 Nginx Ingress 有什么好处？Nginx Ingress 提供的功能和配置都是非常多和灵活，可以满足各种使用场景，自建可以解锁 Nginx Ingress 的全部功能，可以根据自己需求，对配置进行自定义，还能够及时更新版本。
@@ -593,8 +589,15 @@ new-extranet-ingress-nginx-controller             LoadBalancer   172.16.165.100 
 
 最后等旧的 Nginx Ingress 实例完全没有流量的时候，再去 TKE 控制台删除 Nginx Ingress 实例，彻底完成迁移。
 
-## Ingress 用法
+## 附录
+
+### Ingress 用法
 
 Nginx Ingress 实现了 Kubernetes 的 Ingress API 定义的标准能力，Ingress 的基础用法可参考 [Kubernetes 官方文档](https://kubernetes.io/docs/concepts/services-networking/ingress/)。
 
 除此之外，Nginx Ingress 还有很多其它特有的功能，通过 Ingress 注解来扩展 Ingress 的功能，参考 [Nginx Ingress Annotations](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/) 。
+
+### values.yaml 完整配置示例
+
+<FileBlock file="nginx-ingress-values.yaml" showLineNumbers title="values.yaml" />
+
