@@ -525,7 +525,7 @@ ingress-nginx/ingress-nginx     4.9.0           1.9.5           Ingress controll
 
 ### 卸载 Nginx Ingress 插件
 
-在 TKE 集群的【组件管理】删除掉 ingressnginx （避免后面被 helm 安装覆盖后又被 Operator 覆盖回去）:
+在 TKE 集群的【组件管理】删除掉 ingressnginx （避免后面被 helm 安装覆盖后又被插件覆盖回去）:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F28%2F20240328104308.png)
 
