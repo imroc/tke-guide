@@ -51,17 +51,15 @@ systemctl restart kubelet
 安装好 ansible 之后，按照以下步骤操作:
 
 1. 导出所有节点 IP 到 `hosts.ini`:
-
-```bash
-kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}' | tr ' ' '\n' | grep -vE '^169\.254\.*' > hosts.ini
-```
+    ```bash
+    kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}' | tr ' ' '\n' | grep -vE '^169\.254\.*' > hosts.ini
+    ```
 
 2. 准备脚本 `modify-kubelet.sh`:
-
-```bash
-sed -i 's/CLUSTER_DNS.*/CLUSTER_DNS="--cluster-dns=169.254.20.10"/' /etc/kubernetes/kubelet
-systemctl restart kubelet
-```
+    ```bash
+    sed -i 's/CLUSTER_DNS.*/CLUSTER_DNS="--cluster-dns=169.254.20.10"/' /etc/kubernetes/kubelet
+    systemctl restart kubelet
+    ```
 
 3. 准备可以用于节点登录的 ssh 秘钥或密码 (秘钥改名为 key，并执行 `chmod 0600 key`)
 4. 使用 ansible 在所有节点上运行脚本 `modify-kubelet.sh`:
