@@ -523,12 +523,6 @@ ingress-nginx/ingress-nginx     4.9.0           1.9.5           Ingress controll
 
 这里看到是 `4.9.0`，记住这个版本，后面用 helm 安装新版渲染时需要指定这个 chart 版本。
 
-### 卸载 Nginx Ingress 插件
-
-在 TKE 集群的【组件管理】删除掉 ingressnginx （避免后面被 helm 安装覆盖后又被插件覆盖回去）:
-
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F28%2F20240328104308.png)
-
 ### 准备 values.yaml
 
 主要需要保证 helm 新创建的 Nginx Ingress 实例和 TKE 插件创建 Nginx Ingress 实例共用一个 IngressClass，即让 Ingress 规则在两边同时生效。
@@ -589,7 +583,15 @@ new-extranet-ingress-nginx-controller             LoadBalancer   172.16.165.100 
 
 接下来修改域名的 DNS 解析，指向新 Nginx Ingress 流量入口，在 DNS 解析完全生效前，两边流量入口均能正常转发，不管走哪边都没问题，所以这个过程会非常平滑，生产环境的流量不受影响。
 
-最后等旧的 Nginx Ingress 实例完全没有流量的时候，再去 TKE 控制台删除 Nginx Ingress 实例，彻底完成迁移。
+### 卸载插件
+
+最后等旧的 Nginx Ingress 实例完全没有流量的时候，再去 TKE 控制台先删除 Nginx Ingress 实例：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F28%2F20240328105512.png)
+
+再去【组件管理】里删除 Nginx Ingress 插件:
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F28%2F20240328104308.png)
 
 ## 附录
 
