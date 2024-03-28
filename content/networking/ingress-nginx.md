@@ -100,6 +100,8 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
 
 ## 自定义负载均衡器(CLB)
 
+### 使用内网 CLB
+
 默认安装会自动创建出一个公网 CLB 来接入流量，你可以利用 Service 注解对 Nginx Ingress Controller 的 CLB 进行自定义，比如改成内网 CLB，在 `values.yaml` 中这样定义:
 
 ```yaml
@@ -108,6 +110,8 @@ controller:
     annotations:
       service.kubernetes.io/qcloud-loadbalancer-internal-subnetid: 'subnet-xxxxxx' # 内网 CLB 需指定 CLB 实例所在的子网 ID
 ```
+
+### 使用已有 CLB
 
 你也可以直接在 [CLB 控制台](https://console.cloud.tencent.com/clb/instance) 根据自身需求创建一个 CLB （比如自定义实例规格、运营商类型、计费模式、带宽上限等），然后在 `values.yaml` 中用注解复用这个 CLB:
 
@@ -451,6 +455,8 @@ controller:
 
 ## IngressClass 与多实例 NginxIngress
 
+### Ingress 指定 ingressClassName
+
 如果没有显式配置，安装的 NginxIngress 的 IngressClass 名称为 `nginx`，在创建 Ingress 资源时需要指定 `ingressClassName` 为 `nginx` 才会生效：
 
 ```yaml showLineNumbers
@@ -472,6 +478,8 @@ spec:
                 port:
                   number: 80
 ```
+
+### 多实例 NginxIngress
 
 如果要安装多个 Nginx Ingress Controller 实例，需要在 `values.yaml` 指定下 `ingressClassName` (注意不要冲突)：
 
