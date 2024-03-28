@@ -83,7 +83,7 @@ systemctl restart kubelet
 
 ## 关于 NodeLocalDNS 版本
 
-本项目所使用的 NodeLocalDNS addon 的 YAML 是 Kubernetes [官方提供的 YAML](https://raw.githubusercontent.com/kubernetes/kubernetes/master/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml) 自动替换生成的，实时保持最新版本。
+安装方法中使用的开源项目所使用的 NodeLocalDNS addon 的 YAML 是 Kubernetes [官方提供的 YAML](https://raw.githubusercontent.com/kubernetes/kubernetes/master/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml) 自动替换生成的，实时保持最新版本。
 
 > 官方的依赖镜像 `registry.k8s.io/dns/k8s-dns-node-cache` 在国内无法拉取，已替换为 DockerHub 上的 mirror 镜像 [k8smirror/k8s-dns-node-cache](https://hub.docker.com/repository/docker/k8smirror/k8s-dns-node-cache)，会周期性的自动同步最新的 tag，可放心使用。
 
