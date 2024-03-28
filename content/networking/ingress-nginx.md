@@ -599,7 +599,7 @@ new-extranet-ingress-nginx-controller             LoadBalancer   172.16.165.100 
 
 Nginx Ingress 实现了 Kubernetes 的 Ingress API 定义的标准能力，Ingress 的基础用法可参考 [Kubernetes 官方文档](https://kubernetes.io/docs/concepts/services-networking/ingress/)。
 
-比较关键点的点在于一定要指定 `ingressClassName` 为 Nginx Ingress 实例所使用的 IngressClass（默认为 `nginx`），参考 [IngressClass 与多实例 NginxIngress](#ingressclass-与多实例-nginxingress)
+比较关键点的点在于一定要指定 `ingressClassName` 为 Nginx Ingress 实例所使用的 IngressClass（默认为 `nginx`），参考 [IngressClass 与多实例 NginxIngress](#ingressclass-与多实例-nginxingress)。
 
 除此之外，Nginx Ingress 还有很多其它特有的功能，通过 Ingress 注解来扩展 Ingress 的功能，参考 [Nginx Ingress Annotations](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/) 。
 
