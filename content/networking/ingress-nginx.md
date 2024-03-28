@@ -259,7 +259,7 @@ controller:
       image: imroc/logrotate:latest # https://github.com/imroc/docker-logrotate
       imagePullPolicy: IfNotPresent
       env:
-        - name: LOGROTATE_FILE_PATTERN # 轮转的日志文件pattern，与 nginx 配置的日志文件路径相匹配
+        - name: LOGROTATE_FILE_PATTERN # 轮转的日志文件 pattern，与 nginx 配置的日志文件路径相匹配
           value: "/var/log/nginx/nginx_*.log"
         - name: LOGROTATE_FILESIZE # 日志文件超过多大后轮转
           value: "100M"
