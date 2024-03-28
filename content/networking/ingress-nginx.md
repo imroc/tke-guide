@@ -2,7 +2,7 @@
 
 ## 概述
 
-[Nginx Ingress Controller](https://github.com/kubernetes/ingress-nginx) 是基于高性能 NGINX 反向代理实现的 Kubernetes Ingress 控制器，也是最常用的开源 Ingress 实现。本文介绍如何在 TKE 环境中自建 Nginx Ingress Controller，主要使用 helm 进行安装，提供一些 `values.yaml` 配置指引，可根据自己需求合并下配置，文末也会提供合并后的 `values.yaml` 完整配置示例。
+[Nginx Ingress Controller](https://github.com/kubernetes/ingress-nginx) 是基于高性能 NGINX 反向代理实现的 Kubernetes Ingress 控制器，也是最常用的开源 Ingress 实现。本文介绍如何在 TKE 环境中自建 Nginx Ingress Controller，主要使用 helm 进行安装，提供一些 `values.yaml` 配置指引，可根据自己需求合并下配置，文末附录中也提供了合并后的 `values.yaml` 完整配置示例。
 
 ## 前提条件
 
@@ -124,7 +124,7 @@ controller:
 
 ## 启用 CLB 直连
 
-CLB --> Nginx Ingress 这段链路可以直连（不走 NodePort），带来更好的性能，也可以实现获取真实源 IP 的需求。
+流量从 CLB 转发到 Nginx Ingress 这段链路可以直连（不走 NodePort），带来更好的性能，也可以实现获取真实源 IP 的需求。
 
 如果你使用的 TKE Serverless 集群或者能确保所有 Nginx Ingress Pod 调度到超级节点，这时本身就是直连的，不需要做什么。
 
@@ -606,4 +606,3 @@ Nginx Ingress 实现了 Kubernetes 的 Ingress API 定义的标准能力，Ingre
 ### values.yaml 完整配置示例
 
 <FileBlock file="nginx-ingress-values.yaml" showLineNumbers title="values.yaml" />
-
