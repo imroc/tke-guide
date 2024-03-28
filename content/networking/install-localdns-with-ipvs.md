@@ -2,7 +2,7 @@
 
 ## 背景
 
-TKE 对 NodeLocalDNS 进行了产品化支持，直接在扩展组件里面就可以一键安装到集群，参考 [NodeLocalDNSCache 扩展组件说明](https://cloud.tencent.com/document/product/457/49423) ，但是有一种情况不支持：集群网络是 GlobalRouter 且 kube-proxy 转发模式 IPVS。
+TKE 对 [NodeLocalDNS](https://kubernetes.io/docs/tasks/administer-cluster/nodelocaldns/) 进行了产品化支持，直接在扩展组件里面就可以一键安装到集群，参考 [NodeLocalDNSCache 扩展组件说明](https://cloud.tencent.com/document/product/457/49423) ，但是有一种情况不支持：集群网络是 GlobalRouter 且 kube-proxy 转发模式 IPVS。
 
 本文介绍如何为 GlobalRouter + IPVS 的 TKE 集群安装 NodeLocalDNS。
 
@@ -86,7 +86,3 @@ systemctl restart kubelet
 安装方法中使用的开源项目所使用的 NodeLocalDNS addon 的 YAML 是 Kubernetes [官方提供的 YAML](https://raw.githubusercontent.com/kubernetes/kubernetes/master/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml) 自动替换生成的，实时保持最新版本。
 
 > 官方的依赖镜像 `registry.k8s.io/dns/k8s-dns-node-cache` 在国内无法拉取，已替换为 DockerHub 上的 mirror 镜像 [k8smirror/k8s-dns-node-cache](https://hub.docker.com/repository/docker/k8smirror/k8s-dns-node-cache)，会周期性的自动同步最新的 tag，可放心使用。
-
-## 参考资料
-
-* [Using NodeLocal DNSCache in Kubernetes clusters](https://kubernetes.io/docs/tasks/administer-cluster/nodelocaldns/)
