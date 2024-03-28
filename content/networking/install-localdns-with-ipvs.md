@@ -40,7 +40,7 @@ systemctl restart kubelet
 
 新建节点或节点池里指定节点初始化后的【自定义脚本】，这样就可以让节点初始化后自动执行脚本来配置 kubelet 参数：
 
-![](./img/custom-script.png)
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F28%2F20240328180309.png)
 
 > 已有的节点池也可以通过修改节点池配置来指定自定义脚本。
 
