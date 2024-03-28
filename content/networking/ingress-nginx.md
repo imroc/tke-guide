@@ -590,7 +590,7 @@ new-extranet-ingress-nginx-controller             LoadBalancer   172.16.165.100 
 
 接下来修改域名的 DNS 解析，指向新 Nginx Ingress 流量入口，在 DNS 解析完全生效前，两边流量入口均能正常转发，不管走哪边都没问题，所以这个过程会非常平滑，生产环境的流量不受影响。
 
-### 卸载插件
+### 删除旧 NginxIngress 实例和插件
 
 最后等所有旧的 Nginx Ingress 实例完全没有流量的时候，再去 TKE 控制台先删除 Nginx Ingress 实例：
 
