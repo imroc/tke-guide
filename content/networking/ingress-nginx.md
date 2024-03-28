@@ -494,11 +494,17 @@ helm upgrade --install prod ingress-nginx/ingress-nginx \
 
 ## 从 TKE Nginx Ingress 插件迁移到自建 Nginx Ingress
 
+### 迁移的好处
+
 迁移到自建 Nginx Ingress 有什么好处？Nginx Ingress 提供的功能和配置都是非常多和灵活，可以满足各种使用场景，自建可以解锁 Nginx Ingress 的全部功能，可以根据自己需求，对配置进行自定义，还能够及时更新版本。
+
+### 迁移思路
+
+用本文中自建的方法创建一套新的 NginxIngress 实例，与旧的实例共享同一个 IngressClass，也就会共享相同的 Ingress 转发规则，两套流量入口共存，最后修改 DNS 指向新的入口地址完成平滑迁移。
 
 ### 确认已安装的 Nginx Ingress 相关信息
 
-确认已安装的 Nginx Ingress 实例的 IngressClass 名称，比如：
+1. 先确认已安装的 Nginx Ingress 实例的 IngressClass 名称，比如：
 
 ```bash
 $ kubectl get deploy -A | grep nginx
@@ -507,7 +513,7 @@ kube-system            extranet-ingress-nginx-controller           1/1     1    
 
 本例子中只有一个实例，Deployment 名称是 `extranet-ingress-nginx-controller`，IngressClass 是 `-ingress-nginx-controller` 之前的部分，这里是 `extranet`。
 
-另外再检查下当前使用的 nginx ingress 的镜像版本：
+2. 然后确认下当前使用的 nginx ingress 的镜像版本：
 
 ```yaml
 $ kubectl -n kube-system get deploy extranet-ingress-nginx-controller -o yaml | grep image:
@@ -529,7 +535,7 @@ ingress-nginx/ingress-nginx     4.9.0           1.9.5           Ingress controll
 
 看下当前的 IngressClass 定义：
 
-```yaml
+```bash
 $ kubectl get ingressclass extranet -o yaml
 apiVersion: networking.k8s.io/v1
 kind: IngressClass
@@ -542,6 +548,7 @@ metadata:
   resourceVersion: "27703380423"
   uid: 5e2de0d1-8eae-4b55-afde-25c8fe37d478
 spec:
+  # highlight-next-line
   controller: k8s.io/extranet
 ```
 
