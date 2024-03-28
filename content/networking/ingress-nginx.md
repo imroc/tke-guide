@@ -589,7 +589,7 @@ new-extranet-ingress-nginx-controller             LoadBalancer   172.16.165.100 
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F28%2F20240328105512.png)
 
-再去【组件管理】里删除 Nginx Ingress 插件:
+再去【组件管理】里删除 ingressnginx 彻底完成迁移:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F28%2F20240328104308.png)
 
