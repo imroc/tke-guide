@@ -364,7 +364,7 @@ controller:
       memory: 1Gi
 ```
 
-如果是用的超级节点，只需要定义下 requests，即声明每个 Pod 的虚拟机规格：
+如果是用的超级节点或 Serverless 集群，只需要定义下 requests，即声明每个 Pod 的虚拟机规格：
 
 ```yaml
 controller:
