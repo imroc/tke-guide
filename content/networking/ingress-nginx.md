@@ -523,13 +523,11 @@ ingress-nginx/ingress-nginx     4.9.0           1.9.5           Ingress controll
 
 这里看到是 `4.9.0`，记住这个版本，后面用 helm 安装新版渲染时需要指定这个 chart 版本。
 
-### 卸载 Operator
+### 卸载 Nginx Ingress 插件
 
-卸载 Nginx Ingress 插件的 Operator（避免后面被 helm 安装覆盖后又被 Operator 覆盖回去）：
+在 TKE 集群的【组件管理】删除掉 ingressnginx （避免后面被 helm 安装覆盖后又被 Operator 覆盖回去）:
 
-```bash
-kubectl -n kube-system delete deploy tke-ingress-nginx-controller-operator
-```
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F28%2F20240328104308.png)
 
 ### 准备 values.yaml
 
