@@ -21,6 +21,12 @@ cd nodelocaldns
 make
 ```
 
+原理：
+1. 自动获取 kubernetes nodelocaldns 插件最新 yaml 模板和当前集群 `kube-dns` 的 `ClusterIP` 并填充模板生成最终的 `nodelocaldns.yaml` 在当前目录。
+2. 自动将生成的 `nodelocaldns.yaml` 部署到当前集群。
+
+> 如果你使用 GitOps 方式部署应用，可只执行 `make yaml` 来生成 `nodelocaldns.yaml`，然后将该 yaml 文件放入 GitOps 使用的仓库中。
+
 ## 修改 kubelet 参数
 
 如果要让 DNS 缓存组件生效，还需要配置节点上的 kubelet 参数：`--cluster-dns=169.254.20.10`。
