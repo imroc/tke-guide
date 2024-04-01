@@ -1,4 +1,4 @@
-# 安装多个 NginxIngress
+# 安装多个 Nginx Ingress Controller
 
 如果要安装多个 Nginx Ingress Controller 实例，需要在 `values.yaml` 指定下 `ingressClassName` (注意不要冲突)：
 
