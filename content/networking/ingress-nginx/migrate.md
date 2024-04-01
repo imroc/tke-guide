@@ -8,6 +8,8 @@
 
 用本文中自建的方法创建一套新的 NginxIngress 实例，与旧的实例共享同一个 IngressClass，也就会共享相同的 Ingress 转发规则，两套流量入口共存，最后修改 DNS 指向新的入口地址完成平滑迁移。
 
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F01%2F20240401143927.png)
+
 ## 确认已安装的 Nginx Ingress 相关信息
 
 1. 先确认已安装的 Nginx Ingress 实例的 IngressClass 名称，比如：
