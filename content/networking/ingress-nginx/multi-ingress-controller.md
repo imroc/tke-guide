@@ -4,7 +4,7 @@
 
 如果你需要部署多个 Nginx Ingress Controller，即希望不同的 Ingress 规则可能使用不同的流量入口：
 
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F01%2F20240401141614.png)
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F01%2F20240401142429.png)
 
 你可以为集群部署多个 Nginx Ingress Controler，不同的 Ingress 指定不同的 `ingressClassName` 来实现。
 

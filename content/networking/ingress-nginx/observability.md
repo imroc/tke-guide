@@ -1,5 +1,9 @@
 # 可观测性集成
 
+## 概述
+
+本文介绍如何配置 Nginx Ingress 来集成监控和日志系统来提升可观测性，包括与腾讯云上托管的 Prometheus、Grafana 和 CLS 这些产品的集成，也包括与自建的 Prometheus 和 Grafana 的集成。
+
 ## 集成 Prometheus 监控
 
 如果你使用了 [腾讯云 Prometheus 监控服务关联 TKE 集群](https://cloud.tencent.com/document/product/1416/72037)，或者是自己安装了 Prometheus Operator 来监控集群，都可以启用 ServiceMonitor 来采集 Nginx Ingress 的监控数据，只需在 `values.yaml` 中打开这个开关即可：
