@@ -1,0 +1,15 @@
+{
+  "80": {
+    "protocol": [
+      "HTTPS"
+    ],
+    "hosts": {
+      "a.tencent.com": {
+        "tls": "cert-secret-a"
+      },
+      "b.tencent.com": {
+        "tls": "cert-secret-b"
+      }
+    }
+  }
+}

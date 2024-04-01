@@ -33,6 +33,7 @@ const sidebars: SidebarsConfig = {
             'networking/ingress-nginx/high-concurrency',
             'networking/ingress-nginx/high-availability',
             'networking/ingress-nginx/observability',
+            'networking/ingress-nginx/waf',
             'networking/ingress-nginx/multi-ingress-controller',
             'networking/ingress-nginx/migrate',
             'networking/ingress-nginx/values-demo',
