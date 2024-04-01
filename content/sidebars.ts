@@ -18,7 +18,26 @@ const sidebars: SidebarsConfig = {
         slug: '/networking'
       },
       items: [
-        'networking/ingress-nginx',
+        {
+          type: 'category',
+          label: '在 TKE 自建 Nginx Ingress Controller',
+          collapsed: true,
+          link: {
+            type: 'generated-index',
+            slug: '/networking/ingress-nginx'
+          },
+          items: [
+            'networking/ingress-nginx/quick-start',
+            'networking/ingress-nginx/clb',
+            'networking/ingress-nginx/clb-direct-access',
+            'networking/ingress-nginx/high-concurrency',
+            'networking/ingress-nginx/high-availability',
+            'networking/ingress-nginx/observability',
+            'networking/ingress-nginx/multi-ingress-controller',
+            'networking/ingress-nginx/migrate',
+            'networking/ingress-nginx/values-demo',
+          ],
+        },
         'networking/clb-to-pod-directly',
         'networking/how-to-use-eip',
         'networking/install-localdns-with-ipvs',
