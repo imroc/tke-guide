@@ -8,7 +8,7 @@
 
 本文主要介绍将 Nginx Ingress 所使用的 CLB 监听器改为七层监听器：
 
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F01%2F20240401121042.png)
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F01%2F20240401154831.png)
 
 ## 使用 specify-protocol 注解
 

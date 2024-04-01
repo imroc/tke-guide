@@ -128,4 +128,4 @@ spec:
 
 ## 更多自定义
 
-如果需要对 Nginx Ingress 进行更多的自定义，可参考接下来的几篇指引文档，可根据自己需求合并下 `values.yaml` 配置，最后一篇也提供了合并后的 `values.yaml` 完整配置示例。
+如果需要对 Nginx Ingress 进行更多的自定义，可参考接下来的几篇指引文档，根据自己需求合并下 `values.yaml` 配置，最后一篇也提供了合并后的 `values.yaml` 完整配置示例。
