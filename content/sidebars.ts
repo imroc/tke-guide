@@ -61,6 +61,29 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: '弹性伸缩',
+      collapsed: true,
+      link: {
+        type: 'generated-index',
+        slug: '/autoscaling'
+      },
+      items: [
+        {
+          type: 'category',
+          label: '使用 KEDA 实现事件驱动的弹性伸缩最佳实践',
+          collapsed: true,
+          link: {
+            type: 'generated-index',
+            slug: '/autoscaling/keda'
+          },
+          items: [
+            'autoscaling/keda/install'
+          ]
+        }
+      ],
+    },
+    {
+      type: 'category',
       label: '监控告警',
       collapsed: true,
       link: {
