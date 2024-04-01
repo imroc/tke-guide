@@ -29,7 +29,7 @@ Nginx Ingress 依赖的镜像在 `registry.k8s.io` 这个 registry 下，国内�
 准备 `values.yaml`:
 
 ```yaml
-controller: # 默认的镜像在境内无法拉取，可替换为 docker hub 上的 mirror 镜像
+controller: # 以下配置将依赖镜像替换为了 docker hub 上的 mirror 镜像以保证在国内环境能正常拉取
   image:
     registry: docker.io
     image: k8smirror/ingress-nginx-controller

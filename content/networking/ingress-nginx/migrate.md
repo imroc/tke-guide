@@ -84,7 +84,7 @@ helm upgrade --install new-extranet-ingress-nginx ingress-nginx/ingress-nginx \
 
 拿到新的 Nginx Ingress 的流量入口：
 
-```yaml
+```bash
 $ kubectl -n ingress-nginx get svc
 NAME                                              TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)                      AGE
 new-extranet-ingress-nginx-controller             LoadBalancer   172.16.165.100   43.136.214.239   80:31507/TCP,443:31116/TCP   9m37s
