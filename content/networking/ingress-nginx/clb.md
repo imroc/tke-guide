@@ -1,8 +1,12 @@
 # 自定义负载均衡器(CLB)
 
+## 概述
+
+默认安装会自动创建出一个公网 CLB 来接入流量，但你也可以利用 TKE 的 Service 注解对 Nginx Ingress Controller 的 CLB 进行自定义，本文介绍自定义的方法。
+
 ## 使用内网 CLB
 
-默认安装会自动创建出一个公网 CLB 来接入流量，你可以利用 Service 注解对 Nginx Ingress Controller 的 CLB 进行自定义，比如改成内网 CLB，在 `values.yaml` 中这样定义:
+，比如改成内网 CLB，在 `values.yaml` 中这样定义:
 
 ```yaml
 controller:
@@ -25,5 +29,3 @@ controller:
 > 参考文档 [Service 使用已有 CLB](https://cloud.tencent.com/document/product/457/45491)。
 >
 > **注意:** 在 CLB 控制台创建 CLB 实例时，选择的 VPC 需与集群一致。
-
-

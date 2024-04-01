@@ -1,5 +1,7 @@
 # 启用 CLB 直连
 
+## 概述
+
 流量从 CLB 转发到 Nginx Ingress 这段链路可以直连（不走 NodePort），带来更好的性能，也可以实现获取真实源 IP 的需求。
 
 如果你使用的 TKE Serverless 集群或者能确保所有 Nginx Ingress Pod 调度到超级节点，这时本身就是直连的，不需要做什么。

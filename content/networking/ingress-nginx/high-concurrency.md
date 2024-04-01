@@ -1,5 +1,9 @@
 # 高并发场景优化
 
+## 概述
+
+本文介绍如何针对高并发场景对 Nginx Ingress 进行配置调优。
+
 ## 调大 CLB 规格和带宽
 
 高并发场景的流量吞吐需求较高，对 CLB 的转发性能要求也较高，可以在 [CLB 控制台](https://console.cloud.tencent.com/clb/instance) 手动创建一个 CLB，实例规格选择性能容量型，型号根据自己需求来选，另外也将带宽上限调高（注意 VPC 要与 TKE 集群一致）。
