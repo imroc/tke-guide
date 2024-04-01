@@ -6,7 +6,7 @@
 
 ## 使用内网 CLB
 
-，比如改成内网 CLB，在 `values.yaml` 中这样定义:
+比如改成内网 CLB，在 `values.yaml` 中这样定义:
 
 ```yaml
 controller:
