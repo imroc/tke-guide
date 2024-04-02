@@ -70,7 +70,7 @@ const sidebars: SidebarsConfig = {
       items: [
         {
           type: 'category',
-          label: '使用 KEDA 实现事件驱动的弹性伸缩最佳实践',
+          label: '基于 KEDA 的高级弹性伸缩最佳实践',
           collapsed: true,
           link: {
             type: 'generated-index',
