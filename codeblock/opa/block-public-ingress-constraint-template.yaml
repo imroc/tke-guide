@@ -30,19 +30,19 @@ spec:
           ingress.spec.ingressClassName == "qcloud"
         }
         is_qcloud_ingress(ingress) = true {
-          not ingress.annotations["kubernetes.io/ingress.class"]
+          not ingress.metadata.annotations["kubernetes.io/ingress.class"]
         }
         is_qcloud_ingress(ingress) = true {
-          ingress.annotations["kubernetes.io/ingress.class"] == ""
+          ingress.metadata.annotations["kubernetes.io/ingress.class"] == ""
         }
         is_public_ingress(ingress) = true {
-          not ingress.annotations["kubernetes.io/ingress.subnetId"]
+          not ingress.metadata.annotations["kubernetes.io/ingress.subnetId"]
         }
         is_public_ingress(ingress) = true {
-          ingress.annotations["kubernetes.io/ingress.subnetId"] == ""
+          ingress.metadata.annotations["kubernetes.io/ingress.subnetId"] == ""
         }
         is_qcloud_ingress(ingress) = true {
-          ingress.annotations["kubernetes.io/ingress.class"] == "qcloud"
+          ingress.metadata.annotations["kubernetes.io/ingress.class"] == "qcloud"
         }
         is_tke_user(userinfo) = true {
           userinfo.groups[_] == "tke:users"
