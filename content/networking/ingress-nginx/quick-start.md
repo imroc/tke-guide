@@ -58,7 +58,7 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   -f values.yaml
 ```
 
-> 后续如果需要修改 values 配置，或者升级版本，都可以通过执行用个命令来更新 Nginx Ingress Controller。
+> 后续如果需要修改 values 配置，或者升级版本，都可以通过执行这个命令来更新 Nginx Ingress Controller。
 
 查看流量入口(CLB VIP 或域名)：
 
