@@ -75,7 +75,7 @@ ingress-nginx-controller-admission   ClusterIP      172.16.166.237   <none>     
 
 Nginx Ingress 的版本需要与 Kubernetes 集群版本能够兼容，可参考官方 [Supported Versions table](https://github.com/kubernetes/ingress-nginx?tab=readme-ov-file#supported-versions-table) 确认下当前集群版本能否支持最新的 nginx ingress，如果不支持，安装的时候指定下 chart 版本。
 
-比如当前的 TKE 集群版本是 1.24，chart 版本最高只能到 `4.7.*`，检查下有哪些可用版本：
+比如当前的 TKE 集群版本是 1.24，chart 版本最高只能到 `4.7.*`，通过以下命令检查有哪些可用版本：
 
 ```bash
 $ helm search repo ingress-nginx/ingress-nginx --versions | grep 4.7.
@@ -86,7 +86,7 @@ ingress-nginx/ingress-nginx     4.7.1           1.8.1           Ingress controll
 ingress-nginx/ingress-nginx     4.7.0           1.8.0           Ingress controller for Kubernetes using NGINX a...
 ```
 
-可以看到 `4.7.*` 版本最高是 `4.7.5`，安装的时候我们加上版本号：
+可以看到 `4.7.*` 版本最高是 `4.7.5`，安装的时候加上版本号：
 
 ```bash
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
@@ -96,13 +96,13 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   -f values.yaml
 ```
 
-**注意：** TKE 集群升级前，先检查下当前 Nginx Ingress 版本能否兼容升级后的集群版本，如果不能兼容，先升级下 Nginx Ingress（用上面的命令指定 chart 版本号）。
+**注意：** TKE 集群升级前，先检查当前 Nginx Ingress 版本能否兼容升级后的集群版本，如果不能兼容，先升级 Nginx Ingress（用上面的命令指定 chart 版本号）。
 
 ## 使用 Ingress
 
 Nginx Ingress 实现了 Kubernetes 的 Ingress API 定义的标准能力，Ingress 的基础用法可参考 [Kubernetes 官方文档](https://kubernetes.io/docs/concepts/services-networking/ingress/)。
 
-比较关键点的点在于一定要指定 `ingressClassName` 为 Nginx Ingress 实例所使用的 IngressClass（默认为 `nginx`）:
+创建 Ingress 时必须指定 `ingressClassName` 为 Nginx Ingress 实例所使用的 IngressClass（默认为 `nginx`）:
 
 ```yaml showLineNumbers
 apiVersion: networking.k8s.io/v1
