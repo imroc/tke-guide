@@ -6,11 +6,11 @@
 
 <Tabs>
   <TabItem value="template" label="ConstraintTemplate">
-    <FileBlock file="opa/block-public-ingress-constraint-template.yaml" showLineNumbers />
+    <FileBlock file="opa/block-public-ingress-constraint-template.yaml" showLineNumbers title="constraint-template.yaml"/>
   </TabItem>
   <TabItem value="constraint" label="Constraint">
     **注意修改高亮部分**
-    <FileBlock file="opa/block-public-ingress-constraint.yaml" showLineNumbers />
+    <FileBlock file="opa/block-public-ingress-constraint.yaml" showLineNumbers title="constraint.yaml" />
   </TabItem>
 </Tabs>
 
