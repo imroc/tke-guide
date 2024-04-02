@@ -84,6 +84,19 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'OPA 策略管理',
+      collapsed: true,
+      link: {
+        type: 'generated-index',
+        slug: '/opa'
+      },
+      items: [
+        'opa/install',
+        'opa/block-public-ingress',
+      ],
+    },
+    {
+      type: 'category',
       label: '监控告警',
       collapsed: true,
       link: {

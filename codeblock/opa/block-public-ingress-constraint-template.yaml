@@ -1,0 +1,71 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: blockpublicingress
+spec:
+  crd:
+    spec:
+      names:
+        kind: BlockPublicIngress
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            allowedUins:
+              type: array
+              items:
+                type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package blockpublicingress
+
+        is_qcloud_ingress(ingress) = true {
+          not ingress.spec.ingressClassName
+        }
+        is_qcloud_ingress(ingress) = true {
+          ingress.spec.ingressClassName == ""
+        }
+        is_qcloud_ingress(ingress) = true {
+          ingress.spec.ingressClassName == "qcloud"
+        }
+        is_qcloud_ingress(ingress) = true {
+          not ingress.annotations["kubernetes.io/ingress.class"]
+        }
+        is_qcloud_ingress(ingress) = true {
+          ingress.annotations["kubernetes.io/ingress.class"] == ""
+        }
+        is_public_ingress(ingress) = true {
+          not ingress.annotations["kubernetes.io/ingress.subnetId"]
+        }
+        is_public_ingress(ingress) = true {
+          ingress.annotations["kubernetes.io/ingress.subnetId"] == ""
+        }
+        is_qcloud_ingress(ingress) = true {
+          ingress.annotations["kubernetes.io/ingress.class"] == "qcloud"
+        }
+        is_tke_user(userinfo) = true {
+          userinfo.groups[_] == "tke:users"
+          regex.match("^\\d+-\\d+$", userinfo.username)
+        }
+        get_uin(userinfo) = uin {
+          split(userinfo.username, "-", parts)
+          uin := parts[0]
+        }
+        is_uin_allowed(uin, allowed_uins) {
+          allowed_uins[_] == uin
+        }
+
+        violation[{"msg": msg}] {
+          input.review.kind.kind == "Ingress"
+          regex.match("^(extensions|networking.k8s.io)$", input.review.kind.group)
+          regex.match("^(CREATE|UPDATE)$", input.review.operation)
+          ingress := input.review.object
+          is_qcloud_ingress(ingress)
+          is_public_ingress(ingress)
+          userinfo := input.review.userInfo
+          is_tke_user(userinfo)
+          uin := get_uin(userinfo)
+          not is_uin_allowed(uin, input.parameters.allowedUins)
+          msg := sprintf("User '%v' is not allowed to create Ingress resources", [uin])
+        }

@@ -1,0 +1,13 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: BlockPublicIngress
+metadata:
+  name: block-public-ingress
+spec:
+  match:
+    kinds:
+      - apiGroups: ["networking.k8s.io", "extensions"]
+        kinds: ["Ingress"]
+  parameters:
+    # highlight-next-line
+    allowedUins: ["100000000001", "100000000002"] # 只允许该列表里的账号（UIN） 创建公网 Ingress
+
