@@ -77,7 +77,9 @@ const sidebars: SidebarsConfig = {
             slug: '/autoscaling/keda'
           },
           items: [
-            'autoscaling/keda/install'
+            'autoscaling/keda/overview',
+            'autoscaling/keda/install',
+            'autoscaling/keda/cron',
           ]
         }
       ],
