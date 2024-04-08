@@ -39,6 +39,7 @@ const sidebars: SidebarsConfig = {
             'networking/ingress-nginx/values-demo',
           ],
         },
+        'networking/traffic-lossless-upgrade',
         'networking/clb-to-pod-directly',
         'networking/how-to-use-eip',
         'networking/install-localdns-with-ipvs',
