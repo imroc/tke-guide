@@ -1,4 +1,4 @@
-# 概述
+# 认识 KEDA
 
 ## 什么是 KEDA ？
 
@@ -14,12 +14,14 @@ KEDA 的出现主要是为了解决 HPA 无法基于灵活的事件源进行伸�
 
 ## KEDA 的原理
 
-KEDA 并不是要替代 HPA，而是作为 HPA 的补充或者增强，事实上很多时候 KEDA 是配合 HPA 一起工作的，这是 KEDA 的架构：
+KEDA 并不是要替代 HPA，而是作为 HPA 的补充或者增强，事实上很多时候 KEDA 是配合 HPA 一起工作的，这是 KEDA 官方的架构图：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F07%2F20240407153149.png)
 
-对于可扩缩容的工作负载：
+* 当要将工作负载的副本数缩到闲时副本数，或从闲时副本数扩容时，由 KEDA 通过修改工作负载的副本数实现（闲时副本数小于 `minReplicaCount`，包括 0，即可以缩到 0）。
+* 其它情况下的扩缩容由 HPA 实现，HPA 由 KEDA 自动管理，HPA 使用 External Metrics 作为数据源，而 External Metrics 后端的数据由 KEDA 提供。
+* KEDA 各种 Scalers 的核心其实就是为 HPA 暴露 External Metrics 格式的数据，KEDA 会将各种外部事件转换为所需的 External Metrics 数据，最终实现 HPA 通过 External Metrics 数据进行自动伸缩，直接复用了 HPA 已有的能力，所以如果还想要控制扩缩容的行为细节（比如快速扩容，缓慢缩容），可以直接通过配置 HPA 的 `behavior` 字段来实现 (要求 Kubernetes 版本 >= 1.18)。
 
-* 当要将工作负载的副本数缩到闲时副本数，或从闲时副本数扩容时，由 KEDA 的组件 `keda-operator` 通过修改工作负载的副本数实现（闲时副本数小于 `minReplicaCount`，包括 0，即可以缩到 0）。
-* 其它情况下的扩缩容由 HPA 实现，HPA 由 KEDA 自动管理，HPA 使用 External Metrics 作为数据源，而 External Metrics 后端的数据由 KEDA 的组件 `keda-operator-metrics-apiserver` 提供。
-* 核心其实就是 `keda-operator-metrics-apiserver` 为 HPA 暴露 External Metrics 格式的数据，数据是由 `keda-operator-metrics-apiserver` 通过 GRPC 调用 `keda-operator` 获取并转换格式得到的，而 `keda-operator` 会将各种外部事件转换为所需的指标数据。所以最终实现 HPA 通过 External Metrics 数据进行自动伸缩，直接复用了 HPA 已有的能力，所以如果还想要控制扩缩容的行为细节（比如快速扩容，缓慢缩容），可以直接通过配置 HPA 的 `behavior` 字段来实现 (要求 Kubernetes 版本 >= 1.18)。
+除了对工作负载的扩缩容，对于任务计算类场景，KEDA 还可以根据排队的任务数量自动创建 Job 来实现对任务的及时处理：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F08%2F20240408083135.png)
