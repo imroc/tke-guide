@@ -131,6 +131,21 @@ const config: Config = {
       /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
       '@docusaurus/plugin-content-docs',
       ({
+        id: 'appendix',
+        path: 'content/appendix',
+        // 文档的路由前缀
+        routeBasePath: '/appendix',
+        // 左侧导航栏的配置
+        sidebarPath: require.resolve('./content/appendix/sidebars.ts'),
+        // 每个文档左下角 "编辑此页" 的链接
+        editUrl: ({ docPath }) =>
+          `https://github.com/imroc/tke-guide/edit/main/content/appendix/${docPath}`,
+      }),
+    ],
+    [
+      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
+      '@docusaurus/plugin-content-docs',
+      ({
         id: 'yaml',
         path: 'content/yaml',
         // 文档的路由前缀
@@ -212,6 +227,11 @@ const config: Config = {
             label: '实用 YAML',
             position: 'right',
             to: '/yaml',
+          },
+          {
+            label: '附录',
+            position: 'right',
+            to: '/appendix',
           },
           {
             href: 'https://github.com/imroc/tke-guide', // 改成自己的仓库地址
