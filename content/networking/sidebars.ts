@@ -29,6 +29,7 @@ const sidebars: SidebarsConfig = {
     'how-to-use-eip',
     'install-localdns-with-ipvs',
     'expose-grpc-with-tcm',
+    'multi-account-traffic',
   ]
 };
 

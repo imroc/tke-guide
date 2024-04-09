@@ -1,7 +1,7 @@
 import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
-  imageSidebar: [
+  imagesSidebar: [
     'index',
     'use-foreign-container-image',
     'use-mirror-in-container'

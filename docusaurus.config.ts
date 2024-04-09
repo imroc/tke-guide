@@ -116,6 +116,36 @@ const config: Config = {
       /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
       '@docusaurus/plugin-content-docs',
       ({
+        id: 'apps',
+        path: 'content/apps',
+        // 文档的路由前缀
+        routeBasePath: '/apps',
+        // 左侧导航栏的配置
+        sidebarPath: require.resolve('./content/apps/sidebars.ts'),
+        // 每个文档左下角 "编辑此页" 的链接
+        editUrl: ({ docPath }) =>
+          `https://github.com/imroc/tke-guide/edit/main/content/apps/${docPath}`,
+      }),
+    ],
+    [
+      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
+      '@docusaurus/plugin-content-docs',
+      ({
+        id: 'images',
+        path: 'content/images',
+        // 文档的路由前缀
+        routeBasePath: '/images',
+        // 左侧导航栏的配置
+        sidebarPath: require.resolve('./content/images/sidebars.ts'),
+        // 每个文档左下角 "编辑此页" 的链接
+        editUrl: ({ docPath }) =>
+          `https://github.com/imroc/tke-guide/edit/main/content/images/${docPath}`,
+      }),
+    ],
+    [
+      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
+      '@docusaurus/plugin-content-docs',
+      ({
         id: 'troubleshooting',
         path: 'content/troubleshooting',
         // 文档的路由前缀
@@ -222,6 +252,11 @@ const config: Config = {
             label: '排障指南',
             position: 'right',
             to: '/troubleshooting',
+          },
+          {
+            label: '应用管理',
+            position: 'right',
+            to: '/apps',
           },
           {
             label: '容器与镜像',

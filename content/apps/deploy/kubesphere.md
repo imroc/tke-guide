@@ -1,4 +1,4 @@
-# 安装 KubeSphere
+# 自建 KubeSphere
 
 ## 概述
 
