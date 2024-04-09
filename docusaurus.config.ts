@@ -56,138 +56,17 @@ const config: Config = {
       /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
       '@docusaurus/plugin-content-docs',
       ({
-        id: 'autoscaling',
-        path: 'content/autoscaling',
+        id: 'tke',
+        path: 'content',
         // 文档的路由前缀
-        routeBasePath: '/autoscaling',
+        routeBasePath: '/',
         // 左侧导航栏的配置
-        sidebarPath: require.resolve('./content/autoscaling/sidebars.ts'),
+        sidebarPath: require.resolve('./content/sidebars.ts'),
         // 每个文档左下角 "编辑此页" 的链接
         editUrl: ({ docPath }) =>
-          `https://github.com/imroc/tke-guide/edit/main/content/autoscaling/${docPath}`,
+          `https://github.com/imroc/tke-guide/edit/main/content/${docPath}`,
       }),
-    ],
-    [
-      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
-      '@docusaurus/plugin-content-docs',
-      ({
-        id: 'networking',
-        path: 'content/networking',
-        // 文档的路由前缀
-        routeBasePath: '/networking',
-        // 左侧导航栏的配置
-        sidebarPath: require.resolve('./content/networking/sidebars.ts'),
-        // 每个文档左下角 "编辑此页" 的链接
-        editUrl: ({ docPath }) =>
-          `https://github.com/imroc/tke-guide/edit/main/content/networking/${docPath}`,
-      }),
-    ],
-    [
-      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
-      '@docusaurus/plugin-content-docs',
-      ({
-        id: 'storage',
-        path: 'content/storage',
-        // 文档的路由前缀
-        routeBasePath: '/storage',
-        // 左侧导航栏的配置
-        sidebarPath: require.resolve('./content/storage/sidebars.ts'),
-        // 每个文档左下角 "编辑此页" 的链接
-        editUrl: ({ docPath }) =>
-          `https://github.com/imroc/tke-guide/edit/main/content/storage/${docPath}`,
-      }),
-    ],
-    [
-      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
-      '@docusaurus/plugin-content-docs',
-      ({
-        id: 'observability',
-        path: 'content/observability',
-        // 文档的路由前缀
-        routeBasePath: '/observability',
-        // 左侧导航栏的配置
-        sidebarPath: require.resolve('./content/observability/sidebars.ts'),
-        // 每个文档左下角 "编辑此页" 的链接
-        editUrl: ({ docPath }) =>
-          `https://github.com/imroc/tke-guide/edit/main/content/observability/${docPath}`,
-      }),
-    ],
-    [
-      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
-      '@docusaurus/plugin-content-docs',
-      ({
-        id: 'apps',
-        path: 'content/apps',
-        // 文档的路由前缀
-        routeBasePath: '/apps',
-        // 左侧导航栏的配置
-        sidebarPath: require.resolve('./content/apps/sidebars.ts'),
-        // 每个文档左下角 "编辑此页" 的链接
-        editUrl: ({ docPath }) =>
-          `https://github.com/imroc/tke-guide/edit/main/content/apps/${docPath}`,
-      }),
-    ],
-    [
-      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
-      '@docusaurus/plugin-content-docs',
-      ({
-        id: 'images',
-        path: 'content/images',
-        // 文档的路由前缀
-        routeBasePath: '/images',
-        // 左侧导航栏的配置
-        sidebarPath: require.resolve('./content/images/sidebars.ts'),
-        // 每个文档左下角 "编辑此页" 的链接
-        editUrl: ({ docPath }) =>
-          `https://github.com/imroc/tke-guide/edit/main/content/images/${docPath}`,
-      }),
-    ],
-    [
-      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
-      '@docusaurus/plugin-content-docs',
-      ({
-        id: 'troubleshooting',
-        path: 'content/troubleshooting',
-        // 文档的路由前缀
-        routeBasePath: '/troubleshooting',
-        // 左侧导航栏的配置
-        sidebarPath: require.resolve('./content/troubleshooting/sidebars.ts'),
-        // 每个文档左下角 "编辑此页" 的链接
-        editUrl: ({ docPath }) =>
-          `https://github.com/imroc/tke-guide/edit/main/content/troubleshooting/${docPath}`,
-      }),
-    ],
-    [
-      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
-      '@docusaurus/plugin-content-docs',
-      ({
-        id: 'appendix',
-        path: 'content/appendix',
-        // 文档的路由前缀
-        routeBasePath: '/appendix',
-        // 左侧导航栏的配置
-        sidebarPath: require.resolve('./content/appendix/sidebars.ts'),
-        // 每个文档左下角 "编辑此页" 的链接
-        editUrl: ({ docPath }) =>
-          `https://github.com/imroc/tke-guide/edit/main/content/appendix/${docPath}`,
-      }),
-    ],
-    [
-      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
-      '@docusaurus/plugin-content-docs',
-      ({
-        id: 'yaml',
-        path: 'content/yaml',
-        // 文档的路由前缀
-        routeBasePath: '/yaml',
-        // 左侧导航栏的配置
-        sidebarPath: require.resolve('./content/yaml/sidebars.ts'),
-        // 每个文档左下角 "编辑此页" 的链接
-        editUrl: ({ docPath }) =>
-          `https://github.com/imroc/tke-guide/edit/main/content/yaml/${docPath}`,
-      }),
-    ],
-
+    ]
   ],
 
   presets: [
@@ -228,51 +107,6 @@ const config: Config = {
           src: 'img/logo.svg', // 电子书 logo 文件，注意替换
         },
         items: [
-          {
-            label: '网络指南',
-            position: 'right',
-            to: '/networking',
-          },
-          {
-            label: '存储指南',
-            position: 'right',
-            to: '/storage',
-          },
-          {
-            label: '弹性伸缩',
-            position: 'right',
-            to: '/autoscaling',
-          },
-          {
-            label: '可观测性指南',
-            position: 'right',
-            to: '/observability',
-          },
-          {
-            label: '排障指南',
-            position: 'right',
-            to: '/troubleshooting',
-          },
-          {
-            label: '应用管理',
-            position: 'right',
-            to: '/apps',
-          },
-          {
-            label: '容器与镜像',
-            position: 'right',
-            to: '/images',
-          },
-          {
-            label: '实用 YAML',
-            position: 'right',
-            to: '/yaml',
-          },
-          {
-            label: '附录',
-            position: 'right',
-            to: '/appendix',
-          },
           {
             href: 'https://github.com/imroc/tke-guide', // 改成自己的仓库地址
             label: 'GitHub',

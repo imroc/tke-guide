@@ -2,13 +2,7 @@ import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
   tkeSidebar: [
-    {
-      type: "doc",
-      id: "README",
-      customProps: {
-        slug: "/README"
-      }
-    },
+    'README',
     {
       type: 'category',
       label: '网络指南',
@@ -100,15 +94,15 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: '监控告警',
+      label: '可观测性指南',
       collapsed: true,
       link: {
         type: 'generated-index',
-        slug: '/monitoring'
+        slug: '/observability'
       },
       items: [
-        'monitoring/prometheus-scrape-config',
-        'monitoring/grafana-dashboard-for-supernode-pod',
+        'observability/prometheus-scrape-config',
+        'observability/grafana-dashboard-for-supernode-pod',
       ],
     },
     {
@@ -138,16 +132,28 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: '常见应用安装与部署',
+      label: '应用管理',
       collapsed: true,
       link: {
         type: 'generated-index',
-        slug: '/install-apps'
+        slug: '/apps'
       },
       items: [
-        'install-apps/install-harbor-on-tke',
-        'install-apps/install-gitlab-on-tke',
-        'install-apps/install-kubesphere-on-tke',
+        'apps/upgrade-inplace'
+      ]
+    },
+    {
+      type: 'category',
+      label: '常见应用部署',
+      collapsed: true,
+      link: {
+        type: 'generated-index',
+        slug: '/deploy'
+      },
+      items: [
+        'deploy/harbor',
+        'deploy/gitlab',
+        'deploy/kubesphere',
       ],
     },
     {
@@ -162,19 +168,6 @@ const sidebars: SidebarsConfig = {
         'faq/modify-rp-filter-causing-exception',
         'faq/clb-loopback',
         'faq/controller-manager-and-scheduler-unhealthy',
-      ],
-    },
-    {
-      type: 'category',
-      label: '解决方案',
-      collapsed: true,
-      link: {
-        type: 'generated-index',
-        slug: '/solution'
-      },
-      items: [
-        'solution/multi-account',
-        'solution/upgrade-inplace',
       ],
     },
     {
@@ -200,25 +193,9 @@ const sidebars: SidebarsConfig = {
         slug: '/appendix'
       },
       items: [
-        'appendix/useful-kubectl-for-tencent-cloud',
-        'appendix/eks-annotations',
+        'appendix/kubectl',
         'appendix/ingress-error-code',
-        {
-          type: 'category',
-          label: 'Serverless 集群与超级节点',
-          collapsed: true,
-          link: {
-            type: 'generated-index',
-            slug: '/appendix/serverless'
-          },
-          items: [
-            'appendix/serverless/precautions',
-            'appendix/serverless/why-tke-supernode-rocks',
-            'appendix/serverless/supernode-case-online',
-            'appendix/serverless/supernode-case-offline',
-            'appendix/serverless/large-image-solution',
-          ],
-        },
+        'appendix/eks-note',
       ],
     },
   ]

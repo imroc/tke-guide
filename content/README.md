@@ -1,12 +1,10 @@
-import Comment from '@site/src/components/Comment';
-
 # TKE 实践指南
 
-本书将介绍腾讯云容器服务（TKE）相关实战经验与总结。
+本书将介绍 TKE 相关实战经验与总结。
 
 ## 关于本书
 
-本书为电子书形式，内容为本人多年的腾讯云容器服务（TKE）实战经验进行系统性整理的结果，不废话，纯干货。
+本书为电子书形式，内容为本人多年的云原生与 Kubernetes 实战经验进行系统性整理的结果，不废话，纯干货。
 
 ## 在线阅读
 
@@ -24,4 +22,3 @@ import Comment from '@site/src/components/Comment';
 
 您可以使用 [署名 - 非商业性使用 - 相同方式共享 4.0 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 协议共享。
 
-<Comment/>
