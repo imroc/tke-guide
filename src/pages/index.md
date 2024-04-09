@@ -1,3 +1,5 @@
+import Comment from '@site/src/components/Comment';
+
 # TKE 实践指南
 
 本书将介绍腾讯云容器服务（TKE）相关实战经验与总结。
@@ -22,3 +24,4 @@
 
 您可以使用 [署名 - 非商业性使用 - 相同方式共享 4.0 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh) 协议共享。
 
+<Comment/>

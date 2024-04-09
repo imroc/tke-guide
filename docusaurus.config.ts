@@ -56,15 +56,60 @@ const config: Config = {
       /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
       '@docusaurus/plugin-content-docs',
       ({
-        id: 'tke',
-        path: 'content',
+        id: 'autoscaling',
+        path: 'content/autoscaling',
         // 文档的路由前缀
-        routeBasePath: '/',
+        routeBasePath: '/autoscaling',
         // 左侧导航栏的配置
-        sidebarPath: require.resolve('./content/sidebars.ts'),
+        sidebarPath: require.resolve('./content/autoscaling/sidebars.ts'),
         // 每个文档左下角 "编辑此页" 的链接
         editUrl: ({ docPath }) =>
-          `https://github.com/imroc/tke-guide/edit/main/content/${docPath}`,
+          `https://github.com/imroc/tke-guide/edit/main/content/autoscaling/${docPath}`,
+      }),
+    ],
+    [
+      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
+      '@docusaurus/plugin-content-docs',
+      ({
+        id: 'networking',
+        path: 'content/networking',
+        // 文档的路由前缀
+        routeBasePath: '/networking',
+        // 左侧导航栏的配置
+        sidebarPath: require.resolve('./content/networking/sidebars.ts'),
+        // 每个文档左下角 "编辑此页" 的链接
+        editUrl: ({ docPath }) =>
+          `https://github.com/imroc/tke-guide/edit/main/content/networking/${docPath}`,
+      }),
+    ],
+    [
+      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
+      '@docusaurus/plugin-content-docs',
+      ({
+        id: 'monitoring',
+        path: 'content/monitoring',
+        // 文档的路由前缀
+        routeBasePath: '/monitoring',
+        // 左侧导航栏的配置
+        sidebarPath: require.resolve('./content/monitoring/sidebars.ts'),
+        // 每个文档左下角 "编辑此页" 的链接
+        editUrl: ({ docPath }) =>
+          `https://github.com/imroc/tke-guide/edit/main/content/monitoring/${docPath}`,
+      }),
+    ],
+    [
+      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
+      '@docusaurus/plugin-content-docs',
+      ({
+        id: 'yaml',
+        path: 'content/yaml',
+        // 文档的路由前缀
+        routeBasePath: '/yaml',
+        // 左侧导航栏的配置
+        sidebarPath: require.resolve('./content/yaml/sidebars.ts'),
+        // 每个文档左下角 "编辑此页" 的链接
+        editUrl: ({ docPath }) =>
+          `https://github.com/imroc/tke-guide/edit/main/content/yaml/${docPath}`,
       }),
     ],
   ],
@@ -107,6 +152,26 @@ const config: Config = {
           src: 'img/logo.svg', // 电子书 logo 文件，注意替换
         },
         items: [
+          {
+            label: '网络指南',
+            position: 'right',
+            to: '/networking',
+          },
+          {
+            label: '弹性伸缩',
+            position: 'right',
+            to: '/autoscaling',
+          },
+          {
+            label: '监控指南',
+            position: 'right',
+            to: '/monitoring',
+          },
+          {
+            label: '实用 YAML',
+            position: 'right',
+            to: '/yaml',
+          },
           {
             href: 'https://github.com/imroc/tke-guide', // 改成自己的仓库地址
             label: 'GitHub',

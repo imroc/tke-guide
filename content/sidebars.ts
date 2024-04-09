@@ -6,7 +6,7 @@ const sidebars: SidebarsConfig = {
       type: "doc",
       id: "README",
       customProps: {
-        slug: "/"
+        slug: "/README"
       }
     },
     {
