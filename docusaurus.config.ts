@@ -86,15 +86,30 @@ const config: Config = {
       /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
       '@docusaurus/plugin-content-docs',
       ({
-        id: 'monitoring',
-        path: 'content/monitoring',
+        id: 'storage',
+        path: 'content/storage',
         // 文档的路由前缀
-        routeBasePath: '/monitoring',
+        routeBasePath: '/storage',
         // 左侧导航栏的配置
-        sidebarPath: require.resolve('./content/monitoring/sidebars.ts'),
+        sidebarPath: require.resolve('./content/storage/sidebars.ts'),
         // 每个文档左下角 "编辑此页" 的链接
         editUrl: ({ docPath }) =>
-          `https://github.com/imroc/tke-guide/edit/main/content/monitoring/${docPath}`,
+          `https://github.com/imroc/tke-guide/edit/main/content/storage/${docPath}`,
+      }),
+    ],
+    [
+      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
+      '@docusaurus/plugin-content-docs',
+      ({
+        id: 'observability',
+        path: 'content/observability',
+        // 文档的路由前缀
+        routeBasePath: '/observability',
+        // 左侧导航栏的配置
+        sidebarPath: require.resolve('./content/observability/sidebars.ts'),
+        // 每个文档左下角 "编辑此页" 的链接
+        editUrl: ({ docPath }) =>
+          `https://github.com/imroc/tke-guide/edit/main/content/observability/${docPath}`,
       }),
     ],
     [
@@ -174,14 +189,19 @@ const config: Config = {
             to: '/networking',
           },
           {
+            label: '存储指南',
+            position: 'right',
+            to: '/storage',
+          },
+          {
             label: '弹性伸缩',
             position: 'right',
             to: '/autoscaling',
           },
           {
-            label: '监控指南',
+            label: '可观测性指南',
             position: 'right',
-            to: '/monitoring',
+            to: '/observability',
           },
           {
             label: '排障指南',

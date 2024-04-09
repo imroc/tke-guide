@@ -6,7 +6,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: '基于 KEDA 的高级弹性伸缩最佳实践',
-      collapsed: true,
+      collapsed: false,
       link: {
         type: 'generated-index',
         slug: '/keda'
