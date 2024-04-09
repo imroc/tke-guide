@@ -22,5 +22,5 @@ rp_filter 是控制内核是否开启校验数据包源地址的开关，如果�
 
 总结几种常见的场景:
 1. Pod 访问公网 (公网目的 IP 在 VPC 网段之外)
-2. 使用了公网 [启用 CLB 直通 Pod](../networking/clb-to-pod-directly.md) (公网源 IP 在 VPC 网段之外)
+2. 使用了公网 [启用 CLB 直通 Pod](../../networking/clb-to-pod-directly) (公网源 IP 在 VPC 网段之外)
 3. Pod 访问 apiserver (169 的 IP 在 VPC 网段之外)

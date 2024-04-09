@@ -101,6 +101,21 @@ const config: Config = {
       /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
       '@docusaurus/plugin-content-docs',
       ({
+        id: 'troubleshooting',
+        path: 'content/troubleshooting',
+        // 文档的路由前缀
+        routeBasePath: '/troubleshooting',
+        // 左侧导航栏的配置
+        sidebarPath: require.resolve('./content/troubleshooting/sidebars.ts'),
+        // 每个文档左下角 "编辑此页" 的链接
+        editUrl: ({ docPath }) =>
+          `https://github.com/imroc/tke-guide/edit/main/content/troubleshooting/${docPath}`,
+      }),
+    ],
+    [
+      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
+      '@docusaurus/plugin-content-docs',
+      ({
         id: 'yaml',
         path: 'content/yaml',
         // 文档的路由前缀
@@ -112,6 +127,7 @@ const config: Config = {
           `https://github.com/imroc/tke-guide/edit/main/content/yaml/${docPath}`,
       }),
     ],
+
   ],
 
   presets: [
@@ -166,6 +182,11 @@ const config: Config = {
             label: '监控指南',
             position: 'right',
             to: '/monitoring',
+          },
+          {
+            label: '排障指南',
+            position: 'right',
+            to: '/troubleshooting',
           },
           {
             label: '实用 YAML',
