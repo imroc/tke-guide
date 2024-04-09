@@ -224,6 +224,11 @@ const config: Config = {
             to: '/troubleshooting',
           },
           {
+            label: '容器与镜像',
+            position: 'right',
+            to: '/images',
+          },
+          {
             label: '实用 YAML',
             position: 'right',
             to: '/yaml',

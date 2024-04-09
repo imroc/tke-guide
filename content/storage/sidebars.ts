@@ -1,7 +1,7 @@
 import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
-  yamlSidebar: [
+  storageSidebar: [
     'index',
     'cbs-pvc-expansion',
     'readonlymany-pv',

@@ -1,10 +1,10 @@
 import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
-  observabilitySidebar: [
+  imageSidebar: [
     'index',
-    'prometheus-scrape-config',
-    'grafana-dashboard-for-supernode-pod',
+    'use-foreign-container-image',
+    'use-mirror-in-container'
   ]
 };
 
