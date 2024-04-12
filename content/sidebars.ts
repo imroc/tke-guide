@@ -76,7 +76,8 @@ const sidebars: SidebarsConfig = {
             'autoscaling/keda/install',
             'autoscaling/keda/cron',
           ]
-        }
+        },
+        'autoscaling/tke-autoscaling-placeholder',
       ],
     },
     {
