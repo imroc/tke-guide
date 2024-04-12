@@ -31,7 +31,7 @@ controller:
 
 :::
 
-另外多实例的 release 名称也不能与已安装的相同，示例：
+另外多实例的 release 名称也不能与已安装的相同，**即便是 namespace 不同，release 名称也不能相同**（避免 ClusterRole 冲突），示例：
 
 ```bash
 helm upgrade --install prod ingress-nginx/ingress-nginx \
