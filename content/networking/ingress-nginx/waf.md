@@ -67,11 +67,11 @@ controller:
 
 1. 在 [我的证书](https://console.cloud.tencent.com/ssl) 里上传证书并复制证书 ID。
 2. 在 nginx ingress 所在 namespace 创建对应的证书 secret（引用证书 ID）:
-    ```yaml
+    ```yaml showLineNumbers
     apiVersion: v1
     kind: Secret
     metadata:
-      name: cert-secret-test-imroc
+      name: cert-secret-test
       namespace: ingress-nginx
     stringData: # 用 stringData 就不需要手动 base64 转码
       # highlight-next-line
@@ -79,7 +79,7 @@ controller:
     type: Opaque
     ```
 3. 配置 `values.yaml`:
-    ```yaml
+    ```yaml showLineNumbers
     controller: # 以下配置将依赖镜像替换为了 docker hub 上的 mirror 镜像以保证在国内环境能正常拉取
       image:
         registry: docker.io
@@ -109,7 +109,7 @@ controller:
                   "HTTP"
                 ],
                 "hosts": {
-                  "test.imroc.cc": {}
+                  "test.example.com": {}
                 }
               },
               "443": {
@@ -117,8 +117,8 @@ controller:
                   "HTTPS"
                 ],
                 "hosts": {
-                  "test.imroc.cc": {
-                    "tls": "cert-secret-test-imroc"
+                  "test.example.com": {
+                    "tls": "cert-secret-test"
                   }
                 }
               }
@@ -168,7 +168,7 @@ controller:
     spec:
       ingressClassName: nginx
       rules:
-        - host: test.imroc.cc
+        - host: test.example.com
           http:
             paths:
               - backend:
