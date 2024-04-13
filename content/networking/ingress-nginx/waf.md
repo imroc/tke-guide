@@ -57,7 +57,7 @@ controller:
 
 :::tip
 
-如果需要将 HTTP 的流量重定向到 HTTPS，可以在 CLB 控制台找到 nginx ingress 使用的 CLB 实例（实例 ID 可通过查看 nginx ingress controller 的 service 的 yaml 获取），在实例页面手动配置下重定向规则：
+如果需要将 HTTP 的流量重定向到 HTTPS，可以在 CLB 控制台找到 nginx ingress 使用的 CLB 实例（实例 ID 可从 nginx ingress controller 的 service 的 yaml 中获取），在实例页面手动配置下重定向规则：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F13%2F20240413111751.png)
 
