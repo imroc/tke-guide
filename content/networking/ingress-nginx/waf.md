@@ -75,7 +75,7 @@ controller:
       namespace: ingress-nginx
     stringData: # 用 stringData 就不需要手动 base64 转码
       # highlight-next-line
-      qcloud_cert_id: E2pcp0Fy
+      qcloud_cert_id: E2pcp0Fy # 替换证书 ID
     type: Opaque
     ```
 3. 配置 `values.yaml`:
