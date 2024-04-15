@@ -19,7 +19,7 @@ TKE 的 Service 支持使用 `service.cloud.tencent.com/specify-protocol` 这个
 ```yaml
 controller:
   service:
-    enableHttp: false # 如果只允许 HTTPS 访问，可以置为 false 来禁用 80 监听器
+    enableHttp: false # 如果只允许 HTTPS 访问，可以将 enableHttp 置为 false 来禁用 80 监听器
     targetPorts:
       https: http # 让 CLB 443 监听器绑后端 nginx ingress 的 80 （CLB 到后端默认通过 HTTP 转发）
     annotations:
