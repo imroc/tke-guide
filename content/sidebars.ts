@@ -65,7 +65,7 @@ const sidebars: SidebarsConfig = {
       items: [
         {
           type: 'category',
-          label: '基于 KEDA 的高级弹性伸缩最佳实践',
+          label: '事件驱动弹性伸缩最佳实践(KEDA)',
           collapsed: true,
           link: {
             type: 'generated-index',
