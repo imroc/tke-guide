@@ -44,13 +44,13 @@ spec:
         timezone: Asia/Shanghai
         start: 30 9 * * *
         end: 30 10 * * *
-        desiredRepicas: "200"
+        desiredReplicas: "200"
     - type: cron # 每天晚上 6 点秒杀活动，确保前后半小时内至少有 200 个副本
       metadata:
         timezone: Asia/Shanghai
         start: 30 17 * * *
         end: 30 18 * * *
-        desiredRepicas: "200"
+        desiredReplicas: "200"
     # highlight-end
     - type: memory # CPU 利用率超过 60% 扩容
       metricType: Utilization
