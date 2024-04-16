@@ -27,5 +27,22 @@ controller:
 ```
 
 > 参考文档 [Service 使用已有 CLB](https://cloud.tencent.com/document/product/457/45491)。
->
-> **注意:** 在 CLB 控制台创建 CLB 实例时，选择的 VPC 需与集群一致。
+
+:::info[注意]
+
+在 CLB 控制台创建 CLB 实例时，选择的 VPC 需与集群一致。
+
+:::
+
+## 使用内外网双 CLB
+
+有时需要让 nginx ingress 同时使用公网和内网 CLB 接入流量，此时可以配置 nginx ingress 使用两个 service，默认是创建一个公网 CLB Service， 如果还需要一个内网 CLB 的 Service，可以配置 internal service：
+
+```yaml
+controller:
+  service:
+    internal:
+      enabled: true # 创建内网 CLB Service
+      annotations:
+        service.kubernetes.io/qcloud-loadbalancer-internal-subnetid: "subnet-xxxxxxxx" # 配置内网 CLB 的子网
+```
