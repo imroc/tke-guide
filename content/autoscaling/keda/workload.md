@@ -11,7 +11,7 @@ KEDA 支持 Kubernetes Workload 触发器，即可以根据的一个或多个工
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F08%2F20240408084514.png)
 
 * A、B、C 这一组服务通常有比较固定的数量比例。
-* A 的压力突增，迫使扩容，B 和 C 也可以用 KEDA 的 Kubernetes Workload 触发器实现与 A 同时扩容。
+* A 的压力突增，迫使扩容，B 和 C 也可以用 KEDA 的 Kubernetes Workload 触发器实现与 A 几乎同时扩容，而无需等待压力逐级传导才缓慢迫使扩容。
 
 首先配置 A 的扩容，根据 CPU 和内存压力扩容：
 
