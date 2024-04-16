@@ -59,10 +59,12 @@ spec:
      minReplicaCount: 10
      maxReplicaCount: 1000
      triggers:
+       # highlight-start
        - type: kubernetes-workload
          metadata:
            podSelector: 'app=a' # 选中 A 服务
            value: '1' # A/B=3/3=1
+       # highlight-end
    ```
 
   </TabItem>
@@ -83,10 +85,12 @@ spec:
      minReplicaCount: 3
      maxReplicaCount: 340
      triggers:
+       # highlight-start
        - type: kubernetes-workload
          metadata:
            podSelector: 'app=a' # 选中 A 服务
            value: '3' # A/C=3/2=1.5
+       # highlight-end
    ```
 
   </TabItem>
