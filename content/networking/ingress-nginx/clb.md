@@ -42,7 +42,9 @@ controller:
 controller:
   service:
     internal:
+      # highlight-start
       enabled: true # 创建内网 CLB Service
       annotations:
         service.kubernetes.io/qcloud-loadbalancer-internal-subnetid: "subnet-xxxxxxxx" # 配置内网 CLB 的子网
+      # highlight-end
 ```
