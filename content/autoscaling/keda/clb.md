@@ -84,7 +84,7 @@ lb-********
 
 ### 配置示例一：基于 CLB 连接数指标的弹性伸缩
 
-```yaml
+```yaml showLineNumbers
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -100,16 +100,18 @@ spec:
   triggers:
     - type: external
       metadata:
+        # highlight-start
         scalerAddress: clb-scaler.keda.svc.cluster.local:9000
         loadBalancerId: lb-xxxxxxxx
         metricName: ClientConnum # 连接数指标
         threshold: "100" # 每个 Pod 处理 100 条连接
         listener: "TCP/8080" # 可选，指定监听器，格式：协议/端口
+        # highlight-end
 ```
 
 ### 配置示例二：基于 CLB QPS 指标的弹性伸缩
 
-```yaml
+```yaml showLineNumbers
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -125,9 +127,11 @@ spec:
   triggers:
     - type: external
       metadata:
+        # highlight-start
         scalerAddress: clb-scaler.keda.svc.cluster.local:9000
         loadBalancerId: lb-xxxxxxxx
         metricName: TotalReq # 每秒连接数指标
         threshold: "500" # 平均每个 Pod 支撑 500 QPS
         listener: "TCP/8080" # 可选，指定监听器，格式：协议/端口
+        # highlight-end
 ```
