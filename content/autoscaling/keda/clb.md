@@ -71,7 +71,9 @@ lb-********
 
 记录下获取到的 CLB ID，后续 KEDA 的扩缩容配置需要用到。
 
-## ScaledObject 配置方法
+## 使用 ScaledObject 配置基于 CLB 监控指标的弹性伸缩
+
+### 配置方法
 
 基于 CLB 的监控指标通常用于在线业务，通常使用 KEDA 的 `ScaledObject` 配置弹性伸缩，配置 `external` 类型的 trigger，并传入所需的 metadata，主要包含以下字段：
 * `scalerAddress` 是 `keda-operator` 调用 `keda-tencentcloud-clb-scaler` 时使用的地址。
@@ -80,11 +82,7 @@ lb-********
 * `threshold` 是扩缩容的指标阈值，即会通过比较 `metricValue / Pod 数量` 与 `threshold` 的值来决定是否扩缩容。
 * `listener` 是唯一可选的配置，指定监控指标的 CLB 监听器，格式：`协议/端口`。
 
-## 配置示例
-
-下面给出一些常用的配置示例。
-
-### 基于 CLB 连接数指标的弹性伸缩
+### 配置示例一：基于 CLB 连接数指标的弹性伸缩
 
 ```yaml
 apiVersion: keda.sh/v1alpha1
@@ -109,7 +107,7 @@ spec:
         listener: "TCP/9090" # 可选，指定监听器，格式：协议/端口
 ```
 
-### 基于 CLB QPS 指标的弹性伸缩
+### 配置示例二：基于 CLB QPS 指标的弹性伸缩
 
 ```yaml
 apiVersion: keda.sh/v1alpha1
