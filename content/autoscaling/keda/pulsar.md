@@ -192,4 +192,4 @@ NAME                             REFERENCE             TARGETS         MINPODS  
 keda-hpa-consumer-scaledobject   Deployment/consumer   4600m/5 (avg)   1         10        5          31m
 ```
 
-可以通过 `TARGETS` 推算出当前消息堆积数量，以上面 get 到的结果为例：`堆积消息数=4.6*5=23`
+> 可以通过 `TARGETS` 反推出当前消息堆积数量，以上面 get 到的结果为例：`堆积消息数=4.6*5=23`
