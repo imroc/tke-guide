@@ -55,7 +55,7 @@ controller:
 
 ### 方案二：内网 CLB 绑 EIP
 
-另一种思路是 [使用已有 CLB](#使用内网-clb)，然后再跳转到 CLB 控制台，给 CLB 再绑个 EIP（参考 CLB 官方文档：[内网负载均衡实例绑定 EIP](https://cloud.tencent.com/document/product/214/65682)）。
+另一种思路是 [使用内网 CLB](#使用内网-clb)，然后再跳转到 CLB 控制台，给 CLB 再绑个 EIP（参考 CLB 官方文档：[内网负载均衡实例绑定 EIP](https://cloud.tencent.com/document/product/214/65682)）。
 
 :::tip[注意]
 
