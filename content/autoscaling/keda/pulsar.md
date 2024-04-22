@@ -47,7 +47,7 @@ KEDA 的触发器支持 Apache Pulsar，即根据 Pulsar 消息队列中的未�
 ### 部署生产者
 
 1. 准备生产者配置，根据前面获取的 Pulsar 相关信息替换配置：
-  ```yaml
+  ```yaml showLineNumbers
   apiVersion: v1
   stringData:
     # highlight-start
@@ -61,7 +61,7 @@ KEDA 的触发器支持 Apache Pulsar，即根据 Pulsar 消息队列中的未�
   type: Opaque
   ```
 2. 部署生产者持续发送新消息：
-  ```yaml
+  ```yaml showLineNumbers
   apiVersion: apps/v1
   kind: Deployment
   metadata:
@@ -93,7 +93,7 @@ KEDA 的触发器支持 Apache Pulsar，即根据 Pulsar 消息队列中的未�
 ### 部署消费者
 
 1. 准备消费者配置，根据前面获取的 Pulsar 相关信息替换配置：
-  ```yaml
+  ```yaml showLineNumbers
   apiVersion: v1
   stringData:
     # highlight-start
@@ -108,7 +108,7 @@ KEDA 的触发器支持 Apache Pulsar，即根据 Pulsar 消息队列中的未�
   type: Opaque
   ```
 2. 通过 Deployment 部署消费者，持续消费消息：
-  ```yaml
+  ```yaml showLineNumbers
   apiVersion: apps/v1
   kind: Deployment
   metadata:
@@ -140,7 +140,7 @@ KEDA 的触发器支持 Apache Pulsar，即根据 Pulsar 消息队列中的未�
 ### 配置 ScaledObject
 
 1. 先创建 `TriggerAuthentication` 并引用 `consumer-secret` 中的 TOKEN：
-  ```yaml
+  ```yaml showLineNumbers
   apiVersion: keda.sh/v1alpha1
   kind: TriggerAuthentication
   metadata:
@@ -154,7 +154,7 @@ KEDA 的触发器支持 Apache Pulsar，即根据 Pulsar 消息队列中的未�
       # highlight-end
   ```
 2. 创建 ScaledObject（替换高亮行配置）：
-  ```yaml
+  ```yaml showLineNumbers
   apiVersion: keda.sh/v1alpha1
   kind: ScaledObject
   metadata:

@@ -15,7 +15,7 @@ KEDA 支持 Kubernetes Workload 触发器，即可以根据的一个或多个工
 
 首先配置 A 的扩容，根据 CPU 和内存压力扩容：
 
-```yaml
+```yaml showLineNumbers
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -45,7 +45,7 @@ spec:
 <Tabs>
   <TabItem value="B" label="B">
 
-   ```yaml
+   ```yaml showLineNumbers
    apiVersion: keda.sh/v1alpha1
    kind: ScaledObject
    metadata:
@@ -71,7 +71,7 @@ spec:
 
   <TabItem value="C" label="C">
 
-   ```yaml
+   ```yaml showLineNumbers
    apiVersion: keda.sh/v1alpha1
    kind: ScaledObject
    metadata:

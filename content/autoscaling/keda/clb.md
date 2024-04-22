@@ -27,7 +27,7 @@ helm upgrade --install clb-scaler clb-scaler/clb-scaler -n keda \
 
 下面给出一个用于测试的工作负载 YAML 实例：
 
-```yaml
+```yaml showLineNumbers
 apiVersion: v1
 kind: Service
 metadata:
