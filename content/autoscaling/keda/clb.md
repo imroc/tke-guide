@@ -23,6 +23,54 @@ helm upgrade --install clb-scaler clb-scaler/clb-scaler -n keda \
 * `region` 修改为CLB 所在地域（一般就是集群所在地域），地域列表: https://cloud.tencent.com/document/product/213/6091
 * `credentials.secretId` 和 `credentials.secretKey`  是腾讯云账户密钥对，用于查 CLB 监控数据。
 
+## 部署工作负载
+
+下面给出一个用于测试的工作负载 YAML 实例：
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: httpbin
+  name: httpbin
+spec:
+  ports:
+    - port: 8080
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: httpbin
+  type: LoadBalancer
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: httpbin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: httpbin
+  template:
+    metadata:
+      labels:
+        app: httpbin
+    spec:
+      containers:
+        - image: kennethreitz/httpbin:latest
+          name: httpbin
+```
+
+部署好后，会自动创建响应的公网 CLB 接入流量，通过以下命令获取对应的 CLB ID：
+```bash
+$ kubectl svc httpbin -o jsonpath='{.metadata.annotations.service\.kubernetes\.io/loadbalance-id}'
+lb-********
+```
+
+记录下获取到的 CLB ID，后续 KEDA 的扩缩容配置需要用到。
+
 ## ScaledObject 配置方法
 
 基于 CLB 的监控指标通常用于在线业务，通常使用 KEDA 的 `ScaledObject` 配置弹性伸缩，配置 `external` 类型的 trigger，并传入所需的 metadata，主要包含以下字段：
