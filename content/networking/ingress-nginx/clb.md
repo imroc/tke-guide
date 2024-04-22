@@ -36,7 +36,11 @@ controller:
 
 ## 使用内外网双 CLB
 
-有时需要让 nginx ingress 同时使用公网和内网 CLB 接入流量，此时可以配置 nginx ingress 使用两个 service，默认是创建一个公网 CLB Service， 如果还需要一个内网 CLB 的 Service，可以配置 internal service：
+有时需要让 nginx ingress 同时使用公网和内网 CLB 接入流量，有以下两种方案可以实现。
+
+### 方案一：双 Service
+
+第一种思路是配置 nginx ingress 使用两个 service，默认是创建一个公网 CLB Service， 如果还需要一个内网 CLB 的 Service，可以配置 internal service：
 
 ```yaml
 controller:
@@ -48,3 +52,7 @@ controller:
         service.kubernetes.io/qcloud-loadbalancer-internal-subnetid: "subnet-xxxxxxxx" # 配置内网 CLB 的子网
       # highlight-end
 ```
+
+### 方案二：内网 CLB 绑 EIP
+
+另一种思路是 [使用已有 CLB](#使用内网-clb)，然后再跳转到 CLB 控制台，给 CLB 再绑个 EIP（该功能在内测，需要提工单申请开通，参考 [CLB 官方文档：内网负载均衡实例绑定 EIP](https://cloud.tencent.com/document/product/214/65682)）。
