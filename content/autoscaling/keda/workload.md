@@ -40,7 +40,7 @@ spec:
 ```
 
 
-然后配置 B 和 C 的扩容，假设固定比例 A:B:C = 3:3:2，
+然后配置 B 和 C 的扩容，假设固定比例 A:B:C = 3:3:2。
 
 <Tabs>
   <TabItem value="B" label="B">
