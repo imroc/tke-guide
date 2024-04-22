@@ -104,7 +104,7 @@ spec:
         loadBalancerId: lb-xxxxxxxx
         metricName: ClientConnum # 连接数指标
         threshold: "100" # 每个 Pod 处理 100 条连接
-        listener: "TCP/9090" # 可选，指定监听器，格式：协议/端口
+        listener: "TCP/8080" # 可选，指定监听器，格式：协议/端口
 ```
 
 ### 配置示例二：基于 CLB QPS 指标的弹性伸缩
@@ -129,5 +129,5 @@ spec:
         loadBalancerId: lb-xxxxxxxx
         metricName: TotalReq # 每秒连接数指标
         threshold: "500" # 平均每个 Pod 支撑 500 QPS
-        listener: "TCP/443" # 可选，指定监听器，格式：协议/端口
+        listener: "TCP/8080" # 可选，指定监听器，格式：协议/端口
 ```
