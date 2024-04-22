@@ -8,7 +8,7 @@
 
 比如改成内网 CLB，在 `values.yaml` 中这样定义:
 
-```yaml
+```yaml showLineNumbers
 controller:
   service:
     annotations:
@@ -19,7 +19,7 @@ controller:
 
 你也可以直接在 [CLB 控制台](https://console.cloud.tencent.com/clb/instance) 根据自身需求创建一个 CLB （比如自定义实例规格、运营商类型、计费模式、带宽上限等），然后在 `values.yaml` 中用注解复用这个 CLB:
 
-```yaml
+```yaml showLineNumbers
 controller:
   service:
     annotations:
@@ -42,7 +42,7 @@ controller:
 
 第一种思路是配置 nginx ingress 使用两个 service，默认是创建一个公网 CLB Service， 如果还需要一个内网 CLB 的 Service，可以配置 internal service：
 
-```yaml
+```yaml showLineNumbers
 controller:
   service:
     internal:
