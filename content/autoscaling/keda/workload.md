@@ -1,4 +1,4 @@
-# 多级服务同步伸缩 (Workload 触发器)
+# 多级服务同步水平伸缩 (Workload 触发器)
 
 ## Workload 触发器
 
