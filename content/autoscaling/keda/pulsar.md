@@ -193,3 +193,9 @@ keda-hpa-consumer-scaledobject   Deployment/consumer   4600m/5 (avg)   1        
 ```
 
 > 可以通过 `TARGETS` 反推出当前消息堆积数量，以上面 get 到的结果为例：`堆积消息数=4.6*5=23`
+
+## ScaledJob + 超级节点
+
+如果单条消息处理耗时较大，但又需要尽量及时获取到处理结果，可以配置 ScaledJob，队列中每来一条新消息就自动新建一个 Job 来消费，让 Job 的 Pod 调度到超级节点，这样可以做到计算资源完全按需使用、按量计费。
+
+触发器的配置，ScaledObject 与 ScaledJob 完全一致，如需配置 ScaledJob，可参考 ScaledObject 的配置。
