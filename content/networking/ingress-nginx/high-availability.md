@@ -75,7 +75,11 @@ controller:
     tke.cloud.tencent.com/nodepool-id: np-********
 ```
 
-> 超级节点的效果更好，所有 Pod 独占虚拟机，不会相互干扰。
+:::info
+
+超级节点的效果更好，所有 Pod 独占虚拟机，不会相互干扰。如果使用的是 Serverless 集群，则不需要配这里的调度策略，只会调度到超级节点。
+
+:::
 
 ## 合理设置 request limit
 
