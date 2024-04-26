@@ -34,9 +34,9 @@ controller:
 
 :::
 
-## 使用内外网双 CLB
+## 公网和内网 IP 同时接入
 
-有时需要让 nginx ingress 同时使用公网和内网 CLB 接入流量，有以下两种方案可以实现。
+有时需要让 nginx ingress 同时使用公网和内网的 IP 来接入流量，有以下两种方案可以实现。
 
 ### 方案一：双 Service
 
