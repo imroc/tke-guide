@@ -65,7 +65,7 @@ spec:
 
 部署好后，会自动创建响应的公网 CLB 接入流量，通过以下命令获取对应的 CLB ID：
 ```bash
-$ kubectl svc httpbin -o jsonpath='{.metadata.annotations.service\.kubernetes\.io/loadbalance-id}'
+$ kubectl get svc httpbin -o jsonpath='{.metadata.annotations.service\.kubernetes\.io/loadbalance-id}'
 lb-********
 ```
 
