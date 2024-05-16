@@ -78,6 +78,7 @@ const sidebars: SidebarsConfig = {
             'autoscaling/keda/workload',
             'autoscaling/keda/clb',
             'autoscaling/keda/pulsar',
+            'autoscaling/keda/cnapigw',
           ]
         },
         'autoscaling/tke-autoscaling-placeholder',
