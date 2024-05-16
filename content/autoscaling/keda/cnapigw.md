@@ -88,7 +88,7 @@ spec:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F05%2F16%2F20240516152140.png)
 
-从【K8S】服务中选择部署了测试应用的集群、命名空间以及服务：
+从【K8S服务】中选择部署了测试应用的集群、命名空间以及服务：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F05%2F16%2F20240516152341.png)
 
