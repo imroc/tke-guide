@@ -4,6 +4,8 @@
 
 [云原生 API 网关](https://cloud.tencent.com/product/cngw) 是腾讯云上基于 Kong 托管的网关产品，拥有丰富的七层流量管理功能，也支持将请求转发到 TKE 集群上的服务。
 
+本文将介绍如何在 TKE 上利用 KEDA 实现基于云原生 API 网关监控指标的水平伸缩。
+
 ## 操作步骤
 
 ### 配置 Prometheus 采集
