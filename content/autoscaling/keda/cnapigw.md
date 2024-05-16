@@ -8,7 +8,7 @@
 
 ## 操作步骤
 
-### 配置 `Prometheus` 采集
+### 配置 Prometheus 采集
 
 你可以使用腾讯云 Prometheus，也可以使用自建 `Prometheus` 来采集云原生 API 网关的监控数据，在 [云原生 API 网关-可观测性](https://console.cloud.tencent.com/tse/monitor) 页面选择使用的网关实例，并切换到 【Prometheus】页面。
 
