@@ -102,7 +102,7 @@ spec:
 
 配置完成后，就可以通过云原生网关访问 TKE 集群中的服务了，可以压测一段时间，看下 `Prometheus` 中的监控数据是否正常。
 
-### 配置 `KEDA` ScaledObject
+### 配置 KEDA ScaledObject
 
 在安装了 `KEDA` 的前提下，我们可以创建类似以下的 `ScaledObject`：
 
