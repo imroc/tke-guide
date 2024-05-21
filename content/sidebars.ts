@@ -29,6 +29,7 @@ const sidebars: SidebarsConfig = {
             'networking/ingress-nginx/observability',
             'networking/ingress-nginx/waf',
             'networking/ingress-nginx/multi-ingress-controller',
+            'networking/ingress-nginx/billing',
             'networking/ingress-nginx/migrate',
             'networking/ingress-nginx/values-demo',
           ],
