@@ -20,6 +20,12 @@
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F05%2F21%2F20240521201634.png)
 
+## 设置分账标签
+
+在 [分账标签](https://console.cloud.tencent.com/expense/tag) 中设置 `business` 为分账标签：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F05%2F21%2F20240521204515.png)
+
 ## 通过 namespace 划分业务
 
 集群中不同 namespace 可能用于不同业务，一个业务可能关联一个或多个 namespace，假设 ns1 和 ns2 属于 A 业务，ns3 属于 B 业务，对应的云标签分别是 `business: A` 和 `business: B`。
@@ -109,3 +115,11 @@ spec:
                 port:
                   number: 80
 ```
+
+## 费用分账查看
+
+在 【费用中心】-【费用账单】-【账单查看】- 【多维度汇总账单】-【按标签】中，选择 `business` 作为分账标签：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F05%2F21%2F20240521204737.png)
+
+这样就可以按业务展示费用账单了。
