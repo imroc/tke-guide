@@ -44,7 +44,7 @@
 
 另外还需要注意的是，不同 Nginx Ingress 实例需要使用不同的 IngressClass 和 Namespace 以避免冲突，参考[安装多个 Nginx Ingress Controller](./multi-ingress-controller.md) 。
 
-假设 A 业务的 IngressClass 是 `a-ingress`，B 业务的 IngressClass 是 `b-ingress`，以下是安装 Nginx Ingress 时的 `values.yaml` 示例：
+假设 A 业务的 IngressClass 是 `a-ingress`，B 业务的 IngressClass 是 `b-ingress`，以下是安装 A 业务的 Nginx Ingress 时的 `values.yaml` 示例：
 
 ```yaml title="values.yaml"
 controller:
