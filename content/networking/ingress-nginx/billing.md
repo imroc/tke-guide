@@ -12,6 +12,10 @@
 
 费用中心支持按标签分账，要按业务维度分账，可以对不同业务的 Nginx Ingress 的 CLB 和 Pod 打上不同的云标签。
 
+## 根据 namespace 和云标签划分业务
+
+集群中不同 namespace 可能用于不同业务，一个业务可能关联一个或多个 namespace，假设 ns1 和 ns2 属于 A 业务，ns3 属于 B 业务，对应的云标签分别是 `business: A` 和 `business: B`。
+
 ## 新建云标签
 
 假设代表业务的云标签的 key 为 `business`，value 为具体业务的名称，假设有 `A` 和 `B` 两个业务。
@@ -25,10 +29,6 @@
 在 [分账标签](https://console.cloud.tencent.com/expense/tag) 中设置 `business` 为分账标签：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F05%2F21%2F20240521204515.png)
-
-## 根据 namespace 和云标签划分业务
-
-集群中不同 namespace 可能用于不同业务，一个业务可能关联一个或多个 namespace，假设 ns1 和 ns2 属于 A 业务，ns3 属于 B 业务，对应的云标签分别是 `business: A` 和 `business: B`。
 
 ## 为 CLB 打云标签
 
