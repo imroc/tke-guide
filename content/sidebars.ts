@@ -100,15 +100,15 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: '可观测性指南',
+      label: '监控指南',
       collapsed: true,
       link: {
         type: 'generated-index',
-        slug: '/observability'
+        slug: '/monitoring'
       },
       items: [
-        'observability/prometheus-scrape-config',
-        'observability/grafana-dashboard-for-supernode-pod',
+        'monitoring/prometheus-scrape-config',
+        'monitoring/grafana-dashboard-for-supernode-pod',
       ],
     },
     {
