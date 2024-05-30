@@ -108,7 +108,6 @@ const sidebars: SidebarsConfig = {
       },
       items: [
         'monitoring/prometheus-scrape-config',
-        'monitoring/grafana-dashboard-for-supernode-pod',
         'monitoring/grafana',
         'monitoring/kube-prometheus-stack',
       ],
