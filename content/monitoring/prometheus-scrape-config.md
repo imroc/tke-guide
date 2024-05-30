@@ -63,10 +63,10 @@
 
 ## 超级节点采集规则
 
-超级节点是虚拟的节点，监控数据暴露在每个 Pod 的 `9100` 端口下，使用以下采集规则进行采集：
+超级节点是虚拟的节点，每个 Pod 都是独占虚拟机，监控数据暴露在每个 Pod 的 `9100` 端口下，使用以下采集规则进行采集：
 
 ```yaml
-    - job_name: eks # 采集超级节点监控数据
+    - job_name: serverless-pod # 采集超级节点的 Pod 监控数据
       honor_timestamps: true
       metrics_path: '/metrics' # 所有健康数据都在这个路径
       params: # 通常需要加参数过滤掉 ipvs 相关的指标，因为可能数据量较大，打高 Pod 负载。
@@ -123,114 +123,15 @@
 * 如果 Pod 的 phase 不是 Running 也无法采集，可以排除。
 * `container_` 开头的指标是 cadvisor 监控数据，`pod_` 前缀指标是超级节点 Pod 所在子机的监控数据(相当于将 `node_exporter` 的 `node_` 前缀指标替换成了 `pod_`)，`kubelet_` 前缀指标是超级节点 Pod 子机内兼容 kubelet 的指标(主要是 pvc 存储监控)。
 
-## kube-prometheus-stack 配置
 
-如今都流行使用 [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) 这个 helm chart 来自建 Prometheus，在 `values.yaml` 中进行自定义配置然后安装到集群，其中可以配置 Prometheus 原生的 `scrape_config` (非 CRD)，配置方法是将自定义的 `scrape_config` 写到 `prometheus.prometheusSpec.additionalScrapeConfigs` 字段下，下面是示例:
+如果你是用 [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) 部署的监控系统，超级节点的采集配置可写到 `prometheus.prometheusSpec.additionalScrapeConfigs` 字段下，下面是示例:
 
-```yaml
+```yaml title="values.yaml"
 prometheus:
   prometheusSpec:
     additionalScrapeConfigs:
-    - job_name: "tke-cadvisor"
-      scheme: https
-      metrics_path: /metrics/cadvisor
-      tls_config:
-        insecure_skip_verify: true
-      authorization:
-        credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      kubernetes_sd_configs:
-      - role: node
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_node_label_node_kubernetes_io_instance_type]
-        regex: eklet
-        action: drop
-      - action: labelmap
-        regex: __meta_kubernetes_node_label_(.+)
-    - job_name: "tke-kubelet"
-      scheme: https
-      metrics_path: /metrics
-      tls_config:
-        insecure_skip_verify: true
-      authorization:
-        credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      kubernetes_sd_configs:
-      - role: node
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_node_label_node_kubernetes_io_instance_type]
-        regex: eklet
-        action: drop
-      - action: labelmap
-        regex: __meta_kubernetes_node_label_(.+)
-    - job_name: "tke-probes"
-      scheme: https
-      metrics_path: /metrics/probes
-      tls_config:
-        insecure_skip_verify: true
-      authorization:
-        credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      kubernetes_sd_configs:
-      - role: node
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_node_label_node_kubernetes_io_instance_type]
-        regex: eklet
-        action: drop
-      - action: labelmap
-        regex: __meta_kubernetes_node_label_(.+)
-    - job_name: eks
-      honor_timestamps: true
-      metrics_path: '/metrics'
-      params:
-        collect[]: ['ipvs']
-        # - 'cpu'
-        # - 'meminfo'
-        # - 'diskstats'
-        # - 'filesystem'
-        # - 'load0vg'
-        # - 'netdev'
-        # - 'filefd'
-        # - 'pressure'
-        # - 'vmstat'
-      scheme: http
-      kubernetes_sd_configs:
-      - role: pod
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_pod_annotation_tke_cloud_tencent_com_pod_type]
-        regex: eklet
-        action: keep
-      - source_labels: [__meta_kubernetes_pod_phase]
-        regex: Running
-        action: keep
-      - source_labels: [__meta_kubernetes_pod_ip]
-        separator: ;
-        regex: (.*)
-        target_label: __address__
-        replacement: ${1}:9100
-        action: replace
-      - source_labels: [__meta_kubernetes_pod_name]
-        separator: ;
-        regex: (.*)
-        target_label: pod
-        replacement: ${1}
-        action: replace
-      - source_labels: [__meta_kubernetes_namespace]
-        separator: ;
-        regex: (.*)
-        target_label: namespace
-        replacement: ${1}
-        action: replace
-      metric_relabel_configs:
-      - source_labels: [__name__]
-        separator: ;
-        regex: (container_.*|pod_.*|kubelet_.*)
-        replacement: $1
-        action: keep
-    storageSpec:
-     volumeClaimTemplate:
-       spec:
-         accessModes: ["ReadWriteOnce"]
-         resources:
-           requests:
-             storage: 100Gi
+      - job_name: serverless-pod
+        ...
 ```
 
 ## FAQ
