@@ -110,75 +110,12 @@ prometheus-node-exporter:
 
 ## 配置 Grafana 
 
-下面是一些建议加上的配置：
+grafana 是 `kube-prometheus-stack` 中的一个 subchart，它所有的配置都放到 `grafana` 字段下面，如：
 
 ```yaml title="grafana-values.yaml"
 grafana:
-  adminUser: "roc"
+  adminUser: "admin"
   adminPassword: "123456"
-  defaultDashboardsTimezone: "Asia/Shanghai"
-  sidecar:
-    dashboards:
-      folderAnnotation: "grafana_folder"
-      provider:
-        foldersFromFilesStructure: true
-  testFramework:
-    enabled: false
 ```
 
-* `adminUser` 和 `adminPassword` 分别设置管理员的账号和密码。
-* `defaultDashboardsTimezone` 设置展示面板所用的时区，国内固定使用 `Asia/Shanghai`。
-* `folderAnnotation` 是存储 dashboard 的 ConfigMap 的一个注解名称，用于标识该 ConfigMap 下面板 json 文件存储的目录，结合 `foldersFromFilesStructure` 置为 true，可实现 ConfigMap 中的面板按目录组织。
-
-## 声明式配置 Grafana 面板
-
-`kube-prometheus-stack` 自带了很多常用面板，如果还需要其它自定义面板，可以导出 dashboard 的 json 文件，通过 kustomize 引用并统一加上 `grafana_dashboard: 1` 的 label，比如要为 `EnvoyGateway` 加 dashboard，使用以下 kustomize 结构组织文件:
-
-```txt
-envoygateway
-├── dashboards
-│   ├── envoy-clusters.json
-│   ├── envoy-global.json
-│   └── envoy-pod-resource.json
-└── kustomization.yaml
-```
-
-在 `kustomization.yaml` 中用 `configMapGenerator` 用这些 dashboard json 文件生成 ConfigMap，并统一打上 `grafana_dashboard: 1` 的 label 和 `grafana_folder: Envoy` 的 annotation:
-
-```yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-
-namespace: monitoring
-
-generatorOptions:
-  disableNameSuffixHash: true
-  labels:
-    grafana_dashboard: "1"
-commonAnnotations:
-  grafana_folder: "Envoy"
-
-configMapGenerator:
-  - files:
-      - dashboards/envoy-clusters.json
-    name: dashboard-envoy-clusters
-  - files:
-      - dashboards/envoy-global.json
-    name: dashboard-envoy-global
-  - files:
-      - dashboards/envoy-pod-resource.json
-    name: dashboard-envoy-pod-resource
-```
-
-## 配置 Grafana 默认监控大盘
-
-有时候我们希望进入 Grafana 主页后能展示一个默认的监控大盘，能够比较直观看到我们集群或系统的概况，这时可以用以下方法来配置默认的 dashboard。
-
-首先进入 Grafana 并选择希望设置为默认的面板，然后复制下路径，粘贴到 `values` 配置里，示例：
-
-```yaml title="grafana-homepage-values.yaml"
-grafana:
-  grafana.ini:
-    users:
-      home_page: /d/G9PMkKi7k/e99b86-e7bea4-e6a682-e8a788 # 首页自动跳转到该面板的路径
-```
+具体配置建议参考 [在 TKE 上自建 Grafana](grafana)。
