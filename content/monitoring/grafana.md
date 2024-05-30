@@ -37,9 +37,7 @@ testFramework:
 
 下面介绍声明式配置 Dashboard 的方法，可以让你的 Dashboard 在多个 Grafana 之间共享，无需繁琐的手动导出导入的操作。
 
-思路：Dashboard 配置的本质是 json 文件，我们可以将 json 存储到 ConfigMap，利用 Grafana Chart 中自带的 sidecar，将 ConfigMap 中的 json 自动同步到 Grafana 保存 Dashboard 的目录中。
-
-下面介绍实现方法。
+首先说下思路：Dashboard 配置的本质是 json 文件，我们可以将 json 存储到 ConfigMap，利用 Grafana Chart 中自带的 sidecar，将 ConfigMap 中的 json 自动同步到 Grafana 保存 Dashboard 的目录中。
 
 制作好 Dashboard 后，我们可以导出 Dashboard 的 json 文件到本地，通过 `kustomize` 引用并统一加上 `grafana_dashboard: 1` 的 label，比如要为 `EnvoyGateway` 加 Dashboard，使用以下 kustomize 的结构组织文件:
 
