@@ -4,6 +4,10 @@
 
 ## 普通节点采集规则
 
+如果你使用 [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) 或 [victoria-metrics-k8s-stack](https://github.com/VictoriaMetrics/helm-charts/blob/master/charts/victoria-metrics-k8s-stack/README.md) 搭建的监控系统，那么普通节点的监控数据无需自行配置。
+
+如果是自行手动维护 Prometheus 的采集规则，可参考下面的采集规则：
+
 ```yaml
     - job_name: "tke-cadvisor"
       scheme: https
@@ -58,6 +62,8 @@
 * kubelet 通过 `/metrics/cadvisor`, `/metrics` 与 `/metrics/probes` 路径分别暴露了容器 cadvisor 监控数据、kubelet 自身监控数据以及容器健康检查健康数据，为这三个不同路径分别配置采集 job 进行采集。
 
 ## 超级节点采集规则
+
+超级节点是虚拟的节点，监控数据暴露在每个 Pod 的 `9100` 端口下，使用以下采集规则进行采集：
 
 ```yaml
     - job_name: eks # 采集超级节点监控数据

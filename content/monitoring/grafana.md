@@ -95,6 +95,6 @@ grafana:
 在 GitHub 上有开源的 TKE Grafana 监控面板 [grafana-dashboards/tke](https://github.com/grafana-dashboards/tke)，通过以下命令将面板添加到 Grafana：
 
 ```bash
-git clone git@github.com:grafana-dashboards/tke.git
-kubectl apply -k ./tke
+git clone --depth 1 git@github.com:grafana-dashboards/tke.git grafana-dashboards-tke
+kubectl apply -k ./grafana-dashboards-tke
 ```
