@@ -1,4 +1,4 @@
-# Prometheus 采集配置最佳实践
+# TKE Prometheus 采集配置最佳实践
 
 使用 Prometheus 采集腾讯云容器服务的监控数据时如何配置采集规则？主要需要注意的是 kubelet 与 cadvisor 的监控指标采集，本文分享为 Prometheus 配置 `scrape_config` 来采集腾讯云容器服务集群的监控数据的方法。
 
@@ -123,7 +123,6 @@
 * 如果 Pod 的 phase 不是 Running 也无法采集，可以排除。
 * `container_` 开头的指标是 cadvisor 监控数据，`pod_` 前缀指标是超级节点 Pod 所在子机的监控数据(相当于将 `node_exporter` 的 `node_` 前缀指标替换成了 `pod_`)，`kubelet_` 前缀指标是超级节点 Pod 子机内兼容 kubelet 的指标(主要是 pvc 存储监控)。
 
-
 如果你是用 [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) 部署的监控系统，超级节点的采集配置可写到 `prometheus.prometheusSpec.additionalScrapeConfigs` 字段下，下面是示例:
 
 ```yaml title="values.yaml"
@@ -132,6 +131,59 @@ prometheus:
     additionalScrapeConfigs:
       - job_name: serverless-pod
         ...
+```
+
+## Serverless 集群采集规则
+
+Serverless 集群只有超级节点，Pod 上不存在 `tke.cloud.tencent.com/pod-type` 这个注解，也就不需要这个过滤条件，采集规则为：
+
+```yaml
+    - job_name: serverless-pod # 采集超级节点的 Pod 监控数据
+      honor_timestamps: true
+      metrics_path: '/metrics' # 所有健康数据都在这个路径
+      params: # 通常需要加参数过滤掉 ipvs 相关的指标，因为可能数据量较大，打高 Pod 负载。
+        collect[]:
+        - 'ipvs'
+        # - 'cpu'
+        # - 'meminfo'
+        # - 'diskstats'
+        # - 'filesystem'
+        # - 'load0vg'
+        # - 'netdev'
+        # - 'filefd'
+        # - 'pressure'
+        # - 'vmstat'
+      scheme: http
+      kubernetes_sd_configs:
+      - role: pod # 超级节点 Pod 的监控数据暴露在 Pod 自身 IP 的 9100 端口，所以使用 Pod 服务发现
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_phase]
+        regex: Running # 非 Running 状态的 Pod 机器资源已释放，不需要采集
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_ip]
+        separator: ;
+        regex: (.*)
+        target_label: __address__
+        replacement: ${1}:9100 # 监控指标暴露在 Pod 的 9100 端口
+        action: replace
+      - source_labels: [__meta_kubernetes_pod_name]
+        separator: ;
+        regex: (.*)
+        target_label: pod # 将 Pod 名字写到 "pod" label
+        replacement: ${1}
+        action: replace
+      - source_labels: [__meta_kubernetes_namespace]
+        separator: ;
+        regex: (.*)
+        target_label: namespace # 将 Pod 所在 namespace 写到 "namespace" label
+        replacement: ${1}
+        action: replace
+      metric_relabel_configs:
+      - source_labels: [__name__]
+        separator: ;
+        regex: (container_.*|pod_.*|kubelet_.*)
+        replacement: $1
+        action: keep
 ```
 
 ## FAQ
