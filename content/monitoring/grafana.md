@@ -89,3 +89,12 @@ grafana:
     users:
       home_page: /d/G9PMkKi7k/e99b86-e7bea4-e6a682-e8a788 # 首页自动跳转到该面板的路径
 ```
+
+## 配置 TKE 监控面板
+
+在 GitHub 上有开源的 TKE Grafana 监控面板 [grafana-dashboards/tke](https://github.com/grafana-dashboards/tke)，通过以下命令将面板添加到 Grafana：
+
+```bash
+git clone git@github.com:grafana-dashboards/tke.git
+kubectl apply -k ./tke
+```
