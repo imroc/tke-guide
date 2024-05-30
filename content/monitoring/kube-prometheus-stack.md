@@ -32,7 +32,7 @@
 `kube-prometheus-stack` 很多依赖镜像在 `quay.io` 和 `registry.k8s.io` 这些国外的镜像仓库，国内环境拉取会失败，如果你的集群在国内，可以将国外的依赖镜像替换为 DockerHub 中相应的自动同步的 mirror 镜像：
 
 | 国外的依赖镜像                                         | DockerHub 中自动同步的 mirror 镜像                     |
-| ------------------------------------------------------ | ------------------------------------------------------ |
+| :----------------------------------------------------- | :----------------------------------------------------- |
 | quay.io/prometheus-operator/admission-webhook          | docker.io/imroc/prometheus-operator-admission-webhook  |
 | quay.io/prometheus-operator/prometheus-operator        | docker.io/imroc/prometheus-operator                    |
 | quay.io/prometheus/node-exporter                       | docker.io/imroc/prometheus-node-exporter               |
