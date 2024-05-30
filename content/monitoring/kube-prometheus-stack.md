@@ -26,6 +26,7 @@
         - tke-serverless-values.yaml
       # highlight-start
   ```
+  > kustomize 内置到了 kubectl，可通过 `kubectl apply -k .` 进行安装。
 
 ## 国内环境替换镜像地址
 
