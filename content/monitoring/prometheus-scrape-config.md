@@ -2,7 +2,7 @@
 
 使用 Prometheus 采集腾讯云容器服务的监控数据时如何配置采集规则？主要需要注意的是 kubelet 与 cadvisor 的监控指标采集，本文分享为 Prometheus 配置 `scrape_config` 来采集腾讯云容器服务集群的监控数据的方法。
 
-## 普通节点采集规则
+## TKE 集群普通节点采集规则
 
 如果你使用 [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) 或 [victoria-metrics-k8s-stack](https://github.com/VictoriaMetrics/helm-charts/blob/master/charts/victoria-metrics-k8s-stack/README.md) 搭建的监控系统，那么普通节点的监控数据无需自行配置。
 
@@ -61,7 +61,7 @@
 * TKE 节点上的 kubelet 证书是自签的，需要忽略证书校验，所以 `insecure_skip_verify` 要置为 true。
 * kubelet 通过 `/metrics/cadvisor`, `/metrics` 与 `/metrics/probes` 路径分别暴露了容器 cadvisor 监控数据、kubelet 自身监控数据以及容器健康检查健康数据，为这三个不同路径分别配置采集 job 进行采集。
 
-## 超级节点采集规则
+## TKE 集群超级节点采集规则
 
 超级节点是虚拟的节点，每个 Pod 都是独占虚拟机，监控数据暴露在每个 Pod 的 `9100` 端口下，使用以下采集规则进行采集：
 
@@ -133,9 +133,9 @@ prometheus:
         ...
 ```
 
-## Serverless 集群采集规则
+## TKE Serverless 集群采集规则
 
-Serverless 集群只有超级节点，Pod 上不存在 `tke.cloud.tencent.com/pod-type` 这个注解，也就不需要这个过滤条件，采集规则为：
+TKE Serverless 集群只有超级节点，Pod 上不存在 `tke.cloud.tencent.com/pod-type` 这个注解，也就不需要这个过滤条件，采集规则为：
 
 ```yaml
     - job_name: serverless-pod # 采集超级节点的 Pod 监控数据
