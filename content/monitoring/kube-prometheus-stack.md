@@ -6,10 +6,12 @@
 
 ## 自定义配置的方法
 
-
 由于 `kube-prometheus-stack` 这个 chart 非常庞大，还包含了很多其它依赖的 chart，配置也就非常多，如果我们要自定义的配置也很多，写到一个 `values.yaml` 中维护起来比较麻烦，我们可以拆成多个，在安装的时候指定多个配置文件就可以了：
-* 如果你直接用 helm 进行安装，可以指定多次 `-f` 参数。
-* 如果你用 kustomize 引用该 chart 安装，可以用 `additionalValuesFiles` 指定多个 `values` 配置文件。
+* 如果你直接用 helm 进行安装，可以指定多次 `-f` 参数:
+  ```bash
+  helm upgrade --install eg prom/kube-prometheus-stack -f image-values.yaml -f grafana-values.yaml -f tke-serverless-values.yaml
+  ```
+* 如果你用 kustomize 引用该 chart 安装，可以用 `additionalValuesFiles` 指定多个 `values` 配置文件:
   ```yaml showLineNumbers title="kustomization.yaml"
   helmCharts:
     - repo: https://prometheus-community.github.io/helm-charts
