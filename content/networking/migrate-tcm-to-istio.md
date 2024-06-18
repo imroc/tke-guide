@@ -131,4 +131,8 @@ spec:
 * 通过 `serviceAnnotations` 给 Service 加注解。
 * 指定内网CLB有两种方式，直接指定已有内网CLB的ID，或者指定自动创建CLB的子网ID，参考示例中的写法。
 
+东西向网关配置准备好后，使用以下命令在主集群中安装：
 
+```bash
+istioctl install -f eastwest-gateway.yaml
+```
