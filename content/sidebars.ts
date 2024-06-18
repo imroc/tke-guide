@@ -39,6 +39,7 @@ const sidebars: SidebarsConfig = {
         'networking/how-to-use-eip',
         'networking/install-localdns-with-ipvs',
         'networking/expose-grpc-with-tcm',
+        'networking/migrate-tcm-to-istio',
       ],
     },
     {
