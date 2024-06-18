@@ -10,7 +10,9 @@ istio 架构分为控制面和数据面，控制面是 istiod，数据面是网�
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F06%2F18%2F20240618150336.png)
 
-TCM 主要托管的是 isitod，迁移的关键点就是使用自建的 istiod 替换 TCM 的 isitod，但由于根证书问题，两者无法共存，也就无法原地平滑迁移，只能新建一套环境来自建 istio，然后逐渐将业务迁移到新建的 istio 环境中，逐步切流量过来，完成全量迁移之前，两套环境还需共存。
+TCM 主要托管的是 isitod，迁移的关键点就是使用自建的 istiod 替换 TCM 的 isitod，但由于根证书问题，两者无法共存，也就无法原地平滑迁移，只能新建一套环境来自建 istio，然后逐渐将业务迁移到新建的 istio 环境中，逐步切流量过来，完成全量迁移之前，两套环境还需共存：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F06%2F18%2F20240618170536.png)
 
 ## 安装 istio
 
