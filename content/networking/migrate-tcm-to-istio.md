@@ -246,7 +246,7 @@ staging        istio-ingressgateway-staging-5fbf567984-fnvgf   1/1     Running  
 kubectl label namespace your-namespace istio-injection=enabled --overwrite
 ```
 
-> 这与 TCM 有所不同，参考 [TCM 常见问题: 没有自动注入Sidecar](https://cloud.tencent.com/document/product/1261/63059)
+> 这与 TCM 有所不同，参考 [TCM 常见问题: 没有自动注入Sidecar](https://cloud.tencent.com/document/product/1261/63059)。
 
 
 ## 迁移 istio 配置
