@@ -1,0 +1,2 @@
+NAME                           READY   STATUS    RESTARTS   AGE    IP            NODE                           NOMINATED NODE   READINESS GATES
+tke-troubleshooting-helper-0   1/1     Running   0          110s   21.34.22.56   eklet-subnet-7veh1aog-e24a51   <none>           3/3
