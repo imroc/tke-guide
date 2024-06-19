@@ -190,7 +190,7 @@ istioctl create-remote-secret --name=cls-ne1cw84b | kubectl apply -f -
 
 我们为每个集群都维护一个 `IstioOperator` 的 YAML 文件，想在哪个集群安装 Ingress Gateway 就在哪个集群对应的 `IstioOperator` 文件中的 `components` 增加 `ingressGateways` 配置即可，比如在从集群中部署，修改 `member-cluster-1.yaml`:
 
-```yaml
+```yaml showLineNumbers title="member-cluster-1.yaml"
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
