@@ -17,13 +17,13 @@ controller:
     targetCPUUtilizationPercentage: 50
     targetMemoryUtilizationPercentage: 50
     behavior: # 快速扩容应对流量洪峰，缓慢缩容预留 buffer 避免流量异常
-      scaleDown:
+      scaleUp:
         stabilizationWindowSeconds: 300
         policies:
           - type: Percent
             value: 900
             periodSeconds: 15 # 每 15s 最多允许扩容 9 倍于当前副本数
-      scaleUp:
+      scaleDown:
         stabilizationWindowSeconds: 300
         policies:
           - type: Pods
