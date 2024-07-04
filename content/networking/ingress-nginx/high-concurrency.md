@@ -20,6 +20,8 @@ controller:
     - name: sysctl
       image: busybox
       imagePullPolicy: IfNotPresent
+      securityContext:
+        privileged: true
       command:
         - sh
         - -c
