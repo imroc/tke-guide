@@ -166,10 +166,10 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           link: {
             type: 'generated-index',
-            slug: '/okg/game'
+            slug: '/game/okg'
           },
           items: [
-            'okg/game/install',
+            'game/okg/install',
           ],
         },
       ]
