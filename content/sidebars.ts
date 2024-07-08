@@ -153,6 +153,29 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: '游戏方案',
+      collapsed: true,
+      link: {
+        type: 'generated-index',
+        slug: '/game'
+      },
+      items: [
+        {
+          type: 'category',
+          label: 'OpenKruiseGame',
+          collapsed: true,
+          link: {
+            type: 'generated-index',
+            slug: '/okg/game'
+          },
+          items: [
+            'okg/game/install.md',
+          ],
+        },
+      ]
+    },
+    {
+      type: 'category',
       label: '常见应用部署',
       collapsed: true,
       link: {
