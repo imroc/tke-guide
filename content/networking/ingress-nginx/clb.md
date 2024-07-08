@@ -62,3 +62,23 @@ controller:
 该功能是 CLB 的内测功能，需要提工单申请开通。
 
 :::
+
+## CLB 跨域绑定
+
+如果你想使用其它地域的 CLB 来接入流量，可以利用 CLB 的 [跨地域绑定2.0](https://cloud.tencent.com/document/product/214/48180) 和 TKE 的 [Service 跨域绑定](https://cloud.tencent.com/document/product/457/59094) 能力来实现，需要满足以下前提条件:
+1. 账号是带宽上移类型。
+2. 两个 VPC 通过云联网打通了。
+3. 开通了CLB的跨地域绑定2.0 功能(提工单开通)。
+
+然后将 CLB 的 ID、所在地域和 VPC 信息配在注解里:
+
+```yaml showLineNumbers
+controller:
+  service:
+    # highlight-start
+    annotations:
+      service.cloud.tencent.com/cross-region-id: "ap-guangzhou"  # 如果CLB在其它地域，指定下CLB所在地域
+      service.cloud.tencent.com/cross-vpc-id: "vpc-xxx" # 指定CLB所在VPC
+      service.kubernetes.io/tke-existed-lbid: "lb-xxx" # 如果使用已有CLB，指定下CLB ID
+    # highlight-end
+```
