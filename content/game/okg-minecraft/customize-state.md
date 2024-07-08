@@ -99,6 +99,20 @@ spec:
   # highlight-end
 ```
 
+## 测试并观察 opsState
+
+我们用客户端连接游戏服后，执行以下命令可查看各个游戏服务的 `opsState`:
+
+```bash
+$ kubectl get gameserver
+NAME          STATE   OPSSTATE          DP    UP    AGE
+minecraft-0   Ready   WaitToBeDeleted   0     0     68m
+minecraft-1   Ready   None              0     0     69m
+minecraft-2   Ready   WaitToBeDeleted   0     0     70m
+```
+
+> 其中为 `None` 的表示有玩家正在该服游戏，`WaitToBeDeleted` 表示该服没有玩家，可以升级。
+
 ## 参考资料
 
 * [KruiseGame用户手册：自定义服务质量](https://openkruise.io/zh/kruisegame/user-manuals/service-qualities)
