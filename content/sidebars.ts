@@ -169,7 +169,7 @@ const sidebars: SidebarsConfig = {
             slug: '/okg/game'
           },
           items: [
-            'okg/game/install.md',
+            'okg/game/install',
           ],
         },
       ]
