@@ -40,7 +40,7 @@ configMapGenerator:
 
 ## 在 GameServerSet 自定义服务质量
 
-```yaml
+```yaml showLineNumbers
 apiVersion: game.kruise.io/v1alpha1
 kind: GameServerSet
 metadata:
