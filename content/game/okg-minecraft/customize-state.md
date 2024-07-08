@@ -40,6 +40,8 @@ configMapGenerator:
 
 ## 在 GameServerSet 自定义服务质量
 
+重点关注高亮部分：
+
 ```yaml showLineNumbers
 apiVersion: game.kruise.io/v1alpha1
 kind: GameServerSet

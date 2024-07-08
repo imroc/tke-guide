@@ -24,6 +24,8 @@ volumeBindingMode: WaitForFirstConsumer # 等 Pod 第一次调度后再创建 CB
 
 ## 在 GameServerSet 中声明 volume 并挂载
 
+重点关注高亮部分：
+
 ```yaml showLineNumbers
 apiVersion: game.kruise.io/v1alpha1
 kind: GameServerSet
