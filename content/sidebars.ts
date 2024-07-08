@@ -171,6 +171,7 @@ const sidebars: SidebarsConfig = {
           items: [
             'game/okg-minecraft/deploy',
             'game/okg-minecraft/storage',
+            'game/okg-minecraft/client',
             'game/okg-minecraft/customize-state',
           ]
         }
