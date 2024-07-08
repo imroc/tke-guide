@@ -162,16 +162,18 @@ const sidebars: SidebarsConfig = {
       items: [
         {
           type: 'category',
-          label: 'OpenKruiseGame',
+          label: '使用 OpenKruiseGame 部署我的世界',
           collapsed: true,
           link: {
             type: 'generated-index',
-            slug: '/game/okg'
+            slug: '/game/okg-minecraft'
           },
           items: [
-            'game/okg/install',
-          ],
-        },
+            'game/okg-minecraft/deploy',
+            'game/okg-minecraft/storage',
+            'game/okg-minecraft/customize-state',
+          ]
+        }
       ]
     },
     {
