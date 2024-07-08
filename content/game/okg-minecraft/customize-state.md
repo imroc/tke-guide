@@ -98,3 +98,7 @@ spec:
           opsState: None
   # highlight-end
 ```
+
+## 参考资料
+
+* [KruiseGame用户手册：自定义服务质量](https://openkruise.io/zh/kruisegame/user-manuals/service-qualities)
