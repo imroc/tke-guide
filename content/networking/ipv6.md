@@ -28,7 +28,7 @@
 
 如果使用超级节点，通过注解指定 Pod 使用 IPv6:
 
-```yaml
+```yaml showLineNumbers
 apiVersion: apps/v1
 kind: Deployment
 metadata:
