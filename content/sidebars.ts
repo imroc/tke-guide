@@ -40,6 +40,7 @@ const sidebars: SidebarsConfig = {
         'networking/install-localdns-with-ipvs',
         'networking/expose-grpc-with-tcm',
         'networking/migrate-tcm-to-istio',
+        'networking/ipv6',
       ],
     },
     {
