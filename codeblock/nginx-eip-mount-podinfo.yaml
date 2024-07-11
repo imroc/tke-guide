@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+      annotations:
+        eks.tke.cloud.tencent.com/eip-attributes: '{"InternetMaxBandwidthOut":100, "InternetChargeType":"TRAFFIC_POSTPAID_BY_HOUR"}'
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          command:
+            - sleep
+            - infinity
+          # highlight-start
+          volumeMounts:
+            - mountPath: /etc/podinfo # 容器内读取 /etc/podinfo/annotations 可获取当前 Pod 注解，EIP 信息在这个注解里： tke.cloud.tencent.com/eip-public-ip
+              name: podinfo
+          # highlight-end
+      volumes:
+        # highlight-start
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: "labels"
+                fieldRef:
+                  fieldPath: metadata.labels
+              - path: "annotations" # 关键
+                fieldRef:
+                  fieldPath: metadata.annotations
+        # highlight-end

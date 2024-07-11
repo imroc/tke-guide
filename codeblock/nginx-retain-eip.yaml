@@ -13,13 +13,14 @@ spec:
   template:
     metadata:
       annotations:
-        # highlight-start
-        eks.tke.cloud.tencent.com/eip-attributes: "{}" # 指定 Pod 使用 EIP （仅在超级节点支持）
+        eks.tke.cloud.tencent.com/eip-attributes: '{"InternetMaxBandwidthOut":50, "InternetChargeType":"TRAFFIC_POSTPAID_BY_HOUR"}'
+        # highlight-next-line
         eks.tke.cloud.tencent.com/eip-claim-delete-policy: "Never" # 声明要保留 EIP（Pod 重建后保持 EIP 不变），仅支持 StatefulSet
-        # highlight-end
       labels:
         app: nginx
     spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: eklet
       containers:
         - name: nginx
           image: nginx:latest

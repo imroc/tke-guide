@@ -12,7 +12,7 @@ spec:
       labels:
         app: nginx
     spec:
-      # 使用  nodeSelector 显式指定调度到超级节点
+      # 使用 nodeSelector 显式指定调度到超级节点
       # highlight-start
       nodeSelector:
         node.kubernetes.io/instance-type: eklet
