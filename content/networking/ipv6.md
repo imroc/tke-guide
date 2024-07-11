@@ -14,44 +14,16 @@
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F07%2F09%2F20240709164815.png)
 
-## 集群要求
+## 超级节点使用 IPv6
 
-创建集群时如果选【标准集群】，操作系统需要选择支持 `IPv4/IPv6双栈` 的操作系统，然后网络选择【IPv4/IPv6双栈】:
+如果你能让需要 IPv6 的 Pod 调度到超级节点上，那么对集群网络就没有要求，只需在创建超级节点时选分配了 IPv6 网段的子网，然后在工作负载里为 Pod 指定下注解就能让 Pod 支持 IPv6:
+
+<FileBlock file="nginx-ipv6-eks.yaml" showLineNumbers />
+
+## 其它节点使用 IPv6
+
+如果你不能保证让需要 IPv6 的 Pod 调度到超级节点（比如调度到CVM节点、原生节点），可以在创建 `标准集群` 的时候选支持 `IPv4/IPv6双栈` 的操作系统，然后网络就选择【IPv4/IPv6双栈】:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F07%2F09%2F20240709165012.png)
 
-## 创建节点池
-
-创建节点池时，子网需选择分配了 IPv6 网段的子网。
-
-## 超级节点使用 IPv6
-
-如果使用超级节点，通过注解指定 Pod 使用 IPv6:
-
-```yaml showLineNumbers
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nginx
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: nginx
-  template:
-    metadata:
-      annotations:
-        # highlight-start
-        tke.cloud.tencent.com/ipv6-attributes: '{"InternetMaxBandwidthOut": 100}'
-        tke.cloud.tencent.com/need-ipv6-addr: "true"
-        # tke.cloud.tencent.com/ipv6-attributes: '{"BandwidthPackageId":"bwp-xxx","InternetChargeType":"BANDWIDTH_PACKAGE","InternetMaxBandwidthOut":1}' # 如需带宽包，参考这个配置
-        # highlight-end
-      labels:
-        app: nginx
-    spec:
-      nodeSelector:
-        node.kubernetes.io/instance-type: eklet # 调度到超级节点
-      containers:
-      - image: nginx:latest
-        name: nginx
-```
+后续在集群中创建的任何 Pod 就都会带有 IPv6 了。
