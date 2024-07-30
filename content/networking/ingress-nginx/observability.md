@@ -9,6 +9,8 @@
 如果你使用了 [腾讯云 Prometheus 监控服务关联 TKE 集群](https://cloud.tencent.com/document/product/1416/72037)，或者是自己安装了 Prometheus Operator 来监控集群，都可以启用 ServiceMonitor 来采集 Nginx Ingress 的监控数据，只需在 `values.yaml` 中打开这个开关即可：
 
 ```yaml
+commonLabels:
+  prom_id: prom-xxx # 通过这个 label 指定 Prometheus 实例的 ID，以便被 Prometheus 实例识别到 ServiceMonitor
 controller:
   metrics:
     enabled: true # 专门创建一个 service 给 Prometheus 用作 Nginx Ingress 的服务发现
