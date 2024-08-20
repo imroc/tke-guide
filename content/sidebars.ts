@@ -163,6 +163,18 @@ const sidebars: SidebarsConfig = {
       items: [
         {
           type: 'category',
+          label: '在 TKE 使用 OpenKruiseGame 部署游戏',
+          collapsed: true,
+          link: {
+            type: 'generated-index',
+            slug: '/game/okg'
+          },
+          items: [
+            'game/okg/install',
+          ]
+        },
+        {
+          type: 'category',
           label: '使用 OpenKruiseGame 部署我的世界',
           collapsed: true,
           link: {
