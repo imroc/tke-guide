@@ -14,7 +14,9 @@
 
 参考 [官方安装文档](https://openkruise.io/zh/kruisegame/installation/) 进行安装。
 
-## 常见问题: helm 命令所在环境连不上 github 怎么办？
+## 常见问题
+
+### helm 命令所在环境连不上 github 怎么办？
 
 使用 helm 命令安装时，依赖托管在 github 上的 helm repo，如果 helm 命令所在环境连不上 github，会导致安装失败。
 
@@ -35,3 +37,28 @@ helm install kruise-game kruise-game-0.8.0.tgz
 ```
 
 > 注意替换文件名。
+
+### kruise-game-controller-manager 报错 client-side throttling
+
+使用默认配置在 TKE 安装 `OpenKruiseGame` 的时候（v0.8.0），`kruise-game-controller-manager` 的 Pod 可能会起不来：
+
+```log
+I0708 03:28:11.315405       1 request.go:601] Waited for 1.176544858s due to client-side throttling, not priority and fairness, request: GET:https://172.16.128.1:443/apis/operators.coreos.com/v1alpha2?timeout=32s
+I0708 03:28:21.315900       1 request.go:601] Waited for 11.176584459s due to client-side throttling, not priority and fairness, request: GET:https://172.16.128.1:443/apis/install.istio.io/v1alpha1?timeout=32s
+```
+
+是因为 `OpenKruiseGame` 的 helm chart 包中，默认的本地 APIServer 限速太低 (`values.yaml`):
+
+```yaml
+kruiseGame:
+  apiServerQps: 5
+  apiServerQpsBurst: 10
+```
+
+可以改高点：
+
+```yaml
+kruiseGame:
+  apiServerQps: 50
+  apiServerQpsBurst: 100
+```
