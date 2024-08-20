@@ -163,7 +163,7 @@ const sidebars: SidebarsConfig = {
       items: [
         {
           type: 'category',
-          label: '在 TKE 使用 OpenKruiseGame 部署游戏',
+          label: 'OpenKruiseGame',
           collapsed: true,
           link: {
             type: 'generated-index',
@@ -188,7 +188,6 @@ const sidebars: SidebarsConfig = {
             }
           ]
         },
-
       ]
     },
     {
