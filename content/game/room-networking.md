@@ -20,7 +20,6 @@ TKE 支持 [Pod 绑 EIP](../networking/pod-eip.md)，Pod 绑定 EIP 后，每个
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F08%2F22%2F20240822165733.png)
 
-
 ## 方案对比与选型
 
 | 方案     | 费用                                                                                                             | Pod 绑定数量                                             | 大规模使用                                                     |
