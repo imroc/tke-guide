@@ -173,19 +173,30 @@ const sidebars: SidebarsConfig = {
             'game/okg/install',
             {
               type: 'category',
-              label: '使用 OpenKruiseGame 部署我的世界',
+              label: '实践案例',
               collapsed: true,
               link: {
                 type: 'generated-index',
-                slug: '/game/okg-minecraft'
+                slug: '/game/cases'
               },
               items: [
-                'game/okg-minecraft/deploy',
-                'game/okg-minecraft/storage',
-                'game/okg-minecraft/client',
-                'game/okg-minecraft/customize-state',
+                {
+                  type: 'category',
+                  label: '使用 OpenKruiseGame 部署我的世界',
+                  collapsed: true,
+                  link: {
+                    type: 'generated-index',
+                    slug: '/game/okg/cases/minecraft'
+                  },
+                  items: [
+                    'game/okg/cases/minecraft/deploy',
+                    'game/okg/cases/minecraft/storage',
+                    'game/okg/cases/minecraft/client',
+                    'game/okg/cases/minecraft/customize-state',
+                  ]
+                }
               ]
-            }
+            },
           ]
         },
       ]
