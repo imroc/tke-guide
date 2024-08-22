@@ -21,3 +21,12 @@ spec:
       containers:
         - name: nginx
           image: nginx:latest
+          # highlight-start
+          resources: # 声明 EIP 资源，用于调度 (节点能绑定的 EIP 数量有限)
+            limits:
+              tke.cloud.tencent.com/eni-ip: "1"
+              tke.cloud.tencent.com/eip: "1"
+            requests:
+              tke.cloud.tencent.com/eni-ip: "1"
+              tke.cloud.tencent.com/eip: "1"
+          # highlight-end
