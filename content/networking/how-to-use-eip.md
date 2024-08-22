@@ -17,19 +17,21 @@ TKE 的节点有超级节点和非超级节点之分，在为 Pod 绑 EIP 时，
 
 ## 如何为 Pod 绑 EIP ?
 
-### 超级节点下 Pod 绑 EIP
+为 Pod 加 `eip-attributes` 注解以声明需要绑定 EIP，超级节点与非超级节点的写法不同，但值都为 JSON 格式，填写创建 EIP 接口的相关的参数，详细参数列表可参考 [这里](https://cloud.tencent.com/document/api/215/16699#2.-.E8.BE.93.E5.85.A5.E5.8F.82.E6.95.B0) 。
 
-配置 EIP 的核心是使用 `eks.tke.cloud.tencent.com/eip-attributes`  这个 Pod 注解，值为 JSON 格式，填写创建 EIP 接口的相关的参数，详细参数列表参考 [这里](https://cloud.tencent.com/document/api/215/16699#2.-.E8.BE.93.E5.85.A5.E5.8F.82.E6.95.B0) 。
+YAML 写法示例：
 
-下面给出一个简单示例，为每个 Pod 副本都绑定带宽上限 100Mbps，按流量计费的 EIP:
+<Tabs>
+  <TabItem value="eip-supernode" label="超级节点写法">
+    <FileBlock file="nginx-eip.yaml" showLineNumbers />
+  </TabItem>
 
-<FileBlock file="nginx-eip.yaml" showLineNumbers />
+  <TabItem value="eip-vpc-cni" label="非超级节点写法">
+    <FileBlock file="nginx-eip-vpc-cni.yaml" showLineNumbers />
+  </TabItem>
+</Tabs>
 
-### 非超级节点下 Pod 绑 EIP
-
-如果需要为调度到非超级节点上的 Pod 绑 EIP，要求 Pod 使用 `VPC-CNI` 网络模式（更多参考 [这里的说明](https://cloud.tencent.com/document/product/457/64886)）。
-
-<FileBlock file="nginx-eip-vpc-cni.yaml" showLineNumbers />
+> 如果 Pod 在非超级节点，要求 Pod 使用 `VPC-CNI` 网络模式（更多参考 [这里的说明](https://cloud.tencent.com/document/product/457/64886)）。
 
 ## 如何保留 EIP ?
 
