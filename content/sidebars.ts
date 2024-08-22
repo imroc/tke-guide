@@ -36,7 +36,7 @@ const sidebars: SidebarsConfig = {
         },
         'networking/traffic-lossless-upgrade',
         'networking/clb-to-pod-directly',
-        'networking/how-to-use-eip',
+        'networking/pod-eip',
         'networking/install-localdns-with-ipvs',
         'networking/expose-grpc-with-tcm',
         'networking/migrate-tcm-to-istio',
