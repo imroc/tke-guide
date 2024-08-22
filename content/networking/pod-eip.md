@@ -37,7 +37,7 @@ YAML 写法示例：
   </TabItem>
 </Tabs>
 
-> 如果 Pod 在非超级节点，要求 Pod 使用 `VPC-CNI` 网络模式（更多参考 [这里的说明](https://cloud.tencent.com/document/product/457/64886)）。
+> 如果是 TKE 标准集群，要求 Pod 使用 `VPC-CNI` 网络模式（参考这里的[前提条件和限制](https://cloud.tencent.com/document/product/457/64886)）。
 
 ## 如何保留 EIP ?
 

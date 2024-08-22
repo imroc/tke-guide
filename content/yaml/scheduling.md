@@ -20,6 +20,8 @@ Kubernetes 的调度配置有 `nodeSelector` 和 `nodeAffinity` 两种方式，�
 
 节点可能有多种机型，如果希望将 Pod 调度到指定机型的节点上，可以这样配置：
 
+> `nodeAffinity` 写法支持配置多种机型。
+
 <Tabs>
   <TabItem value="nginx-eklet-nodeselector" label="nodeSelector 写法">
     <FileBlock file="scheduling/nginx-instance-type-nodeselector.yaml" showLineNumbers />
