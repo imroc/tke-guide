@@ -19,7 +19,12 @@ TKE 的集群有标准集群与 Serverless 集群之分，两种类型集群为 
 
 > Serverless 集群的能力现已与融入到标准集群中，未来将不存在 Serverless 集群类型。
 
-如果您的存量 Serverless 集群需使用 EIP，查看 YAML 示例时注意选择 Serverless 集群版本的写法。
+:::tip[注意]
+
+1. 如果您使用标准集群，不管 Pod 在超级节点与否，统一都使用标准集群写法即可。
+2. 如果您的存量 Serverless 集群需使用 EIP，查看 YAML 示例时注意选择 Serverless 集群版本的写法。
+
+::::
 
 ## 如何为 Pod 绑 EIP ?
 
