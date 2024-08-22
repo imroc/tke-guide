@@ -161,6 +161,7 @@ const sidebars: SidebarsConfig = {
         slug: '/game'
       },
       items: [
+        'game/room-networking',
         {
           type: 'category',
           label: 'OpenKruiseGame',
