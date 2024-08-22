@@ -78,8 +78,6 @@ Pod 被删除后 EIP 会被释放，EIP 在未绑定状态下会产生费用（�
 
 容器内进程启动时可以读取 `/etc/podinfo/eip` 中的内容来获取 EIP。
 
-> EIP 在 Pod 中容器启动前就已经绑定，所以容器内进程一启动就能读取到 EIP 信息，无需轮询等待。
-
 ## 参考资料
 
 * [Pod 直接绑定弹性公网 IP 使用说明](https://cloud.tencent.com/document/product/457/64886)
