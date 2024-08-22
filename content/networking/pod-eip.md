@@ -28,7 +28,7 @@ TKE 的集群有标准集群与 Serverless 集群之分，两种类型集群为 
 
 ## 如何为 Pod 绑 EIP ?
 
-为 Pod 加 `eip-attributes` 注解以声明需要绑定 EIP，超级节点与非超级节点的写法不同，但值都为 JSON 格式，填写创建 EIP 接口的相关的参数，详细参数列表可参考 [这里](https://cloud.tencent.com/document/api/215/16699#2.-.E8.BE.93.E5.85.A5.E5.8F.82.E6.95.B0) 。
+为 Pod 加 `eip-attributes` 注解以声明需要绑定 EIP，值为 JSON 格式，填写创建 EIP 接口的相关的参数，详细参数列表可参考 [这里](https://cloud.tencent.com/document/api/215/16699#2.-.E8.BE.93.E5.85.A5.E5.8F.82.E6.95.B0) 。
 
 YAML 写法示例：
 
