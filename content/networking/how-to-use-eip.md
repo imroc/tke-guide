@@ -78,3 +78,8 @@ Pod 被删除后 EIP 会被释放，EIP 在未绑定状态下会产生费用（�
 </Tabs>
 
 如果你用的 TKE Serverless 集群，只会有超级节点，无需额外的调度配置。
+
+## 参考资料
+
+* [非超级节点下 Pod 绑 EIP 官方文档: Pod 直接绑定弹性公网 IP 使用说明](https://cloud.tencent.com/document/product/457/64886)
+* [超级节点下 Pod 绑 EIP 相关注解](https://cloud.tencent.com/document/product/457/44173#.E7.BB.91.E5.AE.9A-eip)
