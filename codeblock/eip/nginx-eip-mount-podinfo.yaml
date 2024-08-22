@@ -12,7 +12,8 @@ spec:
       labels:
         app: nginx
       annotations:
-        eks.tke.cloud.tencent.com/eip-attributes: '{"InternetMaxBandwidthOut":100, "InternetChargeType":"TRAFFIC_POSTPAID_BY_HOUR"}'
+        # highlight-next-line
+        tke.cloud.tencent.com/eip-attributes: '{"InternetMaxBandwidthOut":100, "InternetChargeType":"TRAFFIC_POSTPAID_BY_HOUR"}'
     spec:
       nodeSelector:
         node.kubernetes.io/instance-type: eklet

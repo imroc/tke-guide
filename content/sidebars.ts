@@ -231,6 +231,7 @@ const sidebars: SidebarsConfig = {
         'yaml/ingress',
         'yaml/workload',
         'yaml/scheduling',
+        'yaml/networking',
       ],
     },
     {

@@ -1,4 +1,4 @@
-# 调度
+# 调度相关
 
 Kubernetes 的调度配置有 `nodeSelector` 和 `nodeAffinity` 两种方式，其中 `nodeSelector` 是最简单的，而 `nodeAffinity` 则更灵活强大，本文涉及的例子，两种方式均会提供。
 

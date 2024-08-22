@@ -1,6 +1,8 @@
 # Pod 绑 EIP
 
-腾讯云容器服务的 Pod 如果调度到超级节点，是支持给 Pod 绑 EIP 的，本文介绍如何操作。
+腾讯云容器服务 TKE 支持为 Pod 绑定 EIP，参考官方文档 [Pod 直接绑定弹性公网 IP 使用说明](https://cloud.tencent.com/document/product/457/64886)。
+
+本文用更通俗的语言描述下在 TKE 环境如何为 Pod 绑定 EIP。
 
 ## EIP 授权
 
@@ -11,9 +13,13 @@
 3. 选择 `QcloudAccessForIPAMDRoleInQcloudAllocateEIP` 进行关联：
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F07%2F11%2F20240711100056.png)
 
-## 超级节点与非超级节点
+## 标准集群与 Serverless 集群
 
-TKE 的节点有超级节点和非超级节点之分，在为 Pod 绑 EIP 时，Pod 调度到超级节点和非超级节点时，配置方式是不一样的。
+TKE 的集群有标准集群与 Serverless 集群之分，两种类型集群为 Pod  配置 EIP 方式是不一样的。
+
+> Serverless 集群的能力现已与融入到标准集群中，未来将不存在 Serverless 集群类型。
+
+如果您的存量 Serverless 集群需使用 EIP，查看 YAML 示例时注意选择 Serverless 集群版本的写法。
 
 ## 如何为 Pod 绑 EIP ?
 
@@ -22,12 +28,12 @@ TKE 的节点有超级节点和非超级节点之分，在为 Pod 绑 EIP 时，
 YAML 写法示例：
 
 <Tabs>
-  <TabItem value="eip-supernode" label="超级节点写法">
-    <FileBlock file="nginx-eip.yaml" showLineNumbers />
+  <TabItem value="eip" label="标准集群写法">
+    <FileBlock file="eip/nginx-eip.yaml" showLineNumbers />
   </TabItem>
 
-  <TabItem value="eip-vpc-cni" label="非超级节点写法">
-    <FileBlock file="nginx-eip-vpc-cni.yaml" showLineNumbers />
+  <TabItem value="eip-serverless" label="Serverless 集群写法">
+    <FileBlock file="eip/nginx-eip-serverless.yaml" showLineNumbers />
   </TabItem>
 </Tabs>
 
@@ -45,25 +51,31 @@ Pod 被删除后 EIP 会被释放，EIP 在未绑定状态下会产生费用（�
 
 首先需要使用 `StatefulSet` 部署或其它第三方有状态工作负载（如 `OpenKruise` 的 `Advanced StatefulSet`、`OpenKruiseGame` 的 `GameServerSet`）。
 
-> 为什么要用 `StatefulSet` 才可以？因为 `StatefulSet` 的 Pod 是有状态的，Pod 名称有序号，可通过 Pod 名称与 EIP 的关联关系实现固定 EIP，无状态的 Pod 就无法实现了。
+> 为什么要用有状态工作负载才可以？因为有状态工作负载的 Pod 名称有序号，可通过 Pod 名称与 EIP 的关联关系实现固定 EIP，无状态的 Pod 就无法实现了。
 
-其次如果在 Pod 在超级节点，加上 `eks.tke.cloud.tencent.com/eip-claim-delete-policy: "Never"` 这个注解即可实现:
+下面是保留 EIP 的 YAML 示例:
 
-<FileBlock file="nginx-retain-eip.yaml" showLineNumbers />
+<Tabs>
+  <TabItem value="retain-eip" label="标准集群写法">
+    <FileBlock file="eip/nginx-retain-eip.yaml" showLineNumbers />
+  </TabItem>
 
-如果 Pod 不在超级节点，则使用 `tke.cloud.tencent.com/eip-claim-delete-policy: "Never"`：
-
-<FileBlock file="nginx-eip-vpc-cni-retain-ip.yaml" showLineNumbers />
+  <TabItem value="retain-eip-serverless" label="Serverless 集群写法">
+    <FileBlock file="eip/nginx-retain-eip-serverless.yaml" showLineNumbers />
+  </TabItem>
+</Tabs>
 
 ## 如何在容器内获取自身公网 IP ？
 
 可以利用 K8S 的 [Downward API](https://kubernetes.io/zh/docs/tasks/inject-data-application/environment-variable-expose-pod-information/) ，将 Pod 上的一些字段注入到环境变量或挂载到文件，Pod 的 EIP 信息最终会写到 Pod 的 `tke.cloud.tencent.com/eip-public-ip` 这个 annotation 上，但不会 Pod 创建时就写上，是在启动过程写上去的，所以如果注入到环境变量最终会为空，挂载到文件就没问题，以下是使用方法:
 
-<FileBlock file="nginx-eip-mount-podinfo.yaml" showLineNumbers />
+<FileBlock file="eip/nginx-eip-mount-podinfo.yaml" showLineNumbers />
 
 容器内进程启动时可以读取 `/etc/podinfo/eip` 中的内容来获取 EIP。
 
+> EIP 在 Pod 中容器启动前就已经绑定，所以容器内进程一启动就能读取到 EIP 信息，无需轮询等待。
+
 ## 参考资料
 
-* [非超级节点下 Pod 绑 EIP 官方文档: Pod 直接绑定弹性公网 IP 使用说明](https://cloud.tencent.com/document/product/457/64886)
+* [Pod 直接绑定弹性公网 IP 使用说明](https://cloud.tencent.com/document/product/457/64886)
 * [超级节点下 Pod 绑 EIP 相关注解](https://cloud.tencent.com/document/product/457/44173#.E7.BB.91.E5.AE.9A-eip)
