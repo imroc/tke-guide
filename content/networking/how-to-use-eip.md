@@ -63,24 +63,6 @@ Pod 被删除后 EIP 会被释放，EIP 在未绑定状态下会产生费用（�
 
 容器内进程启动时可以读取 `/etc/podinfo/eip` 中的内容来获取 EIP。
 
-## 附录
-
-### 确保 Pod 只调度到超级节点的方法
-
-如果你用的 TKE 标准集群，集群中既包含超级节点，又包含非超级节点，如果希望绑 EIP 的 Pod 都调度到超级节点上，可参考如下配置方法：
-
-<Tabs>
-  <TabItem value="node-selector" label="nodeSelector示例">
-    <FileBlock file="nginx-eklet.yaml" showLineNumbers />
-  </TabItem>
-
-  <TabItem value="node-affinity" label="nodeAffinity示例">
-    <FileBlock file="nginx-eklet-nodeaffinity.yaml" showLineNumbers />
-  </TabItem>
-</Tabs>
-
-如果你用的 TKE Serverless 集群，只会有超级节点，无需额外的调度配置。
-
 ## 参考资料
 
 * [非超级节点下 Pod 绑 EIP 官方文档: Pod 直接绑定弹性公网 IP 使用说明](https://cloud.tencent.com/document/product/457/64886)

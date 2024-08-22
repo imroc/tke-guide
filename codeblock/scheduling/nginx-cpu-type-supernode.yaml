@@ -11,12 +11,13 @@ spec:
     metadata:
       labels:
         app: nginx
-    spec:
-      # 使用  nodeSelector 显式指定调度到 SA2.MEDIUM8 机型的节点
       # highlight-start
-      nodeSelector:
-        node.kubernetes.io/instance-type: SA2.MEDIUM8
+      annotations:
+        eks.tke.cloud.tencent.com/cpu-type: "SA5,SA4,amd" # 优先使用 SA5，如果没资源就尝试 SA4，如果都没有再尝试其他所有 AMD 系列 CPU 的机型
       # highlight-end
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: eklet
       containers:
         - name: nginx
           image: nginx:latest

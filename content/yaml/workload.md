@@ -12,18 +12,6 @@
   </TabItem>
 </Tabs>
 
-## 调度
-
-<Tabs>
-  <TabItem value="eklet" label="调度到超级节点">
-    <FileBlock file="nginx-eklet.yaml" showLineNumbers />
-  </TabItem>
-
-  <TabItem value="instance-type" label="调度指定机型">
-    <FileBlock file="nginx-instance-type.yaml" showLineNumbers />
-  </TabItem>
-</Tabs>
-
 ## 网卡和 IP
 
 <Tabs>
