@@ -59,7 +59,7 @@ Pod 被删除后 EIP 会被释放，EIP 在未绑定状态下会产生费用（�
 
 <FileBlock file="nginx-eip-mount-podinfo.yaml" showLineNumbers />
 
-容器内进程启动时可以读取 `/etc/podinfo/annotations` 中的内容来获取 EIP。
+容器内进程启动时可以读取 `/etc/podinfo/eip` 中的内容来获取 EIP。
 
 ## 附录
 

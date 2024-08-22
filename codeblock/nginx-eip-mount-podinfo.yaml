@@ -24,7 +24,7 @@ spec:
             - infinity
           # highlight-start
           volumeMounts:
-            - mountPath: /etc/podinfo # 容器内读取 /etc/podinfo/annotations 可获取当前 Pod 注解，EIP 信息在这个注解里： tke.cloud.tencent.com/eip-public-ip
+            - mountPath: /etc/podinfo # 容器内读取 /etc/podinfo/eip 可获取当前 Pod EIP 信息
               name: podinfo
           # highlight-end
       volumes:
@@ -35,7 +35,7 @@ spec:
               - path: "labels"
                 fieldRef:
                   fieldPath: metadata.labels
-              - path: "annotations" # 关键
+              - path: "eip" # 关键
                 fieldRef:
-                  fieldPath: metadata.annotations
+                  fieldPath: metadata.annotations["tke.cloud.tencent.com/eip-public-ip"]
         # highlight-end
