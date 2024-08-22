@@ -12,6 +12,8 @@
 
 TKE 支持 [Pod 绑 EIP](../networking/pod-eip.md)，Pod 绑定 EIP 后，每个 Pod 都会分配一个独立的公网地址，房间的公网地址就是 Pod EIP + 房间进程监听的端口号。
 
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F08%2F22%2F20240822172226.png)
+
 ## CLB 映射方案
 
 安装开源的 [tke-extend-network-controller](https://github.com/imroc/tke-extend-network-controller) 插件，可实现用 CLB 四层监听器来为每个 Pod 映射公网地址，每个 Pod 占用 CLB 一个端口，Pod 中房间的公网地址就是 Pod 所被绑定的 CLB 实例的公网 IP 或域名及其监听器对应的端口号。
