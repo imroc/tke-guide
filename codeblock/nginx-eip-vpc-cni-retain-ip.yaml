@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+      annotations:
+        tke.cloud.tencent.com/networks: "tke-route-eni" # 如果集群网络是 GlobalRouter + VPC-CNI 混用，用此注解需要显式指定 Pod 使用 VPC-CNI
+        # 指定 EIP 属性(仅在超级节点支持)，具体字段参考 CLB 的 AllocateAddresses 接口文档：https://cloud.tencent.com/document/api/215/16699#2.-.E8.BE.93.E5.85.A5.E5.8F.82.E6.95.B0
+        tke.cloud.tencent.com/eip-attributes: '{"Bandwidth":"100","ISP":"BGP"}'
+        # highlight-next-line
+        tke.cloud.tencent.com/eip-claim-delete-policy: "Never"
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
