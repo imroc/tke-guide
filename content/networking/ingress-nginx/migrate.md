@@ -6,7 +6,7 @@
 
 ## 迁移思路
 
-用本文中自建的方法创建一套新的 NginxIngress 实例，与旧的实例共享同一个 IngressClass，也就会共享相同的 Ingress 转发规则，两套流量入口共存，最后修改 DNS 指向新的入口地址完成平滑迁移。
+使用本文中自建的方法创建一套新的 Nginx Ingress 实例以及 Ingress 规则，两套流量入口共存，最后修改 DNS 指向新的入口地址，完成平滑迁移。
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F01%2F20240401143927.png)
 
@@ -39,35 +39,14 @@ ingress-nginx/ingress-nginx     4.9.0           1.9.5           Ingress controll
 
 ## 准备 values.yaml
 
-主要需要保证 helm 新创建的 Nginx Ingress 实例和 TKE 插件创建 Nginx Ingress 实例共用一个 IngressClass，即让 Ingress 规则在两边同时生效。
-
-看下当前的 IngressClass 定义：
-
-```bash
-$ kubectl get ingressclass extranet -o yaml
-apiVersion: networking.k8s.io/v1
-kind: IngressClass
-metadata:
-  creationTimestamp: "2024-03-27T10:47:49Z"
-  generation: 1
-  labels:
-    app.kubernetes.io/component: controller
-  name: extranet
-  resourceVersion: "27703380423"
-  uid: 5e2de0d1-8eae-4b55-afde-25c8fe37d478
-spec:
-  # highlight-next-line
-  controller: k8s.io/extranet
-```
-
-拿到 controller 的值 `k8s.io/extranet`，和 IngressClass 名称一起，配到 `values.yaml` 中：
+下面配置 `values.yaml`，确保 helm 新创建的 Nginx Ingress 实例和 TKE 插件创建 Nginx Ingress 实例不要共用同一个 IngressClass：
 
 ```yaml
 controller:
-  ingressClassName: extranet # IngressClass 名称
+  ingressClassName: extranet-new # 新 IngressClass 名称，避免冲突
   ingressClassResource:
     enabled: false # 不自动创建 IngressClass 资源，避免冲突
-    controllerValue: k8s.io/extranet # 新 Nginx Ingress 复用已有的 IngressClass
+    controllerValue: k8s.io/extranet-new
 ```
 
 ## 安装新的 Nginx Ingress Controller
@@ -92,19 +71,22 @@ new-extranet-ingress-nginx-controller             LoadBalancer   172.16.165.100 
 
 `EXTERNAL-IP` 是新的流量入口，验证确认下能够正常转发。
 
+## 复制 Ingress 资源
+
+将使用旧 IngressClass 的 Ingress 资源的 YAML 文件保存下来，并修改其名称（例如添加后缀 `-new`）。然后，将修改后的 YAML 文件应用到集群中。这样，新旧 Nginx Ingress 实例的转发规则将保持一致，确保流量进入任意入口时效果相同。
+
 ## 切换 DNS
 
-至此，新旧 Nginx Ingress 共存，不管走哪个流量入口都能正常转发。
+至此，新旧 Nginx Ingress 共存，无论通过哪个流量入口都能正常转发。
 
-接下来修改域名的 DNS 解析，指向新 Nginx Ingress 流量入口，在 DNS 解析完全生效前，两边流量入口均能正常转发，不管走哪边都没问题，所以这个过程会非常平滑，生产环境的流量不受影响。
+接下来修改域名的 DNS 解析，指向新 Nginx Ingress 流量入口，在 DNS 解析完全生效前，两边流量入口均能正常转发，无论通过哪个流量入口都能正常转发，这个过程会非常平滑，生产环境的流量不受影响。
 
 ## 删除旧 NginxIngress 实例和插件
 
-最后等所有旧的 Nginx Ingress 实例完全没有流量的时候，再去 TKE 控制台先删除 Nginx Ingress 实例：
+1. 等到所有旧的 Nginx Ingress 实例完全没有流量的时候，前往 TKE 控制台删除 Nginx Ingress 实例：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F28%2F20240328105512.png)
 
-再去【组件管理】里删除 ingressnginx 彻底完成迁移:
+再去【组件管理】里删除 `ingressnginx` 彻底完成迁移:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F28%2F20240328104308.png)
-
