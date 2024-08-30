@@ -18,8 +18,6 @@ spec:
         tke.cloud.tencent.com/eip-attributes: '{"Bandwidth":"100", "ISP":"BGP", "InternetMaxBandwidthOut":50, "InternetChargeType":"TRAFFIC_POSTPAID_BY_HOUR"}'
         # highlight-end
     spec:
-      nodeSelector:
-        node.kubernetes.io/instance-type: eklet
       containers:
         - name: nginx
           image: nginx:latest
