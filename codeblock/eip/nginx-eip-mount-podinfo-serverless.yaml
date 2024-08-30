@@ -33,9 +33,6 @@ spec:
         - name: podinfo
           downwardAPI:
             items:
-              - path: "labels"
-                fieldRef:
-                  fieldPath: metadata.labels
               - path: "eip" # 关键
                 fieldRef:
                   fieldPath: metadata.annotations['eks.tke.cloud.tencent.com/eip-attributes']
