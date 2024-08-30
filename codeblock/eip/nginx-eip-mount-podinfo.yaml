@@ -12,14 +12,26 @@ spec:
       labels:
         app: nginx
       annotations:
-        # highlight-next-line
-        eks.tke.cloud.tencent.com/eip-attributes: '{"InternetMaxBandwidthOut":100, "InternetChargeType":"TRAFFIC_POSTPAID_BY_HOUR"}'
+        # highlight-start
+        tke.cloud.tencent.com/networks: "tke-route-eni" # 如果集群网络是 GlobalRouter + VPC-CNI 混用，用此注解需要显式指定 Pod 使用 VPC-CNI
+        # 指定 EIP 属性，具体字段参考 CLB 的 AllocateAddresses 接口文档：https://cloud.tencent.com/document/api/215/16699#2.-.E8.BE.93.E5.85.A5.E5.8F.82.E6.95.B0
+        tke.cloud.tencent.com/eip-attributes: '{"Bandwidth":"100", "ISP":"BGP", "InternetMaxBandwidthOut":50, "InternetChargeType":"TRAFFIC_POSTPAID_BY_HOUR"}'
+        # highlight-end
     spec:
       nodeSelector:
         node.kubernetes.io/instance-type: eklet
       containers:
         - name: nginx
           image: nginx:latest
+          # highlight-start
+          resources: # 声明 EIP 资源，用于调度 (节点能绑定的 EIP 数量有限)
+            limits:
+              tke.cloud.tencent.com/eni-ip: "1"
+              tke.cloud.tencent.com/eip: "1"
+            requests:
+              tke.cloud.tencent.com/eni-ip: "1"
+              tke.cloud.tencent.com/eip: "1"
+          # highlight-end
           command:
             - sleep
             - infinity

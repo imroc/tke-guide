@@ -74,7 +74,15 @@ Pod 被删除后 EIP 会被释放，EIP 在未绑定状态下会产生费用（�
 
 可以利用 K8S 的 [Downward API](https://kubernetes.io/zh/docs/tasks/inject-data-application/environment-variable-expose-pod-information/) ，将 Pod 上的一些字段注入到环境变量或挂载到文件，Pod 的 EIP 信息最终会写到 Pod 的 `tke.cloud.tencent.com/eip-public-ip` 这个 annotation 上，但不会 Pod 创建时就写上，是在启动过程写上去的，所以如果注入到环境变量最终会为空，挂载到文件就没问题，以下是使用方法:
 
-<FileBlock file="eip/nginx-eip-mount-podinfo.yaml" showLineNumbers />
+<Tabs>
+  <TabItem value="mount-eip" label="标准集群写法">
+    <FileBlock file="eip/nginx-eip-mount-podinfo.yaml" showLineNumbers />
+  </TabItem>
+
+  <TabItem value="mount-eip-serverless" label="Serverless 集群写法">
+    <FileBlock file="eip/nginx-eip-mount-podinfo-serverless.yaml" showLineNumbers />
+  </TabItem>
+</Tabs>
 
 容器内进程启动时可以读取 `/etc/podinfo/eip` 中的内容来获取 EIP。
 
