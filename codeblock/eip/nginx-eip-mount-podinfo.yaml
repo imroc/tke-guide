@@ -13,7 +13,7 @@ spec:
         app: nginx
       annotations:
         # highlight-next-line
-        tke.cloud.tencent.com/eip-attributes: '{"InternetMaxBandwidthOut":100, "InternetChargeType":"TRAFFIC_POSTPAID_BY_HOUR"}'
+        eks.tke.cloud.tencent.com/eip-attributes: '{"InternetMaxBandwidthOut":100, "InternetChargeType":"TRAFFIC_POSTPAID_BY_HOUR"}'
     spec:
       nodeSelector:
         node.kubernetes.io/instance-type: eklet
@@ -33,6 +33,9 @@ spec:
         - name: podinfo
           downwardAPI:
             items:
+              - path: "labels"
+                fieldRef:
+                  fieldPath: metadata.labels
               - path: "eip" # 关键
                 fieldRef:
                   fieldPath: metadata.annotations['tke.cloud.tencent.com/eip-public-ip']
