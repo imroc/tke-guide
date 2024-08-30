@@ -86,6 +86,16 @@ Pod 被删除后 EIP 会被释放，EIP 在未绑定状态下会产生费用（�
 
 容器内进程启动时可以读取 `/etc/podinfo/eip` 中的内容来获取 EIP。
 
+## 常见问题：EIP 分配失败
+
+Pod EIP 分配失败，`tke.cloud.tencent.com/eip-public-ip` 注解没有被写上，Pod 事件报错：
+
+```txt
+  Warning  FailedAllocateEIP  4m58s  tke-eni-ipamd      Failed to create eip: failed to allocate eip: [TencentCloudSDKError] Code=UnauthorizedOperation, Message="[request id:********-****-****-****-************]you are not authorized to perform operation (cvm:AllocateAddresses)\nresource (qcs::cvm:ap-guangzhou:uin\/1000******04:eip\/*) has no permission\n"., RequestId=********-****-****-****-************
+```
+
+原因是没正确为 `ipamd` 组件授权，需按照 [EIP 授权](#eip-授权) 步骤进行操作。
+
 ## 参考资料
 
 * [Pod 直接绑定弹性公网 IP 使用说明](https://cloud.tencent.com/document/product/457/64886)
