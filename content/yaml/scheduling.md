@@ -16,6 +16,43 @@ Kubernetes 的调度配置有 `nodeSelector` 和 `nodeAffinity` 两种方式，�
   </TabItem>
 </Tabs>
 
+## 只调度到原生节点
+
+<Tabs>
+  <TabItem value="crane-yaml" label="方式一：编辑 YAML">
+  编辑调度策略：
+
+  ```bash
+  kubectl -n kube-system edit cm crane-scheduler-apply-scope
+  ```
+
+  `namespaceScope` 限制指定命名空间的 Pod 强制调度到原生节点:
+
+  ```yaml
+  apiVersion: v1
+  data:
+    # highlight-next-line
+    namespaceScope: '{"default":true}'
+  kind: ConfigMap
+  metadata:
+    name: crane-scheduler-apply-scope
+    namespace: kube-system
+  ```
+
+  > `default` 改为要限制的命名空间名称，`*` 表示所有命名空间。
+  </TabItem>
+
+  <TabItem value="crane-ui" label="方式二：控制台操作">
+  在集群的【组件管理】中找到 `cranescheduler`，点【更新配置】:
+
+  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F09%2F02%2F20240902141841.png)
+
+  根据需求配置：
+
+  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F09%2F02%2F20240902142247.png)
+  </TabItem>
+</Tabs>
+
 ## 调度到指定机型
 
 节点可能有多种机型，如果希望将 Pod 调度到指定机型的节点上，可以这样配置：
