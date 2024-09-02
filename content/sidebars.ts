@@ -200,6 +200,18 @@ const sidebars: SidebarsConfig = {
             },
           ]
         },
+        {
+          type: 'category',
+          label: 'Agones',
+          collapsed: true,
+          link: {
+            type: 'generated-index',
+            slug: '/game/agones'
+          },
+          items: [
+            'game/agones/install',
+          ]
+        }
       ]
     },
     {
