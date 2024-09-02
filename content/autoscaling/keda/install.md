@@ -30,8 +30,11 @@ image:
     repository: imroc/keda-admission-webhooks
 ```
 
-> 以上 mirror 镜像长期自动同步，可放心使用和更新版本。
+:::tip[说明]
 
+以上 mirror 镜像长期自动同步，可放心使用和更新版本。
+
+:::
 ## 安装
 
 ```bash
