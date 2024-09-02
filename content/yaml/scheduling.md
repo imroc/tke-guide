@@ -28,7 +28,7 @@ Kubernetes 的调度配置有 `nodeSelector` 和 `nodeAffinity` 两种方式，�
 
   `namespaceScope` 限制指定命名空间的 Pod 强制调度到原生节点:
 
-  ```yaml
+  ```yaml showLineNumbers
   apiVersion: v1
   data:
     # highlight-next-line
