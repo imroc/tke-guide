@@ -20,11 +20,14 @@ helm show values kedacore/keda
 ```yaml
 image:
   keda:
-    repository: docker.io/imroc/keda
+    registry: docker.io
+    repository: imroc/keda
   metricsApiServer:
-    repository: docker.io/imroc/keda-metrics-apiserver
+    registry: docker.io
+    repository: imroc/keda-metrics-apiserver
   webhooks:
-    repository: docker.io/imroc/keda-admission-webhooks
+    registry: docker.io
+    repository: imroc/keda-admission-webhooks
 ```
 
 > 以上 mirror 镜像长期自动同步，可放心使用和更新版本。
