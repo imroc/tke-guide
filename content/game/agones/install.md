@@ -36,4 +36,8 @@ helm upgrade --install agones --namespace agones-system --create-namespace -f va
 | us-docker.pkg.dev/agones-images/release/agones-ping       | docker.io/imroc/agones-ping       |
 | us-docker.pkg.dev/agones-images/release/agones-sdk        | docker.io/imroc/agones-sdk        |
 
-> Agones 的 mirror 镜像均使用 [image-porter](https://github.com/imroc/image-porter) 长期自动同步，可放心安装和升级。
+:::tip[说明]
+
+Agones 的 mirror 镜像均使用 [image-porter](https://github.com/imroc/image-porter) 长期自动同步，可放心安装和升级。
+
+:::
