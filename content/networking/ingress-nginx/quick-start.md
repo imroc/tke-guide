@@ -133,3 +133,14 @@ spec:
 ## 更多自定义
 
 如果需要对 Nginx Ingress 进行更多的自定义，可参考接下来的几篇指引文档，根据自己需求合并下 `values.yaml` 配置，最后一篇也提供了合并后的 `values.yaml` 完整配置示例。
+
+另外你也可以将 `values.yaml` 拆成多个文件维护，执行安装或更新命令时，用多个 `-f` 参数指定下多个配置文件即可：
+
+```bash
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace \
+  -f image-values.yaml \
+  -f prom-values.yaml \
+  -f logrotate-values.yaml \
+  -f autoscaling-values.yaml
+```
