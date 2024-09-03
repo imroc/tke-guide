@@ -136,7 +136,7 @@ spec:
 
 另外你也可以将 `values.yaml` 拆成多个文件维护，执行安装或更新命令时，用多个 `-f` 参数指定下多个配置文件即可：
 
-```bash
+```bash showLineNumbers
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   --namespace ingress-nginx --create-namespace \
   # highlight-start
