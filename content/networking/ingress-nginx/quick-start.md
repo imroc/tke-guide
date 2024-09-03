@@ -139,8 +139,10 @@ spec:
 ```bash
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   --namespace ingress-nginx --create-namespace \
+  # highlight-start
   -f image-values.yaml \
   -f prom-values.yaml \
   -f logrotate-values.yaml \
   -f autoscaling-values.yaml
+  # highlight-end
 ```
