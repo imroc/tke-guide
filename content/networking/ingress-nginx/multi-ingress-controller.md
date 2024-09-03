@@ -48,7 +48,7 @@ metadata:
   name: nginx
 spec:
   # highlight-next-line
-  ingressClass: prod
+  ingressClassName: prod
   rules:
     - http:
         paths:
