@@ -17,7 +17,7 @@
 ```yaml showLineNumbers
 controller:
   # highlight-next-line
-  ingressClassName: prod
+  ingressClass: prod
   ingressClassResource:
     # highlight-next-line
     name: prod
@@ -48,7 +48,7 @@ metadata:
   name: nginx
 spec:
   # highlight-next-line
-  ingressClassName: prod
+  ingressClass: prod
   rules:
     - http:
         paths:
