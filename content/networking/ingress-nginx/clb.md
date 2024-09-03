@@ -65,7 +65,7 @@ controller:
 
 ## CLB 跨域绑定
 
-如果你想使用其它地域的 CLB 来接入流量，可以利用 CLB 的 [跨地域绑定2.0](https://cloud.tencent.com/document/product/214/48180) 和 TKE 的 [Service 跨域绑定](https://cloud.tencent.com/document/product/457/59094) 能力来实现，需要满足以下前提条件:
+如果你想使用其它地域或 VPC 的 CLB 来接入流量，可以利用 CLB 的 [跨地域绑定2.0](https://cloud.tencent.com/document/product/214/48180) 和 TKE 的 [Service 跨域绑定](https://cloud.tencent.com/document/product/457/59094) 能力来实现，需要满足以下前提条件:
 1. 账号是带宽上移类型。
 2. 两个 VPC 通过云联网打通了。
 3. 开通了CLB的跨地域绑定2.0 功能(提工单开通)。
