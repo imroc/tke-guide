@@ -52,7 +52,7 @@ controller: # 以下配置将依赖镜像替换为了 docker hub 上的 mirror �
 
 安装：
 
-```bash
+```bash showLineNumbers
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   --namespace ingress-nginx --create-namespace \
   -f values.yaml
@@ -88,12 +88,12 @@ ingress-nginx/ingress-nginx     4.7.0           1.8.0           Ingress controll
 
 可以看到 `4.7.*` 版本最高是 `4.7.5`，安装的时候加上版本号：
 
-```bash
+```bash showLineNumbers
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   # highlight-next-line
   --version 4.7.5 \
+-f values.yaml
   --namespace ingress-nginx --create-namespace \
-  -f values.yaml
 ```
 
 :::info[注意]
