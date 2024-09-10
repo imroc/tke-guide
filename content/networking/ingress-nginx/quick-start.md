@@ -90,6 +90,8 @@ helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm fetch ingress-nginx/ingress-nginx
 ```
 
+> 如果是下载指定版本的 chart，给 fetch 子命令加 `--version` 参数指定即可，如：`helm fetch ingress-nginx/ingress-nginx --version 4.7.5`
+
 查看下载的 chart 包:
 
 ```bash
@@ -124,10 +126,10 @@ ingress-nginx/ingress-nginx     4.7.0           1.8.0           Ingress controll
 
 ```bash showLineNumbers
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace \
   # highlight-next-line
   --version 4.7.5 \
--f values.yaml
-  --namespace ingress-nginx --create-namespace \
+  -f values.yaml
 ```
 
 :::info[注意]
