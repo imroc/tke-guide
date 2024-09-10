@@ -149,7 +149,7 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
 
 ## 常见问题：连不上 GitHub 导致安装失败
 
-ingress-nginx 的 helm chart 仓库地址在 GitHub，如果 helm 命令所在环境连不上 GitHub，就无法下载 chart 包，`helm repo add` 操作也会失败。
+`ingress-nginx` 的 helm chart 仓库地址在 GitHub，如果 helm 命令所在环境连不上 GitHub，就无法下载 chart 包，`helm repo add` 操作也会失败。
 
 如果遇到这个问题，可以将 chart 先在能连上 GitHub 的机器上下载下来，然后拷贝到 helm 命令所在机器上。
 
