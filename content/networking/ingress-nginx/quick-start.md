@@ -71,6 +71,34 @@ ingress-nginx-controller-admission   ClusterIP      172.16.166.237   <none>     
 
 > `LoadBalancer` 类型 Service 的 `EXTERNAL-IP` 就是 CLB 的 VIP 或域名，可以配置下 DNS 解析。如果是 VIP，就配 A 记录；如果是 CLB 域名，就配置 CNAME 记录。
 
+## 常见问题：连不上 GitHub 导致安装失败
+
+`ingress-nginx` 的 helm chart 仓库地址在 GitHub，如果 helm 命令所在环境连不上 GitHub，就无法下载 chart 包，`helm repo add` 操作也会失败。
+
+如果遇到这个问题，可以将 chart 先在能连上 GitHub 的机器上下载下来，然后拷贝到 helm 命令所在机器上。
+
+下载方法：
+
+```bash showLineNumbers
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm fetch ingress-nginx/ingress-nginx
+```
+
+查看下载的 chart 包:
+
+```bash
+$ ls
+ingress-nginx-4.11.2.tgz
+```
+
+将这个压缩包拷贝到 helm 命令所在机器上，安装命令将 chart 名称替换成压缩包文件路径即可：
+
+```bash showLineNumbers
+helm upgrade --install ingress-nginx ingress-nginx-4.11.2.tgz \
+  --namespace ingress-nginx --create-namespace \
+  -f values.yaml
+```
+
 ## 版本与升级
 
 Nginx Ingress 的版本需要与 Kubernetes 集群版本能够兼容，可参考官方 [Supported Versions table](https://github.com/kubernetes/ingress-nginx?tab=readme-ov-file#supported-versions-table) 确认下当前集群版本能否支持最新的 nginx ingress，如果不支持，安装的时候指定下 chart 版本。
@@ -147,30 +175,3 @@ helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   # highlight-end
 ```
 
-## 常见问题：连不上 GitHub 导致安装失败
-
-`ingress-nginx` 的 helm chart 仓库地址在 GitHub，如果 helm 命令所在环境连不上 GitHub，就无法下载 chart 包，`helm repo add` 操作也会失败。
-
-如果遇到这个问题，可以将 chart 先在能连上 GitHub 的机器上下载下来，然后拷贝到 helm 命令所在机器上。
-
-下载方法：
-
-```bash showLineNumbers
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm fetch ingress-nginx/ingress-nginx
-```
-
-查看下载的 chart 包:
-
-```bash
-$ ls
-ingress-nginx-4.11.2.tgz
-```
-
-将这个压缩包拷贝到 helm 命令所在机器上，安装命令将 chart 名称替换成压缩包文件路径即可：
-
-```bash showLineNumbers
-helm upgrade --install ingress-nginx ingress-nginx-4.11.2.tgz \
-  --namespace ingress-nginx --create-namespace \
-  -f values.yaml
-```
