@@ -18,6 +18,12 @@
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 ```
 
+:::tip[说明]
+
+如果 helm 命令所在机器连不上 GitHub，将添加失败，可参考后面的 [常见问题：连不上 GitHub 导致安装失败](#%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98%E8%BF%9E%E4%B8%8D%E4%B8%8A-github-%E5%AF%BC%E8%87%B4%E5%AE%89%E8%A3%85%E5%A4%B1%E8%B4%A5) 进行解决。
+
+:::
+
 查看默认配置:
 
 ```bash
