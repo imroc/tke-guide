@@ -223,6 +223,7 @@ const sidebars: SidebarsConfig = {
         slug: '/deploy'
       },
       items: [
+        'deploy/cert-manager',
         'deploy/harbor',
         'deploy/gitlab',
         'deploy/kubesphere',
