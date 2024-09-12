@@ -43,9 +43,10 @@ ingress-nginx/ingress-nginx     4.9.0           1.9.5           Ingress controll
 
 ```yaml
 controller:
-  ingressClassName: extranet-new # 新 IngressClass 名称，避免冲突
+  ingressClass: extranet-new # 新 IngressClass 名称，避免冲突
   ingressClassResource:
-    enabled: false # 不自动创建 IngressClass 资源，避免冲突
+    name: extranet-new
+    enabled: true
     controllerValue: k8s.io/extranet-new
 ```
 
