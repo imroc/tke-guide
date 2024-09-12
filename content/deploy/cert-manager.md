@@ -6,13 +6,13 @@ cert-manager 的安装可参考官方文档 [Installing with Helm](https://cert-
 
 解决方案是将镜像地址替换为 Docker Hub 上的 mirror 镜像（TKE 环境无需任何配置即可走内网拉取 DockerHub 上的镜像）：
 
-| 原始镜像地址                                  | DockerHub mirror 镜像地址                                                                                                                      |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| quay.io/jetstack/cert-manager-controller      | [docker.io/imroc/cert-manager-controller](https://hub.docker.com/repository/docker/imroc/cert-manager-controller/tags?ordering=name)           |
-| quay.io/jetstack/cert-manager-cainjector      | [docker.io/imroc/cert-manager-cainjector](https://hub.docker.com/repository/docker/imroc/cert-manager-cainjector/tags?ordering=name)           |
-| quay.io/jetstack/cert-manager-webhook         | [docker.io/imroc/cert-manager-webhook](https://hub.docker.com/repository/docker/imroc/cert-manager-webhook/tags?ordering=name)                 |
-| quay.io/jetstack/cert-manager-acmesolver      | [docker.io/imroc/cert-manager-acmesolver](https://hub.docker.com/repository/docker/imroc/cert-manager-acmesolver/tags?ordering=name)           |
-| quay.io/jetstack/cert-manager-startupapicheck | [docker.io/imroc/cert-manager-startupapicheck](https://hub.docker.com/repository/docker/imroc/cert-manager-startupapicheck/tags?ordering=name) |
+| 原始镜像地址                                  | DockerHub mirror 镜像地址                                                                                                        |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| quay.io/jetstack/cert-manager-controller      | [docker.io/imroc/cert-manager-controller](https://hub.docker.com/repository/docker/imroc/cert-manager-controller/tags)           |
+| quay.io/jetstack/cert-manager-cainjector      | [docker.io/imroc/cert-manager-cainjector](https://hub.docker.com/repository/docker/imroc/cert-manager-cainjector/tags)           |
+| quay.io/jetstack/cert-manager-webhook         | [docker.io/imroc/cert-manager-webhook](https://hub.docker.com/repository/docker/imroc/cert-manager-webhook/tags)                 |
+| quay.io/jetstack/cert-manager-acmesolver      | [docker.io/imroc/cert-manager-acmesolver](https://hub.docker.com/repository/docker/imroc/cert-manager-acmesolver/tags)           |
+| quay.io/jetstack/cert-manager-startupapicheck | [docker.io/imroc/cert-manager-startupapicheck](https://hub.docker.com/repository/docker/imroc/cert-manager-startupapicheck/tags) |
 
 :::tip[说明]
 
