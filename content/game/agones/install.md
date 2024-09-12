@@ -28,13 +28,13 @@ helm upgrade --install agones --namespace agones-system --create-namespace -f va
 
 以下是 Agones 依赖的镜像及其在 DockerHub 上自动同步的 mirror 镜像对照表：
 
-| 原始镜像地址                                              | DockerHub mirror 镜像地址         |
-| --------------------------------------------------------- | --------------------------------- |
-| us-docker.pkg.dev/agones-images/release/agones-allocator  | docker.io/imroc/agones-allocator  |
-| us-docker.pkg.dev/agones-images/release/agones-controller | docker.io/imroc/agones-controller |
-| us-docker.pkg.dev/agones-images/release/agones-extensions | docker.io/imroc/agones-extensions |
-| us-docker.pkg.dev/agones-images/release/agones-ping       | docker.io/imroc/agones-ping       |
-| us-docker.pkg.dev/agones-images/release/agones-sdk        | docker.io/imroc/agones-sdk        |
+| 原始镜像地址                                              | DockerHub mirror 镜像地址                                                                                  |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| us-docker.pkg.dev/agones-images/release/agones-allocator  | [docker.io/imroc/agones-allocator](https://hub.docker.com/repository/docker/imroc/agones-allocator/tags)   |
+| us-docker.pkg.dev/agones-images/release/agones-controller | [docker.io/imroc/agones-controller](https://hub.docker.com/repository/docker/imroc/agones-controller/tags) |
+| us-docker.pkg.dev/agones-images/release/agones-extensions | [docker.io/imroc/agones-extensions](https://hub.docker.com/repository/docker/imroc/agones-extensions/tags) |
+| us-docker.pkg.dev/agones-images/release/agones-ping       | [docker.io/imroc/agones-ping](https://hub.docker.com/repository/docker/imroc/agones-ping/tags)             |
+| us-docker.pkg.dev/agones-images/release/agones-sdk        | [docker.io/imroc/agones-sdk](https://hub.docker.com/repository/docker/imroc/agones-sdk/tags)               |
 
 :::tip[说明]
 
