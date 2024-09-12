@@ -46,3 +46,16 @@ helm upgrade --install \
   -f values.yaml
 ```
 > 后续如果需要修改 `values.yaml` 配置，或者升级版本，都可以通过执行这个命令来更新 agones。
+
+## 验证
+
+查看 pod 状态：
+
+```bash
+$ kubectl -n cert-manager get pod
+NAME                                           READY   STATUS    RESTARTS   AGE
+cert-manager-774c68d885-db59h                  1/1     Running   0          23s
+cert-manager-cainjector-56c45955bc-zdzmd       1/1     Running   0          23s
+cert-manager-webhook-79958f7fd5-vjlt9          1/1     Running   0          23s
+```
+
