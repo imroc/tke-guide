@@ -6,13 +6,13 @@
 
 解决方案是将镜像地址替换为 Docker Hub 上的 mirror 镜像（TKE 环境无需任何配置即可走内网拉取 DockerHub 上的镜像）：
 
-| 原始镜像地址                                              | DockerHub mirror 镜像地址                                                                                  |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| us-docker.pkg.dev/agones-images/release/agones-allocator  | [docker.io/imroc/agones-allocator](https://hub.docker.com/repository/docker/imroc/agones-allocator/tags)   |
-| us-docker.pkg.dev/agones-images/release/agones-controller | [docker.io/imroc/agones-controller](https://hub.docker.com/repository/docker/imroc/agones-controller/tags) |
-| us-docker.pkg.dev/agones-images/release/agones-extensions | [docker.io/imroc/agones-extensions](https://hub.docker.com/repository/docker/imroc/agones-extensions/tags) |
-| us-docker.pkg.dev/agones-images/release/agones-ping       | [docker.io/imroc/agones-ping](https://hub.docker.com/repository/docker/imroc/agones-ping/tags)             |
-| us-docker.pkg.dev/agones-images/release/agones-sdk        | [docker.io/imroc/agones-sdk](https://hub.docker.com/repository/docker/imroc/agones-sdk/tags)               |
+| 原始镜像地址                                              | DockerHub mirror 镜像地址                                                                                                |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| us-docker.pkg.dev/agones-images/release/agones-allocator  | [docker.io/imroc/agones-allocator](https://hub.docker.com/repository/docker/imroc/agones-allocator/tags?ordering=name)   |
+| us-docker.pkg.dev/agones-images/release/agones-controller | [docker.io/imroc/agones-controller](https://hub.docker.com/repository/docker/imroc/agones-controller/tags?ordering=name) |
+| us-docker.pkg.dev/agones-images/release/agones-extensions | [docker.io/imroc/agones-extensions](https://hub.docker.com/repository/docker/imroc/agones-extensions/tags?ordering=name) |
+| us-docker.pkg.dev/agones-images/release/agones-ping       | [docker.io/imroc/agones-ping](https://hub.docker.com/repository/docker/imroc/agones-ping/tags?ordering=name)             |
+| us-docker.pkg.dev/agones-images/release/agones-sdk        | [docker.io/imroc/agones-sdk](https://hub.docker.com/repository/docker/imroc/agones-sdk/tags?ordering=name)               |
 
 :::tip[说明]
 
