@@ -12,7 +12,7 @@
 
 ## 配置方法
 
-如果要安装多个 Nginx Ingress Controller，需要在 `values.yaml` 指定下 `ingressClassName` (注意不要冲突)：
+如果要安装多个 Nginx Ingress Controller，需要在 `values.yaml` 指定下 `ingressClass` (注意不要冲突)：
 
 ```yaml showLineNumbers
 controller:
