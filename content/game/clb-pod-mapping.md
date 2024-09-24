@@ -10,6 +10,8 @@
 
 除了 EIP 方案，您还可以使用 `tke-extend-network-controller` 插件的方案，本文将介绍如何使用 `tke-extend-network-controller` 插件来实现为每个 Pod 的指定端口都分配一个独立的公网地址映射(公网 `IP:Port` 到内网 Pod `IP:Port` 的映射)。
 
+> `tke-extend-network-controller` 的代码是开源的，源码托管在 GitHub: https://github.com/tkestack/tke-extend-network-controller
+
 ## 前提条件
 
 安装 `tke-extend-network-controller` 前请确保满足以下前提条件：
