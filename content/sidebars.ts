@@ -162,6 +162,7 @@ const sidebars: SidebarsConfig = {
       },
       items: [
         'game/room-networking',
+        'game/clb-pod-mapping',
         {
           type: 'category',
           label: 'OpenKruiseGame',
