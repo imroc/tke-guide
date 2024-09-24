@@ -8,7 +8,7 @@
 >
 > 关于 EIP 与 CLB 映射两种方案的详细对比参考 [TKE 游戏方案：房间类游戏网络接入](https://imroc.cc/tke/game/room-networking)。
 
-除了 EIP 方案，你还可以使用 `tke-extend-network-controller` 插件的方案，本文将介绍如何使用 `tke-extend-network-controller` 插件来实现为每个 Pod 的指定端口都分配一个独立的公网地址映射(公网 `IP:Port` 到内网 Pod `IP:Port` 的映射)。
+除了 EIP 方案，您还可以使用 `tke-extend-network-controller` 插件的方案，本文将介绍如何使用 `tke-extend-network-controller` 插件来实现为每个 Pod 的指定端口都分配一个独立的公网地址映射(公网 `IP:Port` 到内网 Pod `IP:Port` 的映射)。
 
 ## 前提条件
 
