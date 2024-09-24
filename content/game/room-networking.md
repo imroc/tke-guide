@@ -18,11 +18,11 @@ TKE 支持为 Pod 绑 EIP ，每个 Pod 都会被分配一个独立的公网 IP�
 
 ## CLB 映射方案
 
-安装开源的 [tke-extend-network-controller](https://github.com/tkestack/tke-extend-network-controller) 插件，可实现用 CLB 四层监听器来为每个 Pod 映射公网地址，每个 Pod 占用 CLB 一个端口，Pod 中房间的公网地址就是 Pod 所被绑定的 CLB 实例的公网 IP 或域名及其监听器对应的端口号。
+安装 [tke-extend-network-controller](https://github.com/tkestack/tke-extend-network-controller) 插件，可实现用 CLB 四层监听器来为每个 Pod 映射公网地址，每个 Pod 占用 CLB 一个端口，Pod 中房间的公网地址就是 Pod 所被绑定的 CLB 实例的公网 IP 或域名及其监听器对应的端口号。
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F08%2F22%2F20240822165733.png)
 
-配置方法参考 [使用 CLB 为 Pod 分配公网地址映射](clb-pod-mapping.md)。
+安装和配置方法参考 [使用 CLB 为 Pod 分配公网地址映射](clb-pod-mapping.md)。
 
 ## 方案对比与选型
 
