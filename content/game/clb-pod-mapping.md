@@ -62,6 +62,8 @@ secretKey: "" # 腾讯云子账号的 SecretKey
 
 配置完成后点【完成】即可安装到集群。
 
+如果您使用 GitOps 管理应用，不想通过 TKE 应用市场安装，也可以从 [GitHub](https://github.com/tkestack/charts/tree/main/incubator/tke-extend-network-controller) 下载 chart。
+
 ## 确保 Pod 调度到原生节点或超级节点
 
 要使用 CLB 为 Pod 分配公网地址映射的能力，需要保证承载游戏房间的 Pod 调度到原生节点或超级节点上，如果 Pod 在普通节点（CVM），将不会为该 Pod 分配 CLB 公网地址映射。
