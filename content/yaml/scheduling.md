@@ -74,3 +74,7 @@ Kubernetes 的调度配置有 `nodeSelector` 和 `nodeAffinity` 两种方式，�
 如果 Pod 一定要在超级节点，且业务对机型又有要求，也可以用如下注解显式声明超级节点中的 Pod 的机型：
 
 <FileBlock file="scheduling/nginx-cpu-type-supernode.yaml" showLineNumbers />
+
+## 指定置放群组(超级节点)
+
+<FileBlock file="scheduling/nginx-placement-set.yaml" showLineNumbers />
