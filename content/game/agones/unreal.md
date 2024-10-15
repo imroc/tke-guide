@@ -53,3 +53,7 @@
 ### 安装额外组件
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015104550.png)
+
+## 参考资料
+
+* [虚幻引擎: 设置专用服务器](https://dev.epicgames.com/documentation/zh-cn/unreal-engine/setting-up-dedicated-servers-in-unreal-engine)
