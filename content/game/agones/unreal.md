@@ -5,8 +5,9 @@
 1. 进入 [Visual Studio 下载页面](https://visualstudio.microsoft.com/zh-hans/downloads/)，下载 Visual Studio 并安装，如需免费，可使用社区版。
 2. 安装时确保以下 C++ 相关选项勾选上。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015102406.png)
-3. 虚幻引擎对最新编译器版本可能有兼容性问题，建议勾选下虚幻引擎支持的最新 MVSC 版本，支持的版本信息在虚幻引擎源码中可以找到（文件路径`Engine/Config/Windows/Windows_SDK.json`）。点到【单个组件】，搜索并勾选下。
+3. 虚幻引擎对最新编译器版本可能有兼容性问题，建议勾选下虚幻引擎支持的最新 MVSC 版本，现在虚幻引擎源码中找到当前首选的编译器版本，文件路径 `Engine/Config/Windows/Windows_SDK.json`。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015165228.png)
+4. 在 Visual Studio Installer 中点到【单个组件】，搜索并勾选下首选编译器版本相关组件（记得取消勾选下最新版本）。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015155311.png)
 
 ## 通过源码安装虚幻引擎
