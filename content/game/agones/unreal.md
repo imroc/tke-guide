@@ -30,7 +30,7 @@
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015104840.png)
 12. 在右侧解决方案资源管理器中，右键 `UE5`，点击【生成】。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015105001.png)
-13. 然后经过漫长的构建等待，具体时长也跟机器性能有关（我这里使用的8c16g的windows云服务器，耗时3小时47分）。
+13. 然后经过漫长的构建等待，具体时长也跟机器性能有关（我这里使用的8c32g的windows云服务器，耗时3小时47分）。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015143829.png)
 14. 右键 `UE5`，点击【设为启动项目】。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015144043.png)
