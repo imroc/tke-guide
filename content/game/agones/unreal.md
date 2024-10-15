@@ -1,6 +1,6 @@
 # 将虚幻引擎开发的游戏接入 Agones 并部署到 TKE
 
-## 下载安装 Visual Studio
+## 安装 Visual Studio
 
 1. 进入 [Visual Studio 下载页面](https://visualstudio.microsoft.com/zh-hans/downloads/)，下载 Visual Studio 并安装，如需免费，可使用社区版。
 2. 安装时确保以下 C++ 相关选项勾选上。
