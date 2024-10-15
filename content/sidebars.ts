@@ -211,6 +211,7 @@ const sidebars: SidebarsConfig = {
           },
           items: [
             'game/agones/install',
+            'game/agones/unreal',
           ]
         }
       ]
