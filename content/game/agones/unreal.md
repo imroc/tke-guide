@@ -44,6 +44,8 @@
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015144043.png)
 15. 点击启动调试。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015144326.png)
+16. 如果一切正常，会看到虚幻编辑器启动界面。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016141131.png)
 
 ## 下载 Lyra 项目
 
@@ -58,6 +60,8 @@
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015101010.png)
 7. 等待下载完成。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015101039.png)
+
+## 
 
 ## TODO
 
