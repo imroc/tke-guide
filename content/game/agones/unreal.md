@@ -9,8 +9,9 @@
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015165228.png)
 4. 在 Visual Studio Installer 中点到【单个组件】，搜索并勾选下首选编译器版本相关组件（记得取消勾选下最新版本）。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016102245.png)
-5. 继续在【单个组件】中搜索虚幻引擎建议的 .NET 版本（同样也在 `Windows_SDK.json` 文件中可找到建议的版本）。
+5. 同样也在 `Windows_SDK.json` 文件中可找到建议的 .NET 版本。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016102810.png)
+6. 在【单个组件】中搜索并勾选下 .NET 相关组件（记得取消勾选下最新版本）。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016102718.png)
 
 ## 通过源码安装虚幻引擎
