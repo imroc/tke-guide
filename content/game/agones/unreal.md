@@ -61,7 +61,7 @@
 7. 等待下载完成。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015101039.png)
 
-## 启动 Lyra 项目
+## 配置 Lyra 项目
 
 1. 将 Lyra 项目文件夹里放到 UE 源码目录下，Visual Studio 会自动识别并提示是否重新加载，点【是】。
 2. 右键 Lyra，点击【生成】。
@@ -73,6 +73,15 @@
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016143823.png)
 5. 打开成功后，会看到如下界面。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016144742.png)
+6. 点击【编辑】-【项目设置】。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016145106.png)
+7. 默认地图设置为 `L_Expanse` ，这样启动游戏客户端时会直接进入地图，而不是主菜单，方便测试。
+   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016145330.png)
+8. 回到主界面，依次点击【内容侧滑菜单】-【Plugins】，搜索并双击 `B_ShooterBotSpawner` 打开蓝图窗口。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016145917.png)
+9. `Num bots to Create` 设为 0，然后点【编译】。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016150409.png)
+10. 关闭蓝图窗口。
 
 ## TODO
 
