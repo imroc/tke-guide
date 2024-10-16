@@ -99,6 +99,7 @@
 2. 右键 Lyra，点击【生成】。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016163807.png)
 3. 经过漫长的等待后，在 Lyra 的 `Binaries\Win64` 目录下会生成 `LyraClient` 二进制。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016171047.png)
 
 ## TODO
 
