@@ -61,7 +61,13 @@
 7. 等待下载完成。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015101039.png)
 
-## 
+## 启动 Lyra 项目
+
+1. 将 Lyra 项目文件夹里放到 UE 源码目录下，Visual Studio 会自动识别并提示是否重新加载，点【是】。
+2. 右键 Lyra，点击【生成】。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016144429.png)
+3. 在 Lyra 项目的文件夹下双击 UE 文件(`.uproject`) 的图标，在虚幻引擎中打开 Lyra。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016143823.png)
 
 ## TODO
 
