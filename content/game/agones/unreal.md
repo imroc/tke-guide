@@ -76,14 +76,33 @@
 6. 点击【编辑】-【项目设置】。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016145106.png)
 7. 默认地图设置为 `L_Expanse` ，这样启动游戏客户端时会直接进入地图，而不是主菜单，方便测试。
-   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016145330.png)
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016145330.png)
 8. 回到主界面，依次点击【内容侧滑菜单】-【Plugins】，搜索并双击 `B_ShooterBotSpawner` 打开蓝图窗口。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016145917.png)
 9. `Num bots to Create` 设为 0，然后点【编译】。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016150409.png)
 10. 关闭蓝图窗口。
 
+## 编译服务端
+
+1. 在 Visual Studio 中，解决方案配置切到 `Development Server`。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016163724.png)
+2. 右键 Lyra，点击【生成】。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016163807.png)
+3. 经过漫长的等待后，在 Lyra 的 `Binaries\Win64` 目录下会生成 `LyraServer` 二进制。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016163628.png)
+
+## 编译客户端
+
+1. 在 Visual Studio 中，解决方案配置切到 `Development Client`。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016163724.png)
+2. 右键 Lyra，点击【生成】。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016163807.png)
+3. 经过漫长的等待后，在 Lyra 的 `Binaries\Win64` 目录下会生成 `LyraClient` 二进制。
+
 ## TODO
+
+* 下载安装交叉编译工具：https://dev.epicgames.com/documentation/zh-cn/unreal-engine/linux-development-requirements-for-unreal-engine
 
 ## FAQ
 
