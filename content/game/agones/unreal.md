@@ -96,8 +96,10 @@
 
 1. 在 Visual Studio 中，解决方案配置切到 `Development Client`。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016163724.png)
+
 2. 右键 Lyra，点击【生成】。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016163807.png)
+
 3. 经过漫长的等待后，在 Lyra 的 `Binaries\Win64` 目录下会生成 `LyraClient` 二进制。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016171047.png)
 
@@ -105,12 +107,16 @@
 
 1. 按照截图勾选 `开发` 和 `Server`。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016171540.png)
+
 2. 按照如下截图点击【烘培内容】。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016171752.png)
+
 3. 右下角将显示一个对话框，表明内容正在烘焙。点击此对话框中的 显示输出日志（Show Output Log） ，监控烘焙过程，等待完成。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016172115.png)
+
 4. 在 Lyra 的 `Saved\Cooked` 目录下可以看到烘培出的内容。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016172226.png)
+
 5. 在命令提示符中找到你的项目目录，并执行 `./Binaries/Win64/<PROJECT_NAME>Server.exe -log` ，测试服务器是否成功运行。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016172601.png)
 
@@ -118,6 +124,7 @@
 
 1. 按照截图勾选 `开发` 和 `Client`。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016172706.png)
+
 2. 按照如下截图点击【烘培内容】。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F16%2F20241016172806.png)
 
