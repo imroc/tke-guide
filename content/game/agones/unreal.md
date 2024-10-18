@@ -170,8 +170,10 @@
 
 1. 在命令行进入 Lyra 项目的子目录 `Binaries\Win64`
 2. 执行这个命令启动服务端：`<PROJECT_NAME>Server.exe -log`。
+
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F17%2F20241017230427.png)
 3. 执行两次这个命令，启动两个客户端，即两个玩家连上同一房间：`<PROJECT_NAME>Client.exe 127.0.0.1:7777 -WINDOWED -ResX=800 -ResY=450`。
+
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F17%2F20241017230035.png)
 
 ## 交叉编译服务端
