@@ -189,6 +189,9 @@
 5. 等待交叉编译打包完成。
 
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F17%2F20241017231415.png)
+6. 完成后可以看到选择的目录下多出一个 `LinuxServer` 的目录，这个就是交叉编译出来的服务端。
+
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F18%2F20241018112500.png)
 
 ## TODO
 
