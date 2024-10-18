@@ -177,12 +177,15 @@
 ## 交叉编译服务端
 
 1. 下载安装交叉编译工具：https://dev.epicgames.com/documentation/zh-cn/unreal-engine/linux-development-requirements-for-unreal-engine
-2. 关闭虚幻引擎，再重新打开虚幻引擎，确保交叉编译的工具生效。
+2. 关闭虚幻引擎编辑器，再重新双击 Lyra 的 `uproject` 文件，以便用虚幻引擎编辑器重新打开 Lyra 项目，确保交叉编译的工具生效。
 3. 在 UE5 中平台选到 Linux，编译目标选到 Server，点击打包项目。
+
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F17%2F20241017230951.png) 
 4. 选择输出的目录，我这里直接选 Lyra 项目根目录。
+
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F17%2F20241017231255.png)
 5. 等待交叉编译打包完成。
+
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F17%2F20241017231415.png)
 
 ## TODO
