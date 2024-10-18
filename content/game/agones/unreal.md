@@ -193,15 +193,21 @@
 
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F18%2F20241018112500.png)
 
-## TODO
+## 服务端接入 Agons
 
-* 下载安装交叉编译工具：https://dev.epicgames.com/documentation/zh-cn/unreal-engine/linux-development-requirements-for-unreal-engine
+1. 下载 Agones 最新 release 的源码压缩包并解压。
+2. 将 `sdks/unreal` 下的 `Agones` 目录拷贝到 Lyra 项目的 `Plugins` 目录下。
 
-## FAQ
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F18%2F20241018150243.png)
+3. 编辑 Lyra 项目的 `uproject` 文件，添加 `Plugins`。
+    ```json
+        {
+          "Enabled": true,
+          "Name": "Agones"
+        },
+    ```
 
-### 安装额外组件
-
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F15%2F20241015104550.png)
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F18%2F20241018151000.png)
 
 ## 参考资料
 
