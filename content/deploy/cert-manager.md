@@ -1,5 +1,11 @@
 # 在 TKE 上安装 cert-manager
 
+## 安装方法
+
+可通过 TKE 应用市场安装，也可使用 helm 命令来安装，具体方法本文均有介绍。
+
+通过 TKE 应用市场安装的优点是操作比较简单，无需替换镜像；通过 helm 命令安装的优点是 `cert-manager` 的版本比较及时，可第一时间安装社区最新版，另外也能支持通过 GitOps 方式管理集群的 cert-manager。
+
 ## 通过 TKE 应用市场安装
 
 1. 在 [TKE 应用市场的应用管理](https://console.cloud.tencent.com/tke2/helm) 中选择需要安装 cert-manager 的集群，然后点击【新建】。
