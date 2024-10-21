@@ -193,7 +193,7 @@
 
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F18%2F20241018112500.png)
 
-## 服务端接入 Agons
+## 服务端接入 Agones
 
 1. 下载 Agones 最新 release 的源码压缩包并解压。
 2. 将 `sdks/unreal` 下的 `Agones` 目录拷贝到 Lyra 项目的 `Plugins` 目录下。
