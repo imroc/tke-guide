@@ -1,6 +1,20 @@
 # 在 TKE 上安装 cert-manager
 
-## 安装方法
+## 通过 TKE 应用市场安装
+
+1. 在 [TKE 应用市场的应用管理](https://console.cloud.tencent.com/tke2/helm) 中选择需要安装 cert-manager 的集群，然后点击【新建】。
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F21%2F20241021171014.png)
+
+2. 搜索 cert-manager 并选择，如果没有名为 `cert-manager` 的命名空间就新建一个，然后命名空间选到 `cert-manager` 并点击【完成】。
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F10%2F21%2F20241021171432.png)
+
+3. 安装完成。可通过检查集群 `cert-manager` 命名空间下的 Pod 状态来确认 `cert-manager` 相关组件是否正常运行。
+
+## 使用 helm 命令安装
+
+### 安装思路
 
 cert-manager 的安装可参考官方文档 [Installing with Helm](https://cert-manager.io/docs/installation/helm/) 进行安装，但 cert-manager 依赖的镜像地址域名是 `quay.io`，在国内一般会拉取镜像失败。
 
@@ -20,7 +34,7 @@ cert-manager 的 mirror 镜像均使用 [image-porter](https://github.com/imroc/
 
 :::
 
-## 安装步骤
+### 安装步骤
 
 1. 添加 helm repo:
 
@@ -60,7 +74,7 @@ helm upgrade --install \
 
 > 后续如果需要修改 `values.yaml` 配置，或者升级版本，都可以通过执行这个命令来更新 cert-manager。
 
-## 验证
+### 验证
 
 查看 pod 状态：
 
