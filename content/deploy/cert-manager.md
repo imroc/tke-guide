@@ -30,7 +30,7 @@
 
 ### 安装思路
 
-cert-manager 的安装可参考官方文档 [Installing with Helm](https://cert-manager.io/docs/installation/helm/) 进行安装，但 cert-manager 依赖的镜像地址域名是 `quay.io`，在国内一般会拉取镜像失败。
+cert-manager 的 helm 命令安装方法可参考官方文档 [Installing with Helm](https://cert-manager.io/docs/installation/helm/) 进行安装，但 cert-manager 依赖的镜像地址域名是 `quay.io`，在国内一般会拉取镜像失败。
 
 解决方案是将镜像地址替换为 Docker Hub 上的 mirror 镜像（TKE 环境无需任何配置即可走内网拉取 DockerHub 上的镜像）：
 
