@@ -1,4 +1,4 @@
-# 在 TKE 上自建 Envoy Gateway
+# 在 TKE 使用 EnvoyGateway
 
 ## 什么是 Envoy Gateway?
 
