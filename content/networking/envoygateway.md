@@ -108,7 +108,9 @@ spec:
 
 ## 创建 HTTPRoute
 
-`HTTPRoute` 用于定义 HTTP 转发规则，也是 Gateway API 中最常用的转发规则，在 `HTTPRoute` 中引用 `Gateway`，表示将该规则应用到这个 `Gateway` 中：
+`HTTPRoute` 用于定义 HTTP 转发规则，也是 Gateway API 中最常用的转发规则，类似 Ingress API 中的 `Ingress` 资源。
+
+在 `HTTPRoute` 中引用 `Gateway`，表示将该规则应用到这个 `Gateway` 中：
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
