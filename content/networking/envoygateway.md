@@ -1,4 +1,4 @@
-# 在 TKE 使用 EnvoyGateway
+# 在 TKE 中使用 EnvoyGateway
 
 ## 什么是 Envoy Gateway?
 
