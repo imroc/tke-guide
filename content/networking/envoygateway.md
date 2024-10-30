@@ -133,3 +133,7 @@ spec:
           name: nginx
           port: 80
 ```
+
+确保在 `hostnames` 里定义的域名解析到 `Gateway` 对应的 CLB，然后就可以通过域名访问集群内的服务了。
+
+关于 `HTTPRoute` 更详细的用法参考 [Gateway API 官方文档](https://gateway-api.sigs.k8s.io/guides/http-routing/)。
