@@ -34,7 +34,18 @@ const sidebars: SidebarsConfig = {
             'networking/ingress-nginx/values-demo',
           ],
         },
-        'networking/envoygateway',
+        {
+          type: 'category',
+          label: '在 TKE 使用 EnvoyGateway 流量网关',
+          collapsed: true,
+          link: {
+            type: 'generated-index',
+            slug: '/networking/envoygateway'
+          },
+          items: [
+            'networking/envoygateway/quick-start',
+          ],
+        },
         'networking/traffic-lossless-upgrade',
         'networking/clb-to-pod-directly',
         'networking/pod-eip',
