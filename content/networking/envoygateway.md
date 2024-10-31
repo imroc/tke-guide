@@ -24,7 +24,7 @@ Kubernetes 提供了 `Ingress API` 来接入七层南北向流量，但功能很
 
 EnvoyGateway 使用的是 Gateway API 而不是 Ingress API，在 TKE 控制台无法直接创建，可通过 kubectl 命令进行创建，参考 [连接集群](https://cloud.tencent.com/document/product/457/32191) 这篇文档配置 kubectl。
 
-## 创建 GateawyClass
+## 创建 GatewayClass
 
 类似 `Ingress` 需要指定 `IngressClass`，Gateway API 中每个 `Gateway` 都需要引用一个 `GatewayClass`，`GatewayClass` 相当于是网关实例除监听器外的配置（如部署方式、网关 Pod 的 template、副本数量、关联的 Service 等），所以先创建一个 `GatewayClass`：
 
