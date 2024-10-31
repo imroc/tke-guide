@@ -114,7 +114,7 @@ spec:
 
 更多 CLB 相关的自定义可参考 [Service Annotation 说明](https://cloud.tencent.com/document/product/457/51258)。
 
-举几个常见自定义例子：
+举几个常见的自定义例子：
 1. 通过 `service.cloud.tencent.com/specify-protocol` 注解来修改监听器协议为 HTTPS 并正确引用 SSL 证书，以便让 CLB 能够接入 [腾讯云 WAF](https://cloud.tencent.com/product/waf)。
 2. 通过 `service.kubernetes.io/qcloud-loadbalancer-internal-subnetid` 注解指定 CLB 内网 IP，实现自动创建内网 CLB 来接入流量。
 3. 通过 `service.kubernetes.io/service.extensiveParameters` 注解自定义自动创建的 CLB 更多属性，如指定运营商、带宽上限、实例规格、网络计费模式等。
