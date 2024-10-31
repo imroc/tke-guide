@@ -26,7 +26,7 @@ EnvoyGateway 使用的是 Gateway API 而不是 Ingress API，在 TKE 控制台�
 
 ## 创建 GateawyClass
 
-类似 `Ingress`，Gateway API 中每个 `Gateway` 都需要引用一个 `GatewayClass`，所以先创建一个 `GatewayClass`：
+类似 `Ingress` 需要指定 `IngressClass`，Gateway API 中每个 `Gateway` 都需要引用一个 `GatewayClass`，`GatewayClass` 相当于是网关实例除监听器外的配置（如部署方式、网关 Pod 的 template、副本数量、关联的 Service 等），所以先创建一个 `GatewayClass`：
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
