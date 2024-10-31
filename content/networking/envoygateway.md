@@ -8,9 +8,17 @@
 
 Kubernetes 提供了 `Ingress API` 来接入七层南北向流量，但功能很弱，每种实现都带了不同的 annotation 来增强 Ingress 的能力，灵活性和扩展性也较差，在社区的推进下，推出了 `Gateway API` 作为更好的解决方案，解决 Ingress API 痛点的同时，还统一了四七层南北向流量，同时也支持服务网格的东西向流量（参考 [GAMMA](https://gateway-api.sigs.k8s.io/mesh/gamma/)），各个云厂商以及开源代理软件都在积极适配 `Gateway API`，可参考 [Gateway API 的实现列表](https://gateway-api.sigs.k8s.io/implementations/)，其中 Envoy Gateway 便是其中一个很流行的实现。
 
-## 安装
+## 安装 EnvoyGateway
+
+### 方法一：通过应用市场安装
 
 在 [TKE 应用市场](https://console.cloud.tencent.com/tke2/helm/market) 搜索或在 `网络` 分类中找到 `envoygateway`，点击【创建应用】，命名空间选 `envoy-gateway-system`，若没有则先新建一个，完成其余配置后点击【创建】将 envoygateway 安装到集群中。
+
+### 方法二：通过 Helm 安装
+
+首先确保本机安装了 helm 并能操作 TKE 集群，参考 [本地 Helm 客户端连接集群](https://cloud.tencent.com/document/product/457/32731)。
+
+然后再参考 EnvoyGateway 官方文档 [使用 Helm 安装](https://gateway.envoyproxy.io/zh/latest/install/install-helm/) 进行安装。
 
 ## 配置 kubectl 访问集群
 
