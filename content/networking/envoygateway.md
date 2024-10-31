@@ -12,7 +12,7 @@ Kubernetes 提供了 `Ingress API` 来接入七层南北向流量，但功能很
 
 ### 方法一：通过应用市场安装
 
-在 [TKE 应用市场](https://console.cloud.tencent.com/tke2/helm/market) 搜索或在 `网络` 分类中找到 `envoygateway`，点击【创建应用】，命名空间选 `envoy-gateway-system`，若没有则先新建一个，完成其余配置后点击【创建】将 envoygateway 安装到集群中。
+在 [TKE 应用市场](https://console.cloud.tencent.com/tke2/helm/market) 搜索或在 `网络` 分类中找到 `envoygateway`，点击【创建应用】，命名空间选 `envoy-gateway-system`，若没有则先新建一个，完成其余配置后点击【创建】即可将 envoygateway 安装到集群中。
 
 ### 方法二：通过 Helm 安装
 
