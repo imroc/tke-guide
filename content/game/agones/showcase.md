@@ -22,6 +22,53 @@ TKE 集群主要有标准集群和 Serverless 集群之分，Serverless 集群�
 
 而 TKE 提供了 tke-extend-network-controller 网络插件，可以通过 CLB 端口来为游戏专用服务器暴露公网地址，可参考 [使用 CLB 为 Pod 分配公网地址映射](https://cloud.tencent.com/document/product/457/111623) 进行安装和配置。
 
+如何关联 Agones 的 GameServer 与映射的 CLB IP:Port？
+
+首先定义 `DedicatedCLBService` 时指定 `addressPodAnnotation`，即将 CLB 的 IP:Port 信息注入到 Pod 指定注解中：
+
+```yaml
+apiVersion: networking.cloud.tencent.com/v1alpha1
+kind: DedicatedCLBService
+metadata:
+  namespace: demo
+  name: gameserver
+spec:
+  lbRegion: ap-chengdu
+  maxPod: 50
+  selector:
+    app: gameserver
+  ports:
+  - protocol: UDP
+    targetPort: 9000
+    addressPodAnnotation: networking.cloud.tencent.com/external-address # 将外部地址自动注入到指定的 pod annotation 中
+  existedLbIds: # 复用已有的 CLB 实例，指定 CLB 实例 ID 的列表
+    - lb-xxx
+```
+
+然后定义游戏服工作负载的 pod template 时（`Fleet` 是 `.spec.template.spec.template` 字段），利用 downward API 将注解信息挂载到容器中：
+
+```yaml
+    spec:
+      containers:
+        - ...
+          volumeMounts:
+            - name: podinfo
+              mountPath: /etc/podinfo
+      volumes:
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: "address"
+                fieldRef:
+                  fieldPath: metadata.annotations['networking.cloud.tencent.com/external-address']
+```
+
+游戏服启动时轮询此文件，发现内容不为空时即表示 CLB 已绑定好 Pod，内容即为当前房间的公网地址。可通过调用 Agones SDK 的 `SetLabel` 或 `SetAnnotation` 函数将信息写入到 GameServer 对象中以实现 GameServer 与 CLB 公网地址映射的关联。
+
+具体流程如下：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F06%2F20241106191629.png)
+
 ## 架构设计
 
 在游戏业务场景中，游戏房间不仅有是否分配的状态，还有一些其他业务扩展的状态，比如玩家信息是否加载完成的状态（在玩家匹配成功后，分配一个游戏房间，即 Agones 的 GameServer，但还需等待房间加载完将要连上来的玩家信息后，才通知玩家连接进入房间进行对战）。
