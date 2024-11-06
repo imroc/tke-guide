@@ -73,12 +73,16 @@ spec:
 
 在游戏业务场景中，游戏房间不仅有是否分配的状态，还有一些其他业务扩展的状态，比如玩家信息是否加载完成的状态（在玩家匹配成功后，分配一个游戏房间，即 Agones 的 GameServer，但还需等待房间加载完将要连上来的玩家信息后，才通知玩家连接进入房间进行对战）。
 
-考虑到后续还有很多其它游戏要用，不能直接在大厅服里写这些房间管理的逻辑，所以引入 room-manager 作为房间管理的中间件。
+考虑到后续还有很多其它游戏要用，不能直接在大厅服里写这些房间管理的逻辑，所以引入 room-manager 作为房间管理的中间件，该中间件使用 Go 语言开发，利用 k8s 的 client-go 对集群中的 GameServer 进行 list-watch （其他语言 SDK 不支持自定义资源的 list-watch），为大厅服暴露两个接口：
+1. 查询 GameServer 信息(从 client-go list-watch 的缓存拿)。
+2. 分配 GameServer (Agones 提供的 GameServerAllocation API)。
 
-核心流程:
+整体流程:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F06%2F20241106172705.png)
 
 ## 弹性伸缩
+
+Agones 支持通过 `FleetAutoScaler` 声明游戏服的弹性伸缩策略，可以指定 Fleet 预留的 buffer 大小（冗余的空闲房间），可以是数量，也可以是百分比（空闲房间比例）：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F06%2F20241106172751.png)
