@@ -50,6 +50,8 @@ Fleet 指定游戏专用服务器的副本数，每个副本对应一个 GameSer
 
 Fleet 配置方法参考官方文档 [Quickstart: Create a Game Server Fleet](https://agones.dev/site/docs/getting-started/create-fleet/)。
 
+由于游戏中每场对局的人数、地图、游戏模式等业务属性可能不同，所以需要将 Fleet 拆分成多个，不同 Fleet 使用不同 Pod 规格、使用不同启动参数加载不同地图等业务数据，并打上能标识规格、地图等属性的 label，用于后续分配房间时根据 label 过滤合适的 GameServer。
+
 ## 分配游戏房间的方法
 
 Agones 是单 Pod 单房间的模型，社区也有讨论对单 Pod 多房间的支持，参考 [issue #1197](https://github.com/googleforgames/agones/issues/1197)，但这会让游戏服的管理很复杂也很难实现，最终只给了个 [High Density GameServers](https://agones.dev/site/docs/integration-patterns/high-density-gameservers/) 的妥协方案，流程复杂且需要游戏服自己做很大开发工作来适配。
@@ -112,11 +114,11 @@ spec:
 
 在游戏业务场景中，游戏房间不仅有是否分配的状态，还有一些其他业务扩展的状态，比如玩家信息是否加载完成的状态（在玩家匹配成功后，分配一个游戏房间，即 Agones 的 GameServer，但还需等待房间加载完将要连上来的玩家信息后，才通知玩家连接进入房间进行对战）。
 
-考虑到后续还有很多其它游戏要用，不能直接在大厅服里写这些房间管理的逻辑，所以引入 room-manager 作为房间管理的中间件，该中间件使用 Go 语言开发，利用 k8s 的 client-go 对集群中的 GameServer 进行 list-watch （其他语言 SDK 不支持自定义资源的 list-watch），为大厅服暴露两个接口：
+考虑到后续还有很多其它游戏要用，就打算不直接在大厅服里写这些房间管理的逻辑，所以引入 room-manager 作为房间管理的中间件，该中间件使用 Go 语言开发，利用 k8s 的 client-go 对集群中的 GameServer 进行 list-watch （其他语言 SDK 不支持自定义资源的 list-watch），为大厅服暴露两个接口：
 1. 查询 GameServer 信息(从 client-go list-watch 的缓存拿)。
-2. 分配 GameServer (Agones 提供的 GameServerAllocation API)。
+2. 分配 GameServer (本质上会调用 Agones 提供的 GameServerAllocation API，只是会根据业务需求加一些过滤条件，比如根据匹配的人数、选择的地图和游戏模式等条件匹配满足条件的  GameServer，通过 label 标识和过滤)。
 
-整体流程:
+整体流程如下:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F06%2F20241106172705.png)
 
@@ -125,3 +127,4 @@ spec:
 Agones 支持通过 `FleetAutoScaler` 声明游戏服的弹性伸缩策略，可以指定 Fleet 预留的 buffer 大小（冗余的空闲房间），可以是数量，也可以是百分比（空闲房间比例）：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F06%2F20241106172751.png)
+
