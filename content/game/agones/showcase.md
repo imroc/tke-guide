@@ -1,20 +1,42 @@
 # 案例分享：使用 Agones 在 TKE 上部署游戏专用服务器
 
-## 背景
+## 项目背景
 
 有一款 PVP（房间类）游戏基于虚幻引擎 UE5.4 开发，玩家在线匹配到一个房间后，会进入房间进行对战，同一局的玩家都会连上同一个游戏专用服务器（DS, Dedicated Server）。为降低成本和提升灵活性，决定基于开源的 Agones 在 TKE 上部署游戏专用服务器，可根据空闲房间数量和比例自动扩缩容。
-
-## 使用虚幻引擎插件接入 Agones
-
-在游戏项目导入 Agones 插件并启用后，在合适位置初始化 Agones SDK 和调用相关 hook 函数，即可接入 Agones。
-
-Agones 官方提供了 UE5 的插件和使用方法，参考 [Unreal Engine Game Server Client Plugin](https://agones.dev/site/docs/guides/client-sdks/unreal/)。
 
 ## TKE 集群与节点类型选型
 
 TKE 集群主要有标准集群和 Serverless 集群之分，Serverless 集群的能力现已融入标准集群，未来将不再有 Serverless 集群，所以直接创建 TKE 标准集群即可。
 
-部署游戏专用服务器使用超级节点，超级节点并非实体节点，仅代表一个子网，其中每个 Pod 都是独占的轻量虚拟机，Pod 扩容时没有耗时长的扩容节点过程，调度 Pod 后立即创建和启动一台轻量虚拟机并拉起容器，Pod 停止立即停止计费，即能保证扩容速度，又能按需使用，降低成本。
+部署游戏专用服务器使用超级节点，超级节点并非实体节点，仅代表一个子网，其中每个 Pod 都独占的轻量虚拟机，Pod 扩容时没有耗时长的扩容节点过程，调度 Pod 后立即创建和启动一台轻量虚拟机并拉起容器，Pod 销毁立即自动停止计费，即能保证扩容速度，又能按需使用，降低成本。
+
+## 使用虚幻引擎插件接入 Agones
+
+在游戏项目导入 Agones 插件并启用后，在合适位置初始化 Agones SDK 和调用相关 hook 函数，即可接入 Agones。
+
+Agones 官方提供了 UE5 的插件及其使用方法，参考 [Unreal Engine Game Server Client Plugin](https://agones.dev/site/docs/guides/client-sdks/unreal/)。
+
+## 使用流水线自动构建容器镜像
+
+使用虚幻引擎开发的游戏，需使用虚幻官方提供的工具进行构建，平时自测可以用虚幻编辑器构建，发版时可使用流水线来自动构建并编译容器镜像，推送至镜像仓库。
+
+流水线的大致思路是：
+1.  UE 官方提供了 [通过命令行构建项目](https://dev.epicgames.com/documentation/zh-cn/unreal-engine/linux-development-quickstart-for-unreal-engine#5b%E9%80%9A%E8%BF%87%E5%91%BD%E4%BB%A4%E8%A1%8C%E6%9E%84%E5%BB%BA%E9%A1%B9%E7%9B%AE) 的方法，可根据自身需求在流水线中编写适合的构建命令。
+2.  假设上一步构建出压缩包名为 `LinuxServer.zip`，流水线中将其解压到 `LinuxServer` 文件夹，并使用如下的 `Dockerfile` 构建容器镜像（注意替换 `ENTRYPOINT` 中的脚本名称）。
+    ```dockerfile
+    FROM ubuntu:22.04
+    RUN mkdir /app
+    COPY ./LinuxServer /app
+    RUN useradd -m ue5
+    RUN chown -R ue5:ue5 /app
+    USER ue5
+
+    EXPOSE 7777/tcp
+    EXPOSE 7777/udp
+
+    ENTRYPOINT [ "/app/LyraServer.sh" ]
+    ```
+3. 最后流水线自动将容器镜像推送到镜像仓库。一般游戏的镜像都较大，推荐使用腾讯云 [TCR 镜像仓库](https://cloud.tencent.com/product/tcr)，确保镜像拉取的速度和稳定性。
 
 ## 使用 tke-extend-network-controller 网络插件
 
