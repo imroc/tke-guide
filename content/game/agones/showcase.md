@@ -50,21 +50,23 @@ Fleet 指定游戏专用服务器的副本数，每个副本对应一个 GameSer
 
 Fleet 配置方法参考官方文档 [Quickstart: Create a Game Server Fleet](https://agones.dev/site/docs/getting-started/create-fleet/)。
 
-## 分配战斗房间
+## 分配游戏房间的方法
 
 Agones 是单 Pod 单房间的模型，社区也有讨论对单 Pod 多房间的支持，参考 [issue #1197](https://github.com/googleforgames/agones/issues/1197)，但这会让游戏服的管理很复杂也很难实现，最终只给了个 [High Density GameServers](https://agones.dev/site/docs/integration-patterns/high-density-gameservers/) 的妥协方案，流程复杂且需要游戏服自己做很大开发工作来适配。
 
-所以还是选择了用单 Pod 单房间进行管理，Agones 提供了 [GameServerAllocation](https://agones.dev/site/docs/reference/gameserverallocation/) 来分配 GameServer，一个 GameServer 代表一个房间，调用 GameServerAllocation 分配 GameServer 后，被分配的 GameServer 状态会被标记为 Allocated，该状态的 GameServer 对应的 Pod 可以避免缩容时被删除。
+所以还是选择了用单 Pod 单房间的模型进行管理，Agones 提供了 [GameServerAllocation](https://agones.dev/site/docs/reference/gameserverallocation/) API 来分配 GameServer，一个 GameServer 代表一个房间，调用 GameServerAllocation 分配 GameServer 后，被分配的 GameServer 状态会被标记为 Allocated，该状态的 GameServer 对应的 Pod 可以避免缩容时被删除，下次分配房间时也不会分配该状态的 GameServer。
 
-## 使用 tke-extend-network-controller 网络插件
+## 使用 tke-extend-network-controller 网络插件为房间映射公网地址
 
-游戏房间的公网地址如何暴露？Agones 只提供了 HostPort 这一种方式，如果用 TKE 超级节点，HostPort 无法使用（因为超级节点是虚拟的节点，HostPort 没有意义）。
+每个游戏房间都需要独立的公网地址，而 Agones 只提供了 HostPort 这一种方式，如果用 TKE 超级节点，HostPort 无法使用（因为超级节点是虚拟的节点，HostPort 没有意义）。
 
-而 TKE 提供了 tke-extend-network-controller 网络插件，可以通过 CLB 端口来为游戏专用服务器暴露公网地址，可参考 [使用 CLB 为 Pod 分配公网地址映射](https://cloud.tencent.com/document/product/457/111623) 进行安装和配置。
+TKE 提供了 tke-extend-network-controller 网络插件，可以通过 CLB 端口来为游戏专用服务器暴露公网地址，可参考 [使用 CLB 为 Pod 分配公网地址映射](https://cloud.tencent.com/document/product/457/111623) 进行安装和配置。
 
-如何关联 Agones 的 GameServer 与映射的 CLB IP:Port？
+如何关联 Agones 的 GameServer 与映射的 CLB IP:Port？可以将 IP:Port 信息写到 GameServer 的 label 中。
 
-首先定义 `DedicatedCLBService` 时指定 `addressPodAnnotation`，即将 CLB 的 IP:Port 信息注入到 Pod 指定注解中：
+下面介绍实现步骤：
+
+1. 首先定义 `DedicatedCLBService` 时指定 `addressPodAnnotation`，即将 CLB 的 IP:Port 信息注入到 Pod 指定注解中：
 
 ```yaml
 apiVersion: networking.cloud.tencent.com/v1alpha1
@@ -73,7 +75,6 @@ metadata:
   namespace: demo
   name: gameserver
 spec:
-  lbRegion: ap-chengdu
   maxPod: 50
   selector:
     app: gameserver
@@ -81,11 +82,11 @@ spec:
   - protocol: UDP
     targetPort: 9000
     addressPodAnnotation: networking.cloud.tencent.com/external-address # 将外部地址自动注入到指定的 pod annotation 中
-  existedLbIds: # 复用已有的 CLB 实例，指定 CLB 实例 ID 的列表
+  existedLbIds:
     - lb-xxx
 ```
 
-然后定义游戏服工作负载的 pod template 时（`Fleet` 是 `.spec.template.spec.template` 字段），利用 downward API 将注解信息挂载到容器中：
+2. 然后定义游戏服工作负载的 pod template 时（`Fleet` 是 `.spec.template.spec.template` 字段），利用 downward API 将注解信息挂载到容器中：
 
 ```yaml
     spec:
@@ -103,9 +104,7 @@ spec:
                   fieldPath: metadata.annotations['networking.cloud.tencent.com/external-address']
 ```
 
-游戏服启动时轮询此文件，发现内容不为空时即表示 CLB 已绑定好 Pod，内容即为当前房间的公网地址。可通过调用 Agones SDK 的 `SetLabel` 或 `SetAnnotation` 函数将信息写入到 GameServer 对象中以实现 GameServer 与 CLB 公网地址映射的关联。
-
-具体流程如下：
+3. 游戏服启动时轮询此文件，发现内容不为空时即表示 CLB 已绑定好 Pod，内容即为当前房间的公网地址。可通过调用 Agones SDK 的 `SetLabel` 或 `SetAnnotation` 函数将信息写入到 GameServer 对象中以实现 GameServer 与 CLB 公网地址映射的关联。
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F06%2F20241106191629.png)
 
