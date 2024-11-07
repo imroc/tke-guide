@@ -2,7 +2,7 @@
 
 ## 项目背景
 
-有一款 PVP（房间类）游戏基于虚幻引擎 UE5.4 开发，玩家在线匹配到一个房间后，会进入房间进行对战，同一局的玩家都会连上同一个游戏专用服务器（DS, Dedicated Server）。为降低成本和提升灵活性，决定基于开源的 Agones 在 TKE 上部署游戏专用服务器，可根据空闲房间数量和比例自动扩缩容。
+有一款 PVP（房间类）的游戏基于虚幻引擎 UE5.4 开发，玩家在线匹配到一个房间后，会一起进入该房间进行对战，同一局的玩家都会连上同一个游戏专用服务器（DS, Dedicated Server）。为降低成本和提升灵活性，决定基于开源的 Agones 在 TKE 上部署游戏专用服务器，可根据空闲房间数量和比例自动扩缩容。
 
 ## TKE 集群与节点类型选型
 
@@ -38,7 +38,7 @@ Agones 官方提供了 UE5 的插件及其使用方法，参考 [Unreal Engine G
 
     ENTRYPOINT [ "/app/LyraServer.sh" ]
     ```
-3. 最后流水线自动将容器镜像推送到镜像仓库。一般游戏的镜像都较大，推荐使用腾讯云 [TCR 镜像仓库](https://cloud.tencent.com/product/tcr)，确保镜像拉取的速度和稳定性。
+3. 最后流水线自动将容器镜像推送到镜像仓库。一般游戏的镜像都较大，就使用腾讯云 [TCR 镜像仓库](https://cloud.tencent.com/product/tcr)，确保镜像拉取的速度和稳定性。
 
 ## 使用 tke-extend-network-controller 网络插件
 
