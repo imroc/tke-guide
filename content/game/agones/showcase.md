@@ -60,7 +60,7 @@ Agones 是单 Pod 单房间的模型，社区也有讨论对单 Pod 多房间的
 
 所以还是选择了用单 Pod 单房间的模型进行管理，Agones 提供了 [GameServerAllocation](https://agones.dev/site/docs/reference/gameserverallocation/) API 来分配 GameServer，一个 GameServer 代表一个房间，调用 GameServerAllocation 分配 GameServer 后，被分配的 GameServer 状态会被标记为 Allocated，该状态的 GameServer 对应的 Pod 可以避免缩容时被删除，下次分配房间时也不会分配该状态的 GameServer。
 
-## 使用 tke-extend-network-controller 网络插件为房间映射公网地址
+## 使用 TKE 网络插件为游戏房间映射公网地址
 
 每个游戏房间都需要独立的公网地址，而 Agones 只提供了 HostPort 这一种方式，如果用 TKE 超级节点，HostPort 无法使用（因为超级节点是虚拟的节点，HostPort 没有意义）。
 
