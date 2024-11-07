@@ -20,7 +20,7 @@ Agones 官方提供了 UE5 的插件及其使用方法，参考 [Unreal Engine G
 
 ## 使用流水线自动构建容器镜像
 
-使用虚幻引擎开发的游戏，需使用虚幻官方提供的工具进行构建，平时自测可以用虚幻编辑器构建，发版时可使用流水线来自动构建并编译容器镜像，推送至镜像仓库。
+使用虚幻引擎开发的游戏，需使用虚幻官方提供的工具进行构建，平时自测一般用虚幻编辑器构建在本地测试，发版时则使用 [Coding](https://coding.net/) 流水线来自动构建并编译容器镜像，推送至 [TCR 镜像仓库](https://cloud.tencent.com/product/tcr)。
 
 流水线的大致思路是：
 1.  UE 官方提供了 [通过命令行构建项目](https://dev.epicgames.com/documentation/zh-cn/unreal-engine/linux-development-quickstart-for-unreal-engine#5b%E9%80%9A%E8%BF%87%E5%91%BD%E4%BB%A4%E8%A1%8C%E6%9E%84%E5%BB%BA%E9%A1%B9%E7%9B%AE) 的方法，可根据自身需求在流水线中编写适合的构建命令。
