@@ -130,3 +130,4 @@ Agones 支持通过 `FleetAutoScaler` 声明游戏服的弹性伸缩策略，可
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F06%2F20241106172751.png)
 
+考虑到 Fleet 众多和游戏规模等因素，希望尽可能控制成本，尽可能精准控制 GameServer 数量，决定设定预留 buffer 大小为指定数量的 GameServer，使用脚本定时修改 buffer 大小，以实现在每日高峰期到来之前提前预留的 GameServer 数量，减少玩家的等待时间；高峰期结束后减小 buffer 数量，降低成本。
