@@ -40,6 +40,16 @@ Agones 官方提供了 UE5 的插件及其使用方法，参考 [Unreal Engine G
     ```
 3. 最后流水线自动将容器镜像推送到镜像仓库。一般游戏的镜像都较大，就使用腾讯云 [TCR 镜像仓库](https://cloud.tencent.com/product/tcr)，确保镜像拉取的速度和稳定性。
 
+## 使用 Agones Fleet 部署
+
+Agones 提供了 Fleet 来编排游戏专用服务器，也就是一种 Kubernetes 中扩展的自定义工作负载类型，类似 Kubernetes 的 StatefulSet，只是专为游戏场景设计。
+
+Fleet 指定游戏专用服务器的副本数，每个副本对应一个 GameServer 对象，该对象中可以记录游戏服务器的状态，如是否已被分配、对外的公网地址、玩家数量等。
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F07%2F20241107120107.png)
+
+Fleet 配置方法参考官方文档 [Quickstart: Create a Game Server Fleet](https://agones.dev/site/docs/getting-started/create-fleet/)。
+
 ## 使用 tke-extend-network-controller 网络插件
 
 游戏房间的公网地址如何暴露？Agones 只提供了 HostPort 这一种方式，如果用 TKE 超级节点，HostPort 无法使用（因为超级节点是虚拟的节点，HostPort 没有意义）。
