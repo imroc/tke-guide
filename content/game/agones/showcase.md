@@ -50,6 +50,12 @@ Fleet 指定游戏专用服务器的副本数，每个副本对应一个 GameSer
 
 Fleet 配置方法参考官方文档 [Quickstart: Create a Game Server Fleet](https://agones.dev/site/docs/getting-started/create-fleet/)。
 
+## 分配战斗房间
+
+Agones 是单 Pod 单房间的模型，社区也有讨论对单 Pod 多房间的支持，参考 [issue #1197](https://github.com/googleforgames/agones/issues/1197)，但这会让游戏服的管理很复杂也很难实现，最终只给了个 [High Density GameServers](https://agones.dev/site/docs/integration-patterns/high-density-gameservers/) 的妥协方案，流程复杂且需要游戏服自己做很大开发工作来适配。
+
+所以还是选择了用单 Pod 单房间进行管理，Agones 提供了 [GameServerAllocation](https://agones.dev/site/docs/reference/gameserverallocation/) 来分配 GameServer，一个 GameServer 代表一个房间，调用 GameServerAllocation 分配 GameServer 后，被分配的 GameServer 状态会被标记为 Allocated，该状态的 GameServer 对应的 Pod 可以避免缩容时被删除。
+
 ## 使用 tke-extend-network-controller 网络插件
 
 游戏房间的公网地址如何暴露？Agones 只提供了 HostPort 这一种方式，如果用 TKE 超级节点，HostPort 无法使用（因为超级节点是虚拟的节点，HostPort 没有意义）。
