@@ -64,7 +64,7 @@ Agones 是单 Pod 单房间的模型，社区也有讨论对单 Pod 多房间的
 
 每个游戏房间都需要独立的公网地址，而 Agones 只提供了 HostPort 这一种方式，如果用 TKE 超级节点，HostPort 无法使用（因为超级节点是虚拟的节点，HostPort 没有意义）。
 
-TKE 提供了 tke-extend-network-controller 网络插件，可以通过 CLB 端口来为游戏专用服务器暴露公网地址，可参考 [使用 CLB 为 Pod 分配公网地址映射](https://cloud.tencent.com/document/product/457/111623) 进行安装和配置。
+TKE 提供了 `tke-extend-network-controller` 网络插件，可以通过 CLB 端口来为游戏专用服务器暴露公网地址，可参考 [使用 CLB 为 Pod 分配公网地址映射](https://cloud.tencent.com/document/product/457/111623) 进行安装和配置。
 
 如何关联 Agones 的 GameServer 与映射的 CLB IP:Port？可以将 IP:Port 信息写到 GameServer 的 label 中。
 
