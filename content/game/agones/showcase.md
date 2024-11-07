@@ -2,13 +2,13 @@
 
 ## 术语
 
-- DS：Dedicated Server，游戏专用服务器。在线对战的房间类游戏，同一局的玩家都会连上同一个游戏专用服务器。
+- DS：Dedicated Server， DS 。在线对战的房间类游戏，同一局的玩家都会连上同一个 DS 。
 
 ## 项目背景
 
 有一款 PVP（房间类）的游戏基于虚幻引擎 UE5.4 开发，玩家在线匹配到一个房间后，连上同一个 DS 开始进行对战。
 
-为降低成本和提升灵活性，业务团队决定基于开源的 Agones 在 TKE 上部署游戏专用服务器，可根据空闲房间数量和比例自动扩缩容。
+为降低成本和提升灵活性，业务团队决定基于开源的 Agones 在 TKE 上部署 DS，可根据空闲房间数量和比例自动扩缩容。
 
 ## TKE 集群与节点类型选型
 
@@ -48,9 +48,9 @@ Agones 官方提供了 UE5 的插件及其使用方法，参考 [Unreal Engine G
 
 ## 使用 Agones Fleet 部署
 
-Agones 提供了 Fleet 来编排游戏专用服务器，也就是一种 Kubernetes 中扩展的自定义工作负载类型，类似 Kubernetes 的 StatefulSet，只是专为游戏场景设计。
+Agones 提供了 Fleet 来编排 DS，也就是一种 Kubernetes 中扩展的自定义工作负载类型，类似 Kubernetes 的 StatefulSet，只是专为游戏场景设计。
 
-Fleet 指定游戏专用服务器的副本数，每个副本对应一个 GameServer 对象，该对象中可以记录游戏服务器的状态，如是否已被分配、对外的公网地址、玩家数量等。
+Fleet 指定 DS 的副本数，每个副本对应一个 GameServer 对象，该对象中可以记录游戏服务器的状态，如是否已被分配、对外的公网地址、玩家数量等。
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F07%2F20241107120107.png)
 
@@ -70,7 +70,7 @@ Agones 是单 Pod 单房间的模型，社区也有讨论对单 Pod 多房间的
 
 每个游戏房间都需要独立的公网地址，而 Agones 只提供了 HostPort 这一种方式，如果用 TKE 超级节点，HostPort 无法使用（因为超级节点是虚拟的节点，HostPort 没有意义）。
 
-TKE 提供了 `tke-extend-network-controller` 网络插件，可以通过 CLB 端口来为游戏专用服务器暴露公网地址，可参考 [使用 CLB 为 Pod 分配公网地址映射](https://cloud.tencent.com/document/product/457/111623) 进行安装和配置。
+TKE 提供了 `tke-extend-network-controller` 网络插件，可以通过 CLB 端口来为 DS 暴露公网地址，可参考 [使用 CLB 为 Pod 分配公网地址映射](https://cloud.tencent.com/document/product/457/111623) 进行安装和配置。
 
 如何关联 Agones 的 GameServer 与映射的 CLB IP:Port？可以将 IP:Port 信息写到 GameServer 的 label 中。
 
