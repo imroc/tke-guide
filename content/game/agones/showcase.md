@@ -52,6 +52,8 @@ Fleet 配置方法参考官方文档 [Quickstart: Create a Game Server Fleet](ht
 
 由于游戏中每场对局的人数、地图、游戏模式等业务属性可能不同，所以需要将 Fleet 拆分成多个，不同 Fleet 使用不同 Pod 规格、使用不同启动参数加载不同地图等业务数据，并打上能标识规格、地图等属性的 label，用于后续分配房间时根据 label 过滤合适的 GameServer。
 
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F07%2F20241107150329.png)
+
 ## 分配游戏房间的方法
 
 Agones 是单 Pod 单房间的模型，社区也有讨论对单 Pod 多房间的支持，参考 [issue #1197](https://github.com/googleforgames/agones/issues/1197)，但这会让游戏服的管理很复杂也很难实现，最终只给了个 [High Density GameServers](https://agones.dev/site/docs/integration-patterns/high-density-gameservers/) 的妥协方案，流程复杂且需要游戏服自己做很大开发工作来适配。
@@ -106,7 +108,7 @@ spec:
                   fieldPath: metadata.annotations['networking.cloud.tencent.com/external-address']
 ```
 
-3. 游戏服启动时轮询此文件，发现内容不为空时即表示 CLB 已绑定好 Pod，内容即为当前房间的公网地址。可通过调用 Agones SDK 的 `SetLabel` 或 `SetAnnotation` 函数将信息写入到 GameServer 对象中以实现 GameServer 与 CLB 公网地址映射的关联。
+3. 游戏服启动时轮询此文件，发现内容不为空时即表示 CLB 已绑定好 Pod，内容即为当前房间的公网地址。可通过调用 Agones SDK 的 [SetLabel](https://pkg.go.dev/agones.dev/agones/sdks/go#SDK.SetLabel)  函数将信息写入到 GameServer 对象中以实现 GameServer 与 CLB 公网地址映射的关联。
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F06%2F20241106191629.png)
 
