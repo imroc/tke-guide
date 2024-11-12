@@ -118,6 +118,33 @@ EOF
 
 **下面是各发行版的软件源替换方法**
 
+### Debian 12
+
+```bash
+cat > /etc/apt/sources.list <<'EOF'
+deb http://mirrors.tencentyun.com/debian bookworm main contrib non-free non-free-firmware
+deb http://mirrors.tencentyun.com/debian bookworm-updates main contrib non-free non-free-firmware
+deb http://mirrors.tencentyun.com/debian-security/ bookworm-security main contrib non-free-firmware
+EOF
+```
+
+### Debian 11
+
+```bash
+cat > /etc/apt/sources.list <<'EOF'
+deb http://mirrors.tencentyun.com/debian bullseye main contrib non-free
+#deb-src http://mirrors.tencentyun.com/debian bullseye main contrib non-free
+deb http://mirrors.tencentyun.com/debian bullseye-updates main contrib non-free
+#deb-src http://mirrors.tencentyun.com/debian bullseye-updates main contrib non-free
+deb http://mirrors.tencentyun.com/debian-security bullseye-security main contrib non-free
+#deb-src http://mirrors.tencentyun.com/debian-security bullseye-security main contrib non-free
+#deb http://mirrors.tencentyun.com/debian bullseye-backports main contrib non-free
+#deb-src http://mirrors.tencentyun.com/debian bullseye-backports main contrib non-free
+#deb http://mirrors.tencentyun.com/debian bullseye-proposed-updates main contrib non-free
+#deb-src http://mirrors.tencentyun.com/debian bullseye-proposed-updates main contrib non-free
+EOF
+```
+
 ### Debian 10
 ```bash
 cat > /etc/apt/sources.list <<'EOF'
