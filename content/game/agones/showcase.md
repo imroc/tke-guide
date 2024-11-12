@@ -2,7 +2,7 @@
 
 ## 术语
 
-- DS：Dedicated Server， DS 。在线对战的房间类游戏，同一局的玩家都会连上同一个 DS 。
+- DS：Dedicated Server，游戏专用服务器。在线对战的房间类游戏，同一局的玩家都会连上同一个 DS 。
 
 ## 项目背景
 
@@ -137,3 +137,12 @@ Agones 支持通过 `FleetAutoScaler` 声明游戏服的弹性伸缩策略，可
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F11%2F20241111162148.png)
 
 考虑到 Fleet 众多和游戏规模等因素，希望尽可能控制成本，尽可能精准控制 GameServer 数量，决定设定预留 buffer 大小为指定数量的 GameServer，使用脚本定时修改 buffer 大小，以实现在每日高峰期到来之前提前预留的 GameServer 数量，减少玩家的等待时间；高峰期结束后减小 buffer 数量，降低成本。
+
+## 参考资料
+
+- Agones 官网： https://agones.dev/site/ 
+- Agones 的 UE 插件： https://agones.dev/site/docs/guides/client-sdks/unreal/
+- 使用 CLB 为 Pod 分配公网地址映射: https://cloud.tencent.com/document/product/457/111623
+- tke-extend-network-controller 开源项目: https://github.com/tkestack/tke-extend-network-controller
+- TCR 镜像仓库: https://cloud.tencent.com/product/tcr
+- Coding: https://coding.net/
