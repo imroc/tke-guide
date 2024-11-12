@@ -121,6 +121,7 @@ EOF
 ### Debian 12
 
 ```bash
+rm -f /etc/apt/sources.list.d/*
 cat > /etc/apt/sources.list <<'EOF'
 deb http://mirrors.tencentyun.com/debian bookworm main contrib non-free non-free-firmware
 deb http://mirrors.tencentyun.com/debian bookworm-updates main contrib non-free non-free-firmware
@@ -131,6 +132,7 @@ EOF
 ### Debian 11
 
 ```bash
+rm -f /etc/apt/sources.list.d/*
 cat > /etc/apt/sources.list <<'EOF'
 deb http://mirrors.tencentyun.com/debian bullseye main contrib non-free
 #deb-src http://mirrors.tencentyun.com/debian bullseye main contrib non-free
@@ -147,6 +149,7 @@ EOF
 
 ### Debian 10
 ```bash
+rm -f /etc/apt/sources.list.d/*
 cat > /etc/apt/sources.list <<'EOF'
 deb http://mirrors.tencentyun.com/debian buster main contrib non-free
 # deb-src http://mirrors.tencentyun.com/debian buster main contrib non-free
