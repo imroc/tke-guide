@@ -32,9 +32,6 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 #Suites: noble-security
 #Components: main restricted universe multiverse
 #Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-root@VM-11-53-ubuntu:/etc/apt/sources.list.d# cd ..
-root@VM-11-53-ubuntu:/etc/apt# cat sources.list
-# Ubuntu sources have moved to /etc/apt/sources.list.d/ubuntu.sources
 EOF
 ```
 
