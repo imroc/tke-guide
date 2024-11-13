@@ -16,6 +16,28 @@
 
 **下面是各发行版的软件源替换方法**
 
+### Ubuntu 24
+
+```bash
+cat > /etc/apt/sources.list.d/ubuntu.sources <<'EOF'
+Types: deb
+#URIs: http://archive.ubuntu.com/ubuntu/
+URIs: http://mirrors.tencentyun.com/ubuntu/
+Suites: noble noble-updates noble-backports
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+#Types: deb
+#URIs: http://security.ubuntu.com/ubuntu/
+#Suites: noble-security
+#Components: main restricted universe multiverse
+#Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+root@VM-11-53-ubuntu:/etc/apt/sources.list.d# cd ..
+root@VM-11-53-ubuntu:/etc/apt# cat sources.list
+# Ubuntu sources have moved to /etc/apt/sources.list.d/ubuntu.sources
+EOF
+```
+
 ### Ubuntu 22
 
 ```bash
