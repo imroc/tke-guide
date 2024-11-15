@@ -2,26 +2,73 @@
 
 ## 术语
 
-- DS：Dedicated Server，游戏专用服务器。在线对战的房间类游戏，同一局的玩家都会连上同一个 DS 。
+- DS：Dedicated Server，游戏专用服务器。在线对战的房间类游戏，同一局的玩家都会连上同一个 DS。本文中的方案采用单 Pod 单房间模式，可以认为一个 DS 就是一个游戏房间。
 
-## 项目背景
+## 用户诉求
 
 有一款 PVP（房间类）的游戏基于虚幻引擎 UE5.4 开发，玩家在线匹配到一个房间后，连上同一个 DS 开始进行对战。
 
+具体流程如下。
+
+1. 首先玩家准备游戏，游戏客户端请求大厅服进行游戏匹配：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F15%2F20241115154851.png)
+
+2. 大厅服对玩家进行匹配，匹配成功后，大厅服会根据玩家所选地图、游戏模式和最终匹配人数等条件筛选出符合条件的 DS，将选中的 DS 标记为已分配并下发玩家信息，让 DS 加载：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F15%2F20241115155743.png)
+
+3. 等 DS 加载完玩家信息后，大厅服通知游戏客户端开始游戏并提供 DS 公网地址：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F15%2F20241115160312.png)
+
+4. 客户端拿到 DS 地址后就可以连上 DS，玩家开始对战：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F15%2F20241115160505.png)
+
+核心诉求：
+1. 玩家同时在线数量可能暴涨或暴跌，需支持 DS 的动态扩缩容，且扩容速度要快，避免玩家等待过久。
+2. 每个 DS 都需要独立的公网地址，且 DS 数量可能较大，需要支持大规模动态分配公网地址的能力。
+3. 被分配的 DS 不能被再次被分配，缩容时也不允许已分配的 DS 被销毁，避免玩家中断。
+
+## 初步选型
+
 围绕 DS 有类似 GameLift 这样专门对 DS 进行部署与弹性伸缩云服务，但价格相对较高，灵活性较低，为降低成本和提升灵活性，业务团队决定基于云厂商的托管 Kubernetes 和云原生游戏开源项目来部署 DS，并配置根据空闲房间数量和比例的自动扩缩容。 
 
-## 技术选型
+## 托管 Kubernetes 选型
 
-TKE 是腾讯云上托管 Kubernetes 集群的服务，支持超级节点这种 Serverless 形态，每个 Pod 独占轻量虚拟机，可避免 DS 间干扰，也能实现快速扩容 Pod（无需扩容节点）。
-
-部署 DS 使用超级节点，超级节点并非实体节点，仅代表一个子网，其中每个 Pod 都独占的轻量虚拟机，Pod 扩容时没有耗时长的扩容节点过程，调度 Pod 后立即创建和启动一台轻量虚拟机并拉起容器，Pod 销毁立即自动停止计费，即能保证扩容速度，又能按需使用，降低成本。
+TKE 是腾讯云上托管 Kubernetes 集群的服务，支持超级节点这种 Serverless 形态，每个 Pod 独占轻量虚拟机，既能避免 DS 间相互干扰（强隔离），也能实现快速扩容 Pod（Pod 独占轻量虚机，无需扩容节点）。
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F07%2F20241107103814.png)
 
+Pod 销毁立即自动停止计费，即能保证隔离性和扩容速度，又能按需使用，降低成本，所以托管 Kubernetes 服务选择了 TKE。
 
-TODO：为什么选择 Agones
+## 工作负载选型
 
-开源的 Agones 在 TKE 上部署 DS，可根据空闲房间数量和比例自动扩缩容。
+集群选择了 TKE，接下来就是要确定用什么工作负载类型来部署 DS 了。
+
+Kubernetes 自带了 Deployment 和 StatefulSet 两种工作负载类型，但对游戏 DS 来说，都太简陋了。它们都无法做到标识 Pod 中的房间是否空闲，缩容的时候，非空闲的 Pod 可能会被删除，影响正在对战的玩家。
+
+[OpenKruiseGame](https://openkruise.io/zh/kruisegame/introduction/) 作为 [OpenKruise](https://openkruise.io/zh/) 项目中的一部分，也是 CNCF 的孵化项目，提供了专门针对游戏场景的 GameServerSet 工作负载，支持通过 [自定义服务质量](https://openkruise.io/zh/kruisegame/user-manuals/service-qualities#%E6%B8%B8%E6%88%8F%E6%9C%8D%E7%A9%BA%E9%97%B2%E8%AE%BE%E7%BD%AE%E5%8D%B3%E5%B0%86%E4%B8%8B%E7%BA%BF) 的方式自动设置 Pod 关联的 GameServer 的扩展状态，比如增加一个名为 `idle` 的状态，容器内提供探测脚本，根据探测结果自动设置 GameServer 的 idle 状态，并当 idle 为 true 时，自动将 `opsState` 设为 `WaitToBeDeleted`，以便在缩容时先缩空闲的 Pod，避免影响正在对战的玩家。
+
+但经深入研究，发现存在一些问题：
+1. OpenKruiseGame 的弹性伸缩基于 KEDA，而 KEDA 最终也是依赖 Kubernetes 的 HPA 进行的弹性伸缩，HPA 在缩容时，会将 Pod 副本数降至 HPA 计算出来的期望副本数，这意味着无法绝对保证所有空闲 Pod 都不被缩容，只能做到优先缩容非空闲 Pod，还需结合合理的配置才能尽可能保证空闲 Pod 不被缩容。
+2. 这个自定义的 idle 状态始终是异步的，当 Pod/DS 已被分配，但 idle 状态还没来得及更新，恰好又正在缩容时，可能导致已被分配且即将开始对战的游戏房间被销毁。虽然可以通过调大 `terminationGracePeriodSeconds` + 实现优雅终止来尽量降低影响，但着实不太优雅。
+3. 对于游戏匹配，OpenKruiseGame 并未提供分配 GamesServer 的接口。虽然有提供 [OpenMatch](https://github.com/googleforgames/open-match) 的 director [kruise-game-open-match-director](https://github.com/CloudNativeGame/kruise-game-open-match-director)，可以实现基于 OpenMatch 的游戏匹配（自动将被分配过的 GameServer 的 opsState 置为 Allocated，避免被再次分配和缩容被删除），但由于 OpenMatch 并不能满足业务需求，自研了一套游戏匹配逻辑，所以这个 direcotr 也用不上，需要自行实现  OpenKruiseGame 的 GameServer 分配和管理逻辑才能适配。
+4. 游戏基于虚幻引擎开发，而 OpenKruiseGame 并未提供游戏引擎的 SDK，要实现业务层面的健康检查、扩展状态和信息管理（如房间里的玩家列表以及玩家信息是否加载完成）等，还是使用 SDK 来的更方便。
+
+根据自身业务情况，基于以上原因，不考虑使用 OpenKruiseGame，转而采用了基于 [Agones](https://agones.dev/site/) 来部署 DS。
+
+原因如下：
+1. Agones 提供了各种语言的 SDK 和游戏引擎的插件，当然也包括虚幻引擎，生态很完善，对于开发者来说，让 DS 接入 Kubernetes 很方便。
+2. Agones 天然支持了 GameServer 是否已分配的状态，且提供 [GameServerAllocation](https://agones.dev/site/docs/reference/gameserverallocation/) API 来分配 GameServer，被分配过的 GameServer 的状态自动标记为 `Allocated`，可以避免被再次分配，更重要的是，可以保证缩容时 `Allocated` 的  GameServer 一定不会被销毁。
+3. Agones 对自研的游戏匹配模块很友好，直接基于 GameServerAllocation API 来分配 GameServer，减少了很多 GameServer 状态管理的开发成本。
+
+## 分配游戏房间(DS)的方法
+
+Agones 是单 Pod 单房间的模型，社区也有讨论对单 Pod 多房间的支持，参考 [issue #1197](https://github.com/googleforgames/agones/issues/1197)，但这会让游戏服的管理很复杂也很难实现，最终只给了个 [High Density GameServers](https://agones.dev/site/docs/integration-patterns/high-density-gameservers/) 的妥协方案，流程复杂且需要游戏服自己做很大开发工作来适配。
+
+所以还是选择了用单 Pod 单房间的模型进行管理，Agones 提供了 [GameServerAllocation](https://agones.dev/site/docs/reference/gameserverallocation/) API 来分配 GameServer，一个 GameServer 代表一个房间，也代表一个 DS，还支持根据特征（如 label）分配合适的 GameServer，如不同地图、不同 Pod 规格的 GameServer 打上指定的 label，匹配时根据游戏人数和游戏属性（如选择的地图和游戏模式）来匹配到适合的 GameServer。
 
 ## 使用虚幻引擎插件接入 Agones
 
@@ -61,19 +108,13 @@ Fleet 指定 DS 的副本数，每个副本对应一个 GameServer 对象，该�
 
 Fleet 配置方法参考官方文档 [Quickstart: Create a Game Server Fleet](https://agones.dev/site/docs/getting-started/create-fleet/)。
 
-由于游戏中每场对局的人数、地图、游戏模式等业务属性可能不同，所以需要将 Fleet 拆分成多个，不同 Fleet 使用不同 Pod 规格、使用不同启动参数加载不同地图等业务数据，并打上能标识规格、地图等属性的 label，用于后续分配房间时根据 label 过滤合适的 GameServer。
+由于游戏中每场对局的人数、地图、游戏模式等业务属性可能不同，所以需要将 Fleet 拆分成多个，不同 Fleet 使用不同 Pod 规格、使用不同启动参数加载不同地图等业务数据，并打上能标识规格、地图等属性的 label，用于后续分配房间（DS）时根据 label 过滤合适的 GameServer。
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F11%2F07%2F20241107150329.png)
 
-## 分配游戏房间的方法
-
-Agones 是单 Pod 单房间的模型，社区也有讨论对单 Pod 多房间的支持，参考 [issue #1197](https://github.com/googleforgames/agones/issues/1197)，但这会让游戏服的管理很复杂也很难实现，最终只给了个 [High Density GameServers](https://agones.dev/site/docs/integration-patterns/high-density-gameservers/) 的妥协方案，流程复杂且需要游戏服自己做很大开发工作来适配。
-
-所以还是选择了用单 Pod 单房间的模型进行管理，Agones 提供了 [GameServerAllocation](https://agones.dev/site/docs/reference/gameserverallocation/) API 来分配 GameServer，一个 GameServer 代表一个房间，调用 GameServerAllocation 分配 Game
-
 ## 使用 TKE 网络插件为游戏房间映射公网地址
 
-每个游戏房间都需要独立的公网地址，而 Agones 只提供了 HostPort 这一种方式，如果用 TKE 超级节点，HostPort 无法使用（因为超级节点是虚拟的节点，HostPort 没有意义）。
+每个游戏房间（DS）都需要独立的公网地址，而 Agones 只提供了 HostPort 这一种方式，如果用 TKE 超级节点，HostPort 无法使用（因为超级节点是虚拟的节点，HostPort 没有意义）。
 
 TKE 提供了 `tke-extend-network-controller` 网络插件，可以通过 CLB 端口来为 DS 暴露公网地址，可参考 [使用 CLB 为 Pod 分配公网地址映射](https://cloud.tencent.com/document/product/457/111623) 进行安装和配置。
 
@@ -125,7 +166,7 @@ spec:
 
 ## 架构设计
 
-在游戏业务场景中，游戏房间不仅有是否分配的状态，还有一些其他业务扩展的状态，比如玩家信息是否加载完成的状态（在玩家匹配成功后，分配一个游戏房间，即 Agones 的 GameServer，但还需等待房间加载完将要连上来的玩家信息后，才通知玩家连接进入房间进行对战）。
+在游戏业务场景中，游戏房间（DS）不仅有是否分配的状态，还有一些其他业务扩展的状态，比如玩家信息是否加载完成的状态（在玩家匹配成功后，分配一个游戏房间，即 Agones 的 GameServer，但还需等待房间加载完将要连上来的玩家信息后，才通知玩家连接进入房间进行对战）。
 
 考虑到后续还有很多其它游戏要用，就打算不直接在大厅服里写这些房间管理的逻辑，所以引入 room-manager 作为房间管理的中间件，该中间件使用 Go 语言开发，利用 k8s 的 client-go 对集群中的 GameServer 进行 list-watch （其他语言的 k8s SDK 不支持自定义资源的 list-watch），为大厅服暴露两个接口：
 1. 查询 GameServer 信息(从 client-go list-watch 的缓存拿，用于大厅服查询分配的房间是否加载完玩家信息，等加载完就通知玩家连上该房间进行战斗)。
@@ -151,3 +192,5 @@ Agones 支持通过 `FleetAutoScaler` 声明游戏服的弹性伸缩策略，可
 - tke-extend-network-controller 开源项目: https://github.com/tkestack/tke-extend-network-controller
 - TCR 镜像仓库: https://cloud.tencent.com/product/tcr
 - Coding: https://coding.net/
+- OpenMatch: https://github.com/googleforgames/open-match
+- kruise-game-open-match-director: https://github.com/CloudNativeGame/kruise-game-open-match-director
