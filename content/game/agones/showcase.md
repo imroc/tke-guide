@@ -49,20 +49,9 @@ Pod 销毁立即自动停止计费，即能保证隔离性和扩容速度，又�
 
 Kubernetes 自带了 Deployment 和 StatefulSet 两种工作负载类型，但对游戏 DS 来说，都太简陋了。它们都无法做到标识 Pod 中的房间是否空闲，缩容的时候，非空闲的 Pod 可能会被删除，影响正在对战的玩家。
 
-[OpenKruiseGame](https://openkruise.io/zh/kruisegame/introduction/) 作为 [OpenKruise](https://openkruise.io/zh/) 项目中的一部分，也是 CNCF 的孵化项目，提供了专门针对游戏场景的 GameServerSet 工作负载，支持通过 [自定义服务质量](https://openkruise.io/zh/kruisegame/user-manuals/service-qualities#%E6%B8%B8%E6%88%8F%E6%9C%8D%E7%A9%BA%E9%97%B2%E8%AE%BE%E7%BD%AE%E5%8D%B3%E5%B0%86%E4%B8%8B%E7%BA%BF) 的方式自动设置 Pod 关联的 GameServer 的扩展状态，比如增加一个名为 `idle` 的状态，容器内提供探测脚本，根据探测结果自动设置 GameServer 的 idle 状态，并当 idle 为 true 时，自动将 `opsState` 设为 `WaitToBeDeleted`，以便在缩容时先缩空闲的 Pod，避免影响正在对战的玩家。
+[OpenKruiseGame](https://openkruise.io/zh/kruisegame/introduction/) 和 [Agones](https://agones.dev/site/) 都提供了专门针对游戏场景的 Kubernetes 自定义工作负载类型，都能实现 DS 的动态伸缩，且能避免缩容时销毁非空闲的 DS。
 
-但经深入研究，发现存在一些问题：
-1. OpenKruiseGame 的弹性伸缩基于 KEDA，而 KEDA 最终也是依赖 Kubernetes 的 HPA 进行的弹性伸缩，HPA 在缩容时，会将 Pod 副本数降至 HPA 计算出来的期望副本数，这意味着无法绝对保证所有空闲 Pod 都不被缩容，只能做到优先缩容非空闲 Pod，还需结合合理的配置才能尽可能保证空闲 Pod 不被缩容。
-2. 这个自定义的 idle 状态始终是异步的，当 Pod/DS 已被分配，但 idle 状态还没来得及更新，恰好又正在缩容时，可能导致已被分配且即将开始对战的游戏房间被销毁。虽然可以通过调大 `terminationGracePeriodSeconds` + 实现优雅终止来尽量降低影响，但着实不太优雅。
-3. 对于游戏匹配，OpenKruiseGame 并未提供分配 GamesServer 的接口。虽然有提供 [OpenMatch](https://github.com/googleforgames/open-match) 的 director [kruise-game-open-match-director](https://github.com/CloudNativeGame/kruise-game-open-match-director)，可以实现基于 OpenMatch 的游戏匹配（自动将被分配过的 GameServer 的 opsState 置为 Allocated，避免被再次分配和缩容被删除），但由于 OpenMatch 并不能满足业务需求，自研了一套游戏匹配逻辑，所以这个 direcotr 也用不上，需要自行实现  OpenKruiseGame 的 GameServer 分配和管理逻辑才能适配。
-4. 游戏基于虚幻引擎开发，而 OpenKruiseGame 并未提供游戏引擎的 SDK，要实现业务层面的健康检查、扩展状态和信息管理（如房间里的玩家列表以及玩家信息是否加载完成）等，还是使用 SDK 来的更方便。
-
-根据自身业务情况，基于以上原因，不考虑使用 OpenKruiseGame，转而采用了基于 [Agones](https://agones.dev/site/) 来部署 DS。
-
-原因如下：
-1. Agones 提供了各种语言的 SDK 和游戏引擎的插件，当然也包括虚幻引擎，生态很完善，对于开发者来说，让 DS 接入 Kubernetes 很方便。
-2. Agones 天然支持了 GameServer 是否已分配的状态，且提供 [GameServerAllocation](https://agones.dev/site/docs/reference/gameserverallocation/) API 来分配 GameServer，被分配过的 GameServer 的状态自动标记为 `Allocated`，可以避免被再次分配，更重要的是，可以保证缩容时 `Allocated` 的  GameServer 一定不会被销毁。
-3. Agones 对自研的游戏匹配模块很友好，直接基于 GameServerAllocation API 来分配 GameServer，减少了很多 GameServer 状态管理的开发成本。
+根据自身业务情况，决定采用使用 [Agones](https://agones.dev/site/) 来部署 DS。
 
 ## 分配游戏房间(DS)的方法
 
