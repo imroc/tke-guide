@@ -51,7 +51,7 @@ Kubernetes 自带了 Deployment 和 StatefulSet 两种工作负载类型，但�
 
 [OpenKruiseGame](https://openkruise.io/zh/kruisegame/introduction/) 和 [Agones](https://agones.dev/site/) 都提供了专门针对游戏场景的 Kubernetes 自定义工作负载类型，都能实现 DS 的动态伸缩，且能避免缩容时销毁非空闲的 DS。
 
-根据自身业务情况，决定采用使用 [Agones](https://agones.dev/site/) 来部署 DS。
+团队根据自身业务的需求，最终决定采用使用 [Agones](https://agones.dev/site/) 来部署 DS。
 
 ## 分配游戏房间(DS)的方法
 
