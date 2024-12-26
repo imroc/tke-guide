@@ -105,3 +105,9 @@ spec:
         - state: false
           opsState: None
 ```
+
+:::tip[说明]
+
+预计年后（农历）TKE Serverless 的默认 containerd 版本将变为 1.6.9，届时无需通过注解声明 containerd 版本
+
+:::
