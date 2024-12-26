@@ -2,7 +2,10 @@
 
 ## 背景
 
-如果 TKE Serverless 中使用 OpenKruiseGame，且用到了 [自定义服务质量](https://openkruise.io/zh/kruisegame/user-manuals/service-qualities) 的功能，会存在兼容性问题，需按照本文做一些调整来适配。
+如果 TKE Serverless 中使用 OpenKruiseGame，且用到了 [自定义服务质量](https://openkruise.io/zh/kruisegame/user-manuals/service-qualities) 的功能，有以下问题和需要做的调整：
+
+1. [自定义服务质量](https://openkruise.io/zh/kruisegame/user-manuals/service-qualities) 这个功能依赖了 OpenKruise 中的 `kruise-daemon` 组件，是以 `DaemonSet` 形式部署的，而 TKE Serverless（超级节点）并不是传统的 node 模型，`kruise-daemon` 组件默认不会运行在 Serverless Pod 所在虚拟机中，但可以通过注解声明让 `kruise-daemon` 容器自动注入到 Serverless 的 Pod 中。
+2. 当前 TKE Serverless Pod 中的 containerd 版本是 1.4.3，与 `kruise-damon` 不兼容，会导致 `kruise-daemon` 启动时 panic 退出，可通过指定注解实现使用 containerd 1.6.9 版本，该版本兼容 `kruise-daemon`。预计年后（农历）TKE Serverless 的默认 containerd 版本将变为 1.6.9，届时无需通过注解声明 containerd 版本。
 
 ## 在应用市场安装 OpenKruise 和 OpenKruiseGame
 
@@ -11,8 +14,6 @@
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F12%2F26%2F20241226161254.png)
 
 ## 为 kruise-daemon 增加注解
-
-[自定义服务质量](https://openkruise.io/zh/kruisegame/user-manuals/service-qualities) 这个功能依赖了 OpenKruise 中的 `kruise-daemon` 组件，是以 `DaemonSet` 形式部署的，而 TKE Serverless（超级节点）并不是传统的 node 模型，`kruise-daemon` 组件默认不会运行在 Serverless Pod 所在虚拟机中，但可以通过注解声明让 `kruise-daemon` 容器自动注入到 Serverless 的 Pod 中。
 
 编辑 `kruise-daemon` 的 YAML：
 
@@ -43,9 +44,6 @@ spec:
 
 
 ## 游戏服 Pod 增加标签和注解
-
-1. 当前 TKE Serverless Pod 中的 containerd 版本是 1.4.3，与 `kruise-damon` 不兼容，会导致 `kruise-daemon` 启动时 panic 退出，可通过指定注解实现使用 containerd 1.6.9 版本，该版本兼容 `kruise-daemon`。
-2. 为游戏服 Pod 增加标签 `okg:true`，以便 `kruise-daemon` 能自动注入到 Pod 中。
 
 `GameServerSet` 示例：
 
@@ -106,8 +104,5 @@ spec:
           opsState: None
 ```
 
-:::tip[说明]
-
-预计年后（农历）TKE Serverless 的默认 containerd 版本将变为 1.6.9，届时无需通过注解声明 containerd 版本
-
-:::
+1. `eks.tke.cloud.tencent.com/eklet-version: latest-tkex-ts4` 和 `eks.tke.cloud.tencent.com/not-reuse-cbs: "true"` 这两个注解用于声明使用 containerd 1.6.9 版本，该版本兼容 `kruise-daemon`。
+2. 为游戏服 Pod 增加标签 `okg:true`，以便 `kruise-daemon` 能自动注入到 Pod 中。
