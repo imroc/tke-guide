@@ -42,6 +42,11 @@ spec:
 - `eks.tke.cloud.tencent.com/ds-injection`: 声明该 DaemonSet 需要被注入到 Serverless Pod 中。
 - `eks.tke.cloud.tencent.com/ds-inject-by-label`: 声明注入范围限制到带有 `okg:true` 标签的 Pod（避免全部注入，尽量减少影响范围）。
 
+如果不方便，你也可以通过 TKE 控制台编辑 YAML：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F12%2F26%2F20241226184316.png)
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F12%2F26%2F20241226184348.png)
 
 ## 游戏服 Pod 增加标签和注解
 
