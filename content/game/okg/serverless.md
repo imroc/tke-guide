@@ -1,7 +1,8 @@
 # 在 TKE Serverless 中使用 OpenKruiseGame
 
-如果 TKE Serverless 中使用 OpenKruiseGame，且用到了 [自定义服务质量](https://openkruise.io/zh/kruisegame/user-manuals/service-qualities) 的功能，需按照本文做一些调整来适配。
+## 背景
 
+如果 TKE Serverless 中使用 OpenKruiseGame，且用到了 [自定义服务质量](https://openkruise.io/zh/kruisegame/user-manuals/service-qualities) 的功能，会存在兼容性问题，需按照本文做一些调整来适配。
 
 ## 在应用市场安装 OpenKruise 和 OpenKruiseGame
 
