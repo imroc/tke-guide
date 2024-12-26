@@ -174,6 +174,7 @@ const sidebars: SidebarsConfig = {
           },
           items: [
             'game/okg/install',
+            'game/okg/serverless',
             {
               type: 'category',
               label: '实践案例',
