@@ -26,7 +26,7 @@
 
 参考 [官方安装文档](https://openkruise.io/zh/kruisegame/installation/) 进行安装。
 
-## helm 命令所在环境连不上 github 怎么办？
+### helm 命令所在环境连不上 github 怎么办？
 
 使用 helm 命令安装时，依赖托管在 github 上的 helm repo，如果 helm 命令所在环境连不上 github，会导致安装失败。
 
