@@ -58,6 +58,7 @@ const config: Config = {
       ({
         id: 'tke',
         path: 'content',
+        showLastUpdateTime: true,
         // 文档的路由前缀
         routeBasePath: '/',
         // 左侧导航栏的配置
