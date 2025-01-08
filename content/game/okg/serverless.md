@@ -53,7 +53,6 @@ spec:
 `GameServerSet` 示例：
 
 ```yaml showLineNumbers
-
 apiVersion: game.kruise.io/v1alpha1
 kind: GameServerSet
 metadata:
