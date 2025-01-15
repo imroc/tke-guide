@@ -75,4 +75,4 @@ kruiseGame:
 
 ## 安装 tke-extend-network-controller 网络插件
 
-如需使用 OKG 的 [TencentCloud-CLB](https://openkruise.io/zh/kruisegame/user-manuals/network#tencentcloud-clb) 网络接入，还需确保安装了 `tke-extend-network-controller` 和 `cert-manager` 这两个组件，
+如需使用 OKG 的 [TencentCloud-CLB](https://openkruise.io/zh/kruisegame/user-manuals/network#tencentcloud-clb) 网络接入，还需确保安装了 `tke-extend-network-controller`，具体参考 [安装 tke-extend-network-controller](../../networking/tke-extend-network-controller)。 
