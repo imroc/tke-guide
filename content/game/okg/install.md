@@ -3,8 +3,8 @@
 ## 安装方式
 
 两种方式：
-1. 通过 TKE 应用市场安装。优势是简单方便，其中还包含腾讯云的 provider（包含腾讯云 provider 的在 OpenKruiseGame 官方还未 release 到正式版）。
-2. 通过 helm 安装。优势是可通过 GitOps 管理，更灵活。
+1. 通过 TKE 应用市场安装，优势是简单方便，直接在控制台点点点就可以安装。
+2. 通过 OKG 官方提供的 helm 命令方式安装。优势是版本跟进及时，还可通过 GitOps 方式进行安装和管理（如ArgoCD），更灵活。
 
 ## 通过 TKE 应用市场安装
 
@@ -73,3 +73,6 @@ kruiseGame:
   apiServerQpsBurst: 100
 ```
 
+## 安装 tke-extend-network-controller 网络插件
+
+如需使用 OKG 的 [TencentCloud-CLB](https://openkruise.io/zh/kruisegame/user-manuals/network#tencentcloud-clb) 网络接入，还需确保安装了 `tke-extend-network-controller` 和 `cert-manager` 这两个组件，
