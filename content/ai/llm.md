@@ -6,13 +6,17 @@
 
 ## 部署思路
 
-使用 ollama 运行 AI 大模型，再通过 OpenWebUI 暴露一个聊天交互的界面，OpenWebUI 会调用 ollama 提供的 API 来与大模型交互。
+使用 Ollama 运行 AI 大模型，再通过 OpenWebUI 暴露一个聊天交互的界面，OpenWebUI 会调用 ollama 提供的 API 来与大模型交互。
 
-## 为什么使用 ollama ?
+## Ollama 与 OpenWebUI 介绍
 
-ollama 可以看成 AI 领域的 docker，大模型可以看成 docker 镜像，所有大模型被标准化成相同格式，统一通过 ollama 来运行并提供 API，极大的简化了 AI 大模型部署的复杂度。
+[Ollama](https://ollama.com/) 是一个运行大模型的工具，可以看成是大模型领域的 Docker，可以下载所需的大模型并暴露 API。
 
-## AI 大模型如何存储？
+[OpenWebUI](https://openwebui.com/) 是一个大模型的 Web UI 交互工具，支持 Ollama，即调用 Ollama 暴露的 API 实现与大模型交互：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F27%2F20240427085614.png)
+
+## AI 大模型数据如何存储？
 
 AI 大模型通常占用体积较大，直接打包到容器镜像不太现实，如果启动时通过 `initContainers` 自动下载又会导致启动时间过长，因此建议使用共享存储来挂载 AI 大模型。
 
@@ -131,6 +135,9 @@ spec:
       containers:
       - name: pull-model
         image: imroc/ollama:cuda11.8-ubuntu22.04
+        env:
+        - name: LLM_MODEL
+          value: deepseek-r1:7b
         command:
         - bash
         - -c
@@ -138,7 +145,7 @@ spec:
           set -ex
           ollama serve &
           sleep 5
-          ollama pull deepseek-r1:7b
+          ollama pull $LLM_MODEL
         volumeMounts:
         - name: data
           mountPath: /root/.ollama
@@ -149,7 +156,7 @@ spec:
       restartPolicy: OnFailure
 ```
 
-1. 使用之前我们编译好的 ollama 镜像，执行一个脚本取下载 AI 大模型，本例中下载的是 deepseek-r1:7b，完整列表 [点击这里跳转](https://ollama.com/search)。
+1. 使用之前我们编译好的 ollama 镜像，执行一个脚本取下载 AI 大模型，本例中下载的是 deepseek-r1:7b，完整列表 [点击这里跳转](https://ollama.com/search)，修改 `LLM_MODEL` 以替换大语言模型。
 2. ollama 的模型数据存储在 `/root/.ollama` 目录下，挂载 CFS 类型的 PVC 到该路径。
 
 ## 部署 ollama
