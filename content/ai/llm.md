@@ -247,7 +247,7 @@ spec:
 2. `ENABLE_OPENAI_API` 填 `false`，因为我们使用的是 ollama，不需要使用 openai api，禁用它避免启动时因国内连不上 openapi 地址而无法加载模型（现象是登录 OpenWebUI 返回空白页）。
 3. OpenWebUI 的数据存储在 `/app/backend/data` 目录（如账号密码、聊天历史等数据），我们挂载 PVC 到这个路径。
 
-## 暴露 OpenWebUI 并访问
+## 暴露 OpenWebUI 并与模型对话
 
 如果只是本地测试，可以使用 `kubectl port-forward` 暴露服务：
 
