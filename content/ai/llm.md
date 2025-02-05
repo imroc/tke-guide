@@ -256,7 +256,7 @@ kubectl port-forward service/webui 8080:8080
 ```
 在浏览器中访问 `http://127.0.0.1:8080` 即可。
 
-你还可以通过 Ingress 或 Gateway API 来暴露，我这里通过 Gateway API 来暴露（需安装 Gateway API 的实现，如 TKE 应用市场中的 EnvoyGateway）：
+你还可以通过 Ingress 或 Gateway API 来暴露，我这里通过 Gateway API 来暴露（需安装 Gateway API 的实现，如 TKE 应用市场中的 EnvoyGateway，具体 Gateway API 用法参考 [官方文档](https://gateway-api.sigs.k8s.io/guides/)）：
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -280,7 +280,7 @@ spec:
       port: 8080
 ```
 
-1. `parentRefs` 指定定义好的 `Gateway`（通常一个 Gateway 对应一个 CLB）。
+1. `parentRefs` 引用定义好的 `Gateway`（通常一个 Gateway 对应一个 CLB）。
 2. `hostnames` 替换为你自己的域名，确保域名能正常解析到 Gateway 对应的 CLB 地址。
 3. `backendRefs` 指定 OpenWebUI 的 Service。
 
