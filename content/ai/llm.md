@@ -249,7 +249,7 @@ kubectl port-forward service/webui 8080:8080
 ```
 在浏览器中访问 `http://127.0.0.1:8080` 即可。
 
-你还可以通过 Ingress 或 Gateway API 来暴露，我这里通过 Gateway API 来暴露：
+你还可以通过 Ingress 或 Gateway API 来暴露，我这里通过 Gateway API 来暴露（需安装 Gateway API 的实现，如 TKE 应用市场中的 EnvoyGateway）：
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
