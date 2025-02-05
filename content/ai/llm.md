@@ -156,7 +156,7 @@ spec:
       restartPolicy: OnFailure
 ```
 
-1. 使用之前我们编译好的 ollama 镜像，执行一个脚本取下载 AI 大模型，本例中下载的是 deepseek-r1:7b，完整列表 [点击这里跳转](https://ollama.com/search)，修改 `LLM_MODEL` 以替换大语言模型。
+1. 使用之前我们编译好的 ollama 镜像，执行一个脚本去下载 AI 大模型，本例中下载的是 deepseek-r1:7b，完整列表 [点击这里跳转](https://ollama.com/search)，修改 `LLM_MODEL` 以替换大语言模型。
 2. ollama 的模型数据存储在 `/root/.ollama` 目录下，挂载 CFS 类型的 PVC 到该路径。
 
 ## 部署 ollama
