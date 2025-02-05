@@ -156,6 +156,18 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'AI',
+      collapsed: true,
+      link: {
+        type: 'generated-index',
+        slug: '/ai'
+      },
+      items: [
+        'ai/llm'
+      ],
+    },
+    {
+      type: 'category',
       label: '游戏方案',
       collapsed: true,
       link: {

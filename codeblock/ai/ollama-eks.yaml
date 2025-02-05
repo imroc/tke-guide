@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  labels:
+    app: ollama
+spec:
+  selector:
+    matchLabels:
+      app: ollama
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: ollama
+      annotations:
+        # highlight-add-line
+        eks.tke.cloud.tencent.com/gpu-type: V100
+    spec:
+      containers:
+      - name: ollama
+        image: imroc/ollama:cuda11.8-ubuntu22.04
+        imagePullPolicy: IfNotPresent
+        command: ["ollama", "serve"]
+        env:
+        - name: OLLAMA_HOST
+          value: ":11434"
+        resources:
+          requests:
+            cpu: 2000m
+            memory: 2Gi
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: 4000m
+            memory: 4Gi
+            nvidia.com/gpu: "1"
+        ports:
+        - containerPort: 11434
+          name: ollama
+        volumeMounts:
+        - name: data
+          mountPath: /root/.ollama
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: ai-model
+      restartPolicy: Always
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+spec:
+  selector:
+    app: ollama
+  type: ClusterIP
+  ports:
+  - name: server
+    protocol: TCP
+    port: 11434
+    targetPort: 11434
