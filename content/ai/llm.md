@@ -276,3 +276,9 @@ spec:
 1. `parentRefs` 指定定义好的 `Gateway`（通常一个 Gateway 对应一个 CLB）。
 2. `hostnames` 替换为你自己的域名，确保域名能正常解析到 Gateway 对应的 CLB 地址。
 3. `backendRefs` 指定 OpenWebUI 的 Service。
+
+最后在浏览器访问 `hostnames` 中的地址即可。
+
+首次进入 OpenWebUI 会提示创建管理员账号密码，创建完毕后即可登录，然后默认会使用前面下载好的大模型进行对话。
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F05%2F20250205191427.png)
