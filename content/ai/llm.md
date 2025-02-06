@@ -16,7 +16,7 @@
 
 `Ollama` 提供是 Ollama API，部署架构：
 
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206144144.png)
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206171758.png)
 
 `vLLM` 提供的是兼容 OpenAI 的 API，部署架构：
 
