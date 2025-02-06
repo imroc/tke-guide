@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: ollama
-        image: imroc/ollama:cuda11.8-ubuntu22.04
+        image: imroc/ollama:cuda11.8-ubuntu22.04 # 注意替换为自己的镜像
         imagePullPolicy: IfNotPresent
         command: ["ollama", "serve"]
         env:

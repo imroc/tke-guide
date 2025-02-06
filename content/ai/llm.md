@@ -133,7 +133,7 @@ spec:
     spec:
       containers:
       - name: pull-model
-        image: imroc/ollama:cuda11.8-ubuntu22.04
+        image: imroc/ollama:cuda11.8-ubuntu22.04 # 注意替换为自己的镜像
         env:
         - name: LLM_MODEL
           value: deepseek-r1:7b
@@ -199,7 +199,7 @@ spec:
     spec:
       containers:
       - name: webui
-        image: imroc/open-webui:main # docker hub 中的 mirror 镜像，长期自动同步，可放心使用
+        image: imroc/open-webui:main # docker hub 中的 OpenWebUI mirror 镜像，长期自动同步，可放心使用
         env:
         - name: OLLAMA_BASE_URL
           value: http://ollama:11434 # ollama 的地址
