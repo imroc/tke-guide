@@ -41,13 +41,12 @@ AI 大模型通常占用体积较大，直接打包到容器镜像不太现实�
 
 ## 新建 GPU 节点池
 
-在 TKE 控制台的【节点管理】-【节点池】中点击【新建】，如果【原生节点】或【普通节点】，机型在【GPU 机型】中选择一个没售罄的机型；如果选【超级节点】则无需选择机型（在部署的时候通过注解指定 GPU 类型）。
+在 TKE 控制台的【节点管理】-【节点池】中点击【新建】，如果【原生节点】或【普通节点】，机型在【GPU 机型】中选择一个没售罄的机型，此时也记一下选中机型下方提示的 GPU 驱动版本；如果选【超级节点】则无需选择机型（在部署的时候通过注解指定 GPU 类型）。
 
 ## 确认 GPU 驱动和所需 CUDA 版本
 
-可随便买一台对应节点池机型的云服务器，上去执行 `nvidia-smi` 命令，查看 GPU 驱动版本。
-
-在 nvidia 官网的 [CUDA Toolkit Release Notes](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html) 中，查找适合对应 GPU 驱动版本的 CUDA 版本。
+如果是普通节点或原生节点，在创建节点池选机型的时候就会提示 GPU 驱动版本，如果调度到超级节点，可进入 Pod 执行 nvidia-smi 命令查看 GPU 驱动版本。
+确认好 GPU 驱动版本后，在 nvidia 官网的 [CUDA Toolkit Release Notes](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html) 中，查找适合对应 GPU 驱动版本的 CUDA 版本，用于后面打包镜像时选择对应版本的基础镜像。
 
 ## 编译 ollama 镜像
 
