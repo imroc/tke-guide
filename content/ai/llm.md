@@ -251,7 +251,7 @@ kubectl port-forward service/webui 8080:8080
     :::tip[说明]
 
     1. `host` 替换为你自己的域名，确保域名能正常解析到 Ingress 对应的 CLB 地址。
-    2. `bacekdn.service` 指定 OpenWebUI 的 Service。
+    2. `backend.service` 指定 OpenWebUI 的 Service。
 
     :::
   </TabItem>
