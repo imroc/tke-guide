@@ -137,9 +137,7 @@ spec:
     </Tabs>
     1. `--served-model-name` 参数指定大模型名称，与前面下载 Job 中指定的名称要一致，注意替换。
     2. 模型数据引用前面下载 Job 使用的 PVC，挂载到 `/data` 目录下。
-    3. vllm 监听 8000 端口，定义 Service 方便后续被 OpenWebUI 调用。
-    4. 运行大模型需要使用 GPU，因此在 requests/limits 中指定了 `nvidia.com/gpu` 资源，以便让 Pod 调度到 GPU 机型并分配 GPU 卡使用。
-    5. 如果希望大模型跑在超级节点，需通过 Pod 注解 `eks.tke.cloud.tencent.com/gpu-type` 指定 GPU 类型。
+    3. vLLM 监听 8000 端口暴露 API，定义 Service 方便后续被 OpenWebUI 调用。
   </TabItem>
   <TabItem value="deploy-ollama" label="部署 Ollama">
     通过 Deployment 部署 Ollama:
@@ -151,13 +149,14 @@ spec:
         <FileBlock file="ai/ollama-eks.yaml" showLineNumbers />
       </TabItem>
     </Tabs>
-    1. ollama 的模型数据存储在 `/root/.ollama` 目录下，挂载已经下载好 AI 大模型的 CFS 类型 PVC 到该路径。
-    2. ollama 监听 11434 端口暴露 API，定义 Service 方便后续被 OpenWebUI 调用。
-    3. ollama 默认监听的是回环地址(127.0.0.1)，指定 `OLLAMA_HOST` 环境变量，强制对外暴露 11434 端口。
-    4. 运行大模型需要使用 GPU，因此在 requests/limits 中指定了 `nvidia.com/gpu` 资源，以便让 Pod 调度到 GPU 机型并分配 GPU 卡使用。
-    5. 如果希望大模型跑在超级节点，需通过 Pod 注解 `eks.tke.cloud.tencent.com/gpu-type` 指定 GPU 类型。
+    1. Ollama 的模型数据存储在 `/root/.ollama` 目录下，挂载已经下载好 AI 大模型的 CFS 类型 PVC 到该路径。
+    2. Ollama 监听 11434 端口暴露 API，定义 Service 方便后续被 OpenWebUI 调用。
+    3. Ollama 默认监听的是回环地址(127.0.0.1)，指定 `OLLAMA_HOST` 环境变量，强制对外暴露 11434 端口。
   </TabItem>
 </Tabs>
+
+1. 运行大模型需要使用 GPU，因此在 requests/limits 中指定了 `nvidia.com/gpu` 资源，以便让 Pod 调度到 GPU 机型并分配 GPU 卡使用。
+2. 如果希望大模型跑在超级节点，需通过 Pod 注解 `eks.tke.cloud.tencent.com/gpu-type` 指定 GPU 类型，可选 `V100`、`T4`、`A10*PNV4`、`A10*GNV4`，参考 [这里](https://cloud.tencent.com/document/product/457/39808#gpu-.E8.A7.84.E6.A0.BC)。
 
 ## 部署 OpenWebUI
 
