@@ -15,7 +15,8 @@ spec:
         app: vllm
         # highlight-add-start
       annotations:
-        eks.tke.cloud.tencent.com/gpu-type: V100
+        eks.tke.cloud.tencent.com/gpu-type: V100 # 指定 GPU 卡型号
+        eks.tke.cloud.tencent.com/root-cbs-size: '100' # 超级节点系统盘默认只有 20Gi，vllm 镜像解压后会撑爆磁盘，用这个注解自定义一下系统盘容量（超过20Gi的部分会收费）。
         # highlight-add-end
     spec:
       containers:
