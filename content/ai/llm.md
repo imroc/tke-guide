@@ -50,7 +50,7 @@ AI 大模型通常占用体积较大，直接打包到容器镜像不太现实�
 
 ## 编译 ollama 镜像
 
- 准备 `Dockerfile`:
+准备 `Dockerfile`:
 
 ```dockerfile
 FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
