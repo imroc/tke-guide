@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webui
+  namespace: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webui
+  template:
+    metadata:
+      labels:
+        app: webui
+    spec:
+      containers:
+      - name: webui
+        image: imroc/open-webui:main # docker hub 中的 mirror 镜像，长期自动同步，可放心使用
+        env:
+        - name: OLLAMA_BASE_URL
+          value: http://ollama:11434 # ollama 的地址
+        - name: ENABLE_OPENAI_API # 禁用 OpenAI API，只保留 Ollama API
+          value: "false"
+        tty: true
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "500Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        volumeMounts:
+        - name: webui-volume
+          mountPath: /app/backend/data
+      volumes:
+      - name: webui-volume
+        persistentVolumeClaim:
+          claimName: webui
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webui
+  namespace: test
+  labels:
+    app: webui
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: webui
+

@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vllm-download-model
+  labels:
+    app: vllm-download-model
+spec:
+  template:
+    metadata:
+      name: vllm-download-model
+      labels:
+        app: vllm-download-model
+    spec:
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:latest
+        env:
+        - name: LLM_MODEL
+          value: deepseek-ai/DeepSeek-R1
+        - name: USE_MODELSCOPE
+          value: "1"
+        command:
+        - bash
+        - -c
+        - |
+          set -ex
+          if [[ "$USE_MODELSCOPE" == "1" ]]; then
+            modelscope download --local_dir=/data --model="LLM_MODEL"
+          else
+            huggingface-cli download --local-dir=/data $LLM_MODEL
+          fi
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: ai-model
+      restartPolicy: OnFailure

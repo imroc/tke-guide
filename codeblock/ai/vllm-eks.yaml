@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  labels:
+    app: vllm
+spec:
+  selector:
+    matchLabels:
+      app: vllm
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: vllm
+        # highlight-add-start
+      annotations:
+        eks.tke.cloud.tencent.com/gpu-type: V100
+        # highlight-add-end
+    spec:
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:latest
+        imagePullPolicy: Always
+        command:
+        - vllm
+        - serve
+        - /data/
+        - --served-model-name
+        - deepseek-ai/DeepSeek-R1
+        - --dtype
+        - bfloat16
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8000"
+        securityContext:
+          runAsNonRoot: false
+        ports:
+        - name: "api"
+          containerPort: 8000
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 2000m
+            memory: 2Gi
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: 4000m
+            memory: 4Gi
+            nvidia.com/gpu: "1"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: ai-model
+      restartPolicy: Always
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm
+spec:
+  selector:
+    app: vllm
+  type: ClusterIP
+  ports:
+  - name: server
+    protocol: TCP
+    port: 8000
+    targetPort: 8000
+

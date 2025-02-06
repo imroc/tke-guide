@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ollama-download-model
+  labels:
+    app: ollama-download-model
+spec:
+  template:
+    metadata:
+      name: ollama-download-model
+      labels:
+        app: ollama-download-model
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        env:
+        - name: LLM_MODEL
+          value: deepseek-r1:7b
+        command:
+        - bash
+        - -c
+        - |
+          set -ex
+          ollama serve &
+          sleep 5 # sleep 5 seconds to wait for ollama to start
+          ollama pull $LLM_MODEL
+        volumeMounts:
+        - name: data
+          mountPath: /root/.ollama # ollama 的模型数据存储在 `/root/.ollama` 目录下，挂载 CFS 类型的 PVC 到该路径。
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: ai-model
+      restartPolicy: OnFailure
