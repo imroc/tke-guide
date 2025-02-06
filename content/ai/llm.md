@@ -71,7 +71,7 @@ AI 大模型通常占用体积较大，直接打包到容器镜像不太现实�
 2. 选择左侧菜单栏中的**存储**，在 StorageClass 页面单击**新建**。
 3. 在新建存储页面，根据实际需求，创建 CFS 类型的 StorageClass。如下图所示：
   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206160151.png)
-  * 名称：请输入 StorageClass 名称，本文以 “deepseek” 为例。
+  * 名称：请输入 StorageClass 名称，本文以 “cfs-ai” 为例。
   * Provisioner：选择 “文件存储 CFS”。
   * 存储类型：建议选择“性能存储”，其读写速度比“标准存储”更快。
 
