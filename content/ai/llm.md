@@ -32,40 +32,57 @@ AI 大模型通常占用体积较大，直接打包到容器镜像不太现实�
 
 在腾讯云上可使用 CFS 来作为共享存储，CFS 的性能和可用性都非常不错，适合 AI 大模型的存储。本文将使用 CFS 来存储 AI 大模型。
 
-## 新建 GPU 节点池
+## 操作步骤
 
-在 TKE 控制台的【节点管理】-【节点池】中点击【新建】：
-1. 如果使用【原生节点】或【普通节点】，【机型配置】在【GPU 机型】中选择一个符合需求且没有售罄的机型。
-  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206172803.png)
-2. 如果使用【超级节点】，是虚拟的节点，每个 Pod 都是独占的轻量虚拟机，所以无需选择机型，只需在部署的时候通过 Pod 注解来指定 GPU 卡的型号（后面示例中会有）。
+### 步骤1: 准备集群
 
-## 安装 GPU 插件
+登录 [容器服务控制台](https://console.cloud.tencent.com/tke2)，创建一个集群。详情请参见 [创建集群](https://cloud.tencent.com/document/product/457/103981)。
 
-如果使用普通节点或原生节点，需安装 GPU 插件，在【组件管理】中的【GPU】找到 `nvidia-gpu` 并安装：
+### 步骤2: 准备 CFS 存储
 
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206152134.png)
+#### 安装 CFS 插件
 
-如果使用超级节点则无需安装。
+1. 在集群列表中，单击**集群 ID**，进入集群详情页。
+2. 选择左侧菜单栏中的**组件管理**，在组件页面单击**新建**。
+3. 在新建组件管理页面中勾选 **CFS（腾讯云文件存储）**。
 
-## 准备 CFS 存储
+:::tip[说明]
 
-在【组件管理】中的【存储】找到 `CFS-Turbo` 或 `CFS` 插件并安装：
+
+* 支持选择 **CFS（腾讯云文件存储）**或 **CFS Turbo（腾讯云高性能并行文件系统）**，本文以 **CFS（腾讯云文件存储）为例**。
+* CFS-Turbo 的性能更强，读写速度更快，但成本也更高。如果希望大模型运行速度更快，可以考虑使用 CFS-Turbo。
+
+:::
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F05%2F20250205104156.png)
 
-> `CFS-Turbo` 的性能更强，读写速度更快，也更贵，如果希望大模型运行速度更快，可以考虑使用 `CFS-Turbo`。
+4. 单击完成即可创建组件。
 
-下面是新建 CFS `StorageClass` 的示例：
 
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206160151.png)
+#### 新建 StorageClass
 
-1. 选项较多，所以该示例通过 TKE 控制台来创建 PVC。如希望通过 YAML 来创建，可先用控制台创建一个测试 PVC，再复制出生成的 YAML。
-2. `Provisioner` 选 `文件存储CFS`。
-3. `存储类型` 建议选 `性能存储`，读写速度比 `标准存储` 更快。
+:::tip[说明]
+
+该步骤选择项较多，因此本文示例通过容器服务控制台来创建 PVC。若您希望通过 YAML 来创建，可以先用控制台创建一个测试 PVC，然后复制生成的 YAML 文件
+
+:::
+
+1. 在集群列表中，单击**集群 ID**，进入集群详情页。
+2. 选择左侧菜单栏中的**存储**，在 StorageClass 页面单击**新建**。
+3. 在新建存储页面，根据实际需求，创建 CFS 类型的 StorageClass。如下图所示：
+  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206160151.png)
+  * 名称：请输入 StorageClass 名称，本文以 “deepseek” 为例。
+  * Provisioner：选择 “文件存储 CFS”。
+  * 存储类型：建议选择“性能存储”，其读写速度比“标准存储”更快。
+
+
+:::tip[说明]
 
 如果是新建 CFS-Turbo `StorageClass`，则需要在文件存储控制台先新建好 CFS-Turbo 文件系统，然后创建 `StorageClass` 时引用对应的 CFS-Turbo 实例。
 
-## 创建 PVC
+:::
+
+#### 创建 PVC
 
 创建一个 CFS 类型的 PVC，用于存储 AI 大模型：
 
@@ -85,8 +102,12 @@ spec:
       storage: 100Gi
 ```
 
+:::info[注意]
+
 1. 注意替换 `storageClassName`。
 2. 对于 CFS 来说，`storage` 大小无所谓，可随意指定，按实际占用空间付费的。
+
+:::
 
 再创建一个 PVC 给 OpenWebUI 用，可使用同一个 `storageClassName`:
 
@@ -106,9 +127,38 @@ spec:
       storage: 100Gi
 ```
 
-## 使用 Job 下载 AI 大模型
+### 步骤3: 新建 GPU 节点池
+
+1. 在集群管理页面，选择**集群 ID**，进入集群的基本信息页面。
+2. 选择左侧菜单栏中的**节点管理**，在节点池页面单击**新建**。
+3. 选择节点类型。配置详情请参见 [创建节点池](https://cloud.tencent.com/document/product/457/43735)。
+  * 如果使用**原生节点**或**普通节点**，**机型配置**在**GPU 机型**中选择一个符合需求且没有售罄的机型。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206172803.png)
+  * 如果使用**超级节点**，是虚拟的节点，每个 Pod 都是独占的轻量虚拟机，所以无需选择机型，只需在部署的时候通过 Pod 注解来指定 GPU 卡的型号（后面示例中会有）。
+4. 单击**创建节点池**。
+
+### 步骤4: 安装 GPU 插件
+
+如果使用**普通节点**或**原生节点**，需安装 GPU 插件，如果使用**超级节点**则**无需安装**。
+
+下面是安装 GPU 插件的步骤（仅针对**普通节点**和**原生节点**）：
+1. 在集群列表中，单击**集群 ID**，进入集群详情页。
+2. 选择左侧菜单栏中的**组件管理**，在组件页面单击**新建**。
+3. 在新建组件管理页面中勾选 **nvidia-gpu（NVIDIA GPU 资源管理）**。
+  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206152134.png)
+
+4. 单击完成即可创建组件。
+
+### 步骤5: 使用 Job 下载 AI 大模型
 
 下发一个 Job，将需要用的 AI 大模型下载到 CFS 共享存储中，以下分别是 vLLM 和 Ollama 的 Job 示例：
+
+:::tip[注意]
+
+1. 使用之前 Ollama 或 vLLM 的镜像执行一个脚本去下载我们需要的 AI 大模型，本例中下载的是 DeepSeek-R1 的模型，修改 `LLM_MODEL` 以替换大语言模型。
+2. 如果使用 Ollama，可以在 [Ollama 模型库](https://ollama.com/search) 查询和搜索需要的模型；如果使用 vLLM，可以在 [Hugging Face 模型库](https://huggingface.co/models) 和 [ModelScope 模型库](https://www.modelscope.cn/models) 查询和搜索需要的模型（国内环境可以用 ModelScope 的模型库，避免因网络问题下载失败，通过 `USE_MODELSCOPE` 环境环境变量控制是否从 ModelScope 下载）。
+
+:::
 
 <Tabs>
   <TabItem value="vLLM" label="vLLM Job">
@@ -119,11 +169,7 @@ spec:
   </TabItem>
 </Tabs>
 
-
-1. 使用之前 Ollama 或 vLLM 的镜像执行一个脚本去下载我们需要的 AI 大模型，本例中下载的是 DeepSeek-R1 的模型，修改 `LLM_MODEL` 以替换大语言模型。
-2. 如果使用 Ollama，可以在 [Ollama 模型库](https://ollama.com/search) 查询和搜索需要的模型；如果使用 vLLM，可以在 [Hugging Face 模型库](https://huggingface.co/models) 和 [ModelScope 模型库](https://www.modelscope.cn/models) 查询和搜索需要的模型（国内环境可以用 ModelScope 的模型库，避免因网络问题下载失败，通过 `USE_MODELSCOPE` 环境环境变量控制是否从 ModelScope 下载）。
-
-## 部署 Ollama 或 vLLM
+### 步骤6: 部署 Ollama 或 vLLM
 
 <Tabs>
   <TabItem value="deploy-vllm" label="部署 vLLM">
@@ -158,7 +204,7 @@ spec:
 4. 运行大模型需要使用 GPU，因此在 requests/limits 中指定了 `nvidia.com/gpu` 资源，以便让 Pod 调度到 GPU 机型并分配 GPU 卡使用。
 5. 如果希望大模型跑在超级节点，需通过 Pod 注解 `eks.tke.cloud.tencent.com/gpu-type` 指定 GPU 类型，可选 `V100`、`T4`、`A10*PNV4`、`A10*GNV4`，具体可参考 [这里](https://cloud.tencent.com/document/product/457/39808#gpu-.E8.A7.84.E6.A0.BC)。
 
-## 部署 OpenWebUI
+### 步骤7: 部署 OpenWebUI
 
 使用 Deployment 部署 OpenWebUI，并定义 Service 方便后续对外暴露访问。后端 API 可以由 vLLM 或 Ollama 提供，以下提供这两种情况的 OpenWebUI 部署示例：
 
@@ -173,7 +219,7 @@ spec:
 
 > OpenWebUI 的数据存储在 `/app/backend/data` 目录（如账号密码、聊天历史等数据），我们挂载 PVC 到这个路径。
 
-## 暴露 OpenWebUI 并与模型对话
+### 步骤8: 暴露 OpenWebUI 并与模型对话
 
 如果只是本地测试，可以使用 `kubectl port-forward` 暴露服务：
 
@@ -182,45 +228,49 @@ kubectl port-forward service/webui 8080:8080
 ```
 在浏览器中访问 `http://127.0.0.1:8080` 即可。
 
-你还可以通过 Ingress 或 Gateway API 来暴露，我这里通过 Gateway API 来暴露（需安装 Gateway API 的实现，如 TKE 应用市场中的 EnvoyGateway，具体 Gateway API 用法参考 [官方文档](https://gateway-api.sigs.k8s.io/guides/)）：
+你还可以通过 Ingress 或 Gateway API 来暴露，示例：
 
-```yaml
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: ai
-spec:
-  parentRefs:
-  - group: gateway.networking.k8s.io
-    kind: Gateway
-    namespace: envoy-gateway-system
-    name: imroc
-    sectionName: https
-  hostnames:
-  - "ai.imroc.cc"
-  rules:
-  - backendRefs:
-    - group: ""
-      kind: Service
-      name: webui
-      port: 8080
-```
+<Tabs>
+  <TabItem value="webui-httproute" label="Gateway API">
+    :::info[注意]
 
-1. `parentRefs` 引用定义好的 `Gateway`（通常一个 Gateway 对应一个 CLB）。
-2. `hostnames` 替换为你自己的域名，确保域名能正常解析到 Gateway 对应的 CLB 地址。
-3. `backendRefs` 指定 OpenWebUI 的 Service。
+    使用 Gateway API 需要集群中装有 Gateway API 的实现，如 TKE 应用市场中的 EnvoyGateway，具体 Gateway API 用法参考 [官方文档](https://gateway-api.sigs.k8s.io/guides/)
 
-最后在浏览器访问 `hostnames` 中的地址即可。
+    :::
+    <FileBlock file="ai/webui-httproute.yaml" showLineNumbers />
+    :::tip[说明]
+
+    1. `parentRefs` 引用定义好的 `Gateway`（通常一个 Gateway 对应一个 CLB）。
+    2. `hostnames` 替换为你自己的域名，确保域名能正常解析到 Gateway 对应的 CLB 地址。
+    3. `backendRefs` 指定 OpenWebUI 的 Service。
+
+    :::
+  </TabItem>
+  <TabItem value="webui-ingress" label="Ingress">
+    <FileBlock file="ai/webui-ingress.yaml" showLineNumbers />
+    :::tip[说明]
+
+    1. `host` 替换为你自己的域名，确保域名能正常解析到 Ingress 对应的 CLB 地址。
+    2. `bacekdn.service` 指定 OpenWebUI 的 Service。
+
+    :::
+  </TabItem>
+</Tabs>
+
+
+最后在浏览器访问相应的地址即可进入 OpenWebUI 页面。
 
 首次进入 OpenWebUI 会提示创建管理员账号密码，创建完毕后即可登录，然后默认会使用前面下载好的大模型进行对话。
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F05%2F20250205191427.png)
 
-## 常见问题：如何指定最佳的 CUDA 版本？
+## 常见问题
+
+### 如何指定最佳的 CUDA 版本？
 
 通常 `Ollama` 和 `vLLM` 官方的 `latest` 容器镜像中的 CUDA 版本能兼容大部分 GPU 驱动，如果希望精确控制 CUDA 版本以达到最佳效果或规避一些兼容性问题，可按照下面的方法来指定最佳的 CUDA 版本。
 
-### 确认 GPU 驱动和所需 CUDA 版本
+#### 步骤1: 确认 GPU 驱动和所需 CUDA 版本
 
 确认 GPU 驱动版本：
 1. 如果是普通节点或原生节点，在创建节点池选机型的时候就会提示 GPU 驱动版本。
@@ -228,7 +278,9 @@ spec:
 
 确认 CUDA 版本：在 NVIDIA 官网的 [CUDA Toolkit Release Notes](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html) 中，查找适合前面确认到的 GPU 驱动版本的 CUDA 版本，用于后面打包镜像时选择对应版本的基础镜像。
 
-### 编译 Ollama 镜像
+#### 步骤2: 编译 Ollama 或 vLLM 镜像
+
+##### Ollama 镜像
 
 如果使用 Ollama 运行大模型，按照下面的方法编译指定 CUDA 版本的 Ollama 镜像。
 
@@ -253,9 +305,10 @@ docker push imroc/ollama:cuda11.8-ubuntu22.04
 
 > 注意修改成自己的镜像名称。
 
-### 编译 vLLM 镜像
 
-如果使用 Ollama 运行大模型，按照下面的方法编译指定 CUDA 版本的 Ollama 镜像。
+##### vLLM 镜像
+
+如果使用 vLLM 运行大模型，按照下面的方法编译指定 CUDA 版本的 vLLM 镜像。
 
 1. 克隆 vLLM 仓库：
 
@@ -273,10 +326,10 @@ docker push imroc/vllm-openai:cuda-11.8.0
 
 > 通过 `CUDA_VERSION` 参数指定 CUDA 版本；注意替换成自己的镜像名称。
 
-### 替换镜像
+#### 步骤3: 替换镜像
 
 最后在部署 `Ollama` 或 `vLLM` 的 `Deplioyment` 中，将镜像替换成自己指定了 CUDA 版本编译上传的镜像名称，即可完成指定最佳的 CUDA 版本。
 
-## 常见问题：模型下载失败
+### 模型下载失败
 
 通常是没有开公网，如果使用普通节点或原生节点，可以在创建节点池的时候指定公网带宽，如果使用超级节点，可以 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)，当然这个也适用于普通节点和原生节点。
