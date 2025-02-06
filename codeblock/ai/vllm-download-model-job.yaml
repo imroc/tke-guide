@@ -27,7 +27,7 @@ spec:
         - |
           set -ex
           if [[ "$USE_MODELSCOPE" == "1" ]]; then
-            modelscope download --local_dir=/data --model="LLM_MODEL"
+            modelscope download --local_dir=/data --model="$LLM_MODEL"
           else
             huggingface-cli download --local-dir=/data $LLM_MODEL
           fi
