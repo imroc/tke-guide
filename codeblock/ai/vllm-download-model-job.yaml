@@ -10,6 +10,8 @@ spec:
       name: vllm-download-model
       labels:
         app: vllm-download-model
+      annotations:
+        eks.tke.cloud.tencent.com/root-cbs-size: '50' # 如果用超级节点，默认系统盘只有 20Gi，vllm 镜像解压后会撑爆磁盘，用这个注解自定义一下系统盘容量。
     spec:
       containers:
       - name: vllm
