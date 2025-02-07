@@ -330,6 +330,12 @@ docker push imroc/vllm-openai:cuda-11.8.0
 
 > 通过 `CUDA_VERSION` 参数指定 CUDA 版本；注意替换成自己的镜像名称。
 
+:::info[注意]
+
+该方法只使用 CUDA 版本的微调，不要跨大版本，比如官方 Dockerfile 中使用的 `CUDA_VERSION` 是 12.x，那么指定的 `CUDA_VERSION` 就不要低于 12，因为 vLLM、PyTorch、CUDA 这几个的版本需要在兼容范围内，否则会有兼容性问题。如要编译更低版本的 CUDA，建议参考官方文档的方法（通过 pip 命令安装低版本编译好的 vLLM 二进制），然后编写相应的 Dockerfile 来编译镜像。
+
+:::
+
 #### 步骤3: 替换镜像
 
 最后在部署 `Ollama` 或 `vLLM` 的 `Deplioyment` 中，将镜像替换成自己指定了 CUDA 版本编译上传的镜像名称，即可完成指定最佳的 CUDA 版本。
