@@ -527,5 +527,5 @@ Traceback (most recent call last):
 RuntimeError: Engine process failed to start. See stack trace for the root cause.
 ```
 
-**原因**: 通过用 DeepSeek 帮忙分析，猜测可能是 CUDA 兼容性问题，我使用的是 V100 的卡，CUDA 版本最好使用 11.8，而 vLLM 官方最新版本镜像中的 CUDA 版本当前是 12.4。
-**解决办法**: 正在攻克中。
+- **原因**: 通过用 DeepSeek 帮忙分析，猜测可能是 CUDA 兼容性问题，我使用的是 V100 的卡，CUDA 版本最好使用 11.8，而 vLLM 官方最新版本镜像中的 CUDA 版本当前是 12.4。
+- **解决办法**: 正在攻克中。
