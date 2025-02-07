@@ -206,7 +206,55 @@ spec:
 
 ### 步骤7: 配置 GPU 弹性伸缩
 
-TODO
+如果需要对 GPU 资源进行弹性伸缩，可以按照下面的方法进行配置，需要注意的是，GPU 资源通常比较紧张，缩容后不一定还能再买回来。
+
+GPU 的 Pod 会有一些监控指标，参考 [GPU 监控指标](https://cloud.tencent.com/document/product/457/38929#gpu)，可以根据这些监控指标配置 HPA 实现 GPU Pod 的弹性伸缩，比如按照 GPU 利用率：
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vllm
+spec:
+  minReplicas: 1
+  maxReplicas: 2
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vllm
+  metrics: # 更多 GPU 指标参考 https://cloud.tencent.com/document/product/457/38929#gpu
+  - pods:
+      metric:
+        name: k8s_pod_rate_gpu_used_request # GPU利用率 (占 Request)
+      target:
+        averageValue: "80"
+        type: AverageValue
+    type: Pods
+  behavior:
+    scaleDown:
+      policies:
+      - periodSeconds: 15
+        type: Percent
+        value: 100
+      selectPolicy: Max
+      stabilizationWindowSeconds: 300
+    scaleUp:
+      policies:
+      - periodSeconds: 15
+        type: Percent
+        value: 100
+      - periodSeconds: 15
+        type: Pods
+        value: 4
+      selectPolicy: Max
+      stabilizationWindowSeconds: 0
+```
+
+如果使用原生节点或普通节点，还需对节点池启动弹性伸缩，否则 GPU Pod 扩容后没相应的 GPU 节点会导致 Pod 一直处于 Pending 状态。
+
+节点池启用弹性伸缩的方法是**编辑**节点池，然后勾选**弹性伸缩**，配置一下**节点数量范围**，最后点击**确认**：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F07%2F20250207192313.png)
 
 ### 步骤8: 部署 OpenWebUI
 
