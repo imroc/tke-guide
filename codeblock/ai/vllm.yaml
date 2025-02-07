@@ -72,15 +72,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: vllm
-  namespace: test
+  name: vllm-api
 spec:
   selector:
     app: vllm
   type: ClusterIP
   ports:
-  - name: server
+  - name: api
     protocol: TCP
     port: 8000
     targetPort: 8000
-
