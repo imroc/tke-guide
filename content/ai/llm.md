@@ -4,16 +4,6 @@
 
 本文介绍如何在 TKE 上部署 AI 大模型，以 `DeepSeek-R1` 为例，使用 `Ollama` 或 `vLLM` 运行大模型并暴露 API，然后使用 `OpenWebUI` 提供交互界面。
 
-## Ollama、vLLM 与 OpenWebUI 介绍
-
-* [Ollama](https://ollama.com/) 是一个运行大模型的工具，可以看成是大模型领域的 Docker，可以下载所需的大模型并暴露 Ollama API，极大的简化了大模型的部署。
-* [vLLM](https://docs.vllm.ai) 与 Ollama 类似，也是一个运行大模型的工具，但它针对推理做了很多优化，提高了模型的运行效率和性能，使得在资源有限的情况下也能高效运行大语言模型，另外，它提供兼容 OpenAI 的 API。
-* [OpenWebUI](https://openwebui.com/) 是一个大模型的 Web UI 交互工具，支持通过 Ollama 与 OpenAI 两种 API 与大模型交互。
-
-## 部署思路
-
-使用 `Ollama` 或 `vLLM` 运行 AI 大模型，再通过 `OpenWebUI` 暴露一个聊天交互的界面，`OpenWebUI` 会调用 `Ollama` 或 `vLLM` 提供的 API 来与大模型交互。
-
 `Ollama` 提供是 Ollama API，部署架构：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206171758.png)
@@ -21,6 +11,12 @@
 `vLLM` 提供的是兼容 OpenAI 的 API，部署架构：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206144336.png)
+
+## Ollama、vLLM 与 OpenWebUI 介绍
+
+* [Ollama](https://ollama.com/) 是一个运行大模型的工具，可以看成是大模型领域的 Docker，可以下载所需的大模型并暴露 Ollama API，极大的简化了大模型的部署。
+* [vLLM](https://docs.vllm.ai) 与 Ollama 类似，也是一个运行大模型的工具，但它针对推理做了很多优化，提高了模型的运行效率和性能，使得在资源有限的情况下也能高效运行大语言模型，另外，它提供兼容 OpenAI 的 API。
+* [OpenWebUI](https://openwebui.com/) 是一个大模型的 Web UI 交互工具，支持通过 Ollama 与 OpenAI 两种 API 与大模型交互。
 
 ## 选择 Ollama 还是 vLLM？
 
