@@ -206,7 +206,9 @@ spec:
 
 ### 步骤7: 配置弹性伸缩
 
-### 步骤7: 部署 OpenWebUI
+TODO
+
+### 步骤8: 部署 OpenWebUI
 
 使用 Deployment 部署 OpenWebUI，并定义 Service 方便后续对外暴露访问。后端 API 可以由 vLLM 或 Ollama 提供，以下提供这两种情况的 OpenWebUI 部署示例：
 
@@ -221,7 +223,7 @@ spec:
 
 > OpenWebUI 的数据存储在 `/app/backend/data` 目录（如账号密码、聊天历史等数据），我们挂载 PVC 到这个路径。
 
-### 步骤8: 暴露 OpenWebUI 并与模型对话
+### 步骤9: 暴露 OpenWebUI 并与模型对话
 
 如果只是本地测试，可以使用 `kubectl port-forward` 暴露服务：
 
@@ -525,4 +527,5 @@ Traceback (most recent call last):
 RuntimeError: Engine process failed to start. See stack trace for the root cause.
 ```
 
-**原因**: 通过用 DeepSeek 帮忙分析，猜测可能是 CUDA 兼容性问题，我使用的是 V100 的卡，CUDA 版本最好使用 11.8，而 vLLM 官方镜像中的 CUDA 版本是 12.4
+**原因**: 通过用 DeepSeek 帮忙分析，猜测可能是 CUDA 兼容性问题，我使用的是 V100 的卡，CUDA 版本最好使用 11.8，而 vLLM 官方最新版本镜像中的 CUDA 版本当前是 12.4。
+**解决办法**: 正在攻克中。
