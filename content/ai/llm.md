@@ -332,7 +332,7 @@ docker push imroc/vllm-openai:cuda-11.8.0
 
 最后在部署 `Ollama` 或 `vLLM` 的 `Deplioyment` 中，将镜像替换成自己指定了 CUDA 版本编译上传的镜像名称，即可完成指定最佳的 CUDA 版本。
 
-### 模型下载失败
+### 模型为何下载失败？
 
 通常是没有开公网，如果使用普通节点或原生节点，可以在创建节点池的时候指定公网带宽，如果使用超级节点，可以 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)，当然这个也适用于普通节点和原生节点。
 
