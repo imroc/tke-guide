@@ -1,0 +1,15 @@
+ERROR 02-07 02:51:31 client.py:300] RuntimeError('Engine process (pid 20) died.')
+ERROR 02-07 02:51:31 client.py:300] NoneType: None
+ERROR 02-07 02:51:34 serving_chat.py:661] Error in chat completion stream generator.
+ERROR 02-07 02:51:34 serving_chat.py:661] Traceback (most recent call last):
+ERROR 02-07 02:51:34 serving_chat.py:661]   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/serving_chat.py", line 359, in chat_completion_stream_generator
+ERROR 02-07 02:51:34 serving_chat.py:661]     async for res in result_generator:
+ERROR 02-07 02:51:34 serving_chat.py:661]   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/multiprocessing/client.py", line 658, in _process_request
+ERROR 02-07 02:51:34 serving_chat.py:661]     raise request_output
+ERROR 02-07 02:51:34 serving_chat.py:661] vllm.engine.multiprocessing.MQEngineDeadError: Engine loop is not running. Inspect the stacktrace to find the original error: RuntimeError('Engine process (pid 20) died.').
+CRITICAL 02-07 02:51:34 launcher.py:101] MQLLMEngine is already dead, terminating server process
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [1]
+

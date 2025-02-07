@@ -270,9 +270,32 @@ kubectl port-forward service/webui 8080:8080
 
 ## 常见问题
 
+### CUDA、GPU 驱动、PyTorch、大模型兼容性问题
+
+通常 `Ollama` 和 `vLLM` 官方的 `latest` 容器镜像中的 CUDA 版本能兼容很大部分 GPU 卡和驱动，但要将大模型顺利跑起来，跟 CUDA、GPU卡及其驱动、PyTorch（vLLM）以及大模型本身都可能有关系，很难枚举所有情况，特别是 vLLM，并不是所有大模型都支持，且依赖 PyTorch，而不同 PyTorch 版本能兼容的 CUDA 版本也不一样，不同 CUDA 版本能兼容的 GPU 驱动版本也不一样。
+
+vLLM 启动或运行过程中可能报错，如：
+
+<Tabs>
+  <TabItem value="error-1" label="报错1">
+    <FileBlock file="ai/vllm-unknown-error.txt" showLineNumbers />
+  </TabItem>
+  <TabItem value="error-2" label="报错2">
+    <FileBlock file="ai/vllm-mqllmengine-dead.txt" showLineNumbers />
+  </TabItem>
+  <TabItem value="error-3" label="报错3">
+    <FileBlock file="ai/vllm-driver-too-old-error.txt" showLineNumbers />
+  </TabItem>
+  <TabItem value="error-4" label="报错4">
+    <FileBlock file="ai/vllm-cuda-no-kernel-image-error.txt" showLineNumbers />
+  </TabItem>
+</Tabs>
+
+遇到这些情况建议是先调研和确认下各种版本信息，看能否兼容。不行则尝试换 GPU 卡或换 CUDA 版本(GPU 驱动是自动装的，一般无法改变)，下面有如何指定最佳 CUDA 版本的方法。
+
 ### 如何指定最佳的 CUDA 版本？
 
-通常 `Ollama` 和 `vLLM` 官方的 `latest` 容器镜像中的 CUDA 版本能兼容大部分 GPU 驱动，如果希望精确控制 CUDA 版本以达到最佳效果或规避一些兼容性问题，可按照下面的方法来指定最佳的 CUDA 版本。
+如果希望精确控制 CUDA 版本以达到最佳效果或规避一些兼容性问题，可按照下面的方法来指定最佳的 CUDA 版本。
 
 #### 步骤1: 确认 GPU 驱动和所需 CUDA 版本
 
@@ -488,13 +511,16 @@ KeyboardInterrupt: terminated
 ```
 
 - **原因**: vLLM 启动慢，存活检查失败到阈值，主进程收到 SIGTERM 信号后退出。
-- **解决办法**: 延长 `livenessProbe` 的 `initialDelaySeconds`，避免因 vLLM 启动慢被终止。
+- **解决办法**: 延长 `livenessProbe` 的 `initialDelaySeconds`，避免因 vLLM 启动慢被终止，或者去掉 `livenessProbe`。
 
-### CUDA 兼容性问题
 
-vLLM 启动报错，从报错中看不出原因：
+### vLLM 报错: max seq len is larger than the maximum number of tokens
+
+报错日志：
 
 ```txt
+ValueError: The model's max seq len (131072) is larger than the maximum number of tokens that can be stored in KV cache (93760). Try increasing `gpu_memory_utilization` or decreasing `max_model_len` when initializing the engine.
+[rank0]:[W207 01:57:35.912382100 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
 Traceback (most recent call last):
   File "/usr/local/bin/vllm", line 8, in <module>
     sys.exit(main())
@@ -533,5 +559,4 @@ Traceback (most recent call last):
 RuntimeError: Engine process failed to start. See stack trace for the root cause.
 ```
 
-- **原因**: 通过用 DeepSeek 帮忙分析，猜测可能是 CUDA 兼容性问题，我使用的是 V100 的卡，CUDA 版本最好使用 11.8，而 vLLM 官方最新版本镜像中的 CUDA 版本当前是 12.4。
-- **解决办法**: 正在攻克中。
+**解决办法**: vllm 启动参数指定下 `--max-model-len`，如 `--max-model-len 1024`。
