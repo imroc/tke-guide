@@ -429,7 +429,7 @@ TODO
 
 ## 踩坑分享
 
-### vLLM 启动报错 ValueError: invalid literal for int() with base 10: 'tcp://xxx.xx.xx.xx:8000'
+### vLLM 报错 ValueError: invalid literal for int() with base 10: 'tcp://xxx.xx.xx.xx:8000'
 
 vLLM 启动时报这个错：
 
@@ -473,7 +473,7 @@ Traceback (most recent call last):
 - **原因**：是用 DeepSeek 来帮忙分析得到灵感后发现的：关键点是 `VLLM_PORT` 这个环境变量，vLLM 会解析这个环境变量，它期望是个数字但实际得到的不是所以才报错，但我没定义这个环境变量，这个环境变量是 K8S 根据 Service 自动生成注入到 Pod 中的。
 - **解决办法**：不要给 vLLM 的 Service 名称定义成 `vllm`，换成其它名字。
 
-### vLLM 启动报错 ValueError: Bfloat16 is only supported on GPUs with compute capability of at least 8.0.
+### vLLM 报错 ValueError: Bfloat16 is only supported on GPUs with compute capability of at least 8.0.
 
 vLLM 启动时报这个错：
 
@@ -608,3 +608,65 @@ RuntimeError: Engine process failed to start. See stack trace for the root cause
 ```
 
 **解决办法**: vllm 启动参数指定下 `--max-model-len`，如 `--max-model-len 1024`。
+
+### vLLM 报错: CUDA out of memory
+
+```txt
+ERROR 02-07 03:25:19 engine.py:389] CUDA out of memory. Tried to allocate 150.00 MiB. GPU 0 has a total capacity of 14.58 GiB of which 95.56 MiB is free. Process 81610 has 14.48 GiB memory in use. Of the allocated memory 14.30 GiB is allocated by PyTorch, and 34.90 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+ERROR 02-07 03:25:19 engine.py:389] Traceback (most recent call last):
+Process SpawnProcess-1:
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/multiprocessing/engine.py", line 380, in run_mp_engine
+ERROR 02-07 03:25:19 engine.py:389]     engine = MQLLMEngine.from_engine_args(engine_args=engine_args,
+ERROR 02-07 03:25:19 engine.py:389]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/multiprocessing/engine.py", line 123, in from_engine_args
+ERROR 02-07 03:25:19 engine.py:389]     return cls(ipc_path=ipc_path,
+ERROR 02-07 03:25:19 engine.py:389]            ^^^^^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/multiprocessing/engine.py", line 75, in __init__
+ERROR 02-07 03:25:19 engine.py:389]     self.engine = LLMEngine(*args, **kwargs)
+ERROR 02-07 03:25:19 engine.py:389]                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/llm_engine.py", line 276, in __init__
+ERROR 02-07 03:25:19 engine.py:389]     self._initialize_kv_caches()
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/llm_engine.py", line 416, in _initialize_kv_caches
+ERROR 02-07 03:25:19 engine.py:389]     self.model_executor.determine_num_available_blocks())
+ERROR 02-07 03:25:19 engine.py:389]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/executor/executor_base.py", line 101, in determine_num_available_blocks
+ERROR 02-07 03:25:19 engine.py:389]     results = self.collective_rpc("determine_num_available_blocks")
+ERROR 02-07 03:25:19 engine.py:389]               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/executor/uniproc_executor.py", line 51, in collective_rpc
+ERROR 02-07 03:25:19 engine.py:389]     answer = run_method(self.driver_worker, method, args, kwargs)
+ERROR 02-07 03:25:19 engine.py:389]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/utils.py", line 2220, in run_method
+ERROR 02-07 03:25:19 engine.py:389]     return func(*args, **kwargs)
+ERROR 02-07 03:25:19 engine.py:389]            ^^^^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+ERROR 02-07 03:25:19 engine.py:389]     return func(*args, **kwargs)
+ERROR 02-07 03:25:19 engine.py:389]            ^^^^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/worker.py", line 229, in determine_num_available_blocks
+ERROR 02-07 03:25:19 engine.py:389]     self.model_runner.profile_run()
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+ERROR 02-07 03:25:19 engine.py:389]     return func(*args, **kwargs)
+ERROR 02-07 03:25:19 engine.py:389]            ^^^^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/model_runner.py", line 1235, in profile_run
+ERROR 02-07 03:25:19 engine.py:389]     self._dummy_run(max_num_batched_tokens, max_num_seqs)
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/model_runner.py", line 1346, in _dummy_run
+ERROR 02-07 03:25:19 engine.py:389]     self.execute_model(model_input, kv_caches, intermediate_tensors)
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+ERROR 02-07 03:25:19 engine.py:389]     return func(*args, **kwargs)
+ERROR 02-07 03:25:19 engine.py:389]            ^^^^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/worker/model_runner.py", line 1775, in execute_model
+ERROR 02-07 03:25:19 engine.py:389]     output: SamplerOutput = self.model.sample(
+ERROR 02-07 03:25:19 engine.py:389]                             ^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen2.py", line 505, in sample
+ERROR 02-07 03:25:19 engine.py:389]     next_tokens = self.sampler(logits, sampling_metadata)
+ERROR 02-07 03:25:19 engine.py:389]                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+ERROR 02-07 03:25:19 engine.py:389]     return self._call_impl(*args, **kwargs)
+ERROR 02-07 03:25:19 engine.py:389]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+ERROR 02-07 03:25:19 engine.py:389]     return forward_call(*args, **kwargs)
+ERROR 02-07 03:25:19 engine.py:389]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/sampler.py", line 271, in forward
+```
+
+- **原因**: GPU 卡显存不够。
+- **解决方案**: 换更好的 GPU 卡。
