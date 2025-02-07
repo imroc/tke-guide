@@ -334,7 +334,13 @@ docker push imroc/vllm-openai:cuda-11.8.0
 
 ### 模型为何下载失败？
 
-通常是没有开公网，如果使用普通节点或原生节点，可以在创建节点池的时候指定公网带宽，如果使用超级节点，可以 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)，当然这个也适用于普通节点和原生节点。
+通常是没有开公网，下面是开通公网的方法。
+
+如果使用普通节点或原生节点，可以在创建节点池的时候指定公网带宽：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F07%2F20250207105632.png)
+
+如果使用超级节点，Pod 默认没有公网，可以使用 NAT 网关来访问外网，详情请参考 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)，当然这个也适用于普通节点和原生节点。
 
 ### 如何实现多机多卡分布式部署？
 
