@@ -204,6 +204,8 @@ spec:
 4. 运行大模型需要使用 GPU，因此在 requests/limits 中指定了 `nvidia.com/gpu` 资源，以便让 Pod 调度到 GPU 机型并分配 GPU 卡使用。
 5. 如果希望大模型跑在超级节点，需通过 Pod 注解 `eks.tke.cloud.tencent.com/gpu-type` 指定 GPU 类型，可选 `V100`、`T4`、`A10*PNV4`、`A10*GNV4`，具体可参考 [这里](https://cloud.tencent.com/document/product/457/39808#gpu-.E8.A7.84.E6.A0.BC)。
 
+### 步骤7: 配置弹性伸缩
+
 ### 步骤7: 部署 OpenWebUI
 
 使用 Deployment 部署 OpenWebUI，并定义 Service 方便后续对外暴露访问。后端 API 可以由 vLLM 或 Ollama 提供，以下提供这两种情况的 OpenWebUI 部署示例：
@@ -339,3 +341,50 @@ docker push imroc/vllm-openai:cuda-11.8.0
 使用 `vLLM` 可实现多机多卡分布式部署大模型，下面是具体步骤：
 
 TODO
+
+## 踩坑分享
+
+### vLLM 启动报错 ValueError: invalid literal for int() with base 10: 'tcp://xxx.xx.xx.xx:8000'
+
+vLLM 启动时报这个错：
+
+```txt
+ERROR 02-06 18:29:55 engine.py:389] ValueError: invalid literal for int() with base 10: 'tcp://172.16.168.90:8000'
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/local/lib/python3.12/dist-packages/vllm/engine/multiprocessing/engine.py", line 391, in run_mp_engine
+    raise e
+  File "/usr/local/lib/python3.12/dist-packages/vllm/engine/multiprocessing/engine.py", line 380, in run_mp_engine
+    engine = MQLLMEngine.from_engine_args(engine_args=engine_args,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/vllm/engine/multiprocessing/engine.py", line 123, in from_engine_args
+    return cls(ipc_path=ipc_path,
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/vllm/engine/multiprocessing/engine.py", line 75, in __init__
+    self.engine = LLMEngine(*args, **kwargs)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/vllm/engine/llm_engine.py", line 273, in __init__
+    self.model_executor = executor_class(vllm_config=vllm_config, )
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/vllm/executor/executor_base.py", line 51, in __init__
+    self._init_executor()
+  File "/usr/local/lib/python3.12/dist-packages/vllm/executor/uniproc_executor.py", line 29, in _init_executor
+    get_ip(), get_open_port())
+              ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/vllm/utils.py", line 506, in get_open_port
+    port = envs.VLLM_PORT
+           ^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/vllm/envs.py", line 583, in __getattr__
+    return environment_variables[name]()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/vllm/envs.py", line 188, in <lambda>
+    lambda: int(os.getenv('VLLM_PORT', '0'))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+原因是用 DeepSeek 来帮忙分析得到灵感后发现的：关键点是 `VLLM_PORT` 这个环境变量，vLLM 会解析这个环境变量，它期望是个数字但实际得到的不是所以才报错，但我没定义这个环境变量，这个环境变量是 K8S 根据 Service 自动生成注入到 Pod 中的。
+
+解决办法：不要给 vLLM 的 Service 名称定义成 `vllm`，换成其它名字。
