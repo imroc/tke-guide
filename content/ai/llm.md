@@ -391,6 +391,52 @@ Traceback (most recent call last):
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
-原因是用 DeepSeek 来帮忙分析得到灵感后发现的：关键点是 `VLLM_PORT` 这个环境变量，vLLM 会解析这个环境变量，它期望是个数字但实际得到的不是所以才报错，但我没定义这个环境变量，这个环境变量是 K8S 根据 Service 自动生成注入到 Pod 中的。
+- **原因**：是用 DeepSeek 来帮忙分析得到灵感后发现的：关键点是 `VLLM_PORT` 这个环境变量，vLLM 会解析这个环境变量，它期望是个数字但实际得到的不是所以才报错，但我没定义这个环境变量，这个环境变量是 K8S 根据 Service 自动生成注入到 Pod 中的。
+- **解决办法**：不要给 vLLM 的 Service 名称定义成 `vllm`，换成其它名字。
 
-解决办法：不要给 vLLM 的 Service 名称定义成 `vllm`，换成其它名字。
+### vLLM 启动报错 ValueError: Bfloat16 is only supported on GPUs with compute capability of at least 8.0.
+
+vLLM 启动时报这个错：
+
+```txt
+ValueError: Bfloat16 is only supported on GPUs with compute capability of at least 8.0. Your Tesla V100-SXM2-32GB GPU has compute capability 7.0. You can use float16 instead by explicitly setting the`dtype` flag in CLI, for example: --dtype=half.
+Traceback (most recent call last):
+  File "/usr/local/bin/vllm", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/vllm/scripts.py", line 204, in main
+    args.dispatch_function(args)
+  File "/usr/local/lib/python3.12/dist-packages/vllm/scripts.py", line 44, in serve
+    uvloop.run(run_server(args))
+  File "/usr/local/lib/python3.12/dist-packages/uvloop/__init__.py", line 109, in run
+    return __asyncio.run(
+           ^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+  File "/usr/local/lib/python3.12/dist-packages/uvloop/__init__.py", line 61, in wrapper
+    return await main
+           ^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 875, in run_server
+    async with build_async_engine_client(args) as engine_client:
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 136, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 230, in build_async_engine_client_from_engine_args
+    raise RuntimeError(
+RuntimeError: Engine process failed to start. See stack trace for the root cause.
+```
+
+- **原因**：如报错所提示，GPU 卡不支持指定的 `--dtype` 类型（`bfloat16`)，并给出使用 `float16` 的建议。
+- **解决办法**: 修改 vLLM 的 Deployment 中的启动参数，将 `--dtype` 的值指定为 `float16`。
