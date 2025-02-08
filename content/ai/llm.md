@@ -52,7 +52,7 @@ TKE 有**普通节点**、**原生节点**和**超级节点**三种节点类型�
 
 ### 步骤1: 准备集群
 
-登录 [容器服务控制台](https://console.cloud.tencent.com/tke2)，创建一个集群，选择**标准集群**。详情请参见 [创建集群](https://cloud.tencent.com/document/product/457/103981)。
+登录 [容器服务控制台](https://console.cloud.tencent.com/tke2)，创建一个集群，集群类型选择**TKE标准集群**。详情请参见 [创建集群](https://cloud.tencent.com/document/product/457/103981)。
 
 ### 步骤2: 准备 CFS 存储
 
