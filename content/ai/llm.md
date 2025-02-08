@@ -488,7 +488,7 @@ command:
     --max_num_batched_tokens 1024 \
     --max_model_len 1024 \
     # highlight-add-line
-    --tensor-parallel-size 2
+    --tensor-parallel-size 2 # 指定 N 张卡并行，与 requests 中指定的 GPU 数量一致
 ```
 
 ### 如何实现多机多卡分布式部署？
