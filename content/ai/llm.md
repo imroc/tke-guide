@@ -452,7 +452,7 @@ docker push imroc/vllm-openai:cuda-11.8.0
 
 ### 如何实现多卡部署？
 
-Ollama 和 vLLM 默认将模型部署到单张 GPU 卡上，如果是多人使用，并发请求，可以配置下 Ollama 和 vLLM，将模型部署到多张 GPU 卡上来提升吞吐量。
+Ollama 和 vLLM 默认将模型部署到单张 GPU 卡上，如果是多人使用，并发请求，或者模型太大，可以配置下 Ollama 和 vLLM，将模型部署到多张 GPU 卡上来提升推理速度和吞吐量。
 
 首先在定义 Ollama 或 vLLM 的 Deployment 时，需声明 GPU 的数量大于 1，示例：
 
@@ -490,6 +490,15 @@ command:
     # highlight-add-line
     --tensor-parallel-size 2
 ```
+
+### 如何实现多机多卡分布式部署？
+
+前面说的多卡部署仅限单台机器内的多卡，如果单个模型实在太大，而单台机器的 GPU 推理太慢，可以考虑用多机多卡分布式部署。
+
+如何做到多机部署？如果只是简单增加副本数，各个节点的 GPU 并不能协同处理同一个任务，只能提升并发量，不能提升单个任务的推理速度。下面给出实现多机多卡分布式部署的思路，具体方案可参考相关链接，结合本文给出的示例 YAML 并进行相关修改。
+
+- vLLM 官方支持通过 Ray 实现多机多卡的分布式部署，参考 [vLLM Distributed Inference and Serving](https://docs.vllm.ai/en/latest/serving/distributed_serving.html)。
+- Ollama 官方不支持多机分布式部署，但 [llama.cpp](https://github.com/ggerganov/llama.cpp) 给出了一些支持，参考 issue [Llama.cpp now supports distributed inference across multiple machines. ](https://github.com/ollama/ollama/issues/4643)（门槛较高）。
 
 ## 踩坑分享
 
