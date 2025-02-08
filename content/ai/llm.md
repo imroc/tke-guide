@@ -34,7 +34,7 @@ AI 大模型通常占用体积较大，直接打包到容器镜像不太现实�
 
 ### GPU 机型如何选？
 
-不同的机型使用的 GPU 型号不一样，机型与 GPU 型号的对照表参考 [GPU 计算型实例](https://cloud.tencent.com/document/product/560/19700) 和 [GPU 渲染型实例](https://cloud.tencent.com/document/product/560/63854)，Ollama 相比 vLLM，支持的 GPU 型号更广泛，兼容性更好，建议根据事先调研自己所使用的工具和大模型，选择合适的 GPU 型号，再根据前面的对照表确定要使用的 GPU 机型。
+不同的机型使用的 GPU 型号不一样，机型与 GPU 型号的对照表参考 [GPU 计算型实例](https://cloud.tencent.com/document/product/560/19700) 和 [GPU 渲染型实例](https://cloud.tencent.com/document/product/560/63854)，Ollama 相比 vLLM，支持的 GPU 型号更广泛，兼容性更好，建议根据事先调研自己所使用的工具和大模型，选择合适的 GPU 型号，再根据前面的对照表确定要使用的 GPU 机型，另外也注意下选择的机型在哪些地域在售，以及是否售罄，可通过 [购买云服务器](https://buy.cloud.tencent.com/cvm) 页面进行查询（**实例族**选择**GPU机型**）。
 
 ### 节点类型如何选？
 
@@ -52,7 +52,7 @@ TKE 有**普通节点**、**原生节点**和**超级节点**三种节点类型�
 
 ### 步骤1: 准备集群
 
-登录 [容器服务控制台](https://console.cloud.tencent.com/tke2)，创建一个集群，集群类型选择**TKE标准集群**。详情请参见 [创建集群](https://cloud.tencent.com/document/product/457/103981)。
+登录 [容器服务控制台](https://console.cloud.tencent.com/tke2)，创建一个集群，集群类型选择**TKE 标准集群**。详情请参见 [创建集群](https://cloud.tencent.com/document/product/457/103981)。
 
 ### 步骤2: 准备 CFS 存储
 
