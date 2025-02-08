@@ -500,6 +500,126 @@ command:
 - vLLM 官方支持通过 Ray 实现多机分布式部署，参考 [Running vLLM on multiple nodes](https://docs.vllm.ai/en/latest/serving/distributed_serving.html#running-vllm-on-multiple-nodes) 和 [Deploy Distributed Inference Service with vLLM and LWS on GPUs](https://github.com/kubernetes-sigs/lws/tree/main/docs/examples/vllm/GPU)。
 - Ollama 官方不支持多机分布式部署，但 [llama.cpp](https://github.com/ggerganov/llama.cpp) 给出了一些支持，参考 issue [Llama.cpp now supports distributed inference across multiple machines. ](https://github.com/ollama/ollama/issues/4643)（门槛较高）。
 
+对于 vLLM 来说，在 Kubernetes 环境中推荐使用 [lws](https://github.com/kubernetes-sigs/lws) 来实现多机分布式部署，下面给出部署实例。
+
+首先，按照 [lws 官方文档](https://github.com/kubernetes-sigs/lws/blob/main/docs/setup/install.md) 安装 lws 到集群，需要注意的是，默认使用镜像是 `registry.k8s.io/lws/lws`，这个在国内环境下载不了，需修改 Deployment 的镜像地址为 `docker.io/k8smirror/lws`，该镜像为 lws 在 DockerHub 上的 mirror 镜像，长期自动同步，可放心使用（TKE 环境可直接拉取 DockerHub 的镜像）。
+
+然后，下载 [ray_init.sh](https://raw.githubusercontent.com/kubernetes-sigs/lws/refs/heads/main/docs/examples/vllm/build/ray_init.sh) 脚本，制作 vLLM+Ray 的镜像：
+
+```dockerfile
+FROM docker.io/vllm/vllm-openai:latest
+COPY ray_init.sh /vllm-workspace/ray_init.sh
+```
+
+编译镜像并推送到镜像仓库：
+
+```bash
+docker build -t ccr.ccs.tencentyun.com/imroc/vllm-lws:latest .
+docker push ccr.ccs.tencentyun.com/imroc/vllm-lws:latest
+```
+
+然后编写 `LeaderWorkerSet` 的 YAML 文件并将其部署到集群中：
+
+```yaml
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: vllm
+spec:
+  replicas: 1
+  leaderWorkerTemplate:
+    size: 2
+    restartPolicy: RecreateGroupOnPodRestart
+    leaderTemplate:
+      metadata:
+        labels:
+          role: leader
+      spec:
+        containers:
+          - name: vllm-leader
+            image: ccr.ccs.tencentyun.com/imroc/vllm-lws:latest
+            env:
+              - name: RAY_CLUSTER_SIZE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.annotations['leaderworkerset.sigs.k8s.io/size']
+            command:
+              - sh
+              - -c
+              - "/vllm-workspace/ray_init.sh leader --ray_cluster_size=$RAY_CLUSTER_SIZE;
+                python3 -m vllm.entrypoints.openai.api_server --port 8080 --model /data/DeepSeek-R1-Distill-Qwen-32B --tensor-parallel-size 2 --pipeline-parallel-size 2 --max-model-len 32768 --enforce-eager"
+            resources:
+              limits:
+                nvidia.com/gpu: "2"
+            ports:
+              - containerPort: 8080
+            readinessProbe:
+              tcpSocket:
+                port: 8080
+              initialDelaySeconds: 15
+              periodSeconds: 10
+            volumeMounts:
+              - mountPath: /dev/shm
+                name: dshm
+              - mountPath: /data
+                name: data
+        volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 15Gi
+        - name: data
+          persistentVolumeClaim:
+            claimName: ai-model
+    workerTemplate:
+      spec:
+        containers:
+          - name: vllm-worker
+            image: ccr.ccs.tencentyun.com/imroc/vllm-lws:latest
+            command:
+              - sh
+              - -c
+              - "/vllm-workspace/ray_init.sh worker --ray_address=$(LWS_LEADER_ADDRESS)"
+            resources:
+              limits:
+                nvidia.com/gpu: "2"
+            volumeMounts:
+              - mountPath: /dev/shm
+                name: dshm
+              - mountPath: /data
+                name: data
+        volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 15Gi
+        - name: data
+          persistentVolumeClaim:
+            claimName: ai-model
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-api
+spec:
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    leaderworkerset.sigs.k8s.io/name: vllm
+    role: leader
+  type: ClusterIP
+```
+
+:::info[注意]
+
+- `nvidia.com/gpu` 和 `--tensor-parallel-size` 指定每台节点有多少张 GPU 卡。
+- `--pipeline-parallel-size` 指定有多少台节点。
+
+:::
+
 ### 如何使用超过 2T 的系统盘？
 
 如果出于成本和性能的权衡考虑，或者测试阶段先不引入 CFS，降低复杂度，希望直接用本地系统盘存储大模型，而大模型占用又空间太大，希望能用超过 2T 的系统盘，则需要操作系统支持才可以，名称中带 `UEFI` 字样的系统镜像才支持超过 2T 的系统盘，默认不可用，如有需要可联系官方开通使用。
