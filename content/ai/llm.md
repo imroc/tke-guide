@@ -459,7 +459,7 @@ Ollama 和 vLLM 默认将模型部署到单张 GPU 卡上，如果是多人使�
 ```yaml
 resources:
   requests:
-    nvidia.com/gpu: "2“
+    nvidia.com/gpu: "2"
   limits:
     nvidia.com/gpu: "2"
 ```
