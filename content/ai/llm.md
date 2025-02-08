@@ -497,7 +497,7 @@ command:
 
 如何做到多机部署？如果只是简单增加副本数，各个节点的 GPU 并不能协同处理同一个任务，只能提升并发量，不能提升单个任务的推理速度。下面给出实现多机多卡分布式部署的思路，具体方案可参考相关链接，结合本文给出的示例 YAML 并进行相关修改。
 
-- vLLM 官方支持通过 Ray 实现多机分布式部署，参考 [Running vLLM on multiple nodes](https://docs.vllm.ai/en/latest/serving/distributed_serving.html#running-vllm-on-multiple-nodes)。
+- vLLM 官方支持通过 Ray 实现多机分布式部署，参考 [Running vLLM on multiple nodes](https://docs.vllm.ai/en/latest/serving/distributed_serving.html#running-vllm-on-multiple-nodes) 和 [Deploy Distributed Inference Service with vLLM and LWS on GPUs](https://github.com/kubernetes-sigs/lws/tree/main/docs/examples/vllm/GPU)。
 - Ollama 官方不支持多机分布式部署，但 [llama.cpp](https://github.com/ggerganov/llama.cpp) 给出了一些支持，参考 issue [Llama.cpp now supports distributed inference across multiple machines. ](https://github.com/ollama/ollama/issues/4643)（门槛较高）。
 
 ## 踩坑分享
