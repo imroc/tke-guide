@@ -359,7 +359,7 @@ vLLM 启动或运行过程中可能报错，如：
 1. 如果是普通节点或原生节点，在创建节点池选机型的时候就会提示 GPU 驱动版本。
 2. 如果调度到超级节点，可进入 Pod 执行 `nvidia-smi` 命令查看 GPU 驱动版本。
 
-确认 CUDA 版本：在 NVIDIA 官网的 [CUDA Toolkit Release Notes](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html) 中，查找适合前面确认到的 GPU 驱动版本的 CUDA 版本，用于后面打包镜像时选择对应版本的基础镜像。
+确认 CUDA 版本：在 NVIDIA 官网的 [CUDA Toolkit and Corresponding Driver Versions](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html#id6) 中，查找适合前面确认到的 GPU 驱动版本的 CUDA 版本，用于后面打包镜像时选择对应版本的基础镜像。
 
 #### 步骤2: 编译 Ollama 或 vLLM 镜像
 
