@@ -500,6 +500,10 @@ command:
 - vLLM 官方支持通过 Ray 实现多机分布式部署，参考 [Running vLLM on multiple nodes](https://docs.vllm.ai/en/latest/serving/distributed_serving.html#running-vllm-on-multiple-nodes) 和 [Deploy Distributed Inference Service with vLLM and LWS on GPUs](https://github.com/kubernetes-sigs/lws/tree/main/docs/examples/vllm/GPU)。
 - Ollama 官方不支持多机分布式部署，但 [llama.cpp](https://github.com/ggerganov/llama.cpp) 给出了一些支持，参考 issue [Llama.cpp now supports distributed inference across multiple machines. ](https://github.com/ollama/ollama/issues/4643)（门槛较高）。
 
+### 如何使用超过 2T 的系统盘？
+
+如果出于成本和性能的权衡考虑，希望直接用本地系统盘存储大模型，而大模型占用空间太大，希望能用超过 2T 的系统盘，则需要操作系统支持才可以，名称中带 `UEFI` 字样的系统镜像才支持超过 2T 的系统盘，默认不可用，如有需要可联系官方开通使用。
+
 ## 踩坑分享
 
 ### vLLM 报错 ValueError: invalid literal for int() with base 10: 'tcp://xxx.xx.xx.xx:8000'
