@@ -34,7 +34,8 @@ spec:
         - |
           vllm serve /data/$LLM_MODEL \
               --served-model-name $LLM_MODEL \
-              --host 0.0.0.0 --port 8000 \
+              --host 0.0.0.0 \
+              --port 8000 \
               --trust-remote-code \
               --enable-chunked-prefill \
               --max_num_batched_tokens 1024 \
