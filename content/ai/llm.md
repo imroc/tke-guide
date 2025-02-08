@@ -450,11 +450,46 @@ docker push imroc/vllm-openai:cuda-11.8.0
 
 如果使用超级节点，Pod 默认没有公网，可以使用 NAT 网关来访问外网，详情请参考 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)，当然这个也适用于普通节点和原生节点。
 
-### 如何实现多机多卡分布式部署？
+### 如何实现多卡部署？
 
-使用 `vLLM` 可实现多机多卡分布式部署大模型，下面是具体步骤：
+Ollama 和 vLLM 默认将模型部署到单张 GPU 卡上，如果是多人使用，并发请求，可以配置下 Ollama 和 vLLM，将模型部署到多张 GPU 卡上来提升吞吐量。
 
-TODO
+首先在定义 Ollama 或 vLLM 的 Deployment 时，需声明 GPU 的数量大于 1，示例：
+
+```yaml
+resources:
+  requests:
+    nvidia.com/gpu: "2“
+  limits:
+    nvidia.com/gpu: "2"
+```
+
+对于 Ollama， 指定环境变量 `OLLAMA_SCHED_SPREAD` 为 `1` 表示将模型部署到所有 GPU 卡上，示例：
+
+```yaml
+env:
+- name: OLLAMA_SCHED_SPREAD # 多卡部署
+  value: "1"
+```
+
+对于 vLLM， 则需显示指定 `--tensor-parallel-size` 参数，表示将模型部署到多少张 GPU 卡上，示例：
+
+```yaml showLineNumbers
+command:
+- bash
+- -c
+- |
+  set -ex
+  exec vllm serve /data/DeepSeek-R1-Distill-Qwen-7B \
+    --served-model-name DeepSeek-R1-Distill-Qwen-7B \
+    --host 0.0.0.0 --port 8000 \
+    --trust-remote-code \
+    --enable-chunked-prefill \
+    --max_num_batched_tokens 1024 \
+    --max_model_len 1024 \
+    # highlight-add-line
+    --tensor-parallel-size 2
+```
 
 ## 踩坑分享
 
