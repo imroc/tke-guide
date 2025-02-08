@@ -23,18 +23,23 @@ spec:
       - name: vllm
         image: vllm/vllm-openai:latest
         imagePullPolicy: Always
+        env:
+        - name: PYTORCH_CUDA_ALLOC_CONF
+          value: expandable_segments:True
+        - name: LLM_MODEL
+          value: deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
         command:
-        - vllm
-        - serve
-        - /data/
-        - --served-model-name
-        - deepseek-ai/DeepSeek-R1
-        - --dtype
-        - bfloat16
-        - --host
-        - 0.0.0.0
-        - --port
-        - "8000"
+        - bash
+        - -c
+        - |
+          vllm serve /data/$LLM_MODEL \
+              --served-model-name $LLM_MODEL \
+              --host 0.0.0.0 --port 8000 \
+              --trust-remote-code \
+              --enable-chunked-prefill \
+              --max_num_batched_tokens 1024 \
+              --max_model_len 1024 \
+              --tensor-parallel-size 1
         securityContext:
           runAsNonRoot: false
         ports:
@@ -46,21 +51,12 @@ spec:
             port: 8000
           initialDelaySeconds: 5
           periodSeconds: 5
-        livenessProbe:
-          failureThreshold: 3
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 15
-          periodSeconds: 10
         resources:
           requests:
             cpu: 2000m
             memory: 2Gi
             nvidia.com/gpu: "1"
           limits:
-            cpu: 4000m
-            memory: 4Gi
             nvidia.com/gpu: "1"
         volumeMounts:
         - name: data
