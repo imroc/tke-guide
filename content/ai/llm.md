@@ -503,6 +503,7 @@ command:
 ```dockerfile
 FROM docker.io/vllm/vllm-openai:latest
 COPY ray_init.sh /vllm-workspace/ray_init.sh
+RUN chmod +x /vllm-workspace/ray_init.sh
 ```
 
 编译镜像并推送到镜像仓库：
@@ -513,6 +514,12 @@ docker push ccr.ccs.tencentyun.com/imroc/vllm-lws:latest
 ```
 
 然后编写 `LeaderWorkerSet` 的 YAML 文件并将其部署到集群中：
+
+:::info[说明]
+
+这里假设每台 GPU 节点至少有 2 张 GPU 算卡，每个 Pod 使用 2 张卡，leader + worker 一共 2 个 Pod。
+
+:::
 
 ```yaml
 apiVersion: leaderworkerset.x-k8s.io/v1
@@ -530,33 +537,41 @@ spec:
           role: leader
       spec:
         containers:
-          - name: vllm-leader
-            image: ccr.ccs.tencentyun.com/imroc/vllm-lws:latest
-            env:
-              - name: RAY_CLUSTER_SIZE
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.annotations['leaderworkerset.sigs.k8s.io/size']
-            command:
-              - sh
-              - -c
-              - "/vllm-workspace/ray_init.sh leader --ray_cluster_size=$RAY_CLUSTER_SIZE;
-                python3 -m vllm.entrypoints.openai.api_server --port 8080 --model /data/DeepSeek-R1-Distill-Qwen-32B --tensor-parallel-size 2 --pipeline-parallel-size 2 --max-model-len 32768 --enforce-eager"
-            resources:
-              limits:
-                nvidia.com/gpu: "2"
-            ports:
-              - containerPort: 8080
-            readinessProbe:
-              tcpSocket:
-                port: 8080
-              initialDelaySeconds: 15
-              periodSeconds: 10
-            volumeMounts:
-              - mountPath: /dev/shm
-                name: dshm
-              - mountPath: /data
-                name: data
+        - name: vllm-leader
+          image: ccr.ccs.tencentyun.com/imroc/vllm-lws:latest
+          env:
+          - name: RAY_CLUSTER_SIZE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.annotations['leaderworkerset.sigs.k8s.io/size']
+          command:
+          - sh
+          - -c
+          - |
+            /vllm-workspace/ray_init.sh leader --ray_cluster_size=$RAY_CLUSTER_SIZE
+            python3 -m vllm.entrypoints.openai.api_server \
+              --port 8080 \
+              --model /data/DeepSeek-R1-Distill-Qwen-32B \
+              --served-model-name DeepSeek-R1-Distill-Qwen-32B \
+              --tensor-parallel-size 2 \
+              --pipeline-parallel-size 2 \
+              --dtype=half \
+              --enforce-eager
+          resources:
+            limits:
+              nvidia.com/gpu: "2"
+          ports:
+          - containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          volumeMounts:
+          - mountPath: /dev/shm
+            name: dshm
+          - mountPath: /data
+            name: data
         volumes:
         - name: dshm
           emptyDir:
@@ -568,20 +583,20 @@ spec:
     workerTemplate:
       spec:
         containers:
-          - name: vllm-worker
-            image: ccr.ccs.tencentyun.com/imroc/vllm-lws:latest
-            command:
-              - sh
-              - -c
-              - "/vllm-workspace/ray_init.sh worker --ray_address=$(LWS_LEADER_ADDRESS)"
-            resources:
-              limits:
-                nvidia.com/gpu: "2"
-            volumeMounts:
-              - mountPath: /dev/shm
-                name: dshm
-              - mountPath: /data
-                name: data
+        - name: vllm-worker
+          image: ccr.ccs.tencentyun.com/imroc/vllm-lws:latest
+          command:
+          - sh
+          - -c
+          - "/vllm-workspace/ray_init.sh worker --ray_address=$(LWS_LEADER_ADDRESS)"
+          resources:
+            limits:
+              nvidia.com/gpu: "2"
+          volumeMounts:
+          - mountPath: /dev/shm
+            name: dshm
+          - mountPath: /data
+            name: data
         volumes:
         - name: dshm
           emptyDir:
@@ -590,27 +605,14 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: ai-model
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: vllm-api
-spec:
-  ports:
-    - name: http
-      port: 8080
-      protocol: TCP
-      targetPort: 8080
-  selector:
-    leaderworkerset.sigs.k8s.io/name: vllm
-    role: leader
-  type: ClusterIP
 ```
 
 :::info[注意]
 
 - `nvidia.com/gpu` 和 `--tensor-parallel-size` 指定每台节点有多少张 GPU 卡。
 - `--pipeline-parallel-size` 指定有多少台节点。
+- `--model` 指定模型文件在容器内的路径。
+- `--served-model-name` 指定模型名称。
 
 :::
 
