@@ -557,7 +557,6 @@ spec:
               --served-model-name DeepSeek-R1-Distill-Qwen-32B \
               --tensor-parallel-size 2 \
               --pipeline-parallel-size 2 \
-              --dtype=half \
               --enforce-eager
           resources:
             limits:
