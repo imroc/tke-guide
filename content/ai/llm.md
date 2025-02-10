@@ -550,7 +550,7 @@ spec:
           - |
             /vllm-workspace/ray_init.sh leader --ray_cluster_size=$RAY_CLUSTER_SIZE
             python3 -m vllm.entrypoints.openai.api_server \
-              --port 8080 \
+              --port 8000 \
               --model /data/DeepSeek-R1-Distill-Qwen-32B \
               --served-model-name DeepSeek-R1-Distill-Qwen-32B \
               --tensor-parallel-size 2 \
@@ -561,10 +561,10 @@ spec:
             limits:
               nvidia.com/gpu: "2"
           ports:
-          - containerPort: 8080
+          - containerPort: 8000
           readinessProbe:
             tcpSocket:
-              port: 8080
+              port: 8000
             initialDelaySeconds: 15
             periodSeconds: 10
           volumeMounts:
@@ -605,6 +605,22 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: ai-model
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-api
+spec:
+  ports:
+  - name: http
+    port: 8000
+    protocol: TCP
+    targetPort: 8000
+  selector:
+    leaderworkerset.sigs.k8s.io/name: vllm
+    role: leader
+  type: ClusterIP
 ```
 
 :::info[注意]
@@ -615,6 +631,25 @@ spec:
 - `--served-model-name` 指定模型名称。
 
 :::
+
+Pod 成功跑起来后进入 leader Pod：
+
+```bash
+kubectl exec -it vllm-0 -- bash
+```
+
+测试 API：
+
+```bash
+curl -v http://127.0.0.1:8000/v1/completions -H "Content-Type: application/json" -d '{
+      "model": "DeepSeek-R1-Distill-Qwen-32B",
+      "prompt": "你是谁?",
+      "max_tokens": 100,
+      "temperature": 0
+    }'
+```
+
+如果部署了 OpenWebUI，确保 `OPENAI_API_BASE_URL` 指向上面示例 YAML 中 Service 的地址，如 `http://vllm-api:8000/v1`。
 
 ### 如何使用超过 2T 的系统盘？
 

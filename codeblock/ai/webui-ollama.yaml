@@ -20,7 +20,7 @@ spec:
         - name: OLLAMA_BASE_URL
           value: http://ollama:11434 # ollama 的地址
         - name: ENABLE_OPENAI_API # 禁用 OpenAI API，只保留 Ollama API
-          value: "false"
+          value: "False"
         tty: true
         ports:
         - containerPort: 8080
