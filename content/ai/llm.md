@@ -154,19 +154,13 @@ spec:
   * 如果使用**超级节点**，是虚拟的节点，每个 Pod 都是独占的轻量虚拟机，所以无需选择机型，只需在部署的时候通过 Pod 注解来指定 GPU 卡的型号（后面示例中会有）。
 4. 单击**创建节点池**。
 
-### 步骤4: 安装 GPU 插件
+:::tip[说明]
 
-如果使用**普通节点**或**原生节点**，需安装 GPU 插件，如果使用**超级节点**则**无需安装**。
+GPU 插件无需显式安装，如果使用**普通节点**或**原生节点**，配置了 GPU 机型，会自动安装 GPU 插件；如果使用**超级节点**，则无需安装 GPU 插件。
 
-下面是安装 GPU 插件的步骤（仅针对**普通节点**和**原生节点**）：
-1. 在集群列表中，单击**集群 ID**，进入集群详情页。
-2. 选择左侧菜单栏中的**组件管理**，在组件页面单击**新建**。
-3. 在新建组件管理页面中勾选 **nvidia-gpu（NVIDIA GPU 资源管理）**。
-  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206152134.png)
+:::
 
-4. 单击完成即可创建组件。
-
-### 步骤5: 使用 Job 下载 AI 大模型
+### 步骤4: 使用 Job 下载 AI 大模型
 
 下发一个 Job，将需要用的 AI 大模型下载到 CFS 共享存储中，以下分别是 vLLM 和 Ollama 的 Job 示例：
 
@@ -186,7 +180,7 @@ spec:
   </TabItem>
 </Tabs>
 
-### 步骤6: 部署 Ollama 或 vLLM
+### 步骤5: 部署 Ollama 或 vLLM
 
 <Tabs>
   <TabItem value="deploy-vllm" label="部署 vLLM">
@@ -221,7 +215,7 @@ spec:
 4. 运行大模型需要使用 GPU，因此在 requests/limits 中指定了 `nvidia.com/gpu` 资源，以便让 Pod 调度到 GPU 机型并分配 GPU 卡使用。
 5. 如果希望大模型跑在超级节点，需通过 Pod 注解 `eks.tke.cloud.tencent.com/gpu-type` 指定 GPU 类型，可选 `V100`、`T4`、`A10*PNV4`、`A10*GNV4`，具体可参考 [这里](https://cloud.tencent.com/document/product/457/39808#gpu-.E8.A7.84.E6.A0.BC)。
 
-### 步骤7: 配置 GPU 弹性伸缩
+### 步骤6: 配置 GPU 弹性伸缩
 
 如果需要对 GPU 资源进行弹性伸缩，可以按照下面的方法进行配置。
 
@@ -285,7 +279,7 @@ behavior:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F07%2F20250207192313.png)
 
-### 步骤8: 部署 OpenWebUI
+### 步骤7: 部署 OpenWebUI
 
 使用 Deployment 部署 OpenWebUI，并定义 Service 方便后续对外暴露访问。后端 API 可以由 vLLM 或 Ollama 提供，以下提供这两种情况的 OpenWebUI 部署示例：
 
@@ -300,7 +294,7 @@ behavior:
 
 > OpenWebUI 的数据存储在 `/app/backend/data` 目录（如账号密码、聊天历史等数据），我们挂载 PVC 到这个路径。
 
-### 步骤9: 暴露 OpenWebUI 并与模型对话
+### 步骤8: 暴露 OpenWebUI 并与模型对话
 
 如果只是本地测试，可以使用 `kubectl port-forward` 暴露服务：
 
