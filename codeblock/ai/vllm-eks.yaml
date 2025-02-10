@@ -33,15 +33,15 @@ spec:
         - -c
         - |
           vllm serve /data/$LLM_MODEL \
-              --served-model-name $LLM_MODEL \
-              --host 0.0.0.0 \
-              --port 8000 \
-              --trust-remote-code \
-              --enable-chunked-prefill \
-              --max_num_batched_tokens 1024 \
-              --max_model_len 1024 \
-              --enforce-eager \
-              --tensor-parallel-size 1
+            --served-model-name $LLM_MODEL \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --trust-remote-code \
+            --enable-chunked-prefill \
+            --max_num_batched_tokens 1024 \
+            --max_model_len 1024 \
+            --enforce-eager \
+            --tensor-parallel-size 1
         securityContext:
           runAsNonRoot: false
         ports:
