@@ -665,7 +665,7 @@ spec:
 
 然后确保 vllm 的 Service 的 selector 选中该 label：
 
-```yaml
+```yaml showLineNumbers
 apiVersion: v1
 kind: Service
 metadata:
