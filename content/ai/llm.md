@@ -637,6 +637,54 @@ curl -v http://127.0.0.1:8000/v1/completions -H "Content-Type: application/json"
 
 如果部署了 OpenWebUI，确保 `OPENAI_API_BASE_URL` 指向上面示例 YAML 中 Service 的地址，如 `http://vllm-api:8000/v1`。
 
+### 多GPU集群部署如何负载均衡？
+
+vLLM 分布式多机部署要求每台节点 GPU 数量一致，且要事先规划好节点数量，如果要扩容，只有再建新 GPU 集群，如何让不同的 GPU 集群进行负载均衡呢？
+
+可以用同一个 Service 选中多个不同 GPU 集群的所有 Pod 来实现。
+
+比如用 lws 部署 vllm，让所有 `LeaderWorkerSet` 在同一命名空间，且所有 `LeaderWorkerSet` 的 `leaderTemplate` 下要声明一个相同的 label，比如用 `role: leader`：
+
+```yaml showLineNumbers
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: vllm
+spec:
+  replicas: 1
+  leaderWorkerTemplate:
+    size: 2
+    leaderTemplate:
+      # highlight-add-start
+      metadata:
+        labels:
+          role: leader
+      # highlight-add-end
+      spec:
+```
+
+然后确保 vllm 的 Service 的 selector 选中该 label：
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-api
+spec:
+  ports:
+  - name: http
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  # highlight-add-start
+  selector:
+    role: leader
+  # highlight-add-end
+  type: ClusterIP
+```
+
+配置好后，该 Service 就选中了所有 GPU 集群的 leader Pod，API 请求就可以在多个 GPU 集群之间负载均衡了。
+
 ### 如何使用超过 2T 的系统盘？
 
 如果出于成本和性能的权衡考虑，或者测试阶段先不引入 CFS，降低复杂度，希望直接用本地系统盘存储大模型，而大模型占用又空间太大，希望能用超过 2T 的系统盘，则需要操作系统支持才可以，名称中带 `UEFI` 字样的系统镜像才支持超过 2T 的系统盘，默认不可用，如有需要可联系官方开通使用。
