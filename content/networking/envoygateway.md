@@ -45,6 +45,12 @@ spec:
 
 每个 `Gateway` 对应一个 CLB，在 `Gateway` 上声明端口相当于在 CLB 上创建响应协议的监听器：
 
+:::tip[说明]
+
+Gateway 的所有字段参考 [API Specification: Gateway](https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io/v1.Gateway)
+
+:::
+
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -64,68 +70,29 @@ spec:
 
 > `Gateway` 可以指定命名空间，可以被 `HTTPRoute` 等路由规则跨命名空间引用。
 
-`Gateway` 创建后，`EnvoyGateway` 会自动为其创建一个 LoadBalancer 类型的 Service，也就是一个 CLB。在 TKE 上，LoadBalancer 类型的 Service 默认是一个公网 CLB，如果要自定义，可通过创建 `EnvoyProxy` 自定义资源来自定义，下面是示例：
+`Gateway` 创建后，`EnvoyGateway` 会自动为其创建一个 LoadBalancer 类型的 Service，也就是一个 CLB。在 TKE 上，LoadBalancer 类型的 Service 默认是一个公网 CLB，如果要自定义，可参考常见问题中的**如何自定义 CLB**。
 
-```yaml
-apiVersion: gateway.envoyproxy.io/v1alpha1
-kind: EnvoyProxy
-metadata:
-  name: proxy-config
-  namespace: test
-spec:
-  provider:
-    type: Kubernetes
-    kubernetes:
-      envoyDeployment:
-        replicas: 1
-        container:
-          resources:
-            requests:
-              tke.cloud.tencent.com/eni-ip: "1"
-            limits:
-              tke.cloud.tencent.com/eni-ip: "1"
-        pod:
-          annotations:
-            tke.cloud.tencent.com/networks: tke-route-eni
-      envoyService:
-        annotations:
-          service.kubernetes.io/tke-existed-lbid: lb-5nhlk3nr
-          service.cloud.tencent.com/direct-access: "true"
+如何获取 `Gateway` 对应的 CLB 地址呢？可以通过 `kubectl get gtw` 查看：
+
+```bash
+$ kubectl get gtw test-gw -n test
+NAME      CLASS   ADDRESS         PROGRAMMED   AGE
+test-gw   eg      139.155.64.52   True         358d
 ```
 
-以上示例中：
-
-* 显式声明使用 VPC-CNI 网络模式且启用 CLB 直连 Pod。
-* 使用已有 CLB。
-
-相应的，`GatewayClass` 中需引用该 `EnvoyProxy` 配置:
-
-```yaml
-apiVersion: gateway.networking.k8s.io/v1
-kind: GatewayClass
-metadata:
-  name: eg
-spec:
-  controllerName: gateway.envoyproxy.io/gatewayclass-controller
-  parametersRef:
-    group: gateway.envoyproxy.io
-    kind: EnvoyProxy
-    name: proxy-config
-    namespace: test
-```
-
-更多 CLB 相关的自定义可参考 [Service Annotation 说明](https://cloud.tencent.com/document/product/457/51258)。
-
-举几个常见的自定义例子：
-1. 通过 `service.cloud.tencent.com/specify-protocol` 注解来修改监听器协议为 HTTPS 并正确引用 SSL 证书，以便让 CLB 能够接入 [腾讯云 WAF](https://cloud.tencent.com/product/waf)。
-2. 通过 `service.kubernetes.io/qcloud-loadbalancer-internal-subnetid` 注解指定 CLB 内网 IP，实现自动创建内网 CLB 来接入流量。
-3. 通过 `service.kubernetes.io/service.extensiveParameters` 注解自定义自动创建的 CLB 更多属性，如指定运营商、带宽上限、实例规格、网络计费模式等。
+其中 `ADDRESS` 就是 CLB 的地址（IP 或域名）。
 
 ## 创建 HTTPRoute
 
 `HTTPRoute` 用于定义 HTTP 转发规则，也是 Gateway API 中最常用的转发规则，类似 Ingress API 中的 `Ingress` 资源。
 
 在 `HTTPRoute` 中引用 `Gateway`，表示将该规则应用到这个 `Gateway` 中：
+
+:::tip[说明]
+
+HTTPRoute 的所有字段参考[API Specification: HTTPRoute](https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io/v1.HTTPRoute)
+
+:::
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -156,3 +123,129 @@ spec:
 Gateway API 非常强大，可实现很多复杂的功能，如基于权重、header、cookie 等特征的路由、灰度发布、流量镜像、URL重定向与重写、TLS 路由、GRPC 路由等，更详细的用法参考 [Gateway API 官方文档](https://gateway-api.sigs.k8s.io/guides/http-routing/)。
 
 EnvoyGateway 也支持了 Gateway API 之外的一些特有的高级能力，可参考 [EnvoyGateway 官方文档](https://gateway.envoyproxy.io/latest/)。
+
+## 常见问题
+
+### 如何自定义 CLB？
+
+可通过创建 `EnvoyProxy` 自定义资源来自定义，下面是示例：
+
+```yaml showLineNumbers
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: proxy-config
+  namespace: test
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        replicas: 1
+        container:
+          # hightlight-add-start
+          resources:
+            requests:
+              tke.cloud.tencent.com/eni-ip: "1"
+            limits:
+              tke.cloud.tencent.com/eni-ip: "1"
+          # hightlight-add-end
+        pod:
+          annotations:
+            # hightlight-add-line
+            tke.cloud.tencent.com/networks: tke-route-eni
+      envoyService:
+        annotations:
+          # hightlight-add-start
+          service.kubernetes.io/tke-existed-lbid: lb-5nhlk3nr
+          service.cloud.tencent.com/direct-access: "true"
+          # hightlight-add-end
+```
+
+以上示例中：
+
+* 显式声明使用 VPC-CNI 网络模式且启用 CLB 直连 Pod。
+* 使用已有 CLB，指定了 CLB 的 ID。
+
+相应的，`GatewayClass` 中需引用该 `EnvoyProxy` 配置:
+
+```yaml showLineNumbers
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  # hightlight-add-start
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: proxy-config
+    namespace: test
+  # hightlight-add-end
+```
+
+更多 CLB 相关的自定义可参考 [Service Annotation 说明](https://cloud.tencent.com/document/product/457/51258)。
+
+举几个常见的自定义例子：
+1. 通过 `service.cloud.tencent.com/specify-protocol` 注解来修改监听器协议为 HTTPS 并正确引用 SSL 证书，以便让 CLB 能够接入 [腾讯云 WAF](https://cloud.tencent.com/product/waf)。
+2. 通过 `service.kubernetes.io/qcloud-loadbalancer-internal-subnetid` 注解指定 CLB 内网 IP，实现自动创建内网 CLB 来接入流量。
+3. 通过 `service.kubernetes.io/service.extensiveParameters` 注解自定义自动创建的 CLB 更多属性，如指定运营商、带宽上限、实例规格、网络计费模式等。
+
+### 多个 HTTPRoute 如何服用同一个 CLB
+
+通常一个 `Gateway` 对象就对应一个 CLB，只要不同 `HTTPRoute` 的 `parentRefs` 引用的是同一个 `Gateway` 对象，那么它们就会复用同一个 CLB。
+
+:::info[注意]
+
+如果多个 `HTTPRoute` 复用同一个 CLB，确保它们定义的 HTTP 规则不要冲突，否则可能转发行为可能不符预期。
+
+:::
+
+下面给个示例，第一个 `HTTPRoute`，引用 Gateway `test-gw`，使用域名 `test1.example.com`：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: test1
+  namespace: test
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: test-gw
+      namespace: test
+  hostnames:
+    - "test1.example.com"
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: test1
+          port: 80
+```
+
+第二个 `HTTPRoute`，也引用 Gateway `test-gw`，域名则使用 `test2.example.com`：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: test2
+  namespace: test
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: test-gw
+      namespace: test
+  hostnames:
+    - "test2.example.com"
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: test2
+          port: 80
+```
