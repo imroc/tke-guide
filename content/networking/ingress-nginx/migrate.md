@@ -84,7 +84,7 @@ new-extranet-ingress-nginx-controller             LoadBalancer   172.16.165.100 
 
 ## 删除旧 NginxIngress 实例和插件
 
-1. 等到所有旧的 Nginx Ingress 实例完全没有流量的时候，前往 TKE 控制台删除 Nginx Ingress 实例：
+最后等到所有旧的 Nginx Ingress 实例完全没有流量的时候，前往 TKE 控制台删除 Nginx Ingress 实例：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F28%2F20240328105512.png)
 
