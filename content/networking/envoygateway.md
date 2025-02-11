@@ -455,4 +455,3 @@ spec:
         group: ""
         name: test-cert
 ```
-```
