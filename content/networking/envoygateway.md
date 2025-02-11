@@ -1,32 +1,38 @@
 # 在 TKE 使用 EnvoyGateway 流量网关
 
-## 什么是 Envoy Gateway ?
+## 概述
 
 [EnvoyGateway](https://gateway.envoyproxy.io/) 是基于 [Envoy](https://www.envoyproxy.io/) 实现 [Gateway API](https://gateway-api.sigs.k8s.io/) 的 Kubernetes 网关，你可以通过定义 `Gateway API` 中定义的 `Gateway`、`HTTPRoute` 等资源来管理 Kubernetes 的南北向流量。
 
-## 为什么要用 Gateway API ？
+本文将介绍如何在 TKE 上安装 EnvoyGateway 并使用 `Gateway API` 来接入和管理流量转发。
+
+:::tip[说明]
 
 Kubernetes 提供了 `Ingress API` 来接入七层南北向流量，但功能很弱，每种实现都带了不同的 annotation 来增强 Ingress 的能力，灵活性和扩展性也较差，在社区的推进下，推出了 `Gateway API` 作为更好的解决方案，解决 Ingress API 痛点的同时，还统一了四七层南北向流量，同时也支持服务网格的东西向流量（参考 [GAMMA](https://gateway-api.sigs.k8s.io/mesh/gamma/)），各个云厂商以及开源代理软件都在积极适配 `Gateway API`，可参考 [Gateway API 的实现列表](https://gateway-api.sigs.k8s.io/implementations/)，其中 Envoy Gateway 便是其中一个很流行的实现。
 
 在 TKE 上使用 EnvoyGateway 相比自带的 CLB Ingress 还有一个明显的优势，就是可以多个转发规则的资源（如`HTTPRoute`）可以复用同一个 CLB，且可以跨命名空间。CLB Ingress 必须将所有转发规则写到同一个 Ingress 资源中，不方便管理，且如果不同后端 Service 跨命名空间了，则无法用同一个 Ingress （CLB）来管理了。
 
-## 安装 EnvoyGateway
+:::
 
-### 方法一：通过应用市场安装
+## 操作步骤
+
+### 安装 EnvoyGateway
+
+#### 方法一：通过应用市场安装
 
 在 [TKE 应用市场](https://console.cloud.tencent.com/tke2/helm/market) 搜索或在 `网络` 分类中找到 `envoygateway`，点击【创建应用】，命名空间选 `envoy-gateway-system`，若没有则先新建一个，完成其余配置后点击【创建】即可将 envoygateway 安装到集群中。
 
-### 方法二：通过 Helm 安装
+#### 方法二：通过 Helm 安装
 
 首先确保本机安装了 helm 并能操作 TKE 集群，参考 [本地 Helm 客户端连接集群](https://cloud.tencent.com/document/product/457/32731)。
 
 然后再参考 EnvoyGateway 官方文档 [使用 Helm 安装](https://gateway.envoyproxy.io/zh/latest/install/install-helm/) 进行安装。
 
-## 配置 kubectl 访问集群
+### 配置 kubectl 访问集群
 
 EnvoyGateway 使用的是 Gateway API 而不是 Ingress API，在 TKE 控制台无法直接创建，可通过 kubectl 命令进行创建，参考 [连接集群](https://cloud.tencent.com/document/product/457/32191) 这篇文档配置 kubectl。
 
-## 创建 GatewayClass
+### 创建 GatewayClass
 
 类似 `Ingress` 需要指定 `IngressClass`，Gateway API 中每个 `Gateway` 都需要引用一个 `GatewayClass`，`GatewayClass` 相当于是网关实例除监听器外的配置（如部署方式、网关 Pod 的 template、副本数量、关联的 Service 等），所以先创建一个 `GatewayClass`：
 
@@ -41,7 +47,7 @@ spec:
 
 > `GatewayClass` 是 non-namespaced 资源，无需指定命名空间。
 
-## 创建 Gateway
+### 创建 Gateway
 
 每个 `Gateway` 对应一个 CLB，在 `Gateway` 上声明端口相当于在 CLB 上创建响应协议的监听器：
 
@@ -60,12 +66,12 @@ metadata:
 spec:
   gatewayClassName: eg
   listeners:
-    - name: http
-      protocol: HTTP
-      port: 8080
-      allowedRoutes:
-        namespaces:
-          from: All
+  - name: http
+    protocol: HTTP
+    port: 8080
+    allowedRoutes:
+      namespaces:
+        from: All
 ```
 
 > `Gateway` 可以指定命名空间，可以被 `HTTPRoute` 等路由规则跨命名空间引用。
@@ -82,11 +88,11 @@ test-gw   eg      139.155.64.52   True         358d
 
 其中 `ADDRESS` 就是 CLB 的地址（IP 或域名）。
 
-## 创建 HTTPRoute
+### 创建 HTTPRoute
 
-`HTTPRoute` 用于定义 HTTP 转发规则，也是 Gateway API 中最常用的转发规则，类似 Ingress API 中的 `Ingress` 资源。
+`HTTPRoute` 用于定义 HTTP 转发规则（七层流量），也是 Gateway API 中最常用的转发规则，类似 Ingress API 中的 `Ingress` 资源。
 
-在 `HTTPRoute` 中引用 `Gateway`，表示将该规则应用到这个 `Gateway` 中：
+下面给出一个示例：
 
 :::tip[说明]
 
@@ -102,21 +108,95 @@ metadata:
   namespace: test
 spec:
   parentRefs:
-    - group: gateway.networking.k8s.io
-      kind: Gateway
-      name: test-gw
-      namespace: test
+  - name: test-gw
+    namespace: test
   hostnames:
-    - "test.example.com"
+  - "test.example.com"
   rules:
-    - backendRefs:
-        - group: ""
-          kind: Service
-          name: nginx
-          port: 80
+  - backendRefs:
+    - name: nginx
+      port: 80
 ```
 
-确保在 `hostnames` 里定义的域名解析到 `Gateway` 对应的 CLB，然后就可以通过域名访问集群内的服务了。
+:::info[注意]
+
+1. `parentRefs` 中指定要引用 `Gateway`(CLB)，表示将该规则应用到这个 `Gateway` 中。
+2. `hostnames` 定义转发规则使用的的域名，确保该域名解析到 `Gateway` 对应的 CLB，这样可以通过域名访问集群内的服务。
+3. `backendRefs` 定义该条转发规则对应的后端 Service。
+
+:::
+
+### 创建 TCPRoute 和 UDPRoute
+
+`TCPRoute` 和 `UDPRoute` 用于定义 TCP 和 UDP 转发规则（四层流量），类似 `LoadBalancer` 类型的 `Service`。
+
+下面是 `TCPRoute` 的示例：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: foo
+spec:
+  parentRefs:
+  - namespace: test
+    name: test-gw
+    sectionName: foo
+  rules:
+  - backendRefs:
+    - name: foo
+      port: 6000
+```
+
+:::info[注意]
+
+1. `parentRefs` 指定要引用的`Gateway`(CLB)，表示将该 TCP 要监听到这个 `Gateway` 中。通常只使用 `Gateway` 中的一个端口，所以指定 `sectionName` 来指定使用哪个监听器暴露。
+2. `backendRefs` 定义该条转发规则对应的后端 Service。
+
+:::
+
+下面是 `UDPRoute` 的示例，与 `TCPRoute` 类似：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: bar
+spec:
+  parentRefs:
+  - namespace: test
+    name: test-gw
+    sectionName: bar
+  rules:
+  - backendRefs:
+    - name: bar
+      port: 6000
+```
+
+引用的 `Gateway` 示例：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: test-gw
+  namespace: test
+spec:
+  gatewayClassName: eg
+  listeners:
+  - name: foo
+    protocol: TCP
+    port: 6000
+    allowedRoutes:
+      namespaces:
+        from: All
+  - name: bar
+    protocol: UDP
+    port: 6000
+    allowedRoutes:
+      namespaces:
+        from: All
+```
 
 ## 探索更多用法
 
@@ -248,4 +328,131 @@ spec:
           kind: Service
           name: test2
           port: 80
+```
+
+### 如何实现四七层共用同一个 CLB？
+
+使用 TKE 自带的 `LoadBalancer` 类型的 `Service`，可以实现多个 `Service` 复用同一个 CLB，也就是多个四层端口（TCP/UDP）复用同一个 CLB；使用 TKE 自带的 `Ingress` （CLB Ingress），无法与任何其它 `Ingress` 和 `LoadBalancer` 类型的 `Service` 复用同一个 CLB。所以，如果需要实现四七层共用同一个 CLB，直接使用 TKE 自带的 CLB Service 和 CLB Ingress 无法实现，而如果你安装了 `EnvoyGateway` 的话就可以实现。
+
+下面给个示例，  
+
+### 如何实现自动重定向？
+
+通过配置 `HTTPRoute` 的 `filters` 可实现自动重定向，下面给出示例。
+
+返回 301 状态码重定向，`/api/v1` 前缀替换成 `/apis/v1`：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: redirect-api-v1
+  namespace: test
+spec:
+  hostnames:
+  - test.example.com
+  parentRefs:
+  - name: test-gw
+    namespace: test
+    sectionName: https
+  rules:
+  - filters:
+    - requestRedirect:
+        path:
+          replacePrefixMatch: /apis/v1
+          type: ReplacePrefixMatch
+        statusCode: 301
+      type: RequestRedirect
+    matches:
+    - path:
+        type: PathPrefix
+        value: /api/v1
+```
+
+HTTP 重定向到 HTTPS：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: redirect-https
+  namespace: test
+spec:
+  hostnames:
+  - test.example.com
+  parentRefs:
+  - name: test-gw
+    namespace: test
+    sectionName: http
+  rules:
+  - filters:
+    - requestRedirect:
+        scheme: https
+        statusCode: 301
+        port: 443
+      type: RequestRedirect
+    matches:
+    - path:
+        type: PathPrefix
+        value: /
+```
+
+### 如何配置 HTTPS 或 TLS？
+
+将证书和密钥存储在 Kubernetes 的 Secret 中：
+
+:::tip[说明]
+
+如果不想手动管理证书，希望证书自动签发，可考虑使用 `cert-manager` 来自动签发。参考 [使用 cert-manager 为 dnspod 的域名签发免费证书](https://imroc.cc/kubernetes/certs/sign-free-certs-for-dnspod)。
+
+:::
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-cert
+  namespace: test
+type: kubernetes.io/tls
+data:
+  tls.crt: ***
+  tls.key: ***
+```
+
+在 `Gateway` 的 listeners 中配置 TLS（HTTPS 或 TLS 协议），`tls` 字段里引用证书 Secret：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: test-gw
+  namespace: test
+spec:
+  gatewayClassName: eg
+  listeners:
+  - name: https
+    protocol: HTTPS
+    port: 443
+    allowedRoutes:
+      namespaces:
+        from: All
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - kind: Secret
+        group: ""
+        name: test-cert
+  - name: tls
+    protocol: TLS
+    port: 9443
+    allowedRoutes:
+      namespaces:
+        from: All
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - kind: Secret
+        group: ""
+        name: test-cert
+```
 ```
