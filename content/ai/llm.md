@@ -839,6 +839,8 @@ RuntimeError: Engine process failed to start. See stack trace for the root cause
 
 ### vLLM 报错: CUDA out of memory
 
+报错日志：
+
 ```txt
 ERROR 02-07 03:25:19 engine.py:389] CUDA out of memory. Tried to allocate 150.00 MiB. GPU 0 has a total capacity of 14.58 GiB of which 95.56 MiB is free. Process 81610 has 14.48 GiB memory in use. Of the allocated memory 14.30 GiB is allocated by PyTorch, and 34.90 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
 ERROR 02-07 03:25:19 engine.py:389] Traceback (most recent call last):
