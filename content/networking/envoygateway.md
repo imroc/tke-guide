@@ -334,7 +334,124 @@ spec:
 
 使用 TKE 自带的 `LoadBalancer` 类型的 `Service`，可以实现多个 `Service` 复用同一个 CLB，也就是多个四层端口（TCP/UDP）复用同一个 CLB；使用 TKE 自带的 `Ingress` （CLB Ingress），无法与任何其它 `Ingress` 和 `LoadBalancer` 类型的 `Service` 复用同一个 CLB。所以，如果需要实现四七层共用同一个 CLB，直接使用 TKE 自带的 CLB Service 和 CLB Ingress 无法实现，而如果你安装了 `EnvoyGateway` 的话就可以实现。
 
-下面给个示例，  
+下面给个示例， 首先 `Gateway` 的监听器声明四层和七层的端口：
+
+:::tip[注意]
+
+使用 `name` 给每个监听器取个名字，方便后续通过 `sectionName` 引用。
+
+:::
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: test-gw
+  namespace: test
+spec:
+  gatewayClassName: eg
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    allowedRoutes:
+      namespaces:
+        from: All
+  - name: https
+    protocol: HTTPS
+    port: 443
+    allowedRoutes:
+      namespaces:
+        from: All
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - kind: Secret
+        group: ""
+        name: https-cert
+  - name: tcp-6000
+    protocol: TCP
+    port: 6000
+    allowedRoutes:
+      namespaces:
+        from: All
+  - name: udp-6000
+    protocol: UDP
+    port: 6000
+    allowedRoutes:
+      namespaces:
+        from: All
+```
+
+`HTTPRoute` 里使用 `Gateway` 里的七层监听器（80 和 443）：
+
+:::tip[注意]
+
+使用 `sectionName` 指定具体要绑定的监听器。
+
+:::
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: test
+  namespace: test
+spec:
+  parentRefs:
+  - name: test-gw
+    namespace: test
+    sectionName: http
+  - name: test-gw
+    namespace: test
+    sectionName: https
+  hostnames:
+  - "test.example.com"
+  rules:
+  - backendRefs:
+    - group: ""
+      kind: Service
+      name: nginx
+      port: 80
+```
+
+`TCPRoute` 和 `UDPRoute` 里使用 `Gateway` 里的四层监听器（TCP/6000 和 UDP/6000）：
+
+:::tip[注意]
+
+与 `HTTPRoute` 一样，使用 `sectionName` 指定具体要绑定的监听器。
+
+:::
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: foo
+spec:
+  parentRefs:
+  - namespace: test
+    name: test-gw
+    sectionName: tcp-6000
+  rules:
+  - backendRefs:
+    - name: foo
+      port: 6000
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: foo
+spec:
+  parentRefs:
+  - namespace: test
+    name: test-gw
+    sectionName: udp-6000
+  rules:
+  - backendRefs:
+    - name: foo
+      port: 6000
+```
 
 ### 如何实现自动重定向？
 
