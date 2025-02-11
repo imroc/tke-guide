@@ -457,7 +457,7 @@ spec:
 
 通过配置 `HTTPRoute` 的 `filters` 可实现自动重定向，下面给出示例。
 
-返回 301 状态码重定向，`/api/v1` 前缀替换成 `/apis/v1`：
+路径前缀 `/api/v1` 替换成 `/apis/v1`：
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -473,18 +473,51 @@ spec:
     namespace: test
     sectionName: https
   rules:
-  - filters:
-    - requestRedirect:
-        path:
-          replacePrefixMatch: /apis/v1
-          type: ReplacePrefixMatch
-        statusCode: 301
-      type: RequestRedirect
-    matches:
+  - matches:
     - path:
         type: PathPrefix
         value: /api/v1
+    filters:
+    - type: RequestRedirect
+      requestRedirect:
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /apis/v1
+        statusCode: 301
 ```
+
+> `http://test.example.com/api/v1/pods` 会被重定向到 `http://test.example.com/apis/v1/pods`
+
+以 `/foo` 开头的统一重定向到 `/bar`：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: redirect-api-v1
+  namespace: test
+spec:
+  hostnames:
+  - test.example.com
+  parentRefs:
+  - name: test-gw
+    namespace: test
+    sectionName: https
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /foo
+    filters:
+    - type: RequestRedirect
+      requestRedirect:
+        path:
+          type: ReplaceFullPath
+          replaceFullPath: /bar
+        statusCode: 301
+```
+
+> `https://test.example.com/foo/cayenne` 和 `https://test.example.com/foo/paprika` 都会被重定向到 `https://test.example.com/bar`
 
 HTTP 重定向到 HTTPS：
 
@@ -502,17 +535,19 @@ spec:
     namespace: test
     sectionName: http
   rules:
-  - filters:
-    - requestRedirect:
-        scheme: https
-        statusCode: 301
-        port: 443
-      type: RequestRedirect
-    matches:
+  - matches:
     - path:
         type: PathPrefix
         value: /
+    filters:
+    - type: RequestRedirect
+      requestRedirect:
+        scheme: https
+        statusCode: 301
+        port: 443
 ```
+
+> `http://test.example.com/foo` 会被重定向到 `https://test.example.com/foo`
 
 ### 如何配置 HTTPS 或 TLS？
 
