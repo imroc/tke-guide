@@ -10,7 +10,7 @@
 
 Kubernetes 提供了 `Ingress API` 来接入七层南北向流量，但功能很弱，每种实现都带了不同的 annotation 来增强 Ingress 的能力，灵活性和扩展性也较差，在社区的推进下，推出了 `Gateway API` 作为更好的解决方案，解决 Ingress API 痛点的同时，还统一了四七层南北向流量，同时也支持服务网格的东西向流量（参考 [GAMMA](https://gateway-api.sigs.k8s.io/mesh/gamma/)），各个云厂商以及开源代理软件都在积极适配 `Gateway API`，可参考 [Gateway API 的实现列表](https://gateway-api.sigs.k8s.io/implementations/)，其中 Envoy Gateway 便是其中一个很流行的实现。
 
-在 TKE 上使用 EnvoyGateway 相比自带的 CLB Ingress 还有一个明显的优势，就是可以多个转发规则的资源（如`HTTPRoute`）可以复用同一个 CLB，且可以跨命名空间。CLB Ingress 必须将所有转发规则写到同一个 Ingress 资源中，不方便管理，且如果不同后端 Service 跨命名空间了，则无法用同一个 Ingress （CLB）来管理了。
+在 TKE 上使用 EnvoyGateway 相比自带的 CLB Ingress 还有一个明显的优势，就是多个转发规则资源（如`HTTPRoute`）可以复用同一个 CLB，且可以跨命名空间。CLB Ingress 必须将所有转发规则写到同一个 Ingress 资源中，不方便管理，且如果不同后端 Service 跨命名空间了，则无法用同一个 Ingress （CLB）来管理了。
 
 :::
 
