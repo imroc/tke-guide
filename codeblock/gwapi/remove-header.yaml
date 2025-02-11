@@ -1,0 +1,24 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  namespace: test
+  name: foo-set-header
+spec:
+  hostnames:
+  - test.example.com
+  parentRefs:
+  - name: test-gw
+    namespace: test
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /foo
+    filters:
+    - type: RequestHeaderModifier
+      requestHeaderModifier:
+        # highlight-next-line
+        remove: ["x-request-id"]
+    backendRefs:
+    - name: foo
+      port: 8080

@@ -607,3 +607,42 @@ spec:
         group: ""
         name: test-cert
 ```
+
+### 如何修改 HTTP Header？
+
+在 `HTTPRoute` 中使用 `RequestHeaderModifier` 这个 filter 可以修改 HTTP 请求的 Header。
+
+以下是修改请求 Header 的例子：
+
+:::tip[说明]
+
+对路径以 `/foo` 开头的请求修改 Header。
+
+:::
+
+<Tabs>
+  <TabItem value="add-header" label="增加Header">
+    <FileBlock file="gwapi/add-header.yaml" showLineNumbers />
+  </TabItem>
+  <TabItem value="set-header" label="修改Header">
+    <FileBlock file="gwapi/set-header.yaml" showLineNumbers />
+  </TabItem>
+  <TabItem value="remove-header" label="删除Header">
+    <FileBlock file="gwapi/remove-header.yaml" showLineNumbers />
+  </TabItem>
+</Tabs>
+
+如果要改响应的 Header 也是类似的，`RequestHeaderModifier` 改成 `ResponseHeaderModifier` 即可：
+
+```yaml
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        add:
+        - name: X-Header-Add-1
+          value: header-add-1
+        - name: X-Header-Add-2
+          value: header-add-2
+        - name: X-Header-Add-3
+          value: header-add-3
+```

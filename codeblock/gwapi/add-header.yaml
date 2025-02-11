@@ -1,0 +1,27 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  namespace: test
+  name: foo-add-header
+spec:
+  hostnames:
+  - test.example.com
+  parentRefs:
+  - name: test-gw
+    namespace: test
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /foo
+        # highlight-add-start
+    filters:
+    - type: RequestHeaderModifier
+      requestHeaderModifier:
+        add:
+        - name: my-header-name
+          value: my-header-value
+          # highlight-add-end
+    backendRefs:
+    - name: foo
+      port: 8080
