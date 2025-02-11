@@ -637,7 +637,7 @@ curl -v http://127.0.0.1:8000/v1/completions -H "Content-Type: application/json"
 
 如果部署了 OpenWebUI，确保 `OPENAI_API_BASE_URL` 指向上面示例 YAML 中 Service 的地址，如 `http://vllm-api:8000/v1`。
 
-### 多GPU集群部署如何负载均衡？
+### 多 GPU 集群部署如何负载均衡？
 
 vLLM 分布式多机部署要求每台节点 GPU 数量一致，且要事先规划好节点数量，如果要扩容，只有再建新 GPU 集群，如何让不同的 GPU 集群进行负载均衡呢？
 
