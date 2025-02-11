@@ -198,12 +198,6 @@ spec:
         from: All
 ```
 
-## 探索更多用法
-
-Gateway API 非常强大，可实现很多复杂的功能，如基于权重、header、cookie 等特征的路由、灰度发布、流量镜像、URL重定向与重写、TLS 路由、GRPC 路由等，更详细的用法参考 [Gateway API 官方文档](https://gateway-api.sigs.k8s.io/guides/http-routing/)。
-
-EnvoyGateway 也支持了 Gateway API 之外的一些特有的高级能力，可参考 [EnvoyGateway 官方文档](https://gateway.envoyproxy.io/latest/)。
-
 ## 常见问题
 
 ### 如何自定义 CLB？
@@ -646,3 +640,9 @@ spec:
         - name: X-Header-Add-3
           value: header-add-3
 ```
+
+## 探索更多用法
+
+Gateway API 非常强大，可实现很多复杂的功能，如基于权重、header、cookie 等特征的路由、灰度发布、流量镜像、URL重定向与重写、TLS 路由、GRPC 路由等，更详细的用法参考 [Gateway API 官方文档](https://gateway-api.sigs.k8s.io/guides/http-routing/)。
+
+EnvoyGateway 也支持了 Gateway API 之外的一些特有的高级能力，可参考 [EnvoyGateway 官方文档](https://gateway.envoyproxy.io/latest/)。
