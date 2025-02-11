@@ -217,23 +217,23 @@ spec:
       envoyDeployment:
         replicas: 1
         container:
-          # hightlight-add-start
+          # highlight-add-start
           resources:
             requests:
               tke.cloud.tencent.com/eni-ip: "1"
             limits:
               tke.cloud.tencent.com/eni-ip: "1"
-          # hightlight-add-end
+          # highlight-add-end
         pod:
           annotations:
-            # hightlight-add-line
+            # highlight-add-line
             tke.cloud.tencent.com/networks: tke-route-eni
       envoyService:
         annotations:
-          # hightlight-add-start
+          # highlight-add-start
           service.kubernetes.io/tke-existed-lbid: lb-5nhlk3nr
           service.cloud.tencent.com/direct-access: "true"
-          # hightlight-add-end
+          # highlight-add-end
 ```
 
 以上示例中：
@@ -250,13 +250,13 @@ metadata:
   name: eg
 spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
-  # hightlight-add-start
+  # highlight-add-start
   parametersRef:
     group: gateway.envoyproxy.io
     kind: EnvoyProxy
     name: proxy-config
     namespace: test
-  # hightlight-add-end
+  # highlight-add-end
 ```
 
 更多 CLB 相关的自定义可参考 [Service Annotation 说明](https://cloud.tencent.com/document/product/457/51258)。
