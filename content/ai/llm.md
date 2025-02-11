@@ -899,4 +899,4 @@ ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packa
 ```
 
 - **原因**: GPU 卡显存不够。
-- **解决方案**: 换更好的 GPU 卡。
+- **解决方案**: 换显存更大的 GPU 卡。
