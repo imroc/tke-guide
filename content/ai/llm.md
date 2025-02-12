@@ -384,8 +384,8 @@ RUN curl -fsSL https://ollama.com/install.sh | sh
 编译并上传镜像：
 
 ```bash
-docker build -t imroc/ollama:cuda11.8-ubuntu22.04 .
-docker push imroc/ollama:cuda11.8-ubuntu22.04
+docker build -t ccr.ccs.tencentyun.com/imroc/ollama:cuda11.8-ubuntu22.04 .
+docker push ccr.ccs.tencentyun.com/imroc/ollama:cuda11.8-ubuntu22.04
 ```
 
 > 注意修改成自己的镜像名称。
@@ -405,8 +405,8 @@ git clone --depth=1 https://github.com/vllm-project/vllm.git
 
 ```bash
 cd vllm
-docker build --build-arg CUDA_VERSION=11.8.0 -t imroc/vllm-openai:cuda-11.8.0 .
-docker push imroc/vllm-openai:cuda-11.8.0
+docker build --build-arg CUDA_VERSION=11.8.0 -t ccr.ccs.tencentyun.com/imroc/vllm-openai:cuda-11.8.0 .
+docker push ccr.ccs.tencentyun.com/imroc/vllm-openai:cuda-11.8.0
 ```
 
 > 通过 `CUDA_VERSION` 参数指定 CUDA 版本；注意替换成自己的镜像名称。
@@ -871,9 +871,9 @@ RuntimeError: Engine process failed to start. See stack trace for the root cause
 
 **解决办法**: vllm 启动参数指定下 `--max-model-len`，如 `--max-model-len 1024`。
 
-### vLLM 报错: CUDA out of memory
+### vLLM 或 SGLang 报错: CUDA out of memory
 
-报错日志：
+vLLM 报错日志：
 
 ```txt
 ERROR 02-07 03:25:19 engine.py:389] CUDA out of memory. Tried to allocate 150.00 MiB. GPU 0 has a total capacity of 14.58 GiB of which 95.56 MiB is free. Process 81610 has 14.48 GiB memory in use. Of the allocated memory 14.30 GiB is allocated by PyTorch, and 34.90 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
@@ -932,5 +932,36 @@ ERROR 02-07 03:25:19 engine.py:389]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ERROR 02-07 03:25:19 engine.py:389]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/sampler.py", line 271, in forward
 ```
 
+SGLang 报错日志：
+
+```txt
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 540.00 MiB. GPU 0 has a total capacity of 14.76 GiB of which 298.75 MiB is free. Process 63729 has 14.46 GiB memory in use. Of the allocated memory 14.35 GiB is allocated by PyTorch, and 1.52 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+```
+
 - **原因**: GPU 卡显存不够。
-- **解决方案**: 换显存更大的 GPU 卡。
+- **解决方案**: 换显存更大的 GPU 卡，或使用多机部署组成 GPU 集群。
+
+### SGLang 报错：SGLang only supports sm75 and above.
+
+报错日志：
+
+```txt
+[2025-02-12 02:56:48 TP0] Compute capability below sm80. Use float16 due to lack of bfloat16 support.
+[2025-02-12 02:56:48 TP0] Scheduler hit an exception: Traceback (most recent call last):
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 1787, in run_scheduler_process
+    scheduler = Scheduler(server_args, port_args, gpu_id, tp_rank, dp_rank)
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 240, in __init__
+    self.tp_worker = TpWorkerClass(
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker_overlap_thread.py", line 63, in __init__
+    self.worker = TpModelWorker(server_args, gpu_id, tp_rank, dp_rank, nccl_port)
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker.py", line 68, in __init__
+    self.model_runner = ModelRunner(
+  File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 186, in __init__
+    self.load_model()
+  File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 293, in load_model
+    raise RuntimeError("SGLang only supports sm75 and above.")
+RuntimeError: SGLang only supports sm75 and above.
+```
+
+- 原因：GPU 显卡计算能力不够，提示至少计算能力要 SM7.5
+- 解决方案：换成计算能力大于等于 SM7.5 的 GPU，如 T4、A100
