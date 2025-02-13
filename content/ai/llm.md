@@ -880,7 +880,7 @@ spec:
     targetPort: 30000
 ```
 
-配置好后，该 Service 就选中了所有 GPU 集群的 leader Pod，向改 Service 发送的 API 请求就可以在多个 GPU 集群之间负载均衡了。
+配置好后，该 Service 就选中了所有 GPU 集群的 leader Pod，向改 Service 发送的 API 请求就可以在多个 GPU 集群之间负载均衡了。如果部署了 OpenWebUI，确保 `OPENAI_API_BASE_URL` 指向这个新 Service 的地址，如 `http://sglang-api.30000/v1`。
 
 ## 踩坑分享
 
