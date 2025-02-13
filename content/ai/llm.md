@@ -448,7 +448,9 @@ docker push ccr.ccs.tencentyun.com/imroc/vllm-openai:cuda-12.4.1
 
 ##### SGLang 镜像
 
-具体操作与 vLLM 类似。
+SGLang 官方镜像提供了各个 CUDA 版本，修改镜像 tag 即可，可选 tag 列表在 [这里](https://hub.docker.com/r/lmsysorg/sglang/tags) 搜索。
+
+如果没有期望的，可以参考以下类似 vLLM 的方式自行编译。
 
 1. 克隆 SGLang 仓库：
 
