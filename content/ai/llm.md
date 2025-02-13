@@ -30,6 +30,16 @@
 
 - **选型建议**：如果有一定的技术能力且愿意折腾，能用 vLLM 或 SGLang 成功跑起来更推荐用 vLLM 和 SGLang 将大模型部署到 Kubernetes 中，否则就用 Ollama ，两种方式在本文中都有相应的部署示例。
 
+:::info[注意]
+
+本文中的示例使用的镜像都是官方提供的镜像，tag 为 latest，建议根据自身情况改成指定版本的 tag，可点击下面的连接查看镜像的 tag 列表：
+
+- sglang: [lmsysorg/sglang](https://hub.docker.com/r/lmsysorg/sglang/tags)
+- ollama: [ollama/ollama](https://hub.docker.com/r/ollama/ollama/tags)
+- vllm: [vllm/vllm-openai](https://hub.docker.com/r/vllm/vllm-openai/tags)
+
+:::
+
 ### AI 大模型数据如何存储？
 
 AI 大模型通常占用体积较大，直接打包到容器镜像不太现实，如果启动时通过 `initContainers` 自动下载又会导致启动时间过长，因此建议使用共享存储来挂载 AI 大模型（先下发一个 Job 将模型下载到共享存储，然后再将共享存储挂载到运行大模型的 Pod 中），这样后面 Pod 启动时就无需下载模型了（虽然最终加载模型时同样也会经过CFS的网络下载，但只要 CFS 使用规格比较高，如 Turbo 类型，速度就会很快）。
