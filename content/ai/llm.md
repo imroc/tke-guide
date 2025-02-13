@@ -300,6 +300,9 @@ behavior:
   <TabItem value="webui-vllm" label="vLLM 后端">
     <FileBlock file="ai/webui-vllm.yaml" showLineNumbers />
   </TabItem>
+  <TabItem value="webui-sglang" label="SGLang 后端">
+    <FileBlock file="ai/webui-sglang.yaml" showLineNumbers />
+  </TabItem>
   <TabItem value="webui-ollama" label="Ollama 后端">
     <FileBlock file="ai/webui-ollama.yaml" showLineNumbers />
   </TabItem>
