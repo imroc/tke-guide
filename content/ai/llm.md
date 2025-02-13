@@ -2,34 +2,37 @@
 
 ## 概述
 
-本文介绍如何在 TKE 上部署 AI 大模型，以 `DeepSeek-R1` 为例，使用 `Ollama` 或 `vLLM` 运行大模型并暴露 API，然后使用 `OpenWebUI` 提供交互界面。
+本文介绍如何在 TKE 上部署 AI 大模型，以 `DeepSeek-R1` 为例，使用 `Ollama`、`vLLM` 或 `SGLang` 运行大模型并暴露 API，然后使用 `OpenWebUI` 提供交互界面。
 
 `Ollama` 提供是 Ollama API，部署架构：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206171758.png)
 
-`vLLM` 提供的是兼容 OpenAI 的 API，部署架构：
+`vLLM` 和 `SGLang` 都提供了兼容 OpenAI 的 API，部署架构：
 
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F06%2F20250206144336.png)
 
-## Ollama、vLLM 与 OpenWebUI 介绍
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F13%2F20250213145518.png)
+
+## Ollama、vLLM、SGLang 与 OpenWebUI 介绍
 
 * [Ollama](https://ollama.com/) 是一个运行大模型的工具，可以看成是大模型领域的 Docker，可以下载所需的大模型并暴露 Ollama API，极大的简化了大模型的部署。
 * [vLLM](https://docs.vllm.ai) 与 Ollama 类似，也是一个运行大模型的工具，但它针对推理做了很多优化，提高了模型的运行效率和性能，使得在资源有限的情况下也能高效运行大语言模型，另外，它提供兼容 OpenAI 的 API。
+* [SGLang](https://docs.sglang.ai/) 与 vLLM 类似，性能更强，且针对 DeepSeek 做了深度优化，也是 DeepSeek 官方推荐的工具。
 * [OpenWebUI](https://openwebui.com/) 是一个大模型的 Web UI 交互工具，支持通过 Ollama 与 OpenAI 两种 API 与大模型交互。
 
 ## 技术选型
 
-### 选择 Ollama 还是 vLLM？
+### Ollama、vLLM 还是 SGLang？
 
 - Ollama 的特点：个人用户或本地开发环境使用 Ollama 很方便，对各种 GPU 硬件和大模型的兼容性很好，不需要复杂的配置就能跑起来，但性能上不如 vLLM。
 - vLLM 的特点：推理性能更好，也更节约资源，适合部署到服务器供多人使用，还支持多机多卡分布式部署，上限更高，但能适配的 GPU 硬件比 Ollama 少，且需要根据不同 GPU 和大模型来调整 vllm 的启动参数才能跑起来或者获得更好的性能表现。
+- SGLang 的特点：是性能卓越的新兴之秀，针对特定模型优化（如 DeepSeek），吞吐量更高。
 
-- **选型建议**：如果有一定的技术能力且愿意折腾，能用 vLLM 成功跑起来更推荐用 vLLM 将大模型部署到 Kubernetes 中，否则就用 Ollama ，两种方式在本文中都有相应的部署示例。
+- **选型建议**：如果有一定的技术能力且愿意折腾，能用 vLLM 或 SGLang 成功跑起来更推荐用 vLLM 和 SGLang 将大模型部署到 Kubernetes 中，否则就用 Ollama ，两种方式在本文中都有相应的部署示例。
 
 ### AI 大模型数据如何存储？
 
-AI 大模型通常占用体积较大，直接打包到容器镜像不太现实，如果启动时通过 `initContainers` 自动下载又会导致启动时间过长，因此建议使用共享存储来挂载 AI 大模型（先下发一个 Job 将模型下载到共享存储，然后再将共享存储挂载到运行大模型的 Pod 中）。
+AI 大模型通常占用体积较大，直接打包到容器镜像不太现实，如果启动时通过 `initContainers` 自动下载又会导致启动时间过长，因此建议使用共享存储来挂载 AI 大模型（先下发一个 Job 将模型下载到共享存储，然后再将共享存储挂载到运行大模型的 Pod 中），这样后面 Pod 启动时就无需下载模型了（虽然最终加载模型时同样也会经过CFS的网络下载，但只要 CFS 使用规格比较高，如 Turbo 类型，速度就会很快）。
 
 在腾讯云上可使用 CFS 来作为共享存储，CFS 的性能和可用性都非常不错，适合 AI 大模型的存储。本文将使用 CFS 来存储 AI 大模型。
 
@@ -162,12 +165,15 @@ GPU 插件无需显式安装，如果使用**普通节点**或**原生节点**�
   <TabItem value="vLLM" label="vLLM Job">
     <FileBlock file="ai/vllm-download-model-job.yaml" showLineNumbers title="vllm-download-model-job.yaml" />
   </TabItem>
+  <TabItem value="SGLang" label="SGLang Job">
+    <FileBlock file="ai/sglang-download-model-job.yaml" showLineNumbers title="sglang-download-model-job.yaml" />
+  </TabItem>
   <TabItem value="Ollama" label="Ollama Job">
     <FileBlock file="ai/ollama-download-model-job.yaml" showLineNumbers title="ollama-download-model-job.yaml" />
   </TabItem>
 </Tabs>
 
-### 步骤5: 部署 Ollama 或 vLLM
+### 步骤5: 部署 Ollama、vLLM 或 SGLang
 
 <Tabs>
   <TabItem value="deploy-vllm" label="部署 vLLM">
@@ -199,8 +205,13 @@ GPU 插件无需显式安装，如果使用**普通节点**或**原生节点**�
     3. Ollama 默认监听的是回环地址(127.0.0.1)，指定 `OLLAMA_HOST` 环境变量，强制对外暴露 11434 端口。
   </TabItem>
 </Tabs>
-4. 运行大模型需要使用 GPU，因此在 requests/limits 中指定了 `nvidia.com/gpu` 资源，以便让 Pod 调度到 GPU 机型并分配 GPU 卡使用。
-5. 如果希望大模型跑在超级节点，需通过 Pod 注解 `eks.tke.cloud.tencent.com/gpu-type` 指定 GPU 类型，可选 `V100`、`T4`、`A10*PNV4`、`A10*GNV4`，具体可参考 [这里](https://cloud.tencent.com/document/product/457/39808#gpu-.E8.A7.84.E6.A0.BC)。
+
+:::info[注意]
+
+- 运行大模型需要使用 GPU，因此在 requests/limits 中指定了 `nvidia.com/gpu` 资源，以便让 Pod 调度到 GPU 机型并分配 GPU 卡使用。
+- 如果希望大模型跑在超级节点，需通过 Pod 注解 `eks.tke.cloud.tencent.com/gpu-type` 指定 GPU 类型，可选 `V100`、`T4`、`A10*PNV4`、`A10*GNV4`，具体可参考 [这里](https://cloud.tencent.com/document/product/457/39808#gpu-.E8.A7.84.E6.A0.BC)。
+6. 
+:::
 
 ### 步骤6: 配置 GPU 弹性伸缩
 
@@ -405,8 +416,8 @@ git clone --depth=1 https://github.com/vllm-project/vllm.git
 
 ```bash
 cd vllm
-docker build --build-arg CUDA_VERSION=11.8.0 -t ccr.ccs.tencentyun.com/imroc/vllm-openai:cuda-11.8.0 .
-docker push ccr.ccs.tencentyun.com/imroc/vllm-openai:cuda-11.8.0
+docker build --build-arg CUDA_VERSION=12.4.1 -t ccr.ccs.tencentyun.com/imroc/vllm-openai:cuda-12.4.1 .
+docker push ccr.ccs.tencentyun.com/imroc/vllm-openai:cuda-12.4.1
 ```
 
 > 通过 `CUDA_VERSION` 参数指定 CUDA 版本；注意替换成自己的镜像名称。
@@ -416,6 +427,26 @@ docker push ccr.ccs.tencentyun.com/imroc/vllm-openai:cuda-11.8.0
 该方法只使用 CUDA 版本的微调，不要跨大版本，比如官方 Dockerfile 中使用的 `CUDA_VERSION` 是 12.x，那么指定的 `CUDA_VERSION` 就不要低于 12，因为 vLLM、PyTorch、CUDA 这几个的版本需要在兼容范围内，否则会有兼容性问题。如要编译更低版本的 CUDA，建议参考官方文档的方法（通过 pip 命令安装低版本编译好的 vLLM 二进制），然后编写相应的 Dockerfile 来编译镜像。
 
 :::
+
+##### SGLang 镜像
+
+具体操作与 vLLM 类似。
+
+1. 克隆 SGLang 仓库：
+
+```bash
+git clone --depth=1 https://github.com/sgl-project/sglang.git
+```
+
+2. 指定 CUDA 版本并编译上传：
+
+```bash
+cd sglang/docker
+docker build --build-arg CUDA_VERSION=12.4.1 -t ccr.ccs.tencentyun.com/imroc/sglang:cuda-12.4.1 .
+docker push ccr.ccs.tencentyun.com/imroc/sglang:cuda-12.4.1
+```
+
+> 通过 `CUDA_VERSION` 参数指定 CUDA 版本；注意替换成自己的镜像名称。
 
 #### 步骤3: 替换镜像
 
@@ -430,6 +461,10 @@ docker push ccr.ccs.tencentyun.com/imroc/vllm-openai:cuda-11.8.0
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F07%2F20250207105632.png)
 
 如果使用超级节点，Pod 默认没有公网，可以使用 NAT 网关来访问外网，详情请参考 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)，当然这个也适用于普通节点和原生节点。
+
+### 如何使用超过 2T 的系统盘？
+
+如果出于成本和性能的权衡考虑，或者测试阶段先不引入 CFS，降低复杂度，希望直接用本地系统盘存储大模型，而大模型占用又空间太大，希望能用超过 2T 的系统盘，则需要操作系统支持才可以，名称中带 `UEFI` 字样的系统镜像才支持超过 2T 的系统盘，默认不可用，如有需要可联系官方开通使用。
 
 ### 如何实现多卡并行？
 
@@ -479,7 +514,10 @@ command:
 如何做到多机部署？如果只是简单增加副本数，各个节点的 GPU 并不能协同处理同一个任务，只能提升并发量，不能提升单个任务的推理速度。下面给出实现多机多卡分布式部署的思路，具体方案可参考相关链接，结合本文给出的示例 YAML 并进行相关修改。
 
 - vLLM 官方支持通过 Ray 实现多机分布式部署，参考 [Running vLLM on multiple nodes](https://docs.vllm.ai/en/latest/serving/distributed_serving.html#running-vllm-on-multiple-nodes) 和 [Deploy Distributed Inference Service with vLLM and LWS on GPUs](https://github.com/kubernetes-sigs/lws/tree/main/docs/examples/vllm/GPU)。
+- SGLang 官方支持多机分布式部署，参考 [Run Multi-Node Inference](https://docs.sglang.ai/references/multi_node.html)。
 - Ollama 官方不支持多机分布式部署，但 [llama.cpp](https://github.com/ggerganov/llama.cpp) 给出了一些支持，参考 issue [Llama.cpp now supports distributed inference across multiple machines. ](https://github.com/ollama/ollama/issues/4643)（门槛较高）。
+
+#### vLLM 多机部署
 
 对于 vLLM 来说，在 Kubernetes 环境中推荐使用 [lws](https://github.com/kubernetes-sigs/lws) 来实现多机分布式部署，下面给出部署实例。
 
@@ -637,13 +675,111 @@ curl -v http://127.0.0.1:8000/v1/completions -H "Content-Type: application/json"
 
 如果部署了 OpenWebUI，确保 `OPENAI_API_BASE_URL` 指向上面示例 YAML 中 Service 的地址，如 `http://vllm-api:8000/v1`。
 
+#### SGLang 多机部署
+
+对于 SGLang 来说，官方没有给出在 Kubernetes 上多机部署的方案和实例，但我们可以参考 [Example: Serving with two H200*8 nodes and docker](https://github.com/sgl-project/sglang/tree/main/benchmark/deepseek_v3#example-serving-with-two-h2008-nodes-and-docker) 这个官方例子，将其转化为 `StatefulSet` 方式进行部署。以下是 2 个 4 卡 GPU 节点组成集群的例子：
+
+:::info[注意]
+
+注意根据实际情况修改：
+
+- `replicas` 为 GPU 集群的总节点数，需 `REPLICAS` 环境变量的值保持一致。
+- `LLM_MODEL` 环境变量为模型名称，与前面下载 Job 中指定的名称一致。
+- `TOTAL_GPU` 环境变量为总 GPU 卡数，等于每个节点的 GPU 数量乘以节点数。
+- `STATEFULSET_NAME` 环境变量的值 `StatefulSet` 实际名称保持一致。
+- `SERVICE_NAME` 环境变量的值与 `StatefulSet` 中指定的 `serviceName`，以及实际的 Service 的名称保持一致。
+- 如果部署了 OpenWebUI，确保 `OPENAI_API_BASE_URL` 指向第一个副本的地址（leader），如 `http://sglang-0.sglang:3000/v1`。
+
+:::
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sglang
+spec:
+  selector:
+    matchLabels:
+      app: sglang
+  serviceName: sglang
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: sglang
+    spec:
+      containers:
+      - name: sglang
+        image: lmsysorg/sglang:latest
+        env:
+        - name: LLM_MODEL
+          value: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
+        - name: TOTAL_GPU
+          value: "8"
+        - name: REPLICAS
+          value: "2"
+        - name: STATEFULSET_NAME
+          value: "sglang"
+        - name: SERVICE_NAME
+          value: "sglang"
+        - name: ORDINAL_NUMBER
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
+        ports:
+        - containerPort: 30000
+        resources:
+          limits:
+            nvidia.com/gpu: "4"
+        command:
+        - bash
+        - -c
+        - |
+          if [[ "$ORDINAL_NUMBER" == "0" ]]; then
+            python3 -m sglang.launch_server --model-path /data/$LLM_MODEL --tp $TOTAL_GPU --dist-init-addr $STATEFULSET_NAME-0.$SERVICE_NAME:5000 --nnodes $REPLICAS --node-rank $ORDINAL_NUMBER --trust-remote-code --host 0.0.0.0 --port 30000
+          else
+            python3 -m sglang.launch_server --model-path /data/$LLM_MODEL --tp $TOTAL_GPU --dist-init-addr $STATEFULSET_NAME-0.$SERVICE_NAME:5000 --nnodes $REPLICAS --node-rank $ORDINAL_NUMBER --trust-remote-code
+          fi
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: shm
+          mountPath: /dev/shm
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: ai-model
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 40Gi
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sglang
+spec:
+  selector:
+    app: sglang
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: api
+    protocol: TCP
+    port: 30000
+    targetPort: 30000
+```
+
 ### 多 GPU 集群部署如何负载均衡？
 
-vLLM 分布式多机部署要求每台节点 GPU 数量一致，且要事先规划好节点数量，如果要扩容，只有再建新 GPU 集群，如何让不同的 GPU 集群进行负载均衡呢？
+分布式多机部署要求每台节点 GPU 数量一致，且要事先规划好节点数量，如果要扩容，只有再建新 GPU 集群，如何让不同的 GPU 集群进行负载均衡呢？
 
-可以用同一个 Service 选中多个不同 GPU 集群的所有 Pod 来实现。
+可以用同一个 Service 选中多个不同 GPU 集群的所有 Pod 来实现，以下给出 vLLM 和 SGLang 的示例。
 
-比如用 lws 部署 vllm，让所有 `LeaderWorkerSet` 在同一命名空间，且所有 `LeaderWorkerSet` 的 `leaderTemplate` 下要声明一个相同的 label，比如用 `role: leader`：
+#### vLLM 多机负载均衡
+
+如果用 lws 部署 vllm，可以让所有 `LeaderWorkerSet` 在同一命名空间，且所有 `LeaderWorkerSet` 的 `leaderTemplate` 下要声明一个相同的 label，比如用 `role: leader`：
 
 ```yaml showLineNumbers
 apiVersion: leaderworkerset.x-k8s.io/v1
@@ -685,9 +821,30 @@ spec:
 
 配置好后，该 Service 就选中了所有 GPU 集群的 leader Pod，API 请求就可以在多个 GPU 集群之间负载均衡了。
 
-### 如何使用超过 2T 的系统盘？
+#### SGLang 多机负载均衡
 
-如果出于成本和性能的权衡考虑，或者测试阶段先不引入 CFS，降低复杂度，希望直接用本地系统盘存储大模型，而大模型占用又空间太大，希望能用超过 2T 的系统盘，则需要操作系统支持才可以，名称中带 `UEFI` 字样的系统镜像才支持超过 2T 的系统盘，默认不可用，如有需要可联系官方开通使用。
+SGLang 前面给出了使用 StatefulSet 实现多机部署的例子，它的 API 由第一个副本（leader）进行处理，如果用多个 StatefulSet 组成多个 GPU 集群，则可以新建一个 Service，选中所有 StatefulSet 的第一个副本。
+
+首先要求所有 StatefulSet 在同一个命名空间，且 Pod 模板要声明一个相同的 label，比如用 `model: deepseek-r1`，然后新建一个 Service 选中此 label 和 `apps.kubernetes.io/pod-index: "0"` 这个 label (只选中每个 GPU 集群的 leader Pod)：
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: sglang-api
+spec:
+  selector:
+    app: sglang-api
+    apps.kubernetes.io/pod-index: "0"
+  type: ClusterIP
+  ports:
+  - name: api
+    protocol: TCP
+    port: 30000
+    targetPort: 30000
+```
+
+配置好后，该 Service 就选中了所有 GPU 集群的 leader Pod，向改 Service 发送的 API 请求就可以在多个 GPU 集群之间负载均衡了。
 
 ## 踩坑分享
 
