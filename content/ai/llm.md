@@ -713,7 +713,7 @@ curl -v http://127.0.0.1:8000/v1/completions -H "Content-Type: application/json"
 
 #### SGLang 多机部署
 
-对于 SGLang 来说，官方没有给出在 Kubernetes 上多机部署的方案和实例，但我们可以参考 [Example: Serving with two H200*8 nodes and docker](https://github.com/sgl-project/sglang/tree/main/benchmark/deepseek_v3#example-serving-with-two-h2008-nodes-and-docker) 这个官方例子，将其转化为 `StatefulSet` 或 `LeaderWorkerSet` 方式进行部署。以下是 2 个 4 卡 GPU 节点组成集群的例子：
+对于 SGLang 来说，官方没有给出在 Kubernetes 上多机部署的方案和实例，但我们可以参考 [Example: Serving with two H200*8 nodes and docker](https://github.com/sgl-project/sglang/tree/main/benchmark/deepseek_v3#example-serving-with-two-h2008-nodes-and-docker) 这个官方例子，将其转化为 `StatefulSet` 或 `LeaderWorkerSet` 方式进行部署。以下是 2 个 4 卡 GPU 节点组成的 GPU 集群的例子：
 
 <Tabs>
   <TabItem value="sglang-sts" label="StatefulSet 方式部署">
