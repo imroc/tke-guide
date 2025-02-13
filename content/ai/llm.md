@@ -713,91 +713,17 @@ curl -v http://127.0.0.1:8000/v1/completions -H "Content-Type: application/json"
 
 #### SGLang 多机部署
 
-对于 SGLang 来说，官方没有给出在 Kubernetes 上多机部署的方案和实例，但我们可以参考 [Example: Serving with two H200*8 nodes and docker](https://github.com/sgl-project/sglang/tree/main/benchmark/deepseek_v3#example-serving-with-two-h2008-nodes-and-docker) 这个官方例子，将其转化为 `StatefulSet` 方式进行部署。以下是 2 个 4 卡 GPU 节点组成集群的例子：
+对于 SGLang 来说，官方没有给出在 Kubernetes 上多机部署的方案和实例，但我们可以参考 [Example: Serving with two H200*8 nodes and docker](https://github.com/sgl-project/sglang/tree/main/benchmark/deepseek_v3#example-serving-with-two-h2008-nodes-and-docker) 这个官方例子，将其转化为 `StatefulSet` 或 `LeaderWorkerSet` 方式进行部署。以下是 2 个 4 卡 GPU 节点组成集群的例子：
 
-```yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: sglang
-spec:
-  selector:
-    matchLabels:
-      app: sglang
-  serviceName: sglang
-  replicas: 2
-  template:
-    metadata:
-      labels:
-        app: sglang
-    spec:
-      containers:
-      - name: sglang
-        image: lmsysorg/sglang:latest
-        env:
-        - name: LLM_MODEL
-          value: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
-        - name: TOTAL_GPU
-          value: "8"
-        - name: REPLICAS
-          value: "2"
-        - name: STATEFULSET_NAME
-          value: "sglang"
-        - name: SERVICE_NAME
-          value: "sglang"
-        - name: ORDINAL_NUMBER
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
-        ports:
-        - containerPort: 30000
-        resources:
-          limits:
-            nvidia.com/gpu: "4"
-        command:
-        - bash
-        - -c
-        - |
-          if [[ "$ORDINAL_NUMBER" == "0" ]]; then
-            python3 -m sglang.launch_server --model-path /data/$LLM_MODEL --tp $TOTAL_GPU --dist-init-addr $STATEFULSET_NAME-0.$SERVICE_NAME:5000 --nnodes $REPLICAS --node-rank $ORDINAL_NUMBER --trust-remote-code --host 0.0.0.0 --port 30000
-          else
-            python3 -m sglang.launch_server --model-path /data/$LLM_MODEL --tp $TOTAL_GPU --dist-init-addr $STATEFULSET_NAME-0.$SERVICE_NAME:5000 --nnodes $REPLICAS --node-rank $ORDINAL_NUMBER --trust-remote-code
-          fi
-        volumeMounts:
-        - name: data
-          mountPath: /data
-        - name: shm
-          mountPath: /dev/shm
-      volumes:
-      - name: data
-        persistentVolumeClaim:
-          claimName: ai-model
-      - name: shm
-        emptyDir:
-          medium: Memory
-          sizeLimit: 40Gi
----
-
-apiVersion: v1
-kind: Service
-metadata:
-  name: sglang
-spec:
-  selector:
-    app: sglang
-  type: ClusterIP
-  clusterIP: None
-  ports:
-  - name: api
-    protocol: TCP
-    port: 30000
-    targetPort: 30000
-```
+<Tabs>
+  <TabItem value="sglang-sts" label="StatefulSet 方式部署">
+    <FileBlock file="ai/sglang-multi-node-statefulset.yaml" showLineNumbers />
 
 :::info[注意]
 
 根据实际情况修改：
 
+- `nvidia.com/gpu` 为每个节点的 GPU 卡数。
 - `replicas` 为 GPU 集群的总节点数，需 `REPLICAS` 环境变量的值保持一致。
 - `LLM_MODEL` 环境变量为模型名称，与前面下载 Job 中指定的名称一致。
 - `TOTAL_GPU` 环境变量为总 GPU 卡数，等于每个节点的 GPU 数量乘以节点数。
@@ -806,6 +732,26 @@ spec:
 - 如果部署了 OpenWebUI，确保 `OPENAI_API_BASE_URL` 指向第一个副本的地址（leader），如 `http://sglang-0.sglang:3000/v1`。
 
 :::
+
+  </TabItem>
+  <TabItem value="sglang-lws" label="LeaderWorkerSet 方式部署">
+    <FileBlock file="ai/sglang-multi-node-lws.yaml" showLineNumbers />
+
+:::info[注意]
+
+使用 LeaderWorkerSet 部署的前提需在集群中安装 lws 组件，可按照 [lws 官方文档](https://github.com/kubernetes-sigs/lws/blob/main/docs/setup/install.md) 安装 lws 到集群，需要注意的是，默认使用镜像是 `registry.k8s.io/lws/lws`，这个在国内环境下载不了，需修改 Deployment 的镜像地址为 `docker.io/k8smirror/lws`，该镜像为 lws 在 DockerHub 上的 mirror 镜像，长期自动同步，可放心使用（TKE 环境可直接拉取 DockerHub 的镜像）。
+
+根据实际情况修改 YAML 中的一些配置：
+
+- `nvidia.com/gpu` 为每个节点的 GPU 卡数。
+- `--tp` 为总 GPU 卡数，等于每个节点的 GPU 数量乘以节点数。
+- `--model-path` 模型加载的目录。
+
+:::
+
+  </TabItem>
+</Tabs>
+
 
 ### 多 GPU 集群部署如何负载均衡？
 
