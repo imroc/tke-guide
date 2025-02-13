@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sglang
+  labels:
+    app: sglang
+spec:
+  selector:
+    matchLabels:
+      app: sglang
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: sglang
+    spec:
+      containers:
+      - name: sglang
+        image: lmsysorg/sglang:latest
+        env:
+        - name: LLM_MODEL
+          value: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
+        command:
+        - bash
+        - -c
+        - |
+          set -x
+          exec python3 -m sglang.launch_server \
+            --host 0.0.0.0 \
+            --port 30000 \
+            --model-path /data/$LLM_MODEL
+        resources:
+          limits:
+            nvidia.com/gpu: "1"
+        ports:
+        - containerPort: 30000
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: shm
+          mountPath: /dev/shm
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: ai-model
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 40Gi
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sglang
+spec:
+  selector:
+    app: sglang
+  type: ClusterIP
+  ports:
+  - name: api
+    protocol: TCP
+    port: 30000
+    targetPort: 30000
+

@@ -190,6 +190,12 @@ GPU 插件无需显式安装，如果使用**普通节点**或**原生节点**�
     2. 模型数据引用前面下载 Job 使用的 PVC，挂载到 `/data` 目录下。
     3. vLLM 监听 8000 端口暴露 API，定义 Service 方便后续被 OpenWebUI 调用。
   </TabItem>
+  <TabItem value="deploy-sglang" label="部署 SGLang">
+    通过 Deployment 部署 SGLang:
+    <FileBlock file="ai/sglang.yaml" showLineNumbers />
+    1. `LLM_MODEL` 环境变量指定大模型名称，与前面下载 Job 中指定的名称要一致，注意替换。
+    2. 模型数据引用前面下载 Job 使用的 PVC，挂载到 `/data` 目录下。
+  </TabItem>
   <TabItem value="deploy-ollama" label="部署 Ollama">
     通过 Deployment 部署 Ollama:
     <Tabs>
@@ -488,7 +494,7 @@ env:
   value: "1"
 ```
 
-对于 vLLM， 则需显示指定 `--tensor-parallel-size` 参数，表示将模型部署到多少张 GPU 卡上，示例：
+对于 vLLM， 则需显式指定 `--tensor-parallel-size` 参数，表示将模型部署到多少张 GPU 卡上，示例：
 
 ```yaml showLineNumbers
 command:
@@ -505,6 +511,22 @@ command:
     --max_model_len 1024 \
     # highlight-add-line
     --tensor-parallel-size 2 # 指定 N 张卡并行，与 requests 中指定的 GPU 数量一致
+```
+
+对于 SGLang，与 vLLM 类似，显式指定 `--tp` 参数，表示将模型部署到多少张卡上 GPU 卡上，示例：
+
+```yaml showLineNumbers
+command:
+- bash
+- -c
+- |
+  set -x
+  exec python3 -m sglang.launch_server \
+    --host 0.0.0.0 \
+    --port 30000 \
+    --model-path /data/$LLM_MODEL \
+    # highlight-add-line
+    --tp 4
 ```
 
 ### 如何实现多机分布式部署？
