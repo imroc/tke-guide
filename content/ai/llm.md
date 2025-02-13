@@ -710,19 +710,6 @@ curl -v http://127.0.0.1:8000/v1/completions -H "Content-Type: application/json"
 
 对于 SGLang 来说，官方没有给出在 Kubernetes 上多机部署的方案和实例，但我们可以参考 [Example: Serving with two H200*8 nodes and docker](https://github.com/sgl-project/sglang/tree/main/benchmark/deepseek_v3#example-serving-with-two-h2008-nodes-and-docker) 这个官方例子，将其转化为 `StatefulSet` 方式进行部署。以下是 2 个 4 卡 GPU 节点组成集群的例子：
 
-:::info[注意]
-
-注意根据实际情况修改：
-
-- `replicas` 为 GPU 集群的总节点数，需 `REPLICAS` 环境变量的值保持一致。
-- `LLM_MODEL` 环境变量为模型名称，与前面下载 Job 中指定的名称一致。
-- `TOTAL_GPU` 环境变量为总 GPU 卡数，等于每个节点的 GPU 数量乘以节点数。
-- `STATEFULSET_NAME` 环境变量的值 `StatefulSet` 实际名称保持一致。
-- `SERVICE_NAME` 环境变量的值与 `StatefulSet` 中指定的 `serviceName`，以及实际的 Service 的名称保持一致。
-- 如果部署了 OpenWebUI，确保 `OPENAI_API_BASE_URL` 指向第一个副本的地址（leader），如 `http://sglang-0.sglang:3000/v1`。
-
-:::
-
 ```yaml
 apiVersion: apps/v1
 kind: StatefulSet
@@ -801,6 +788,19 @@ spec:
     port: 30000
     targetPort: 30000
 ```
+
+:::info[注意]
+
+根据实际情况修改：
+
+- `replicas` 为 GPU 集群的总节点数，需 `REPLICAS` 环境变量的值保持一致。
+- `LLM_MODEL` 环境变量为模型名称，与前面下载 Job 中指定的名称一致。
+- `TOTAL_GPU` 环境变量为总 GPU 卡数，等于每个节点的 GPU 数量乘以节点数。
+- `STATEFULSET_NAME` 环境变量的值 `StatefulSet` 实际名称保持一致。
+- `SERVICE_NAME` 环境变量的值与 `StatefulSet` 中指定的 `serviceName`，以及实际的 Service 的名称保持一致。
+- 如果部署了 OpenWebUI，确保 `OPENAI_API_BASE_URL` 指向第一个副本的地址（leader），如 `http://sglang-0.sglang:3000/v1`。
+
+:::
 
 ### 多 GPU 集群部署如何负载均衡？
 
