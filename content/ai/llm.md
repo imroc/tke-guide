@@ -799,7 +799,7 @@ spec:
 
 可以用同一个 Service 选中多个不同 GPU 集群的所有 Pod 来实现，以下给出 vLLM 和 SGLang 的示例。
 
-#### vLLM 多机负载均衡
+#### vLLM 多集群负载均衡
 
 如果用 lws 部署 vllm，可以让所有 `LeaderWorkerSet` 在同一命名空间，且所有 `LeaderWorkerSet` 的 `leaderTemplate` 下要声明一个相同的 label，比如用 `role: leader`：
 
@@ -843,7 +843,7 @@ spec:
 
 配置好后，该 Service 就选中了所有 GPU 集群的 leader Pod，API 请求就可以在多个 GPU 集群之间负载均衡了。
 
-#### SGLang 多机负载均衡
+#### SGLang 多集群负载均衡
 
 SGLang 前面给出了使用 StatefulSet 实现多机部署的例子，它的 API 由第一个副本（leader）进行处理，如果用多个 StatefulSet 组成多个 GPU 集群，则可以新建一个 Service，选中所有 StatefulSet 的第一个副本。
 
