@@ -8,7 +8,7 @@
 
 ## SGLang 对 GPU 的要求
 
-SGLang 用 GPU 运行 DeepSeek 大模型，要求 GPU 的计算能力大于等于 7.5，推荐 8.0 以上
+SGLang 用 GPU 运行 DeepSeek 大模型，要求 GPU 的计算能力大于等于 7.5，推荐 8.0 以上，如果不满足可能出现类似以下的报错：
 
 ```yaml
 [2025-02-12 02:56:48 TP0] Compute capability below sm80. Use float16 due to lack of bfloat16 support.
