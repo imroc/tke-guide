@@ -38,7 +38,7 @@ AI 大模型通常占用体积较大，直接打包到容器镜像不太现实�
 
 ### GPU 机型如何选？
 
-不同的机型使用的 GPU 型号不一样，机型与 GPU 型号的对照表参考 [GPU 计算型实例](https://cloud.tencent.com/document/product/560/19700) 和 [GPU 渲染型实例](https://cloud.tencent.com/document/product/560/63854)，Ollama 相比 vLLM，支持的 GPU 型号更广泛，兼容性更好，建议根据事先调研自己所使用的工具和大模型，选择合适的 GPU 型号，再根据前面的对照表确定要使用的 GPU 机型，另外也注意下选择的机型在哪些地域在售，以及是否售罄，可通过 [购买云服务器](https://buy.cloud.tencent.com/cvm) 页面进行查询（**实例族**选择**GPU机型**）。
+不同的机型使用的 GPU 型号不一样，机型与 GPU 型号的对照表参考 [GPU 计算型实例](https://cloud.tencent.com/document/product/560/19700) ，Ollama 相比 vLLM，支持的 GPU 型号更广泛，兼容性更好，建议根据事先调研自己所使用的工具和大模型，选择合适的 GPU 型号，再根据前面的对照表确定要使用的 GPU 机型，另外也注意下选择的机型在哪些地域在售，以及是否售罄，可通过 [购买云服务器](https://buy.cloud.tencent.com/cvm) 页面进行查询（**实例族**选择**GPU机型**）。
 
 ## 镜像说明
 

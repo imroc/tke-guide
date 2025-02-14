@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepseek-r1
+  labels:
+    app: deepseek-r1
+spec:
+  selector:
+    matchLabels:
+      app: deepseek-r1
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: deepseek-r1
+    spec:
+      containers:
+      - name: deepseek-r1
+        image: lmsysorg/sglang:latest
+        env:
+        - name: LLM_MODEL
+          value: deepseek-ai/
+        command:
+        - python3
+        - -m
+        - deepseek-r1.launch_server
+        - --host=0.0.0.0
+        - --port=30000
+        - --tp=1
+        - --model-path=/data/DeepSeek-R1
+        resources:
+          limits:
+            nvidia.com/gpu: "1"
+        ports:
+        - containerPort: 30000
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: shm
+          mountPath: /dev/shm
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: ai-model
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 40Gi
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deepseek-r1
+spec:
+  selector:
+    app: deepseek-r1
+  type: ClusterIP
+  ports:
+  - name: api
+    protocol: TCP
+    port: 30000
+    targetPort: 30000
+
