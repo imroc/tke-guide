@@ -6,7 +6,7 @@
 
 本文将基于 SGLang 在 TKE 集群上部署满血版 DeepSeek-R1 模型，提供最佳实践的部署示例。
 
-## SGLang 对 GPU 的要求
+## 选择 GPU 型号
 
 SGLang 用 GPU 运行 DeepSeek 大模型，要求 GPU 的计算能力大于等于 7.5，推荐 8.0 以上，如果不满足可能出现类似以下的报错：
 
@@ -27,8 +27,6 @@ SGLang 用 GPU 运行 DeepSeek 大模型，要求 GPU 的计算能力大于等�
     raise RuntimeError("SGLang only supports sm75 and above.")
 RuntimeError: SGLang only supports sm75 and above.
 ```
-
-## 选择 GPU 型号
 
 在腾讯云上售卖的 GPU 型号 以及各型号的显存大小可参考 [GPU 计算型实例](https://cloud.tencent.com/document/product/560/19700)。
 
