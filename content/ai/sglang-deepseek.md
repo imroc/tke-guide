@@ -126,7 +126,7 @@ GPU 型号与计算能力的关系参考 NVIDIA 官方文档 [Your GPU Compute C
 
   :::
 
-  ```yaml
+  ```yaml showLineNumbers
   apiVersion: storage.k8s.io/v1
   kind: StorageClass
   metadata:
@@ -134,9 +134,11 @@ GPU 型号与计算能力的关系参考 NVIDIA 官方文档 [Your GPU Compute C
   provisioner: com.tencent.cloud.csi.cfsturbo
   reclaimPolicy: Delete
   volumeBindingMode: Immediate
+  # highlight-start
   parameters:
     fsid: 564b8ef1
     host: 11.0.0.7
+  # highlight-end
   ```
   </TabItem>
 
