@@ -220,5 +220,42 @@ spec:
 
 使用 [LeaderWorkerSet] 多机部署满血版的 DeepSeek-R1：
 
+:::info[说明]
+
+- `nvidia.com/gpu` 为单机 GPU 卡数。
+- `--tp` 为单个 GPU 集群的 GPU 总卡数（节点数量*单机 GPU 卡数）。
+- `size` 为单个 GPU 集群的节点数。
+- `replicas` 为 GPU 集群数量。
+
+:::
+
 <FileBlock file="ai/sglang-lws-deepseek-r1.yaml" showLineNumbers />
+
+
+再创建一个 Service 用于 SGLang 提供的兼容 OpenAI 的 API：
+
+:::info[注意]
+
+- `leaderworkerset.sigs.k8s.io/name` 指定 lws 的名称。
+- 所有 GPU 集群的 leader Pod 的 index 固定为 0，可以通过 `apps.kubernetes.io/pod-index: "0"` 这个 label 来选中。
+- 涉及 API 地址配置的地方（如 OpenWebUI），指向这个 Service 的地址（如 `http://deepseek-r1-api:30000/v1`）。
+
+:::
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: deepseek-r1-api
+spec:
+  type: ClusterIP
+  selector:
+    leaderworkerset.sigs.k8s.io/name: deepseek-r1
+    apps.kubernetes.io/pod-index: "0"
+  ports:
+  - name: api
+    port: 30000
+    targetPort: 30000
+```
+
 
