@@ -1104,3 +1104,59 @@ RuntimeError: SGLang only supports sm75 and above.
 
 - 原因：GPU 显卡计算能力不够，提示至少计算能力要 SM7.5
 - 解决方案：换成计算能力大于等于 SM7.5 的 GPU，如 T4、A100
+
+### GPU 数量需被注意力头数整除
+
+在进行多机部署时，需确保模型的注意力头数能整除总 GPU 数量，否则加载模型就会报错：
+
+<Tabs>
+  <TabItem value="vllm" label="vLLM 报错">
+    ```txt
+    ValueError: Total number of attention heads (32) must be divisible by tensor parallel size
+    ```
+  </TabItem>
+  <TabItem value="sglang" label="SGLang 报错">
+    ```txt
+    [2025-02-14 02:47:45 TP0] Scheduler hit an exception: Traceback (most recent call last):
+      File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 1816, in run_scheduler_process
+        scheduler = Scheduler(server_args, port_args, gpu_id, tp_rank, dp_rank)
+      File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 240, in __init__
+        self.tp_worker = TpWorkerClass(
+      File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker_overlap_thread.py", line 63, in __init__
+        self.worker = TpModelWorker(server_args, gpu_id, tp_rank, dp_rank, nccl_port)
+      File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker.py", line 68, in __init__
+        self.model_runner = ModelRunner(
+      File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 194, in __init__
+        self.load_model()
+      File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 317, in load_model
+        self.model = get_model(
+      File "/sgl-workspace/sglang/python/sglang/srt/model_loader/__init__.py", line 22, in get_model
+        return loader.load_model(
+      File "/sgl-workspace/sglang/python/sglang/srt/model_loader/loader.py", line 357, in load_model
+        model = _initialize_model(
+      File "/sgl-workspace/sglang/python/sglang/srt/model_loader/loader.py", line 138, in _initialize_model
+        return model_class(
+      File "/sgl-workspace/sglang/python/sglang/srt/models/qwen2.py", line 332, in __init__
+        self.model = Qwen2Model(config, quant_config=quant_config)
+      File "/sgl-workspace/sglang/python/sglang/srt/models/qwen2.py", line 241, in __init__
+        self.layers = make_layers(
+      File "/sgl-workspace/sglang/python/sglang/srt/utils.py", line 313, in make_layers
+        [
+      File "/sgl-workspace/sglang/python/sglang/srt/utils.py", line 314, in <listcomp>
+        maybe_offload_to_cpu(layer_fn(idx=idx, prefix=f"{prefix}.{idx}"))
+      File "/sgl-workspace/sglang/python/sglang/srt/models/qwen2.py", line 243, in <lambda>
+        lambda idx, prefix: Qwen2DecoderLayer(
+      File "/sgl-workspace/sglang/python/sglang/srt/models/qwen2.py", line 180, in __init__
+        self.self_attn = Qwen2Attention(
+      File "/sgl-workspace/sglang/python/sglang/srt/models/qwen2.py", line 105, in __init__
+        assert self.total_num_heads % tp_size == 0
+    AssertionError
+    ```
+  </TabItem>
+</Tabs>
+
+模型的注意力头数等于模型文件 `config.json` 中 `num_attention_heads` 的值，比如 `DeepSeek-R1-Distill-Qwen-32B` 的注意力头数为 40：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F14%2F20250214113101.png)
+
+如果每台节点一张 GPU 卡，总共 3 个节点，那么 `40 / 3` 无法整除，启动就会报错，改成 2 台节点反而可以成功（`40 / 2` 可以整除）。
