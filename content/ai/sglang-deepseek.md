@@ -104,19 +104,46 @@ GPU 型号与计算能力的关系参考 NVIDIA 官方文档 [Your GPU Compute C
 
 #### 新建 StorageClass
 
-:::tip[说明]
+<Tabs>
+  <TabItem value="console", label="通过控制台创建">
 
-该步骤选择项较多，因此本文示例通过容器服务控制台来创建 PVC。若您希望通过 YAML 来创建，可以先用控制台创建一个测试 PVC，然后复制生成的 YAML 文件
+  1. 在集群列表中，单击**集群 ID**，进入集群详情页。
+  2. 选择左侧菜单栏中的**存储**，在 StorageClass 页面单击**新建**。
+  3. 在新建存储页面，根据实际需求，创建 CFS-Turbo 类型的 StorageClass。如下图所示：
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F14%2F20250214164723.png)
+    - 名称：请输入 StorageClass 名称，本文以 “cfs-turbo” 为例。
+    - Provisioner：选择 “文件存储CFS turbo”。
+    - CFS turbo：选择前面**创建 CFS-Turbo 实例**步骤中创建出来的 CFS-Turbo 的实例。
 
-:::
+  </TabItem>
+  <TabItem value="yaml", label="通过YAML创建">
 
-1. 在集群列表中，单击**集群 ID**，进入集群详情页。
-2. 选择左侧菜单栏中的**存储**，在 StorageClass 页面单击**新建**。
-3. 在新建存储页面，根据实际需求，创建 CFS-Turbo 类型的 StorageClass。如下图所示：
-  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F14%2F20250214164723.png)
-  * 名称：请输入 StorageClass 名称，本文以 “cfs-turbo” 为例。
-  * Provisioner：选择 “文件存储CFS turbo”。
-  * CFS turbo：选择前面**创建 CFS-Turbo 实例**步骤中创建出来的 CFS-Turbo 的实例。
+  :::info[注意]
+
+  - `fsid` 替换为前面步骤新建的 CFS-Turbo 实例的挂载点 ID（在实例的挂载点信息页面可查看，注意不是 `cfs-xxx` 的 ID）。
+  - `host` 替换为前面步骤新建的 CFS-Turbo 实例的IPv4地址（同样也在挂载点信息页面可查看）。
+
+  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F14%2F20250214195827.png)
+
+  :::
+
+  ```yaml
+  apiVersion: storage.k8s.io/v1
+  kind: StorageClass
+  metadata:
+    name: cfs-turbo
+  provisioner: com.tencent.cloud.csi.cfsturbo
+  reclaimPolicy: Delete
+  volumeBindingMode: Immediate
+  parameters:
+    fsid: 564b8ef1
+    host: 11.0.0.7
+  ```
+    ```
+  </TabItem>
+
+</Tabs>
+
 
 
 #### 创建 PVC
