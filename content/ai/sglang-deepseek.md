@@ -218,7 +218,7 @@ spec:
 
 ### 使用 SGLang 部署满血版的 DeepSeek-R1
 
-使用 [LeaderWorkerSet] 多机部署满血版的 DeepSeek-R1：
+使用 `LeaderWorkerSet` 多机部署满血版的 DeepSeek-R1：
 
 :::info[说明]
 
