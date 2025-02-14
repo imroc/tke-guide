@@ -719,40 +719,40 @@ curl -v http://127.0.0.1:8000/v1/completions -H "Content-Type: application/json"
 
 <Tabs>
   <TabItem value="sglang-sts" label="StatefulSet 方式部署">
-    <FileBlock file="ai/sglang-multi-node-statefulset.yaml" showLineNumbers />
 
-:::info[注意]
+  :::info[注意]
 
-用 Statefulset 部署无需引入 lws 依赖，但扩容 GPU 集群时有点麻烦，需手动创建新的 Statefulset。
+  用 Statefulset 部署无需引入 lws 依赖，但扩容 GPU 集群时有点麻烦，需手动创建新的 Statefulset。
 
-根据实际情况修改：
+  根据实际情况修改：
 
-- `nvidia.com/gpu` 为每个节点的 GPU 卡数。
-- `replicas` 为 GPU 集群的总节点数，需 `REPLICAS` 环境变量的值保持一致。
-- `LLM_MODEL` 环境变量为模型名称，与前面下载 Job 中指定的名称一致。
-- `TOTAL_GPU` 环境变量为总 GPU 卡数，等于每个节点的 GPU 数量乘以节点数。
-- `STATEFULSET_NAME` 环境变量的值 `StatefulSet` 实际名称保持一致。
-- `SERVICE_NAME` 环境变量的值与 `StatefulSet` 中指定的 `serviceName`，以及实际的 Service 的名称保持一致。
-- 如果部署了 OpenWebUI，确保 `OPENAI_API_BASE_URL` 指向第一个副本的地址（leader），如 `http://sglang-0.sglang:3000/v1`。
+  - `nvidia.com/gpu` 为每个节点的 GPU 卡数。
+  - `replicas` 为 GPU 集群的总节点数，需 `REPLICAS` 环境变量的值保持一致。
+  - `LLM_MODEL` 环境变量为模型名称，与前面下载 Job 中指定的名称一致。
+  - `TOTAL_GPU` 环境变量为总 GPU 卡数，等于每个节点的 GPU 数量乘以节点数。
+  - `STATEFULSET_NAME` 环境变量的值 `StatefulSet` 实际名称保持一致。
+  - `SERVICE_NAME` 环境变量的值与 `StatefulSet` 中指定的 `serviceName`，以及实际的 Service 的名称保持一致。
+  - 如果部署了 OpenWebUI，确保 `OPENAI_API_BASE_URL` 指向第一个副本的地址（leader），如 `http://sglang-0.sglang:3000/v1`。
 
-:::
+  :::
 
+  <FileBlock file="ai/sglang-multi-node-statefulset.yaml" showLineNumbers />
   </TabItem>
   <TabItem value="sglang-lws" label="LeaderWorkerSet 方式部署">
-    <FileBlock file="ai/sglang-multi-node-lws.yaml" showLineNumbers />
 
-:::info[注意]
+  :::info[注意]
 
-使用 LeaderWorkerSet 部署的前提需在集群中安装 lws 组件，可按照 [lws 官方文档](https://github.com/kubernetes-sigs/lws/blob/main/docs/setup/install.md) 安装 lws 到集群，需要注意的是，默认使用镜像是 `registry.k8s.io/lws/lws`，这个在国内环境下载不了，需修改 Deployment 的镜像地址为 `docker.io/k8smirror/lws`，该镜像为 lws 在 DockerHub 上的 mirror 镜像，长期自动同步，可放心使用（TKE 环境可直接拉取 DockerHub 的镜像）。
+  使用 LeaderWorkerSet 部署的前提需在集群中安装 lws 组件，可按照 [lws 官方文档](https://github.com/kubernetes-sigs/lws/blob/main/docs/setup/install.md) 安装 lws 到集群，需要注意的是，默认使用镜像是 `registry.k8s.io/lws/lws`，这个在国内环境下载不了，需修改 Deployment 的镜像地址为 `docker.io/k8smirror/lws`，该镜像为 lws 在 DockerHub 上的 mirror 镜像，长期自动同步，可放心使用（TKE 环境可直接拉取 DockerHub 的镜像）。
 
-根据实际情况修改 YAML 中的一些配置：
+  根据实际情况修改 YAML 中的一些配置：
 
-- `nvidia.com/gpu` 为每个节点的 GPU 卡数。
-- `--tp` 为总 GPU 卡数，等于每个节点的 GPU 数量乘以节点数。
-- `--model-path` 模型加载的目录。
+  - `nvidia.com/gpu` 为每个节点的 GPU 卡数。
+  - `--tp` 为总 GPU 卡数，等于每个节点的 GPU 数量乘以节点数。
+  - `--model-path` 模型加载的目录。
 
-:::
+  :::
 
+  <FileBlock file="ai/sglang-multi-node-lws.yaml" showLineNumbers />
   </TabItem>
 </Tabs>
 
