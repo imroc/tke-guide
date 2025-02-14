@@ -753,55 +753,33 @@ curl -v http://127.0.0.1:8000/v1/completions -H "Content-Type: application/json"
 </Tabs>
 
 
-### 多 GPU 集群部署如何负载均衡？
+### 多机部署如何扩容 GPU？
 
-分布式多机部署要求每台节点 GPU 数量一致，且要事先规划好节点数量，如果要扩容，只有再建新 GPU 集群，如何让不同的 GPU 集群进行负载均衡呢？
+分布式多机部署一般要求每台节点 GPU 数量一致，且要事先规划好总节点数量，然后根据这些信息配置启动参数（GPU 并行数量，总节点数量），如果要扩容，只能增加新的 GPU 集群，且让请求负载均衡到多个 GPU 集群。
 
-可以用同一个 Service 选中多个不同 GPU 集群的所有 Pod 来实现，以下给出 vLLM 和 SGLang 的示例。
-
-#### vLLM 多集群负载均衡
-
-如果用 lws 部署 vllm，可以让所有 `LeaderWorkerSet` 在同一命名空间，且所有 `LeaderWorkerSet` 的 `leaderTemplate` 下要声明一个相同的 label，比如用 `role: leader`：
-
-```yaml showLineNumbers
-apiVersion: leaderworkerset.x-k8s.io/v1
-kind: LeaderWorkerSet
-metadata:
-  name: vllm
-spec:
-  replicas: 1
-  leaderWorkerTemplate:
-    size: 2
-    leaderTemplate:
-      # highlight-add-start
-      metadata:
-        labels:
-          role: leader
-      # highlight-add-end
-      spec:
-```
-
-然后确保 vllm 的 Service 的 selector 选中该 label：
-
-```yaml showLineNumbers
-apiVersion: v1
-kind: Service
-metadata:
-  name: vllm-api
-spec:
-  ports:
-  - name: http
-    port: 8080
-    protocol: TCP
-    targetPort: 8080
-  # highlight-add-start
-  selector:
-    role: leader
-  # highlight-add-end
-  type: ClusterIP
-```
-
-配置好后，该 Service 就选中了所有 GPU 集群的 leader Pod，API 请求就可以在多个 GPU 集群之间负载均衡了。
+以下是具体思路：
+- 新增 GPU 集群：可以利用 lws 的能力，调整 replicas 的值，replicas + 1 表示新增一个 leader + worker 的集群，即扩容新的 GPU 集群。
+- 多 GPU 集群负载均衡：可以新建一个 Service 选中多个不同 GPU 集群的 leader Pod 来实现，示例：
+  :::info[注意]
+   - `leaderworkerset.sigs.k8s.io/name` 指定 lws 的名称。
+   - 所有 GPU 集群的 leader Pod 的 index 固定为 0，可以通过 `apps.kubernetes.io/pod-index: "0"` 这个 label 来选中。
+   - 涉及 API 地址配置的地方（如 OpenWebUI），指向这个新 Service 的地址（如 `http://vllm-leader:8000/v1`）。
+  :::
+  ```yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: vllm-leader
+  spec:
+    type: ClusterIP
+    selector:
+      leaderworkerset.sigs.k8s.io/name: vllm
+      apps.kubernetes.io/pod-index: "0"
+    ports:
+    - name: api
+      port: 8000
+      targetPort: 8000
+  ```
 
 #### SGLang 多集群负载均衡
 
