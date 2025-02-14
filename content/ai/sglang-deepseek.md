@@ -103,7 +103,7 @@ GPU 型号与计算能力的关系参考 NVIDIA 官方文档 [Your GPU Compute C
 #### 新建 StorageClass
 
 <Tabs>
-  <TabItem value="console", label="通过控制台创建">
+  <TabItem value="console" label="通过控制台创建">
 
   1. 在集群列表中，单击**集群 ID**，进入集群详情页。
   2. 选择左侧菜单栏中的**存储**，在 StorageClass 页面单击**新建**。
@@ -114,7 +114,7 @@ GPU 型号与计算能力的关系参考 NVIDIA 官方文档 [Your GPU Compute C
     - CFS turbo：选择前面**创建 CFS-Turbo 实例**步骤中创建出来的 CFS-Turbo 的实例。
 
   </TabItem>
-  <TabItem value="yaml", label="通过YAML创建">
+  <TabItem value="yaml" label="通过YAML创建">
 
   :::info[注意]
 
