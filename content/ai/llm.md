@@ -761,9 +761,11 @@ curl -v http://127.0.0.1:8000/v1/completions -H "Content-Type: application/json"
 - 新增 GPU 集群：可以利用 lws 的能力，调整 replicas 的值，replicas + 1 表示新增一个 leader + worker 的集群，即扩容新的 GPU 集群。
 - 多 GPU 集群负载均衡：可以新建一个 Service 选中多个不同 GPU 集群的 leader Pod 来实现，示例：
   :::info[注意]
+
    - `leaderworkerset.sigs.k8s.io/name` 指定 lws 的名称。
    - 所有 GPU 集群的 leader Pod 的 index 固定为 0，可以通过 `apps.kubernetes.io/pod-index: "0"` 这个 label 来选中。
    - 涉及 API 地址配置的地方（如 OpenWebUI），指向这个新 Service 的地址（如 `http://vllm-leader:8000/v1`）。
+   
   :::
   ```yaml
   apiVersion: v1
