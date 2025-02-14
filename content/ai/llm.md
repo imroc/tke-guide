@@ -713,13 +713,17 @@ curl -v http://127.0.0.1:8000/v1/completions -H "Content-Type: application/json"
 
 #### SGLang 多机部署
 
-对于 SGLang 来说，官方没有给出在 Kubernetes 上多机部署的方案和实例，但我们可以参考 [Example: Serving with two H200*8 nodes and docker](https://github.com/sgl-project/sglang/tree/main/benchmark/deepseek_v3#example-serving-with-two-h2008-nodes-and-docker) 这个官方例子，将其转化为 `StatefulSet` 或 `LeaderWorkerSet` 方式进行部署。以下是 2 个 4 卡 GPU 节点组成的 GPU 集群的例子：
+对于 SGLang 来说，官方没有给出在 Kubernetes 上多机部署的方案和实例，但我们可以参考 [Example: Serving with two H200*8 nodes and docker](https://github.com/sgl-project/sglang/tree/main/benchmark/deepseek_v3#example-serving-with-two-h2008-nodes-and-docker) 这个官方例子，将其转化为 `StatefulSet` 和 `LeaderWorkerSet` 方式进行部署，最佳实践推荐使用 `LeaderWorkerSet` 部署（需安装 lws 组件） 。
+
+以下是 2 个 4 卡 GPU 节点组成的 GPU 集群的例子：
 
 <Tabs>
   <TabItem value="sglang-sts" label="StatefulSet 方式部署">
     <FileBlock file="ai/sglang-multi-node-statefulset.yaml" showLineNumbers />
 
 :::info[注意]
+
+用 Statefulset 部署无需引入 lws 依赖，但扩容 GPU 集群时有点麻烦，需手动创建新的 Statefulset。
 
 根据实际情况修改：
 
@@ -782,31 +786,6 @@ curl -v http://127.0.0.1:8000/v1/completions -H "Content-Type: application/json"
       port: 8000
       targetPort: 8000
   ```
-
-#### SGLang 多集群负载均衡
-
-SGLang 前面给出了使用 StatefulSet 实现多机部署的例子，它的 API 由第一个副本（leader）进行处理，如果用多个 StatefulSet 组成多个 GPU 集群，则可以新建一个 Service，选中所有 StatefulSet 的第一个副本。
-
-首先要求所有 StatefulSet 在同一个命名空间，且 Pod 模板要声明一个相同的 label，比如用 `model: deepseek-r1`，然后新建一个 Service 选中此 label 和 `apps.kubernetes.io/pod-index: "0"` 这个 label (只选中每个 GPU 集群的 leader Pod)：
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: sglang-api
-spec:
-  selector:
-    app: sglang-api
-    apps.kubernetes.io/pod-index: "0"
-  type: ClusterIP
-  ports:
-  - name: api
-    protocol: TCP
-    port: 30000
-    targetPort: 30000
-```
-
-配置好后，该 Service 就选中了所有 GPU 集群的 leader Pod，向改 Service 发送的 API 请求就可以在多个 GPU 集群之间负载均衡了。如果部署了 OpenWebUI，确保 `OPENAI_API_BASE_URL` 指向这个新 Service 的地址，如 `http://sglang-api.30000/v1`。
 
 ## 踩坑分享
 
