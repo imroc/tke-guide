@@ -114,6 +114,7 @@ GPU 型号与计算能力的关系参考 NVIDIA 官方文档 [Your GPU Compute C
     - CFS turbo：选择前面**创建 CFS-Turbo 实例**步骤中创建出来的 CFS-Turbo 的实例。
 
   </TabItem>
+
   <TabItem value="yaml" label="通过YAML创建">
 
   :::info[注意]
