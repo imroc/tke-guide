@@ -294,7 +294,7 @@ behavior:
 
 ### 步骤7: 部署 OpenWebUI
 
-使用 Deployment 部署 OpenWebUI，并定义 Service 方便后续对外暴露访问。后端 API 可以由 vLLM 或 Ollama 提供，以下提供这两种情况的 OpenWebUI 部署示例：
+使用 Deployment 部署 OpenWebUI，并定义 Service 方便后续对外暴露访问。后端 API 可以由 vLLM、SGLang 或 Ollama 提供，以下提供这三种情况的 OpenWebUI 部署示例：
 
 <Tabs>
   <TabItem value="webui-vllm" label="vLLM 后端">
