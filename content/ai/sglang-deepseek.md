@@ -202,6 +202,14 @@ lws 上架应用市场还在进行中。
 
 下发一个 Job 用于下载 AI 大模型：
 
+:::info[注意]
+
+满血版的 DeepSeek-R1 是 671B 的大模型，一共 642G，下载耗时可能较长，实测在上海下载 ModelScope 上的模型文件，100Mbps 的云服务器带宽，耗时 16 个多小时：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F17%2F20250217100442.png)
+
+:::
+
 ```yaml
 apiVersion: batch/v1
 kind: Job
