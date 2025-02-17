@@ -302,3 +302,52 @@ spec:
 ```
 
 
+## 踩坑分享
+
+### 驱动版本不匹配
+
+创建节点池选机型时，如果驱动版本选的过低，SGLang 启动可能报错：
+
+```txt
+INFO 02-17 02:35:21 __init__.py:190] Automatically detected platform cuda.
+Traceback (most recent call last):
+  File "/usr/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/usr/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/sgl-workspace/sglang/python/sglang/launch_server.py", line 6, in <module>
+    from sglang.srt.entrypoints.http_server import launch_server
+  File "/sgl-workspace/sglang/python/sglang/srt/entrypoints/http_server.py", line 41, in <module>
+    from sglang.srt.entrypoints.engine import _launch_subprocesses
+  File "/sgl-workspace/sglang/python/sglang/srt/entrypoints/engine.py", line 36, in <module>
+    from sglang.srt.managers.data_parallel_controller import (
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/data_parallel_controller.py", line 27, in <module>
+    from sglang.srt.managers.io_struct import (
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/io_struct.py", line 24, in <module>
+    from sglang.srt.managers.schedule_batch import BaseFinishReason
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/schedule_batch.py", line 42, in <module>
+    from sglang.srt.configs.model_config import ModelConfig
+  File "/sgl-workspace/sglang/python/sglang/srt/configs/model_config.py", line 24, in <module>
+    from sglang.srt.layers.quantization import QUANTIZATION_METHODS
+  File "/sgl-workspace/sglang/python/sglang/srt/layers/quantization/__init__.py", line 5, in <module>
+    from vllm.model_executor.layers.quantization.aqlm import AQLMConfig
+  File "/usr/local/lib/python3.10/dist-packages/vllm/__init__.py", line 7, in <module>
+    from vllm.engine.arg_utils import AsyncEngineArgs, EngineArgs
+  File "/usr/local/lib/python3.10/dist-packages/vllm/engine/arg_utils.py", line 20, in <module>
+    from vllm.executor.executor_base import ExecutorBase
+  File "/usr/local/lib/python3.10/dist-packages/vllm/executor/executor_base.py", line 15, in <module>
+    from vllm.platforms import current_platform
+  File "/usr/local/lib/python3.10/dist-packages/vllm/platforms/__init__.py", line 222, in __getattr__
+    _current_platform = resolve_obj_by_qualname(
+  File "/usr/local/lib/python3.10/dist-packages/vllm/utils.py", line 1906, in resolve_obj_by_qualname
+    module = importlib.import_module(module_name)
+  File "/usr/lib/python3.10/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "/usr/local/lib/python3.10/dist-packages/vllm/platforms/cuda.py", line 15, in <module>
+    import vllm._C  # noqa
+ImportError: /usr/local/lib/python3.10/dist-packages/vllm/_C.abi3.so: undefined symbol: cuTensorMapEncodeTiled
+```
+
+- **原因**：是容器的 CUDA 与节点安装的驱动版本不匹配。
+- **解决方案**： 驱动版本选最新的。
+  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F17%2F20250217104343.png)
