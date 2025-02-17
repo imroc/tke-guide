@@ -51,6 +51,7 @@ GPU 型号与计算能力的关系参考 NVIDIA 官方文档 [Your GPU Compute C
 
 **结论**：选择广州、上海、南京、北京这些国内地域创建 TKE 集群。
 
+
 ## 操作步骤
 
 ### 准备集群
@@ -272,8 +273,97 @@ spec:
 
 :::
 
-<FileBlock file="ai/sglang-lws-deepseek-r1.yaml" showLineNumbers />
-
+```yaml showLineNumbers
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: deepseek-r1
+spec:
+  replicas: 1
+  leaderWorkerTemplate:
+    size: 4
+    restartPolicy: RecreateGroupOnPodRestart
+    leaderTemplate:
+      metadata:
+        labels:
+          role: leader
+      spec:
+        terminationGracePeriodSeconds: 1
+        containers:
+        - name: leader
+          image: lmsysorg/sglang:latest
+          command:
+          - bash
+          - -c
+          - |
+            set -x
+            exec python3 -m sglang.launch_server \
+              --model-path /data/DeepSeek-R1 \
+              --nnodes $LWS_GROUP_SIZE \
+              --tp 4 \
+              --node-rank 0 \
+              --dist-init-addr $(LWS_LEADER_ADDRESS):5000 \
+              --trust-remote-code \
+              --host 0.0.0.0 \
+              --port 30000
+          resources:
+            limits:
+              nvidia.com/gpu: "4"
+          ports:
+          - containerPort: 30000
+          volumeMounts:
+          - mountPath: /dev/shm
+            name: dshm
+          - mountPath: /data
+            name: data
+        volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 40Gi
+        - name: data
+          persistentVolumeClaim:
+            claimName: ai-model-turbo
+    workerTemplate:
+      spec:
+        terminationGracePeriodSeconds: 1
+        containers:
+        - name: worker
+          image: lmsysorg/sglang:latest
+          env:
+          - name: ORDINAL_NUMBER
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
+          command:
+          - bash
+          - -c
+          - |
+            set -x
+            exec python3 -m sglang.launch_server \
+              --model-path /data/DeepSeek-R1 \
+              --nnodes $LWS_GROUP_SIZE \
+              --tp 4 \
+              --node-rank $ORDINAL_NUMBER \
+              --dist-init-addr $(LWS_LEADER_ADDRESS):5000 \
+              --trust-remote-code
+          resources:
+            limits:
+              nvidia.com/gpu: "4"
+          volumeMounts:
+          - mountPath: /dev/shm
+            name: dshm
+          - mountPath: /data
+            name: data
+        volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 40Gi
+        - name: data
+          persistentVolumeClaim:
+            claimName: ai-model
+```
 
 再创建一个 Service 用于 SGLang 提供的兼容 OpenAI 的 API：
 
@@ -300,9 +390,6 @@ spec:
     port: 30000
     targetPort: 30000
 ```
-
-
-## 踩坑分享
 
 ### 报错: undefined symbol: cuTensorMapEncodeTiled
 

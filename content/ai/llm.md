@@ -787,8 +787,6 @@ curl -v http://127.0.0.1:8000/v1/completions -H "Content-Type: application/json"
       targetPort: 8000
   ```
 
-## 踩坑分享
-
 ### vLLM 报错 ValueError: invalid literal for int() with base 10: 'tcp://xxx.xx.xx.xx:8000'
 
 vLLM 启动时报这个错：
