@@ -304,9 +304,9 @@ spec:
 
 ## 踩坑分享
 
-### 驱动版本不匹配
+### 报错: undefined symbol: cuTensorMapEncodeTiled
 
-创建节点池选机型时，如果驱动版本选的过低，SGLang 启动可能报错：
+SGLang 启动报错：
 
 ```txt
 INFO 02-17 02:35:21 __init__.py:190] Automatically detected platform cuda.
@@ -348,6 +348,42 @@ Traceback (most recent call last):
 ImportError: /usr/local/lib/python3.10/dist-packages/vllm/_C.abi3.so: undefined symbol: cuTensorMapEncodeTiled
 ```
 
-- **原因**：是容器的 CUDA 与节点安装的驱动版本不匹配。
-- **解决方案**： 驱动版本选最新的。
+- **原因**：创建节点池选机型时，如果驱动版本选的过低，导致容器的 CUDA 版本与节点安装的驱动版本不兼容。
+- **解决方案**： 选机型时，驱动版本选最新的。
   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F17%2F20250217104343.png)
+
+### 报错: 'str' object cannot be interpreted as an integer
+
+SGLang 启动报错：
+
+```txt
+[2025-02-17 03:15:47 TP0] Scheduler hit an exception: Traceback (most recent call last):
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 1816, in run_scheduler_process
+    scheduler = Scheduler(server_args, port_args, gpu_id, tp_rank, dp_rank)
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 240, in __init__
+    self.tp_worker = TpWorkerClass(
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker_overlap_thread.py", line 63, in __init__
+    self.worker = TpModelWorker(server_args, gpu_id, tp_rank, dp_rank, nccl_port)
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker.py", line 68, in __init__
+    self.model_runner = ModelRunner(
+  File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 186, in __init__
+    min_per_gpu_memory = self.init_torch_distributed()
+  File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 261, in init_torch_distributed
+    initialize_model_parallel(tensor_model_parallel_size=self.tp_size)
+  File "/sgl-workspace/sglang/python/sglang/srt/distributed/parallel_state.py", line 1055, in initialize_model_parallel
+    _TP = init_model_parallel_group(
+  File "/sgl-workspace/sglang/python/sglang/srt/distributed/parallel_state.py", line 890, in init_model_parallel_group
+    return GroupCoordinator(
+  File "/sgl-workspace/sglang/python/sglang/srt/distributed/parallel_state.py", line 268, in __init__
+    self.mq_broadcaster = MessageQueue.create_from_process_group(
+  File "/sgl-workspace/sglang/python/sglang/srt/distributed/device_communicators/shm_broadcast.py", line 484, in create_from_process_group
+    buffer_io = MessageQueue(
+  File "/sgl-workspace/sglang/python/sglang/srt/distributed/device_communicators/shm_broadcast.py", line 207, in __init__
+    local_subscribe_port = get_open_port()
+  File "/sgl-workspace/sglang/python/sglang/srt/utils.py", line 1392, in get_open_port
+    s.bind(("", port))
+TypeError: 'str' object cannot be interpreted as an integer
+```
+
+- **原因**：创建了名为 `sglang` 的 Service，容器启动时会被自动注入 `SGLANG_PORT` 的环境变量，而该变量的值格式类似 `tcp://x.x.x.x:30000`，SGLang 启动时读取了该环境变量，用于监听端口，而值并非数字格式就报错了。
+- **解决方案**：Service 名称改成其它名字，`sglang-api`。
