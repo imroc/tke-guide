@@ -1,6 +1,6 @@
 # 在 TKE 使用 SGLang 部署 DeepSeek-R1
 
-:::warn[警告]
+:::warning[警告]
 
 实践还在进行中，本文尚未完成！
 
