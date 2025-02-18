@@ -557,7 +557,7 @@ Error from server (Forbidden): error when creating "deepseek-r1-a800.yaml": lead
 
 - **原因**：刚安装好 lws 组件不久，ResourceQuota 状态还没同步好。
 - **解决方案**：等待一会儿再重试。
-```
+
 ## 参考资料
 
 - ModelScope 上的 DeepSeek-R1 模型列表: https://www.modelscope.cn/collections/DeepSeek-R1-c8e86ac66ed943
