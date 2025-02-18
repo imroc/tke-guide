@@ -543,8 +543,8 @@ RuntimeError: Not enough memory. Please try to increase --mem-fraction-static.
 RuntimeError: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 802: system not yet initialized
 ```
 
-- **原因**: 疑似 CUDA 版本不匹配，用的 latest 标签，容器内 CUDA 版本是 12.5，而节点安装的 CUDA 版本是 12.2。
-- **解决方案**: 原生节点添加 A800 机型安装的 CUDA 版本最高是 12.2，而直接通过 HCC 控制台安装可以支持到 12.4，改成使用 HCC 创建云服务器，然后通过添加已有节点方式加入 TKE 集群；再改 sglang 的镜像 tag，指定 CUDA 版本与节点匹配的 tag，如 `v0.4.3.post2-cu124`。
+- **原因**: 未知。
+- **解决方案**: 正在解决中。
 
 ### kubectl 报错: status unknown for quota: tke-default-quota, resources: count/leaderworkersets.leaderworkerset.x-k8s.io
 
