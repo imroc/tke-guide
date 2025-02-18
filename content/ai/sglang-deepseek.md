@@ -553,7 +553,7 @@ RuntimeError: Unexpected error from cudaGetDeviceCount(). Did you run some cuda 
 ```bash
 $ kubectl apply --recursive -f deepseek-r1-a800.yaml
 Error from server (Forbidden): error when creating "deepseek-r1-a800.yaml": leaderworkersets.leaderworkerset.x-k8s.io "deepseek-r1" is forbidden: status unknown for quota: tke-default-quota, resources: count/leaderworkersets.leaderworkerset.x-k8s.io
-
+```
 
 - **原因**：刚安装好 lws 组件不久，ResourceQuota 状态还没同步好。
 - **解决方案**：等待一会儿再重试。
