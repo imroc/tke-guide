@@ -391,6 +391,8 @@ spec:
     targetPort: 30000
 ```
 
+## 常见问题
+
 ### 报错: undefined symbol: cuTensorMapEncodeTiled
 
 SGLang 启动报错：
@@ -474,3 +476,27 @@ TypeError: 'str' object cannot be interpreted as an integer
 
 - **原因**：创建了名为 `sglang` 的 Service，容器启动时会被自动注入 `SGLANG_PORT` 的环境变量，而该变量的值格式类似 `tcp://x.x.x.x:30000`，SGLang 启动时读取了该环境变量，用于监听端口，而值并非数字格式就报错了。
 - **解决方案**：Service 名称改成其它名字，`sglang-api`。
+
+### 报错: Not enough memory. Please try to increase --mem-fraction-static.
+
+SGLang 加载完模型后报错：
+
+```ctx
+[2025-02-17 10:13:46 TP4] Scheduler hit an exception: Traceback (most recent call last):
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 1816, in run_scheduler_process
+    scheduler = Scheduler(server_args, port_args, gpu_id, tp_rank, dp_rank)
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 240, in __init__
+    self.tp_worker = TpWorkerClass(
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker_overlap_thread.py", line 63, in __init__
+    self.worker = TpModelWorker(server_args, gpu_id, tp_rank, dp_rank, nccl_port)
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker.py", line 68, in __init__
+    self.model_runner = ModelRunner(
+  File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 215, in __init__
+    self.init_memory_pool(
+  File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 628, in init_memory_pool
+    raise RuntimeError(
+RuntimeError: Not enough memory. Please try to increase --mem-fraction-static.
+```
+
+- **原因**：显存不够。
+- **解决方案**：换其它 GPU 型号的机型或者用更多的节点数组建集群。
