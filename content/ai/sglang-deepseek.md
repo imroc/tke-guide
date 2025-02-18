@@ -1,10 +1,32 @@
-# 在 TKE 使用 SGLang 部署满血版 DeepSeek-R1 最佳实践
+# 在 TKE 使用 SGLang 部署 DeepSeek-R1
+
+:::warn[警告]
+
+实践还在进行中，本文尚未完成！
+
+:::
 
 ## 概述
 
 [SGLang](https://docs.sglang.ai/) 与 [vLLM](https://docs.vllm.ai) 类似， 用于运行 AI 大模型，是性能卓越的新兴之秀，与 DeepSeek 官方合作并专门针对 DeepSeek 进行了深度优化，也是 DeepSeek 官方推荐的部署工具。
 
-本文将基于 SGLang 在 TKE 集群上部署满血版 DeepSeek-R1 模型，提供最佳实践的部署示例。
+本文将基于 SGLang 在 TKE 集群上部署 DeepSeek-R1 模型，提供最佳实践的部署示例。
+
+## DeepSeek-R1 模型列表
+
+SGLang 支持 [HuggingFace](https://huggingface.co/models) 和 [ModelScope](https://www.modelscope.cn/models) 上的大模型，由于腾讯云的 GPU 机型基本只在国内售卖，而 HuggingFace 上的模型在国内下载会有网络问题，所以本文以 ModelScope 上的 DeepSeek-R1 模型为例。
+
+DeepSeek-R1 除了原版的 671B （满血版）模型外，还有一系列蒸馏版，满血版对硬件要求高，蒸馏版是缩小版 DeepSeek-R1，对硬件要求低。
+
+| 参数量 | 模型名称                      |
+| ------ | ----------------------------- |
+| 1.5B   | DeepSeek-R1-Distill-Qwen-1.5B |
+| 7B     | DeepSeek-R1-Distill-Qwen-7B   |
+| 8B     | DeepSeek-R1-Distill-Llama-8B  |
+| 14B    | DeepSeek-R1-Distill-Qwen-14B  |
+| 32B    | DeepSeek-R1-Distill-Qwen-32B  |
+| 70B    | DeepSeek-R1-Distill-Llama-70B |
+| 671B   | DeepSeek-R1 (满血版)          |
 
 ## 选择 GPU 型号
 
@@ -28,29 +50,32 @@ SGLang 用 GPU 运行 DeepSeek 大模型，要求 GPU 的计算能力大于等�
 RuntimeError: SGLang only supports sm75 and above.
 ```
 
-在腾讯云上售卖的 GPU 型号 以及各型号的显存大小可参考 [GPU 计算型实例](https://cloud.tencent.com/document/product/560/19700)。
+在腾讯云上售卖的 GPU 服务器分两类：[GPU 云服务器](https://cloud.tencent.com/product/gpu) 和 [高性能计算集群 HCC](https://cloud.tencent.com/product/hcc)。
+- GPU 云服务器售卖的机型、地域以及对应的 GPU 型号和显存大小及参考 [GPU 云服务器实例规格](https://cloud.tencent.com/document/product/560/19700)。
+- HCC 售卖的机型以及对应的 GPU 型号和显存大小参考 [HCC 实例规格](https://cloud.tencent.com/document/product/1646/81562)，售卖地域参考 [HCC 实例售卖地域](https://cloud.tencent.com/document/product/1646/81565)。
 
 GPU 型号与计算能力的关系参考 NVIDIA 官方文档 [Your GPU Compute Capability](https://developer.nvidia.com/cuda-gpus) 中 **CUDA-Enabled Datacenter Products** 的表格。
 
 根据以上信息，总结一下腾讯云售卖的 GPU 型号计算能力与显存：
 
-| GPU 型号 | 计算能力 | GPU 显存 |
-| -------- | -------- | -------- |
-| P4       | 6.1      | 8GB      |
-| P40      | 6.1      | 24GB     |
-| V100     | 7.0      | 32GB     |
-| T4       | 7.5      | 16GB     |
-| A100     | 8.0      | 40GB     |
-| A10      | 8.6      | 24GB     |
-
-**结论**：由于 SGLang 推荐 GPU 计算能力要在 8.0 以上，所以选择 A100 或 A10 型号的 GPU 来部署。A10 对比 A100，显存更小，但比 A100 便宜很多，货源也更充足，可根据需求自行选择。
+| GPU 型号           | 计算能力 | 显存      | 售卖渠道 |
+| ------------------ | -------- | --------- | -------- |
+| NVIDIA P4          | 6.1      | 8GB       | CVM      |
+| NVIDIA P40         | 6.1      | 24GB      | CVM      |
+| NVIDIA V100        | 7.0      | 32GB      | CVM/HCC  |
+| NVIDIA P40         | 6.1      | 24GB      | CVM      |
+| NVIDIA T4          | 7.5      | 16GB      | CVM      |
+| NVIDIA A10         | 8.6      | 24GB      | CVM      |
+| NVIDIA A100        | 8.0      | 40GB      | CVM/HCC  |
+| NVIDIA A800        | 8.0      | 40GB/80GB | HCC      |
+| NVIDIA H800        | 9.0      | 80GB      | HCC      |
+| NVIDIA GPU（邀测） | 9.0      | 未知      | HCC      |
 
 ## 选择 TKE 集群地域
 
-由于 A10 和 A100 型号的 GPU 只在部分地域售卖，所以我们需要选择这些有售卖的地域来创建 TKE 集群，具体售卖地域参考 [GPU 计算型实例](https://cloud.tencent.com/document/product/560/19700) 中的表格。
+由于 GPU 机型只在部分地域售卖，所以我们需要选择这些有售卖的地域来创建 TKE 集群，具体售卖地域参考 [GPU 云服务器实例规格](https://cloud.tencent.com/document/product/560/19700) 和 [HCC 实例售卖地域](https://cloud.tencent.com/document/product/1646/81565) 中的表格。
 
 **结论**：选择广州、上海、南京、北京这些国内地域创建 TKE 集群。
-
 
 ## 操作步骤
 
@@ -184,12 +209,6 @@ spec:
 ### 安装 LWS 组件
 
 SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes-sigs/lws) 组件，在 TKE 应用市场中找到 lws：
-
-:::info[注意]
-
-lws 上架应用市场还在进行中。
-
-:::
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F14%2F20250214151529.png)
 
@@ -500,3 +519,46 @@ RuntimeError: Not enough memory. Please try to increase --mem-fraction-static.
 
 - **原因**：显存不够。
 - **解决方案**：换其它 GPU 型号的机型或者用更多的节点数组建集群。
+
+### 报错: Error 802: system not yet initialized
+
+```txt
+[2025-02-18 03:43:01 TP3] Scheduler hit an exception: Traceback (most recent call last):
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 1816, in run_scheduler_process
+    scheduler = Scheduler(server_args, port_args, gpu_id, tp_rank, dp_rank)
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 240, in __init__
+    self.tp_worker = TpWorkerClass(
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker_overlap_thread.py", line 63, in __init__
+    self.worker = TpModelWorker(server_args, gpu_id, tp_rank, dp_rank, nccl_port)
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker.py", line 68, in __init__
+    self.model_runner = ModelRunner(
+  File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 187, in __init__
+    min_per_gpu_memory = self.init_torch_distributed()
+  File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 232, in init_torch_distributed
+    torch.get_device_module(self.device).set_device(self.gpu_id)
+  File "/usr/local/lib/python3.10/dist-packages/torch/cuda/__init__.py", line 478, in set_device
+    torch._C._cuda_setDevice(device)
+  File "/usr/local/lib/python3.10/dist-packages/torch/cuda/__init__.py", line 319, in _lazy_init
+    torch._C._cuda_init()
+RuntimeError: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 802: system not yet initialized
+```
+
+- **原因**: 疑似 CUDA 版本不匹配，用的 latest 标签，容器内 CUDA 版本是 12.5，而节点安装的 CUDA 版本是 12.2。
+- **解决方案**: 原生节点添加 A800 机型安装的 CUDA 版本最高是 12.2，而直接通过 HCC 控制台安装可以支持到 12.4，改成使用 HCC 创建云服务器，然后通过添加已有节点方式加入 TKE 集群；再改 sglang 的镜像 tag，指定 CUDA 版本与节点匹配的 tag，如 `v0.4.3.post2-cu124`。
+
+### kubectl 报错: status unknown for quota: tke-default-quota, resources: count/leaderworkersets.leaderworkerset.x-k8s.io
+
+通过 kubectl apply 创建 `LeaderWorkerSet` 时报错：
+
+```bash
+$ kubectl apply --recursive -f deepseek-r1-a800.yaml
+Error from server (Forbidden): error when creating "deepseek-r1-a800.yaml": leaderworkersets.leaderworkerset.x-k8s.io "deepseek-r1" is forbidden: status unknown for quota: tke-default-quota, resources: count/leaderworkersets.leaderworkerset.x-k8s.io
+
+
+- **原因**：刚安装好 lws 组件不久，ResourceQuota 状态还没同步好。
+- **解决方案**：等待一会儿再重试。
+```
+## 参考资料
+
+- ModelScope 上的 DeepSeek-R1 模型列表: https://www.modelscope.cn/collections/DeepSeek-R1-c8e86ac66ed943
+
