@@ -470,7 +470,7 @@ docker push ccr.ccs.tencentyun.com/imroc/sglang:cuda-12.4.1
 
 #### 步骤3: 替换镜像
 
-最后在部署 `Ollama` 或 `vLLM` 的 `Deplioyment` 中，将镜像替换成自己指定了 CUDA 版本编译上传的镜像名称，即可完成指定最佳的 CUDA 版本。
+最后在部署 `Ollama` 或 `vLLM` 的 `Deployment` 中，将镜像替换成自己指定了 CUDA 版本编译上传的镜像名称，即可完成指定最佳的 CUDA 版本。
 
 ### 模型为何下载失败？
 
