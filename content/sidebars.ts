@@ -165,6 +165,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'ai/llm',
         'ai/sglang-deepseek-r1',
+        'ai/faq',
       ],
     },
     {
