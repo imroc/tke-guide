@@ -44,17 +44,31 @@
 - **集群类型**：选择**TKE 标准集群**。
 - **Kubernetes版本**：要大于等于1.28（多机部署依赖的 LWS 组件的要求），建议选最新版。
 
-### 添加 GPU 节点
+### 购买 GPU 服务器
 
-优先通过创建节点池的方式购买和添加节点，节点类型可用**普通节点**和**原生节点**，如果用**普通节点**，需显式指定操作系统，系统镜像选 `TencentOS Server 3.1 (TK4) UEFI | img-39ywauzd`；驱动和 CUDA 版本选最新。
-
-如果通过节点池的方式选不到，可先在 [云服务器购买页面](https://buy.cloud.tencent.com/cvm) 进行购买，再通过添加已有节点的方式加进 TKE 集群。
+测试 POC 阶段，可先在 [云服务器购买页面](https://buy.cloud.tencent.com/cvm) 进行购买，支持按量计费。
 
 :::info[注意]
 
 对于 **PNV6.32XLARGE1280** 和 **PNV6.96XLARGE2304** 的机型，在**架构**为**异构计算**中找；对于 **HCCPNV6** 的机型，在**架构**为**高性能计算集群**中找，且需提前创建高性能计算集群，详情请参见 [创建高性能计算集群](https://cloud.tencent.com/document/product/1646/93026#3680502d-53cb-440e-8cf1-3eebbb7db3c5)。
 
 :::
+
+正式购买阶段，需通过 [高性能计算平台-工作空间](https://console.cloud.tencent.com/thpc/workspace/index) 购买，不支持按量计费，其规格与机型对照表如下：
+
+| 规格              | 机型              | 是否支持 RDMA |
+| ----------------- | ----------------- | ------------- |
+| 96AS.32XLARGE1280 | PNV6.32XLARGE1280 | 不支持        |
+| 96AS.32XLARGE1280 | PNV6.96XLARGE2304 | 不支持        |
+| 96A               | HCCPNV6           | 支持          |
+
+### 添加 GPU 节点
+
+通过添加已有节点的方式将购买到的 GPU 服务器加入 TKE 集群。
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F19%2F20250219175511.png)
+
+系统镜像选 `TencentOS Server 3.1 (TK4) UEFI | img-39ywauzd`，驱动和 CUDA 选最新版本。
 
 ### 准备 CFS 存储
 
