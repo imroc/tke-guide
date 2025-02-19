@@ -30,20 +30,6 @@
 
 ## 操作步骤
 
-### 创建 TKE 集群
-
-登录 [容器服务控制台](https://console.cloud.tencent.com/tke2)，创建一个集群：
-
-:::tip[说明]
-
-更多详情请参见 [创建集群](https://cloud.tencent.com/document/product/457/103981)。
-
-:::
-
-- **地域**：选择协调好的 GPU 资源所在地域
-- **集群类型**：选择**TKE 标准集群**。
-- **Kubernetes版本**：要大于等于1.28（多机部署依赖的 LWS 组件的要求），建议选最新版。
-
 ### 购买 GPU 服务器
 
 测试 POC 阶段，可先在 [云服务器购买页面](https://buy.cloud.tencent.com/cvm) 进行购买，支持按量计费。
@@ -61,6 +47,20 @@
 | 96AS.32XLARGE1280 | PNV6.32XLARGE1280 | 不支持        |
 | 96AS.32XLARGE1280 | PNV6.96XLARGE2304 | 不支持        |
 | 96A               | HCCPNV6           | 支持          |
+
+### 创建 TKE 集群
+
+登录 [容器服务控制台](https://console.cloud.tencent.com/tke2)，创建一个集群：
+
+:::tip[说明]
+
+更多详情请参见 [创建集群](https://cloud.tencent.com/document/product/457/103981)。
+
+:::
+
+- **地域**：选择购买的 GPU 服务器所在地域
+- **集群类型**：选择**TKE 标准集群**。
+- **Kubernetes版本**：要大于等于1.28（多机部署依赖的 LWS 组件的要求），建议选最新版。
 
 ### 添加 GPU 节点
 
