@@ -162,7 +162,7 @@ GPU 插件无需显式安装，如果使用**普通节点**或**原生节点**�
 
 ### 步骤4: 使用 Job 下载 AI 大模型
 
-下发一个 Job，将需要用的 AI 大模型下载到 CFS 共享存储中，以下分别是 vLLM 和 Ollama 的 Job 示例：
+下发一个 Job，将需要用的 AI 大模型下载到 CFS 共享存储中，以下分别是 vLLM、SGLang 和 Ollama 的 Job 示例：
 
 :::tip[注意]
 
@@ -205,6 +205,7 @@ GPU 插件无需显式安装，如果使用**普通节点**或**原生节点**�
     <FileBlock file="ai/sglang.yaml" showLineNumbers />
     1. `LLM_MODEL` 环境变量指定大模型名称，与前面下载 Job 中指定的名称要一致，注意替换。
     2. 模型数据引用前面下载 Job 使用的 PVC，挂载到 `/data` 目录下。
+    3. SGLang 监听 30000 端口暴露 API，并定义 Service 以便后续被 OpenWebUI 调用。
   </TabItem>
   <TabItem value="deploy-ollama" label="部署 Ollama">
     通过 Deployment 部署 Ollama:
