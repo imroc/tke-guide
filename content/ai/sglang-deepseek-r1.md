@@ -12,25 +12,19 @@
 
 本文将基于 SGLang 在 TKE 集群上部署 DeepSeek-R1 模型，提供最佳实践的部署示例。
 
-## 选择机型
+## 机型与部署方案
 
-要部署满血版的 DeepSeek-R1 需要用 [高性能计算集群 HCC](https://cloud.tencent.com/product/hcc) 中售卖的机型，参考 [HCC 实例规格](https://cloud.tencent.com/document/product/1646/81562)。HCC 支持 RDMA，且 GPU 显存大，规格高，适合部署满血版的 DeepSeek-R1。
+由于满血版的 DeepSeek-R1 参数量较大，需要用较大显存且支持 FP8 量化的大规格 GPU 实例，目前合适的机型有 [HCCPNV6](https://cloud.tencent.com/document/product/1646/81562#HCCPNV6)（[高性能计算集群](https://cloud.tencent.com/product/hcc)）和 [PNV6.32XLARGE1280 / PNV6.96XLARGE2304](https://cloud.tencent.com/document/product/560/19700#PNV6)（[GPU 云服务器](https://cloud.tencent.com/product/gpu)），推荐的部署方案是用两台该机型的节点组建 GPU 集群来运行满血 DeepSeek-R1（并发小的话一台也可以）。
 
 :::info[注意]
 
-由于 HCC GPU 资源紧张，一般直接买时买不出来的，需联系售后预留资源。
+该机型的实例正在邀测中，需联系您的销售经理开通使用并协调资源。
 
 :::
 
-## 选择 TKE 集群地域
-
-由于 HCC GPU 机型只在部分地域售卖，所以我们需要选择这些有售卖的地域来创建 TKE 集群，具体售卖地域参考 [HCC 实例售卖地域](https://cloud.tencent.com/document/product/1646/81565) 中的表格。
-
-**结论**：选择广州、上海、南京、北京这些国内地域创建 TKE 集群。
-
 ## 操作步骤
 
-### 准备集群
+### 创建 TKE 集群
 
 登录 [容器服务控制台](https://console.cloud.tencent.com/tke2)，创建一个集群：
 
@@ -40,16 +34,21 @@
 
 :::
 
+- **地域**：选择协调好的 GPU 资源所在地域
 - **集群类型**：选择**TKE 标准集群**。
 - **Kubernetes版本**：要大于等于1.28（多机部署依赖的 LWS 组件的要求），建议选最新版。
 
-### 购买 HCC 机器
+### 添加 GPU 节点
 
-TODO
+优先通过创建节点池的方式购买和添加节点，节点类型可用**普通节点**和**原生节点**，如果用**普通节点**，需显式指定操作系统，系统镜像选 `TencentOS Server 3.1 (TK4) UEFI | img-39ywauzd`；驱动和 CUDA 版本选最新。
 
-### 添加 HCC 机器到 TKE 集群
+如果通过节点池的方式选不到，可先在 [云服务器购买页面](https://buy.cloud.tencent.com/cvm) 进行购买，再通过添加已有节点的方式加进 TKE 集群。
 
-TODO
+:::info[注意]
+
+对于 **PNV6.32XLARGE1280** 和 **PNV6.96XLARGE2304** 的机型，在**架构**为**异构计算**中找；对于 **HCCPNV6** 的机型，在**架构**为**高性能计算集群**中找，且需提前创建高性能计算集群，详情请参见 [创建高性能计算集群](https://cloud.tencent.com/document/product/1646/93026#3680502d-53cb-440e-8cf1-3eebbb7db3c5)。
+
+:::
 
 ### 准备 CFS 存储
 
@@ -234,10 +233,10 @@ spec:
 
 :::info[说明]
 
-- `nvidia.com/gpu` 为单机 GPU 卡数。
-- `--tp` 为单个 GPU 集群的 GPU 总卡数（节点数量*单机 GPU 卡数）。
-- `size` 为单个 GPU 集群的节点数。
-- `replicas` 为 GPU 集群数量。
+- `nvidia.com/gpu` 为单机 GPU 卡数，这里是 8 卡。
+- `--tp` 为单个 GPU 集群的 GPU 总卡数（节点数量*单机 GPU 卡数），这里是 16 卡。
+- `size` 为单个 GPU 集群的节点数，这里是 2。
+- `replicas` 为 GPU 集群数量，这里是 1 个 GPU 集群，如需扩容，准备好节点资源后，调整这里的数量即可。
 
 :::
 
@@ -256,29 +255,43 @@ spec:
         labels:
           role: leader
       spec:
-        hostNetwork: true
+        hostNetwork: true # 如果使用 HCCPNV6 机型，支持 RDMA，需要使用 HostNetwork 才能让 RDMA 生效。
         hostPID: true
-        dnsPolicy: ClusterFirstWithHostNet
+        dnsPolicy: ClusterFirstWithHostNet # 如果使用 HostNetwork，默认使用节点上 /etc/resolv.conf 中的 dns server，会导致 LWS_LEADER_ADDRESS 指定的域名解析失败，所以 dnsPolicy 指定为 ClusterFirstWithHostNet 以便使用 coredns 解析。
         containers:
         - name: leader
           image: lmsysorg/sglang:latest
+          env:
+          - name: TOTAL_GPU
+            value: "16"
+          - name: MODEL_DIRECTORY
+            value: "DeepSeek-R1"
+          - name: MODEL_NAME
+            value: "DeepSeek-R1"
           command:
           - bash
           - -c
           - |
             set -x
+            MODEL_DIRECTORY="${MODEL_DIRECTORY:-MODEL_NAME}"
             exec python3 -m sglang.launch_server \
-              --model-path /data/DeepSeek-R1 \
+              --model-path /data/$MODEL_DIRECTORY \
+              --served-model-name $MODEL_NAME \
               --nnodes $LWS_GROUP_SIZE \
-              --tp 16 \
+              --tp $TOTAL_GPU \
               --node-rank 0 \
               --dist-init-addr $(LWS_LEADER_ADDRESS):5000 \
+              --log-requests \
+              --enable-metric \
+              --allow-auto-truncate \
+              --watchdog-timeout 3600 \
+              --disable-custom-all-reduce \
               --trust-remote-code \
               --host 0.0.0.0 \
               --port 30000
           resources:
             limits:
-              nvidia.com/gpu: "8"
+              nvidia.com/gpu: "8" # 每台节点 8 张 GPU 卡，每个 Pod 独占 1 台节点。
           ports:
           - containerPort: 30000
           volumeMounts:
@@ -295,9 +308,9 @@ spec:
             claimName: ai-model-turbo
     workerTemplate:
       spec:
-        hostNetwork: true
+        hostNetwork: true # worker 与 master 保持一致
         hostPID: true
-        dnsPolicy: ClusterFirstWithHostNet
+        dnsPolicy: ClusterFirstWithHostNet # worker 与 master 保持一致
         containers:
         - name: worker
           image: lmsysorg/sglang:latest
@@ -306,21 +319,34 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
+          - name: TOTAL_GPU
+            value: "16"
+          - name: MODEL_DIRECTORY
+            value: "DeepSeek-R1"
+          - name: MODEL_NAME
+            value: "DeepSeek-R1"
           command:
           - bash
           - -c
           - |
             set -x
+            MODEL_DIRECTORY="${MODEL_DIRECTORY:-MODEL_NAME}"
             exec python3 -m sglang.launch_server \
-              --model-path /data/DeepSeek-R1 \
+              --model-path /data/$MODEL_DIRECTORY \
+              --served-model-name $MODEL_NAME \
               --nnodes $LWS_GROUP_SIZE \
-              --tp 16 \
+              --tp $TOTAL_GPU \
               --node-rank $ORDINAL_NUMBER \
               --dist-init-addr $(LWS_LEADER_ADDRESS):5000 \
+              --log-requests \
+              --enable-metric \
+              --allow-auto-truncate \
+              --watchdog-timeout 3600 \
+              --disable-custom-all-reduce \
               --trust-remote-code
           resources:
             limits:
-              nvidia.com/gpu: "8"
+              nvidia.com/gpu: "8" # 每台节点 8 张 GPU 卡，每个 Pod 独占 1 台节点。
           volumeMounts:
           - mountPath: /dev/shm
             name: dshm
@@ -335,15 +361,12 @@ spec:
             claimName: ai-model
 ```
 
-- 2 台节点，每台节点 8 张 GPU 卡，每个 Pod 独占 1 台节点。
-- 使用 HostNetwork，让 RDMA 生效。
-
 再创建一个 Service 用于 SGLang 提供的兼容 OpenAI 的 API：
 
 :::info[注意]
 
 - `leaderworkerset.sigs.k8s.io/name` 指定 lws 的名称。
-- 所有 GPU 集群的 leader Pod 的 index 固定为 0，可以通过 `apps.kubernetes.io/pod-index: "0"` 这个 label 来选中。
+- 所有 GPU 集群的 leader Pod 的 index 固定为 0，可以通过 `apps.kubernetes.io/pod-index: "0"` 这个 label 来选中，如果修改 `replicas` 扩容出新的 GPU 集群，新集群 leader 会被自动被该 Service 选中并负载均衡。
 - 涉及 API 地址配置的地方（如 OpenWebUI），指向这个 Service 的地址（如 `http://deepseek-r1-api:30000/v1`）。
 
 :::
@@ -473,32 +496,6 @@ RuntimeError: Not enough memory. Please try to increase --mem-fraction-static.
 
 - **原因**：显存不够。
 - **解决方案**：换其它 GPU 型号的机型或者用更多的节点数组建集群。
-
-### 报错: Error 802: system not yet initialized
-
-```txt
-[2025-02-18 03:43:01 TP3] Scheduler hit an exception: Traceback (most recent call last):
-  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 1816, in run_scheduler_process
-    scheduler = Scheduler(server_args, port_args, gpu_id, tp_rank, dp_rank)
-  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 240, in __init__
-    self.tp_worker = TpWorkerClass(
-  File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker_overlap_thread.py", line 63, in __init__
-    self.worker = TpModelWorker(server_args, gpu_id, tp_rank, dp_rank, nccl_port)
-  File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker.py", line 68, in __init__
-    self.model_runner = ModelRunner(
-  File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 187, in __init__
-    min_per_gpu_memory = self.init_torch_distributed()
-  File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 232, in init_torch_distributed
-    torch.get_device_module(self.device).set_device(self.gpu_id)
-  File "/usr/local/lib/python3.10/dist-packages/torch/cuda/__init__.py", line 478, in set_device
-    torch._C._cuda_setDevice(device)
-  File "/usr/local/lib/python3.10/dist-packages/torch/cuda/__init__.py", line 319, in _lazy_init
-    torch._C._cuda_init()
-RuntimeError: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 802: system not yet initialized
-```
-
-- **原因**: 未知。
-- **解决方案**: 正在解决中。
 
 ### kubectl 报错: status unknown for quota: tke-default-quota, resources: count/leaderworkersets.leaderworkerset.x-k8s.io
 
