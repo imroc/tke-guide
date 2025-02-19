@@ -248,6 +248,7 @@ spec:
 - `MODEL_DIRECTORY` 为模型文件的子目录路径。
 - `MODEL_NAME` 为模型名称，API 调用将使用此模型名称进行交互。
 - leader 和 worker 的环境变量需一致，如需调整记得将 leader 和 worker 的 template 都做相同的修改。
+- 如果使用支持 RDMA 的机型，需使用 HostNetwork 才能让 RDMA 生效。
 
 :::
 

@@ -35,7 +35,7 @@ vLLM 启动或运行过程中可能报错，如：
 
 确认 CUDA 版本：在 NVIDIA 官网的 [CUDA Toolkit and Corresponding Driver Versions](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html#id6) 中，查找适合前面确认到的 GPU 驱动版本的 CUDA 版本，用于后面打包镜像时选择对应版本的基础镜像。
 
-### 步骤2: 编译 Ollama 或 vLLM 镜像
+### 步骤2: 编译 Ollama、vLLM 或 SGLang 镜像
 
 ##### Ollama 镜像
 
@@ -113,7 +113,7 @@ docker push ccr.ccs.tencentyun.com/imroc/sglang:cuda-12.4.1
 
 ### 步骤3: 替换镜像
 
-最后在部署 `Ollama` 或 `vLLM` 的 `Deployment` 中，将镜像替换成自己指定了 CUDA 版本编译上传的镜像名称，即可完成指定最佳的 CUDA 版本。
+最后在部署 `Ollama`、`vLLM` 或 `SGLang` 的 `Deployment` 中，将镜像替换成自己指定了 CUDA 版本编译上传的镜像名称，即可完成指定最佳的 CUDA 版本。
 
 ## 模型为何下载失败？
 
@@ -131,7 +131,7 @@ docker push ccr.ccs.tencentyun.com/imroc/sglang:cuda-12.4.1
 
 ## 如何实现多卡并行？
 
-Ollama 和 vLLM 默认将模型部署到单张 GPU 卡上，如果是多人使用，并发请求，或者模型太大，可以配置下 Ollama 和 vLLM，将模型部署到多张 GPU 卡上并行计算来提升推理速度和吞吐量。
+Ollama、vLLM 和 SGLang 默认将模型部署到单张 GPU 卡上，如果是多人使用，并发请求，或者模型太大，可以配置下 Ollama 和 vLLM，将模型部署到多张 GPU 卡上并行计算来提升推理速度和吞吐量。
 
 首先在定义 Ollama 或 vLLM 的 Deployment 时，需声明 GPU 的数量大于 1，示例：
 
