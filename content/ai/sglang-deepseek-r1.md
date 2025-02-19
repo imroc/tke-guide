@@ -233,7 +233,7 @@ spec:
 
 :::info[说明]
 
-- `nvidia.com/gpu` 为单机 GPU 卡数，这里是 8 卡。
+- `nvidia.com/gpu` 为单机 GPU 卡数，这里是 8 卡（leader 和 worker 保持一致）。
 - `leaderWorkerTemplate.size` 为单个 GPU 集群的节点数，2 表示两个节点组成的 GPU 集群（1 个 leader 和 1 个 worker）。
 - `replicas` 为 GPU 集群数量，这里是 1 个 GPU 集群，如需扩容，准备好节点资源后，调整这里的数量即可。
 - `TOTAL_GPU` 为单个 GPU 集群的 GPU 总卡数（节点数量*单机 GPU 卡数），这里是 16 卡。
