@@ -164,7 +164,7 @@ const sidebars: SidebarsConfig = {
       },
       items: [
         'ai/llm',
-        'ai/sglang-deepseek',
+        'ai/sglang-deepseek-r1',
       ],
     },
     {
