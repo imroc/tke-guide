@@ -308,7 +308,7 @@ spec:
             medium: Memory
         - name: data
           persistentVolumeClaim:
-            claimName: ai-model-turbo
+            claimName: ai-model
     workerTemplate:
       spec:
         hostNetwork: true # worker 与 master 保持一致
