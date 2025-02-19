@@ -229,7 +229,7 @@ spec:
 
 ### 部署 DeepSeek-R1
 
-使用 `LeaderWorkerSet` 多机部署满血版的 DeepSeek-R1：
+使用 `LeaderWorkerSet` 部署满血版的 DeepSeek-R1 (2 台 8 卡的 GPU 节点)：
 
 :::info[说明]
 
