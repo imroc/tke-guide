@@ -451,7 +451,7 @@ spec:
         app: deepseek-r1
     spec:
       containers:
-      - name: deepseek-r1
+      - name: sglang
         image: lmsysorg/sglang:latest
         env:
         - name: TOTAL_GPU
@@ -475,7 +475,9 @@ spec:
             --allow-auto-truncate \
             --watchdog-timeout 3600 \
             --disable-custom-all-reduce \
-            --trust-remote-code
+            --trust-remote-code \
+            --host 0.0.0.0 \
+            --port 30000
         resources:
           limits:
             nvidia.com/gpu: "8"
@@ -523,6 +525,19 @@ spec:
 :::
 
 部署好后如果像扩容，可以通过调高 `replicas` 来增加 DeepSeek-R1 副本数（前提是准备好新的 GPU 节点资源）。
+
+### 验证 API
+
+Pod 成功跑起来后用 kubectl exec 进入 leader Pod，使用 curl 测试 API：
+
+```bash
+curl -v http://127.0.0.1:30000/v1/completions -H "Content-Type: application/json" -d '{
+      "model": "DeepSeek-R1",
+      "prompt": "你是谁?",
+      "max_tokens": 100,
+      "temperature": 0
+    }'
+```
 
 ## 常见问题
 
