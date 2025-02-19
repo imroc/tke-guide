@@ -1,4 +1,4 @@
-# 在 TKE 使用 SGLang 部署 DeepSeek-R1
+# 部署满血版 DeepSeek-R1 (SGLang)
 
 :::warning[警告]
 
@@ -12,9 +12,19 @@
 
 本文将基于 SGLang 在 TKE 集群上部署 DeepSeek-R1 模型，提供最佳实践的部署示例。
 
+## 选择机型
+
+要部署满血版的 DeepSeek-R1 需要用 [高性能计算集群 HCC](https://cloud.tencent.com/product/hcc) 中售卖的机型，参考 [HCC 实例规格](https://cloud.tencent.com/document/product/1646/81562)。HCC 支持 RDMA，且 GPU 显存大，规格高，适合部署满血版的 DeepSeek-R1。
+
+:::info[注意]
+
+由于 HCC GPU 资源紧张，一般直接买时买不出来的，需联系售后预留资源。
+
+:::
+
 ## 选择 TKE 集群地域
 
-由于 GPU 机型只在部分地域售卖，所以我们需要选择这些有售卖的地域来创建 TKE 集群，具体售卖地域参考 [GPU 云服务器实例规格](https://cloud.tencent.com/document/product/560/19700) 和 [HCC 实例售卖地域](https://cloud.tencent.com/document/product/1646/81565) 中的表格。
+由于 HCC GPU 机型只在部分地域售卖，所以我们需要选择这些有售卖的地域来创建 TKE 集群，具体售卖地域参考 [HCC 实例售卖地域](https://cloud.tencent.com/document/product/1646/81565) 中的表格。
 
 **结论**：选择广州、上海、南京、北京这些国内地域创建 TKE 集群。
 
@@ -33,15 +43,13 @@
 - **集群类型**：选择**TKE 标准集群**。
 - **Kubernetes版本**：要大于等于1.28（多机部署依赖的 LWS 组件的要求），建议选最新版。
 
-### 新建 GPU 节点池
+### 购买 HCC 机器
 
-1. 在集群管理页面，选择**集群 ID**，进入集群的基本信息页面。
-2. 选择左侧菜单栏中的**节点管理**，在节点池页面单击**新建**。
-3. 节点类型选择**原生节点**或**普通节点**。配置详情请参见 [创建节点池](https://cloud.tencent.com/document/product/457/43735)。
-  - 如果使用**原生节点**或**普通节点**，**操作系统**选新一点的；**系统盘**和**数据盘**默认 50GB，建议调大点（如200GB），避免因 SGLang 镜像大导致节点磁盘空间不够而无法正常拉起；**机型配置**在**GPU 机型**中选择一个符合需求且没有售罄的机型，如有 GPU 驱动选项，也选最新的版本。
-  - 如果使用**超级节点**，是虚拟的节点，每个 Pod 都是独占的轻量虚拟机，所以无需选择机型，只需在部署的时候通过 Pod 注解来指定 GPU 卡的型号（后面示例中会有），但超级节点暂不支持 A100，只有用 A10。
-  - **子网**选同一个可用区的，避免 GPU 集群跨机房传输数据导致性能损耗，并且需要所在可用区有 A10 或 A100 卡的机型可购买。
-4. 单击**创建节点池**。
+TODO
+
+### 添加 HCC 机器到 TKE 集群
+
+TODO
 
 ### 准备 CFS 存储
 
@@ -96,14 +104,14 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-name: cfs-turbo
+  name: cfs-turbo
 provisioner: com.tencent.cloud.csi.cfsturbo
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 # highlight-start
 parameters:
-fsid: 564b8ef1
-host: 11.0.0.7
+  fsid: 564b8ef1
+  host: 11.0.0.7
 # highlight-end
 ```
 #### 创建 PVC
@@ -241,14 +249,16 @@ metadata:
 spec:
   replicas: 1
   leaderWorkerTemplate:
-    size: 4
+    size: 2
     restartPolicy: RecreateGroupOnPodRestart
     leaderTemplate:
       metadata:
         labels:
           role: leader
       spec:
-        terminationGracePeriodSeconds: 1
+        hostNetwork: true
+        hostPID: true
+        dnsPolicy: ClusterFirstWithHostNet
         containers:
         - name: leader
           image: lmsysorg/sglang:latest
@@ -260,7 +270,7 @@ spec:
             exec python3 -m sglang.launch_server \
               --model-path /data/DeepSeek-R1 \
               --nnodes $LWS_GROUP_SIZE \
-              --tp 4 \
+              --tp 16 \
               --node-rank 0 \
               --dist-init-addr $(LWS_LEADER_ADDRESS):5000 \
               --trust-remote-code \
@@ -268,7 +278,7 @@ spec:
               --port 30000
           resources:
             limits:
-              nvidia.com/gpu: "4"
+              nvidia.com/gpu: "8"
           ports:
           - containerPort: 30000
           volumeMounts:
@@ -280,13 +290,14 @@ spec:
         - name: dshm
           emptyDir:
             medium: Memory
-            sizeLimit: 40Gi
         - name: data
           persistentVolumeClaim:
             claimName: ai-model-turbo
     workerTemplate:
       spec:
-        terminationGracePeriodSeconds: 1
+        hostNetwork: true
+        hostPID: true
+        dnsPolicy: ClusterFirstWithHostNet
         containers:
         - name: worker
           image: lmsysorg/sglang:latest
@@ -303,13 +314,13 @@ spec:
             exec python3 -m sglang.launch_server \
               --model-path /data/DeepSeek-R1 \
               --nnodes $LWS_GROUP_SIZE \
-              --tp 4 \
+              --tp 16 \
               --node-rank $ORDINAL_NUMBER \
               --dist-init-addr $(LWS_LEADER_ADDRESS):5000 \
               --trust-remote-code
           resources:
             limits:
-              nvidia.com/gpu: "4"
+              nvidia.com/gpu: "8"
           volumeMounts:
           - mountPath: /dev/shm
             name: dshm
@@ -319,11 +330,13 @@ spec:
         - name: dshm
           emptyDir:
             medium: Memory
-            sizeLimit: 40Gi
         - name: data
           persistentVolumeClaim:
             claimName: ai-model
 ```
+
+- 2 台节点，每台节点 8 张 GPU 卡，每个 Pod 独占 1 台节点。
+- 使用 HostNetwork，让 RDMA 生效。
 
 再创建一个 Service 用于 SGLang 提供的兼容 OpenAI 的 API：
 
