@@ -1,4 +1,4 @@
-# 部署满血版 DeepSeek-R1 (SGLang)
+# 在 TKE 上部署满血版 DeepSeek-R1 (SGLang)
 
 :::warning[警告]
 
