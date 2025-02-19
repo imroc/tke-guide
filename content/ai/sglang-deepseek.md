@@ -12,65 +12,6 @@
 
 本文将基于 SGLang 在 TKE 集群上部署 DeepSeek-R1 模型，提供最佳实践的部署示例。
 
-## DeepSeek-R1 模型列表
-
-SGLang 支持 [HuggingFace](https://huggingface.co/models) 和 [ModelScope](https://www.modelscope.cn/models) 上的大模型，由于腾讯云的 GPU 机型基本只在国内售卖，而 HuggingFace 上的模型在国内下载会有网络问题，所以本文以 ModelScope 上的 DeepSeek-R1 模型为例。
-
-DeepSeek-R1 除了原版的 671B （满血版）模型外，还有一系列蒸馏版，满血版对硬件要求高，蒸馏版是缩小版 DeepSeek-R1，对硬件要求低。
-
-| 参数量 | 模型名称                      |
-| ------ | ----------------------------- |
-| 1.5B   | DeepSeek-R1-Distill-Qwen-1.5B |
-| 7B     | DeepSeek-R1-Distill-Qwen-7B   |
-| 8B     | DeepSeek-R1-Distill-Llama-8B  |
-| 14B    | DeepSeek-R1-Distill-Qwen-14B  |
-| 32B    | DeepSeek-R1-Distill-Qwen-32B  |
-| 70B    | DeepSeek-R1-Distill-Llama-70B |
-| 671B   | DeepSeek-R1 (满血版)          |
-
-## 选择 GPU 型号
-
-SGLang 用 GPU 运行 DeepSeek 大模型，要求 GPU 的计算能力大于等于 7.5，推荐 8.0 以上，如果不满足可能出现类似以下的报错：
-
-```yaml
-[2025-02-12 02:56:48 TP0] Compute capability below sm80. Use float16 due to lack of bfloat16 support.
-[2025-02-12 02:56:48 TP0] Scheduler hit an exception: Traceback (most recent call last):
-  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 1787, in run_scheduler_process
-    scheduler = Scheduler(server_args, port_args, gpu_id, tp_rank, dp_rank)
-  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 240, in __init__
-    self.tp_worker = TpWorkerClass(
-  File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker_overlap_thread.py", line 63, in __init__
-    self.worker = TpModelWorker(server_args, gpu_id, tp_rank, dp_rank, nccl_port)
-  File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker.py", line 68, in __init__
-    self.model_runner = ModelRunner(
-  File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 186, in __init__
-    self.load_model()
-  File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 293, in load_model
-    raise RuntimeError("SGLang only supports sm75 and above.")
-RuntimeError: SGLang only supports sm75 and above.
-```
-
-在腾讯云上售卖的 GPU 服务器分两类：[GPU 云服务器](https://cloud.tencent.com/product/gpu) 和 [高性能计算集群 HCC](https://cloud.tencent.com/product/hcc)。
-- GPU 云服务器售卖的机型、地域以及对应的 GPU 型号和显存大小及参考 [GPU 云服务器实例规格](https://cloud.tencent.com/document/product/560/19700)。
-- HCC 售卖的机型以及对应的 GPU 型号和显存大小参考 [HCC 实例规格](https://cloud.tencent.com/document/product/1646/81562)，售卖地域参考 [HCC 实例售卖地域](https://cloud.tencent.com/document/product/1646/81565)。
-
-GPU 型号与计算能力的关系参考 NVIDIA 官方文档 [Your GPU Compute Capability](https://developer.nvidia.com/cuda-gpus) 中 **CUDA-Enabled Datacenter Products** 的表格。
-
-根据以上信息，总结一下腾讯云售卖的 GPU 型号计算能力与显存：
-
-| GPU 型号           | 计算能力 | 显存      | 售卖渠道 |
-| ------------------ | -------- | --------- | -------- |
-| NVIDIA P4          | 6.1      | 8GB       | CVM      |
-| NVIDIA P40         | 6.1      | 24GB      | CVM      |
-| NVIDIA V100        | 7.0      | 32GB      | CVM/HCC  |
-| NVIDIA P40         | 6.1      | 24GB      | CVM      |
-| NVIDIA T4          | 7.5      | 16GB      | CVM      |
-| NVIDIA A10         | 8.6      | 24GB      | CVM      |
-| NVIDIA A100        | 8.0      | 40GB      | CVM/HCC  |
-| NVIDIA A800        | 8.0      | 40GB/80GB | HCC      |
-| NVIDIA H800        | 9.0      | 80GB      | HCC      |
-| NVIDIA GPU（邀测） | 9.0      | 未知      | HCC      |
-
 ## 选择 TKE 集群地域
 
 由于 GPU 机型只在部分地域售卖，所以我们需要选择这些有售卖的地域来创建 TKE 集群，具体售卖地域参考 [GPU 云服务器实例规格](https://cloud.tencent.com/document/product/560/19700) 和 [HCC 实例售卖地域](https://cloud.tencent.com/document/product/1646/81565) 中的表格。
