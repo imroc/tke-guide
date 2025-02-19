@@ -176,6 +176,12 @@ spec:
 
 ### 安装 LWS 组件
 
+:::info[注意]
+
+如果只使用单机部署的方案，无需安装 LWS 组件，可跳过此步骤。
+
+:::
+
 SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes-sigs/lws) 组件，在 TKE 应用市场中找到 lws：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F14%2F20250214151529.png)
@@ -251,20 +257,17 @@ spec:
 
 ### 部署 DeepSeek-R1
 
-使用 `LeaderWorkerSet` 部署满血版的 DeepSeek-R1 (2 台 8 卡的 GPU 节点)：
+下面提供单机部署和双机集群部署两种方式的实例。
 
-:::info[说明]
+:::tip[说明]
 
-- `nvidia.com/gpu` 为单机 GPU 卡数，这里是 8 卡（leader 和 worker 保持一致）。
-- `leaderWorkerTemplate.size` 为单个 GPU 集群的节点数，2 表示两个节点组成的 GPU 集群（1 个 leader 和 1 个 worker）。
-- `replicas` 为 GPU 集群数量，这里是 1 个 GPU 集群，如需扩容，准备好节点资源后，调整这里的数量即可。
-- `TOTAL_GPU` 为单个 GPU 集群的 GPU 总卡数（节点数量*单机 GPU 卡数），这里是 16 卡。
-- `MODEL_DIRECTORY` 为模型文件的子目录路径。
-- `MODEL_NAME` 为模型名称，API 调用将使用此模型名称进行交互。
-- leader 和 worker 的环境变量需一致，如需调整记得将 leader 和 worker 的 template 都做相同的修改。
-- 如果使用支持 RDMA 的机型，需使用 HostNetwork 才能让 RDMA 生效。
+使用本文指定的机型，每台有 8 张 GPU 算卡，单机部署也能成功运行，如果并发和吞吐要求较高，建议使用双机集群部署。
 
 :::
+
+#### 双机集群部署
+
+使用 `LeaderWorkerSet` 部署满血版的 DeepSeek-R1 双机集群(2 台 8 卡的 GPU 节点，1 个 leader 和 1 个 worker)：
 
 ```yaml showLineNumbers
 apiVersion: leaderworkerset.x-k8s.io/v1
@@ -385,19 +388,8 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: ai-model
-```
 
-再创建一个 Service 用于 SGLang 提供的兼容 OpenAI 的 API：
-
-:::info[注意]
-
-- `leaderworkerset.sigs.k8s.io/name` 指定 lws 的名称。
-- 所有 GPU 集群的 leader Pod 的 index 固定为 0，可以通过 `apps.kubernetes.io/pod-index: "0"` 这个 label 来选中，如果修改 `replicas` 扩容出新的 GPU 集群，新集群 leader 会被自动被该 Service 选中并负载均衡。
-- 涉及 API 地址配置的地方（如 OpenWebUI），指向这个 Service 的地址（如 `http://deepseek-r1-api:30000/v1`）。
-
-:::
-
-```yaml
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -406,12 +398,131 @@ spec:
   type: ClusterIP
   selector:
     leaderworkerset.sigs.k8s.io/name: deepseek-r1
-    apps.kubernetes.io/pod-index: "0"
+    role: leader
   ports:
   - name: api
+    protocol: TCP
     port: 30000
     targetPort: 30000
 ```
+
+:::info[说明]
+
+- `nvidia.com/gpu` 为单机 GPU 卡数，这里是 8 卡（leader 和 worker 保持一致）。
+- `leaderWorkerTemplate.size` 为单个 GPU 集群的节点数，2 表示两个节点组成的 GPU 集群（1 个 leader 和 1 个 worker）。
+- `replicas` 为 GPU 集群数量，这里是 1 个 GPU 集群，如需扩容，准备好节点资源后，调整这里的数量即可。
+- `TOTAL_GPU` 为单个 GPU 集群的 GPU 总卡数（节点数量*单机 GPU 卡数），这里是 16 卡。
+- `MODEL_DIRECTORY` 为模型文件的子目录路径。
+- `MODEL_NAME` 为模型名称，API 调用将使用此模型名称进行交互。
+- leader 和 worker 的环境变量需一致，如需调整记得将 leader 和 worker 的 template 都做相同的修改。
+- 如果使用支持 RDMA 的机型，需使用 HostNetwork 才能让 RDMA 生效。
+- Service 中 `leaderworkerset.sigs.k8s.io/name` 指定的是 lws 的名称。
+- 涉及 OpenAI API 地址配置的地方（如 OpenWebUI），指向这个 Service 的地址（如 `http://deepseek-r1-api:30000/v1`）。
+
+:::
+
+部署好后如果像扩容，可以通过调高 `replicas` 来增加 GPU 集群数量（前提是准备好新的 GPU 节点资源）。
+
+#### 单机部署
+
+使用 `Deployment` 部署单机满血版的 DeepSeek-R1：
+
+:::tip[提示]
+
+单机部署无需 RDMA，可优先选不支持 RDMA 的机型以节约成本。
+
+:::
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepseek-r1
+  labels:
+    app: deepseek-r1
+spec:
+  selector:
+    matchLabels:
+      app: deepseek-r1
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: deepseek-r1
+    spec:
+      containers:
+      - name: deepseek-r1
+        image: lmsysorg/sglang:latest
+        env:
+        - name: TOTAL_GPU
+          value: "8"
+        - name: MODEL_DIRECTORY
+          value: "DeepSeek-R1"
+        - name: MODEL_NAME
+          value: "DeepSeek-R1"
+        command:
+        - bash
+        - -c
+        - |
+          set -x
+          MODEL_DIRECTORY="${MODEL_DIRECTORY:-MODEL_NAME}"
+          exec python3 -m deepseek-r1.launch_server \
+            --model-path /data/$MODEL_DIRECTORY \
+            --served-model-name $MODEL_NAME \
+            --tp $TOTAL_GPU \
+            --log-requests \
+            --enable-metric \
+            --allow-auto-truncate \
+            --watchdog-timeout 3600 \
+            --disable-custom-all-reduce \
+            --trust-remote-code
+        resources:
+          limits:
+            nvidia.com/gpu: "8"
+        ports:
+        - containerPort: 30000
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: shm
+          mountPath: /dev/shm
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: ai-model
+      - name: shm
+        emptyDir:
+          medium: Memory
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deepseek-r1-api
+spec:
+  selector:
+    app: deepseek-r1
+  type: ClusterIP
+  ports:
+  - name: api
+    protocol: TCP
+    port: 30000
+    targetPort: 30000
+```
+
+:::info[说明]
+
+- `nvidia.com/gpu` 和 `TOTAL_GPU` 都是单机 GPU 卡数，这里是 8 卡。
+- `replicas` 为 DeepSeek-R1 副本数，1 个副本占用 1 台 GPU 节点。
+- `MODEL_DIRECTORY` 为模型文件的子目录路径。
+- `MODEL_NAME` 为模型名称，API 调用将使用此模型名称进行交互。
+- 由于是单机部署，无需 RDMA，也无需使用 HostNetwork。
+- 涉及 OpenAI API 地址配置的地方（如 OpenWebUI），指向这里创建的 Service 的地址（如 `http://deepseek-r1-api:30000/v1`）。
+
+:::
+
+部署好后如果像扩容，可以通过调高 `replicas` 来增加 DeepSeek-R1 副本数（前提是准备好新的 GPU 节点资源）。
 
 ## 常见问题
 
