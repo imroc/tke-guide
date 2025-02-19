@@ -205,6 +205,8 @@ spec:
       name: download-model
       labels:
         app: download-model
+        annotations:
+          eks.tke.cloud.tencent.com/root-cbs-size: '100' # 如果调度到超级节点，默认系统盘只有 20Gi，sglang 镜像解压后会撑爆磁盘，用这个注解自定义一下系统盘容量（超过20Gi的部分会收费）。
     spec:
       containers:
       - name: sglang
