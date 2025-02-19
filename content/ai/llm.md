@@ -42,7 +42,7 @@ AI 大模型通常占用体积较大，直接打包到容器镜像不太现实�
 
 ## 镜像说明
 
-本文中的示例使用的镜像都是官方提供的镜像 tag 为 latest，建议根据自身情况改成指定版本的 tag，可点击下面的连接查看镜像的 tag 列表：
+本文中的示例使用的镜像都是官方提供的镜像，tag 为 latest，建议根据自身情况改成指定版本的 tag，可点击下面的连接查看镜像的 tag 列表：
 
 - sglang: [lmsysorg/sglang](https://hub.docker.com/r/lmsysorg/sglang/tags)
 - ollama: [ollama/ollama](https://hub.docker.com/r/ollama/ollama/tags)

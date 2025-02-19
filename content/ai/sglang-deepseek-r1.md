@@ -22,6 +22,12 @@
 
 :::
 
+## 镜像说明
+
+本文中的示例使用的镜像是 SGLang 官方提供的[lmsysorg/sglang](https://hub.docker.com/r/lmsysorg/sglang/tags) 镜像，tag 为 latest，建议指定 tag 到固定版本。
+
+官方镜像在 DockerHub，且体积较大，在 TKE 环境默认有免费的 DockerHub 镜像加速，国内地域也可以拉取 DockerHub 的镜像，但速度一般，镜像较大时等待的时间较长，建议将镜像同步至 [容器镜像服务 TCR](https://cloud.tencent.com/product/tcr)，再替换 YAML 中镜像地址，这样可极大加快镜像拉取速度。
+
 ## 操作步骤
 
 ### 创建 TKE 集群
