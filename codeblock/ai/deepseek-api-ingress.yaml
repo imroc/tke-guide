@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: deepseek-api
+spec:
+  rules:
+  - host: "deepseek.your.domain"
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: deepseek-r1-api
+            port:
+              number: 30000
+
+

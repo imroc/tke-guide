@@ -539,6 +539,44 @@ curl -v http://127.0.0.1:30000/v1/completions -H "Content-Type: application/json
     }'
 ```
 
+### 暴露 API
+
+如果希望将 API 对外暴露，可以通过 Ingress 或 Gateway API 来暴露，示例：
+
+<Tabs>
+  <TabItem value="api-httproute" label="Gateway API">
+
+  :::info[注意]
+
+  使用 Gateway API 需要集群中装有 Gateway API 的实现，如 TKE 应用市场中的 EnvoyGateway，具体 Gateway API 用法参考 [官方文档](https://gateway-api.sigs.k8s.io/guides/)。
+
+  :::
+
+  <FileBlock file="ai/deepseek-api-httproute.yaml" showLineNumbers />
+
+  :::tip[说明]
+
+  1. `parentRefs` 引用定义好的 `Gateway`（通常一个 Gateway 对应一个 CLB）。
+  2. `hostnames` 替换为你自己的域名，确保域名能正常解析到 Gateway 对应的 CLB 地址。
+  3. `backendRefs` 指定 DeepSeek 的 Service。
+
+  :::
+
+  </TabItem>
+
+  <TabItem value="webui-ingress" label="Ingress">
+    <FileBlock file="ai/deepseek-api-ingress.yaml" showLineNumbers />
+
+   :::tip[说明]
+
+   1. `host` 替换为你自己的域名，确保域名能正常解析到 Ingress 对应的 CLB 地址。
+   2. `backend.service` 指定 DeepSeek 的 Service。
+
+   :::
+
+  </TabItem>
+</Tabs>
+
 ## 常见问题
 
 ### 报错: undefined symbol: cuTensorMapEncodeTiled
