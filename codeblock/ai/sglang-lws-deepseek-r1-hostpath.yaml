@@ -78,10 +78,10 @@ spec:
         - name: worker
           image: lmsysorg/sglang:latest
           env:
-          - name: ORDINAL_NUMBER
+          - name: LWS_WORKER_INDEX
             valueFrom:
               fieldRef:
-                fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
+                fieldPath: metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']
           - name: TOTAL_GPU
             value: "16"
           - name: MODEL_DIRECTORY
@@ -99,7 +99,7 @@ spec:
               --served-model-name $MODEL_NAME \
               --nnodes $LWS_GROUP_SIZE \
               --tp $TOTAL_GPU \
-              --node-rank $ORDINAL_NUMBER \
+              --node-rank $LWS_WORKER_INDEX \
               --dist-init-addr $LWS_LEADER_ADDRESS:5000 \
               --log-requests \
               --enable-metric \
