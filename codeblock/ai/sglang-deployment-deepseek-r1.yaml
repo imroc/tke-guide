@@ -48,6 +48,8 @@ spec:
             --watchdog-timeout 3600 \
             --disable-custom-all-reduce \
             --trust-remote-code \
+            --mem-fraction-static 0.9 \
+            --max-running-request 8 \
             --host 0.0.0.0 \
             --port 30000 $EXTRA_ARGS
         resources:
