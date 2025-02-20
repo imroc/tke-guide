@@ -465,7 +465,7 @@ ollama:
 openaiBaseApiUrl: "http://deepseek-r1:30000/api/v1"
 ```
 
-如果通过 YAML 部署 OpenWebUI，配置下 Pod 环境变量，示例：
+如果通过 YAML 部署 OpenWebUI，需配置下 Pod 环境变量，示例：
 
 ```yaml
 env:
