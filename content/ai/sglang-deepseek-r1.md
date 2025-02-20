@@ -266,7 +266,6 @@ spec:
 
 创建一个 DaemonSet ，让每个节点都下载大模型文件到本地盘：
 
-
 ```yaml
 apiVersion: apps/v1
 kind: DaemonSet
