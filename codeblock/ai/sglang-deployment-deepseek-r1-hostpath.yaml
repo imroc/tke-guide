@@ -26,12 +26,18 @@ spec:
           value: "DeepSeek-R1"
         - name: MODEL_NAME
           value: "DeepSeek-R1"
+        - name: API_KEY
+          value: ""
         command:
         - bash
         - -c
         - |
           set -x
           MODEL_DIRECTORY="${MODEL_DIRECTORY:-MODEL_NAME}"
+          EXTRA_ARGS=""
+          if [[ "$API_KEY" != "" ]]; then
+              EXTRA_ARGS="--api-key $API_KEY"
+          fi
           exec python3 -m sglang.launch_server \
             --model-path /data/$MODEL_DIRECTORY \
             --served-model-name $MODEL_NAME \
@@ -43,7 +49,7 @@ spec:
             --disable-custom-all-reduce \
             --trust-remote-code \
             --host 0.0.0.0 \
-            --port 30000
+            --port 30000 $EXTRA_ARGS
         resources:
           limits:
             nvidia.com/gpu: "8"
