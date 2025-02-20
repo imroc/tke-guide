@@ -121,7 +121,7 @@ spec:
             medium: Memory
         - name: data
           hostPath:
-            path: /model
+            path: /data/model
             type: DirectoryOrCreate
 
 ---

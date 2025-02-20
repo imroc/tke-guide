@@ -288,7 +288,7 @@ spec:
       volumes:
       - name: model
         hostPath:
-          path: /model
+          path: /data/model
           type: DirectoryOrCreate
 ```
 

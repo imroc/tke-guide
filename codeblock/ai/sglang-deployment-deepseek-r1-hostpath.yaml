@@ -70,7 +70,7 @@ spec:
       volumes:
       - name: data
         hostPath:
-          path: /model
+          path: /data/model
           type: DirectoryOrCreate
       - name: shm
         emptyDir:
