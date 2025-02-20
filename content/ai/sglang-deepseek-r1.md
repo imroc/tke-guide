@@ -341,7 +341,7 @@ SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes
   <TabItem value="share" label="挂载 CFS 共享存储">
     <FileBlock file="ai/sglang-lws-deepseek-r1.yaml" showLineNumbers />
   </TabItem>
-  <TabItem value="share" label="挂载本地存储">
+  <TabItem value="local" label="挂载本地存储">
     <FileBlock file="ai/sglang-lws-deepseek-r1-hostpath.yaml" showLineNumbers />
   </TabItem>
 </Tabs>
@@ -373,7 +373,7 @@ SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes
   <TabItem value="share" label="挂载 CFS 共享存储">
     <FileBlock file="ai/sglang-deployment-deepseek-r1.yaml" showLineNumbers />
   </TabItem>
-  <TabItem value="share" label="挂载本地存储">
+  <TabItem value="local" label="挂载本地存储">
     <FileBlock file="ai/sglang-deployment-deepseek-r1-hostpath.yaml" showLineNumbers />
   </TabItem>
 </Tabs>
