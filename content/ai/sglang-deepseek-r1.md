@@ -295,6 +295,7 @@ spec:
       - name: model
         hostPath:
           path: /model
+          type: DirectoryOrCreate
 ```
 
 ### 安装 LWS 组件
@@ -336,7 +337,15 @@ SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes
 
 使用 `LeaderWorkerSet` 部署满血版的 DeepSeek-R1 双机集群(2 台 8 卡的 GPU 节点，1 个 leader 和 1 个 worker)：
 
-<FileBlock file="ai/sglang-lws-deepseek-r1.yaml" showLineNumbers />
+<Tabs>
+  <TabItem value="share" label="挂载 CFS 共享存储">
+    <FileBlock file="ai/sglang-lws-deepseek-r1.yaml" showLineNumbers />
+  </TabItem>
+  <TabItem value="share" label="挂载本地存储">
+    <FileBlock file="ai/sglang-lws-deepseek-r1-hostpath.yaml" showLineNumbers />
+  </TabItem>
+</Tabs>
+
 
 :::info[说明]
 
@@ -360,7 +369,14 @@ SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes
 
 使用 `Deployment` 部署单机满血版的 DeepSeek-R1：
 
-<FileBlock file="ai/sglang-deployment-deepseek-r1.yaml" showLineNumbers />
+<Tabs>
+  <TabItem value="share" label="挂载 CFS 共享存储">
+    <FileBlock file="ai/sglang-deployment-deepseek-r1.yaml" showLineNumbers />
+  </TabItem>
+  <TabItem value="share" label="挂载本地存储">
+    <FileBlock file="ai/sglang-deployment-deepseek-r1-hostpath.yaml" showLineNumbers />
+  </TabItem>
+</Tabs>
 
 :::info[说明]
 
