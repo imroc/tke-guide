@@ -108,7 +108,8 @@
 
 新建一个后续使用 CFS 存储大模型的 PVC，可通过控制台或 YAML 创建。
 
-##### 通过控制台创建
+<Tabs>
+<TabItem value="console" label="通过控制台创建">
 
 1. 在集群列表中，单击**集群 ID**，进入集群详情页。
 2. 选择左侧菜单栏中的**存储**，在 StorageClass 页面单击**新建**。
@@ -118,7 +119,8 @@
   - Provisioner：选择 “文件存储CFS turbo”。
   - CFS turbo：选择前面**创建 CFS-Turbo 实例**步骤中创建出来的 CFS-Turbo 的实例。
 
-##### 通过 YAML 创建
+</TabItem>
+<TabItem value="yaml" label="通过 YAML 创建">
 
 :::info[注意]
 
@@ -143,11 +145,16 @@ parameters:
   host: 11.0.0.7
 # highlight-end
 ```
+</TabItem>
+</Tabs>
+
+
 #### 创建 PVC
 
 创建一个使用 CFS-Turbo 的 PVC，用于存储 AI 大模型，可通过控制台或 YAML 创建。
 
-##### 通过控制台创建
+<Tabs>
+<TabItem value="console" label="通过控制台创建">
 
 1. 在集群列表中，单击**集群 ID**，进入集群详情页。
 2. 选择左侧菜单栏中的**存储**，在 PersistentVolumeClaim 页面单击**新建**。
@@ -160,7 +167,8 @@ parameters:
   - StorageClass：选择前面新建的  StorageClass 的名称。
   - 是否指定PersistentVolue：选择 “不指定”。
 
-##### 通过 YAML 创建
+</TabItem>
+<TabItem value="yaml" label="通过 YAML 创建">
 
 ```yaml
 apiVersion: v1
@@ -183,6 +191,10 @@ spec:
 注意替换 `storageClassName` 为**新建 StorageClass** 步骤中配置的名称。
 
 :::
+
+</TabItem>
+</Tabs>
+
 
 ### 安装 LWS 组件
 
@@ -274,7 +286,7 @@ spec:
 下面提供单机和双机两种部署方式的示例：
 
 <Tabs>
-<TabItem value="lws" title="双机集群部署">
+<TabItem value="lws" label="双机集群部署">
 
 使用 `LeaderWorkerSet` 部署满血版的 DeepSeek-R1 双机集群(2 台 8 卡的 GPU 节点，1 个 leader 和 1 个 worker)：
 
@@ -433,7 +445,7 @@ spec:
 部署好后如果像扩容，可以通过调高 `replicas` 来增加 GPU 集群数量（前提是准备好新的 GPU 节点资源）。
 
 </TabItem>
-<TabItem value="deployment" title="单机部署">
+<TabItem value="deployment" label="单机部署">
 
 使用 `Deployment` 部署单机满血版的 DeepSeek-R1：
 
