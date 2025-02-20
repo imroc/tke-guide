@@ -200,7 +200,7 @@ spec:
 </TabItem>
 </Tabs>
 
-#### 下载 AI 大模型
+#### 使用 Job 下载大模型文件
 
 下发一个 Job 用于下载 AI 大模型：
 
@@ -257,7 +257,17 @@ spec:
 </TabItem>
 
 <TabItem value="local" label="本地存储">
-    TODO
+
+#### 配置系统盘
+
+购买服务器时，系统盘容量建议选 1T 以上，并使用**增强型SSD云硬盘**：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F20%2F20250220111326.png)
+
+#### 使用 DaemonSet 下载大模型文件
+
+TODO
+
 </TabItem>
 
 </Tabs>
