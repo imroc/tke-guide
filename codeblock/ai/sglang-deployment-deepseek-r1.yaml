@@ -9,6 +9,8 @@ spec:
     matchLabels:
       app: deepseek-r1
   replicas: 1
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
