@@ -80,9 +80,14 @@
 
 系统镜像选 `TencentOS Server 3.1 (TK4) UEFI | img-39ywauzd`，驱动和 CUDA 选最新版本。
 
-### 准备 CFS 存储
+### 准备存储与模型文件
 
-满血版 DeepSeek-R1 体积较大，为加快模型下载和加载速度，建议使用 CFS-Turbo 共享存储，Turbo 系列性能与规格详情参考 [腾讯云文件存储官方文档](https://cloud.tencent.com/document/product/582/38112#turbo-.E7.B3.BB.E5.88.97)。
+满血版 DeepSeek-R1 体积较大，为加快模型下载和加载速度，建议使用性能最强的存储，本文给出本地存储和共享存储两种方案的示例。
+
+<Tabs>
+<TabItem value="local" label="共享存储">
+
+共享存储使用 CFS-Turbo，Turbo 系列性能与规格详情参考 [腾讯云文件存储官方文档](https://cloud.tencent.com/document/product/582/38112#turbo-.E7.B3.BB.E5.88.97)，使用下面的步骤准备 CFS-Turbo 存储和下载大模型文件。
 
 #### 安装 CFS 插件
 
@@ -195,34 +200,7 @@ spec:
 </TabItem>
 </Tabs>
 
-
-### 安装 LWS 组件
-
-:::info[注意]
-
-如果只使用单机部署的方案，无需安装 LWS 组件，可跳过此步骤。
-
-:::
-
-SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes-sigs/lws) 组件，在 TKE 应用市场中找到 lws：
-
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F14%2F20250214151529.png)
-
-安装到集群中：
-
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F14%2F20250214153816.png)
-
-- 应用名：建议填 `lws`。
-- 命名空间：建议使用 `lws-system`（新建命名空间）。
-
-:::info[说明]
-
-如需希望使用 kubectl 或 helm 等方式部署 LWS，可请参考 LWS 官方文档（[kubectl 方式安装](https://github.com/kubernetes-sigs/lws/blob/main/docs/setup/install.md) 和 [helm 方式安装](https://github.com/kubernetes-sigs/lws/blob/main/charts/lws/README.md)）。
-需要注意的是，官方默认使用镜像是 `registry.k8s.io/lws/lws`，这个在国内环境下载不了，可替换镜像地址为 `docker.io/k8smirror/lws`，该镜像为 lws 在 DockerHub 上的 mirror 镜像，长期自动同步，可放心使用（TKE 环境可直接拉取 DockerHub 的镜像），也可以同步到自己的 TCR 或 CCR 镜像仓库，提高镜像下载速度。
-
-:::
-
-### 下载 AI 大模型
+#### 下载 AI 大模型
 
 下发一个 Job 用于下载 AI 大模型：
 
@@ -274,6 +252,42 @@ spec:
 - CFS-Turbo 的 PVC 挂载到 `/data` 目录，存储下载的模型文件。
 - `--local_dir` 指定模型文件下载目录。
 - `--model` 指定 [ModelScope 模型库](https://www.modelscope.cn/models) 中的模型名称，满血版的 DeepSeek-R1 模型名称为 `deepseek-ai/DeepSeek-R1`。
+
+:::
+
+</TabItem>
+
+<TabItem value="local" label="本地存储">
+    TODO
+</TabItem>
+
+</Tabs>
+
+
+
+### 安装 LWS 组件
+
+:::info[注意]
+
+如果只使用单机部署的方案，无需安装 LWS 组件，可跳过此步骤。
+
+:::
+
+SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes-sigs/lws) 组件，在 TKE 应用市场中找到 lws：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F14%2F20250214151529.png)
+
+安装到集群中：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F14%2F20250214153816.png)
+
+- 应用名：建议填 `lws`。
+- 命名空间：建议使用 `lws-system`（新建命名空间）。
+
+:::info[说明]
+
+如需希望使用 kubectl 或 helm 等方式部署 LWS，可请参考 LWS 官方文档（[kubectl 方式安装](https://github.com/kubernetes-sigs/lws/blob/main/docs/setup/install.md) 和 [helm 方式安装](https://github.com/kubernetes-sigs/lws/blob/main/charts/lws/README.md)）。
+需要注意的是，官方默认使用镜像是 `registry.k8s.io/lws/lws`，这个在国内环境下载不了，可替换镜像地址为 `docker.io/k8smirror/lws`，该镜像为 lws 在 DockerHub 上的 mirror 镜像，长期自动同步，可放心使用（TKE 环境可直接拉取 DockerHub 的镜像），也可以同步到自己的 TCR 或 CCR 镜像仓库，提高镜像下载速度。
 
 :::
 
