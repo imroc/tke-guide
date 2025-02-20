@@ -456,6 +456,8 @@ curl -v http://127.0.0.1:30000/v1/completions -H "Content-Type: application/json
 </TabItem>
 </Tabs>
 
+最后在需要使用 API 的应用中配置 API 地址及其密钥即可。
+
 ## 参考资料
 
 - ModelScope 上的 DeepSeek-R1 模型列表: https://www.modelscope.cn/collections/DeepSeek-R1-c8e86ac66ed943
