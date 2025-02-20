@@ -474,8 +474,3 @@ env:
 - name: ENABLE_OLLAMA_API # 禁用 Ollama API，只保留 OpenAI API
   value: "False"
 ```
-
-## 参考资料
-
-- ModelScope 上的 DeepSeek-R1 模型列表: https://www.modelscope.cn/collections/DeepSeek-R1-c8e86ac66ed943
-- 部署大模型常见问题: https://imroc.cc/tke/ai/faq
