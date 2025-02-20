@@ -85,7 +85,7 @@
 满血版 DeepSeek-R1 体积较大，为加快模型下载和加载速度，建议使用性能最强的存储，本文给出本地存储和共享存储两种方案的示例。
 
 <Tabs>
-<TabItem value="local" label="共享存储">
+<TabItem value="share" label="共享存储">
 
 共享存储使用 CFS-Turbo，Turbo 系列性能与规格详情参考 [腾讯云文件存储官方文档](https://cloud.tencent.com/document/product/582/38112#turbo-.E7.B3.BB.E5.88.97)，使用下面的步骤准备 CFS-Turbo 存储和下载大模型文件。
 
