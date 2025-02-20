@@ -452,7 +452,7 @@ curl -v http://127.0.0.1:30000/v1/completions -H 'X-API-Key: 93e8b39f55fc4097956
 :::info[说明]
 
 - **模型提供方**: 由于 SGLang 兼容 OpenAI 的 API，所以选择 **OPENAI API**。
-- **API 密钥**：用部署 DeepSeek-R1 的 YAML 中配置的 `API_KEY` 环境变量的值。
+- **API 密钥**：填写 DeepSeek-R1 部署时指定的 API KEY（`API_KEY` 环境变量）。
 - **API 域名**：用 DeepSeek-R1 最终被暴露出来的外部地址。
 - **模型**：填写 DeepSeek-R1 部署时指定的模型名称（`MODEL_NAME` 环境变量）。
 
