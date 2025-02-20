@@ -472,6 +472,7 @@ env:
 - name: OPENAI_API_BASE_URL
   value: http://deepseek-r1:30000/api/v1 # vllm 的地址
 - name: ENABLE_OLLAMA_API # 禁用 Ollama API，只保留 OpenAI API
+  value: "False"
 ```
 
 ## 参考资料
