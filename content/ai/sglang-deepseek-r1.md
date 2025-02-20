@@ -82,14 +82,13 @@
 
 ### 准备存储与模型文件
 
-满血版 DeepSeek-R1 体积较大，为加快模型下载和加载速度，建议使用性能最强的存储，本文给出本地存储和共享存储两种方案的示例。
+满血版 DeepSeek-R1 体积较大，为加快模型下载和加载速度，建议使用性能最强的存储，本文给出本地存储和 CFS 共享存储两种方案的示例。
 
-<Tabs>
-<TabItem value="share" label="共享存储">
+#### CFS 共享存储
 
 共享存储使用 CFS-Turbo，Turbo 系列性能与规格详情参考 [腾讯云文件存储官方文档](https://cloud.tencent.com/document/product/582/38112#turbo-.E7.B3.BB.E5.88.97)，使用下面的步骤准备 CFS-Turbo 存储和下载大模型文件。
 
-#### 安装 CFS 插件
+##### 安装 CFS 插件
 
 1. 在集群列表中，单击**集群 ID**，进入集群详情页。
 2. 选择左侧菜单栏中的**组件管理**，在组件页面单击**新建**。
@@ -99,7 +98,7 @@
 
 4. 单击完成即可创建组件。
 
-#### 创建 CFS-Turbo 实例
+##### 创建 CFS-Turbo 实例
 
 1. 登录 [CFS 控制台](https://console.cloud.tencent.com/cfs/fs)，单击**创建**来新建一个 CFS-Turbo 实例。
 2. **文件系统类型**选择 Turbo 系列的：
@@ -109,7 +108,7 @@
 5. **网络类型**如果选**云联网网络**，需确保 TKE 集群所在 VPC 已加入该云联网中；如果选**VPC 网络**，则需选择 TKE 集群所在 VPC，子网选与 GPU 节点池在同一个可用区的子网。
 6. 单击**立即创建**。
 
-#### 新建 StorageClass
+##### 新建 StorageClass
 
 新建一个后续使用 CFS 存储大模型的 PVC，可通过控制台或 YAML 创建。
 
@@ -154,7 +153,7 @@ parameters:
 </Tabs>
 
 
-#### 创建 PVC
+##### 创建 PVC
 
 创建一个使用 CFS-Turbo 的 PVC，用于存储 AI 大模型，可通过控制台或 YAML 创建。
 
@@ -200,7 +199,7 @@ spec:
 </TabItem>
 </Tabs>
 
-#### 使用 Job 下载大模型文件
+##### 使用 Job 下载大模型文件
 
 创建一个 Job 用于下载大模型文件到 CFS：
 
@@ -252,17 +251,15 @@ spec:
 
 :::
 
-</TabItem>
+#### 本地存储
 
-<TabItem value="local" label="本地存储">
-
-#### 配置系统盘
+##### 配置系统盘
 
 购买服务器时，系统盘容量建议选 1T 以上，并使用**增强型SSD云硬盘**：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F20%2F20250220111326.png)
 
-#### 使用 DaemonSet 下载大模型文件
+##### 使用 DaemonSet 下载大模型文件
 
 创建一个 DaemonSet ，让每个节点都下载大模型文件到本地盘：
 
@@ -299,12 +296,6 @@ spec:
         hostPath:
           path: /model
 ```
-
-</TabItem>
-
-</Tabs>
-
-
 
 ### 安装 LWS 组件
 
