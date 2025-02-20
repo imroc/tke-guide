@@ -402,7 +402,9 @@ curl -v http://127.0.0.1:30000/v1/completions -H "Content-Type: application/json
     }'
 ```
 
-### 暴露 API
+## 常见问题
+
+### 如何对外暴露 API ？
 
 如果希望将 API 对外暴露，可以通过 Ingress 或 Gateway API 来暴露，示例：
 
