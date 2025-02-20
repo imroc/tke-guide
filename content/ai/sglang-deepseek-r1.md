@@ -14,13 +14,23 @@
 
 ## 机型与部署方案
 
-由于满血版的 DeepSeek-R1 参数量较大，需要用较大显存且支持 FP8 量化的大规格 GPU 实例，目前合适的机型有 [HCCPNV6](https://cloud.tencent.com/document/product/1646/81562#HCCPNV6)（[高性能计算集群](https://cloud.tencent.com/product/hcc)）和 [PNV6.32XLARGE1280 / PNV6.96XLARGE2304](https://cloud.tencent.com/document/product/560/19700#PNV6)（[GPU 云服务器](https://cloud.tencent.com/product/gpu)），推荐的部署方案是用两台该机型的节点组建 GPU 集群来运行满血 DeepSeek-R1（并发小的话一台也可以）。
+由于满血版的 DeepSeek-R1 参数量较大，需要用较大显存且支持 FP8 量化的大规格 GPU 实例，目前合适的机型规格有 [HCCPNV6.96XLARGE2304](https://cloud.tencent.com/document/product/1646/81562#HCCPNV6)（[高性能计算集群](https://cloud.tencent.com/product/hcc)）和 [PNV6.32XLARGE1280 / PNV6.96XLARGE2304](https://cloud.tencent.com/document/product/560/19700#PNV6)（[GPU 云服务器](https://cloud.tencent.com/product/gpu)），推荐的部署方案是用两台该机型的节点组建 GPU 集群来运行满血 DeepSeek-R1（并发小的话一台也可以）。
+
+下面是这几种规格的核心参数：
+
+| 规格                 | RDMA          | CPU核心数 | 内存(GB) | GPU 卡数 |
+| -------------------- | ------------- | --------- | -------- | -------- |
+| PNV6.32XLARGE1280    | 不支持        | 128       | 1280     | 8        |
+| PNV6.96XLARGE2304    | 不支持        | 384       | 2304     | 8        |
+| HCCPNV6.96XLARGE2304 | 支持(3.2Tbps) | 384       | 2304     | 8        |
 
 :::info[注意]
 
-该机型的实例正在邀测中，需联系您的销售经理开通使用并协调资源。
+这几种规格的机型实例都正在邀测中，且资源紧张，需联系您的销售经理开通使用并协调好资源。
 
 :::
+
+**选型建议**：两台组建 GPU 集群来运行满血 DeepSeek-R1 建议选 `HCCPNV6.96XLARGE2304`，因为支持 RDMA，可显著提升 DeepSeek 运行性能；单台部署优先考虑 `PNV6.32XLARGE1280` 和 `PNV6.96XLARGE2304` 以节约成本。
 
 ## 镜像说明
 
@@ -36,7 +46,7 @@
 
 :::info[注意]
 
-对于 **PNV6.32XLARGE1280** 和 **PNV6.96XLARGE2304** 的机型，在**架构**为**异构计算**中找；对于 **HCCPNV6** 的机型，在**架构**为**高性能计算集群**中找，且需提前创建高性能计算集群，详情请参见 [创建高性能计算集群](https://cloud.tencent.com/document/product/1646/93026#3680502d-53cb-440e-8cf1-3eebbb7db3c5)。
+对于 **PNV6.32XLARGE1280** 和 **PNV6.96XLARGE2304** 的这两种规格，需在**架构**为**异构计算**中找；对于 **HCCPNV6.96XLARGE2304** 的规格，需在**架构**为**高性能计算集群**中找，且要先提前创建高性能计算集群，详情请参见 [创建高性能计算集群](https://cloud.tencent.com/document/product/1646/93026#3680502d-53cb-440e-8cf1-3eebbb7db3c5)。
 
 :::
 
