@@ -1,11 +1,5 @@
 # 在 TKE 上部署满血版 DeepSeek-R1 (SGLang)
 
-:::warning[警告]
-
-实践还在进行中，本文尚未完成！
-
-:::
-
 ## 概述
 
 [SGLang](https://docs.sglang.ai/) 与 [vLLM](https://docs.vllm.ai) 类似， 用于运行 AI 大模型，是性能卓越的新兴之秀，与 DeepSeek 官方合作并专门针对 DeepSeek 进行了深度优化，也是 DeepSeek 官方推荐的部署工具。
