@@ -202,7 +202,7 @@ spec:
 
 #### 使用 Job 下载大模型文件
 
-下发一个 Job 用于下载 AI 大模型：
+创建一个 Job 用于下载大模型文件到 CFS：
 
 :::info[注意]
 
@@ -222,11 +222,9 @@ metadata:
 spec:
   template:
     metadata:
-      name: download-model
+      name: sglang
       labels:
         app: download-model
-        annotations:
-          eks.tke.cloud.tencent.com/root-cbs-size: '100' # 如果调度到超级节点，默认系统盘只有 20Gi，sglang 镜像解压后会撑爆磁盘，用这个注解自定义一下系统盘容量（超过20Gi的部分会收费）。
     spec:
       containers:
       - name: sglang
@@ -266,7 +264,42 @@ spec:
 
 #### 使用 DaemonSet 下载大模型文件
 
-TODO
+创建一个 DaemonSet ，让每个节点都下载大模型文件到本地盘：
+
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: download-model
+  labels:
+    app: download-model
+spec:
+  selector:
+    matchLabels:
+      app: download-model
+  template:
+    metadata:
+      labels:
+        app: download-model
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: sglang
+        image: lmsysorg/sglang:latest
+        command:
+        - modelscope
+        - download
+        - --local_dir=/data/DeepSeek-R1
+        - --model=deepseek-ai/DeepSeek-R1
+        volumeMounts:
+        - name: model
+          mountPath: /data
+      volumes:
+      - name: model
+        hostPath:
+          path: /model
+```
 
 </TabItem>
 
