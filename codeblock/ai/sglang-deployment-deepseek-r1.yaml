@@ -49,6 +49,11 @@ spec:
             nvidia.com/gpu: "8"
         ports:
         - containerPort: 30000
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 30000
+          periodSeconds: 5
         volumeMounts:
         - name: data
           mountPath: /data
