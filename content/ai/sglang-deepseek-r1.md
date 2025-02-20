@@ -248,7 +248,6 @@ spec:
 
 :::info[说明]
 
-- 由于 A10 和 A00 只在国内地域售卖，所以集群一定在国内地域，而国内地域下载 HuggingFace 上的模型会有网络问题，而 ModelScope 不会有问题，所以我们下载 ModelScope 上的模型。
 - CFS-Turbo 的 PVC 挂载到 `/data` 目录，存储下载的模型文件。
 - `--local_dir` 指定模型文件下载目录。
 - `--model` 指定 [ModelScope 模型库](https://www.modelscope.cn/models) 中的模型名称，满血版的 DeepSeek-R1 模型名称为 `deepseek-ai/DeepSeek-R1`。
