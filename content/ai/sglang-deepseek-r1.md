@@ -345,142 +345,7 @@ SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes
 
 使用 `LeaderWorkerSet` 部署满血版的 DeepSeek-R1 双机集群(2 台 8 卡的 GPU 节点，1 个 leader 和 1 个 worker)：
 
-```yaml showLineNumbers
-apiVersion: leaderworkerset.x-k8s.io/v1
-kind: LeaderWorkerSet
-metadata:
-  name: deepseek-r1
-spec:
-  replicas: 1
-  leaderWorkerTemplate:
-    size: 2
-    restartPolicy: RecreateGroupOnPodRestart
-    leaderTemplate:
-      metadata:
-        labels:
-          role: leader
-      spec:
-        hostNetwork: true # 如果使用 HCCPNV6 机型，支持 RDMA，需要使用 HostNetwork 才能让 RDMA 生效。
-        hostPID: true
-        dnsPolicy: ClusterFirstWithHostNet # 如果使用 HostNetwork，默认使用节点上 /etc/resolv.conf 中的 dns server，会导致 LWS_LEADER_ADDRESS 指定的域名解析失败，所以 dnsPolicy 指定为 ClusterFirstWithHostNet 以便使用 coredns 解析。
-        containers:
-        - name: leader
-          image: lmsysorg/sglang:latest
-          env:
-          - name: TOTAL_GPU
-            value: "16"
-          - name: MODEL_DIRECTORY
-            value: "DeepSeek-R1"
-          - name: MODEL_NAME
-            value: "DeepSeek-R1"
-          command:
-          - bash
-          - -c
-          - |
-            set -x
-            MODEL_DIRECTORY="${MODEL_DIRECTORY:-MODEL_NAME}"
-            exec python3 -m sglang.launch_server \
-              --model-path /data/$MODEL_DIRECTORY \
-              --served-model-name $MODEL_NAME \
-              --nnodes $LWS_GROUP_SIZE \
-              --tp $TOTAL_GPU \
-              --node-rank 0 \
-              --dist-init-addr $(LWS_LEADER_ADDRESS):5000 \
-              --log-requests \
-              --enable-metric \
-              --allow-auto-truncate \
-              --watchdog-timeout 3600 \
-              --disable-custom-all-reduce \
-              --trust-remote-code \
-              --host 0.0.0.0 \
-              --port 30000
-          resources:
-            limits:
-              nvidia.com/gpu: "8" # 每台节点 8 张 GPU 卡，每个 Pod 独占 1 台节点。
-          ports:
-          - containerPort: 30000
-          volumeMounts:
-          - mountPath: /dev/shm
-            name: dshm
-          - mountPath: /data
-            name: data
-        volumes:
-        - name: dshm
-          emptyDir:
-            medium: Memory
-        - name: data
-          persistentVolumeClaim:
-            claimName: ai-model
-    workerTemplate:
-      spec:
-        hostNetwork: true # worker 与 master 保持一致
-        hostPID: true
-        dnsPolicy: ClusterFirstWithHostNet # worker 与 master 保持一致
-        containers:
-        - name: worker
-          image: lmsysorg/sglang:latest
-          env:
-          - name: ORDINAL_NUMBER
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
-          - name: TOTAL_GPU
-            value: "16"
-          - name: MODEL_DIRECTORY
-            value: "DeepSeek-R1"
-          - name: MODEL_NAME
-            value: "DeepSeek-R1"
-          command:
-          - bash
-          - -c
-          - |
-            set -x
-            MODEL_DIRECTORY="${MODEL_DIRECTORY:-MODEL_NAME}"
-            exec python3 -m sglang.launch_server \
-              --model-path /data/$MODEL_DIRECTORY \
-              --served-model-name $MODEL_NAME \
-              --nnodes $LWS_GROUP_SIZE \
-              --tp $TOTAL_GPU \
-              --node-rank $ORDINAL_NUMBER \
-              --dist-init-addr $(LWS_LEADER_ADDRESS):5000 \
-              --log-requests \
-              --enable-metric \
-              --allow-auto-truncate \
-              --watchdog-timeout 3600 \
-              --disable-custom-all-reduce \
-              --trust-remote-code
-          resources:
-            limits:
-              nvidia.com/gpu: "8" # 每台节点 8 张 GPU 卡，每个 Pod 独占 1 台节点。
-          volumeMounts:
-          - mountPath: /dev/shm
-            name: dshm
-          - mountPath: /data
-            name: data
-        volumes:
-        - name: dshm
-          emptyDir:
-            medium: Memory
-        - name: data
-          persistentVolumeClaim:
-            claimName: ai-model
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: deepseek-r1-api
-spec:
-  type: ClusterIP
-  selector:
-    leaderworkerset.sigs.k8s.io/name: deepseek-r1
-    role: leader
-  ports:
-  - name: api
-    protocol: TCP
-    port: 30000
-    targetPort: 30000
-```
+<FileBlock file="ai/sglang-lws-deepseek-r1.yaml" showLineNumbers />
 
 :::info[说明]
 
@@ -504,85 +369,7 @@ spec:
 
 使用 `Deployment` 部署单机满血版的 DeepSeek-R1：
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: deepseek-r1
-  labels:
-    app: deepseek-r1
-spec:
-  selector:
-    matchLabels:
-      app: deepseek-r1
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: deepseek-r1
-    spec:
-      containers:
-      - name: sglang
-        image: lmsysorg/sglang:latest
-        env:
-        - name: TOTAL_GPU
-          value: "8"
-        - name: MODEL_DIRECTORY
-          value: "DeepSeek-R1"
-        - name: MODEL_NAME
-          value: "DeepSeek-R1"
-        command:
-        - bash
-        - -c
-        - |
-          set -x
-          MODEL_DIRECTORY="${MODEL_DIRECTORY:-MODEL_NAME}"
-          exec python3 -m sglang.launch_server \
-            --model-path /data/$MODEL_DIRECTORY \
-            --served-model-name $MODEL_NAME \
-            --tp $TOTAL_GPU \
-            --log-requests \
-            --enable-metric \
-            --allow-auto-truncate \
-            --watchdog-timeout 3600 \
-            --disable-custom-all-reduce \
-            --trust-remote-code \
-            --host 0.0.0.0 \
-            --port 30000
-        resources:
-          limits:
-            nvidia.com/gpu: "8"
-        ports:
-        - containerPort: 30000
-        volumeMounts:
-        - name: data
-          mountPath: /data
-        - name: shm
-          mountPath: /dev/shm
-      volumes:
-      - name: data
-        persistentVolumeClaim:
-          claimName: ai-model
-      - name: shm
-        emptyDir:
-          medium: Memory
-      restartPolicy: Always
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: deepseek-r1-api
-spec:
-  selector:
-    app: deepseek-r1
-  type: ClusterIP
-  ports:
-  - name: api
-    protocol: TCP
-    port: 30000
-    targetPort: 30000
-```
+<FileBlock file="ai/sglang-deployment-deepseek-r1.yaml" showLineNumbers />
 
 :::info[说明]
 
@@ -626,26 +413,7 @@ curl -v http://127.0.0.1:30000/v1/completions -H "Content-Type: application/json
 
 :::
 
-```yaml
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: deepseek-api
-spec:
-  parentRefs:
-  - group: gateway.networking.k8s.io
-    kind: Gateway
-    namespace: envoy-gateway-system
-    name: deepseek
-  hostnames:
-  - "deepseek.your.domain"
-  rules:
-  - backendRefs:
-    - group: ""
-      kind: Service
-      name: deepseek-r1-api
-      port: 30000
-```
+<FileBlock file="ai/deepseek-r1-httproute.yaml" showLineNumbers />
 
 :::tip[说明]
 
@@ -659,24 +427,7 @@ spec:
 
 <TabItem value="webui-ingress" label="Ingress">
 
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: deepseek-api
-spec:
-  rules:
-  - host: "deepseek.your.domain"
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: deepseek-r1-api
-            port:
-              number: 30000
-```
+<FileBlock file="ai/deepseek-r1-ingress.yaml" showLineNumbers />
 
 :::tip[说明]
 

@@ -15,22 +15,36 @@ spec:
         app: deepseek-r1
     spec:
       containers:
-      - name: deepseek-r1
+      - name: sglang
         image: lmsysorg/sglang:latest
         env:
-        - name: LLM_MODEL
-          value: deepseek-ai/
+        - name: TOTAL_GPU
+          value: "8"
+        - name: MODEL_DIRECTORY
+          value: "DeepSeek-R1"
+        - name: MODEL_NAME
+          value: "DeepSeek-R1"
         command:
-        - python3
-        - -m
-        - deepseek-r1.launch_server
-        - --host=0.0.0.0
-        - --port=30000
-        - --tp=1
-        - --model-path=/data/DeepSeek-R1
+        - bash
+        - -c
+        - |
+          set -x
+          MODEL_DIRECTORY="${MODEL_DIRECTORY:-MODEL_NAME}"
+          exec python3 -m sglang.launch_server \
+            --model-path /data/$MODEL_DIRECTORY \
+            --served-model-name $MODEL_NAME \
+            --tp $TOTAL_GPU \
+            --log-requests \
+            --enable-metric \
+            --allow-auto-truncate \
+            --watchdog-timeout 3600 \
+            --disable-custom-all-reduce \
+            --trust-remote-code \
+            --host 0.0.0.0 \
+            --port 30000
         resources:
           limits:
-            nvidia.com/gpu: "1"
+            nvidia.com/gpu: "8"
         ports:
         - containerPort: 30000
         volumeMounts:
@@ -45,14 +59,13 @@ spec:
       - name: shm
         emptyDir:
           medium: Memory
-          sizeLimit: 40Gi
       restartPolicy: Always
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: deepseek-r1
+  name: deepseek-r1-api
 spec:
   selector:
     app: deepseek-r1
@@ -62,4 +75,3 @@ spec:
     protocol: TCP
     port: 30000
     targetPort: 30000
-
