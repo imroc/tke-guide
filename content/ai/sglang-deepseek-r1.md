@@ -330,10 +330,9 @@ SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes
 
 双机（多机）集群部署使用 [LWS](https://github.com/kubernetes-sigs/lws) 中的 `LeaderWorkerSet` 来部署，单机部署则直接使用 `Deployment` 部署。
 
-下面提供单机和双机两种部署方式的示例：
+下面提供单机和双机两种部署方式的示例。
 
-<Tabs>
-<TabItem value="lws" label="双机集群部署">
+#### 双机集群部署
 
 使用 `LeaderWorkerSet` 部署满血版的 DeepSeek-R1 双机集群(2 台 8 卡的 GPU 节点，1 个 leader 和 1 个 worker)：
 
@@ -364,8 +363,7 @@ SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes
 
 部署好后如果像扩容，可以通过调高 `replicas` 来增加 GPU 集群数量（前提是准备好新的 GPU 节点资源）。
 
-</TabItem>
-<TabItem value="deployment" label="单机部署">
+#### 单机部署
 
 使用 `Deployment` 部署单机满血版的 DeepSeek-R1：
 
@@ -390,9 +388,6 @@ SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes
 :::
 
 部署好后如果像扩容，可以通过调高 `replicas` 来增加 DeepSeek-R1 副本数（前提是准备好新的 GPU 节点资源）。
-
-</TabItem>
-</Tabs>
 
 ### 验证 API
 
