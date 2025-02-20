@@ -42,7 +42,7 @@
 
 :::info[注意]
 
-对于 **PNV6.32XLARGE1280** 和 **PNV6.96XLARGE2304** 的这两种规格，需在**架构**为**异构计算**中找；对于 **HCCPNV6.96XLARGE2304** 的规格，需在**架构**为**高性能计算集群**中找，且要先提前创建高性能计算集群，详情请参见 [创建高性能计算集群](https://cloud.tencent.com/document/product/1646/93026#3680502d-53cb-440e-8cf1-3eebbb7db3c5)。
+对于 **PNV6.32XLARGE1280** 和 **PNV6.96XLARGE2304** 的这两种规格，**架构**选择**异构计算**才能看到；对于 **HCCPNV6.96XLARGE2304** 的规格，**架构**选择**高性能计算集群**才能看到，且要先提前创建高性能计算集群，详情请参见 [创建高性能计算集群](https://cloud.tencent.com/document/product/1646/93026#3680502d-53cb-440e-8cf1-3eebbb7db3c5)。
 
 :::
 
