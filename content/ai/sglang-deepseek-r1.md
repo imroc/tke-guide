@@ -6,6 +6,14 @@
 
 本文将基于 SGLang 在 TKE 集群上部署满血版 DeepSeek-R1 模型，提供最佳实践的部署示例。
 
+:::info[镜像说明]
+
+本文中的示例使用的镜像是 SGLang 官方提供的镜像（[lmsysorg/sglang](https://hub.docker.com/r/lmsysorg/sglang/tags)），tag 为 latest，建议指定 tag 到固定版本。
+
+官方镜像托管在 DockerHub，且体积较大，在 TKE 环境中，默认提供免费的 DockerHub 镜像加速服务。中国大陆用户也可以直接从 DockerHub 拉取镜像，但速度可能较慢，尤其是对于较大的镜像，等待时间会更长。为提高镜像拉取速度，建议将镜像同步至 [容器镜像服务 TCR](https://cloud.tencent.com/product/tcr)，并在 YAML 文件中替换相应的镜像地址，这样可以显著加快镜像的拉取速度。
+
+:::
+
 ## 机型与部署方案
 
 由于满血版的 DeepSeek-R1 参数量较大，需要用较大显存且支持 FP8 量化的大规格 GPU 实例，目前合适的机型规格有 [HCCPNV6.96XLARGE2304](https://cloud.tencent.com/document/product/1646/81562#HCCPNV6)（[高性能计算集群](https://cloud.tencent.com/product/hcc)）和 [PNV6.32XLARGE1280 / PNV6.96XLARGE2304](https://cloud.tencent.com/document/product/560/19700#PNV6)（[GPU 云服务器](https://cloud.tencent.com/product/gpu)），推荐的部署方案是用两台该机型的节点组建 GPU 集群来运行满血 DeepSeek-R1，如果对并发和性能要求不高，也可以单台部署。
@@ -25,12 +33,6 @@
 :::
 
 **选型建议**：两台组建 GPU 集群来运行满血 DeepSeek-R1 建议选 `HCCPNV6.96XLARGE2304`，因为支持 RDMA，可显著提升 DeepSeek 运行性能，token 生成速度大概有 **600~700/s**；单台部署优先考虑 `PNV6.32XLARGE1280` 和 `PNV6.96XLARGE2304` 以节约成本，token 生成速度大概有 **20~40/s**。
-
-## 镜像说明
-
-本文中的示例使用的镜像是 SGLang 官方提供的镜像（[lmsysorg/sglang](https://hub.docker.com/r/lmsysorg/sglang/tags)），tag 为 latest，建议指定 tag 到固定版本。
-
-官方镜像托管在 DockerHub，且体积较大，在 TKE 环境中，默认提供免费的 DockerHub 镜像加速服务。中国大陆用户也可以直接从 DockerHub 拉取镜像，但速度可能较慢，尤其是对于较大的镜像，等待时间会更长。为提高镜像拉取速度，建议将镜像同步至 [容器镜像服务 TCR](https://cloud.tencent.com/product/tcr)，并在 YAML 文件中替换相应的镜像地址，这样可以显著加快镜像的拉取速度。
 
 ## 操作步骤
 
