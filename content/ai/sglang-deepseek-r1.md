@@ -537,7 +537,7 @@ spec:
         - |
           set -x
           MODEL_DIRECTORY="${MODEL_DIRECTORY:-MODEL_NAME}"
-          exec python3 -m deepseek-r1.launch_server \
+          exec python3 -m sglang.launch_server \
             --model-path /data/$MODEL_DIRECTORY \
             --served-model-name $MODEL_NAME \
             --tp $TOTAL_GPU \
