@@ -445,7 +445,7 @@ curl -v http://127.0.0.1:30000/v1/completions -H 'X-API-Key: 93e8b39f55fc4097956
 </TabItem>
 </Tabs>
 
-最后在需要使用 API 的应用中配置 API 地址、API 密钥、模型名称等，比如 Chatbox 的配置：
+最后在需要使用 API 的应用中配置 API 地址、API 密钥、模型名称等，比如 [Chatbox](https://chatboxai.app/) 的配置：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F20%2F20250220165250.png)
 
