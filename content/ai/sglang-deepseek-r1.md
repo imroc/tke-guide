@@ -383,7 +383,7 @@ SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes
 Pod 成功跑起来后用 kubectl exec 进入 leader Pod，使用 curl 测试 API：
 
 ```bash
-curl -v http://127.0.0.1:30000/v1/completions -H "Content-Type: application/json" -d '{
+curl -v http://127.0.0.1:30000/v1/completions -H 'X-API-Key: 93e8b39f55fc4097956054c80a8ed7cf'  -H "Content-Type: application/json" -d '{
       "model": "DeepSeek-R1",
       "prompt": "你是谁?",
       "max_tokens": 100,
@@ -445,7 +445,18 @@ curl -v http://127.0.0.1:30000/v1/completions -H "Content-Type: application/json
 </TabItem>
 </Tabs>
 
-最后在需要使用 API 的应用中配置 API 地址及其密钥即可。
+最后在需要使用 API 的应用中配置 API 地址、API 密钥、模型名称等，比如 Chatbox 的配置：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F20%2F20250220165250.png)
+
+:::info[说明]
+
+- **模型提供方**: 由于 SGLang 兼容 OpenAI 的 API，所以选择 **OPENAI API**。
+- **API 密钥**：用部署 DeepSeek-R1 的 YAML 中配置的 `API_KEY` 环境变量的值。
+- **API 域名**：用 DeepSeek-R1 最终被暴露出来的外部地址。
+- **模型**：填写 DeepSeek-R1 部署时指定的模型名称（`MODEL_NAME` 环境变量）。
+
+:::
 
 ### 如何使用 OpenWebUI 与模型对话？
 
