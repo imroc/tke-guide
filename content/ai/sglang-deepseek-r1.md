@@ -24,7 +24,7 @@
 
 :::
 
-**选型建议**：两台组建 GPU 集群来运行满血 DeepSeek-R1 建议选 `HCCPNV6.96XLARGE2304`，因为支持 RDMA，可显著提升 DeepSeek 运行性能；单台部署优先考虑 `PNV6.32XLARGE1280` 和 `PNV6.96XLARGE2304` 以节约成本。
+**选型建议**：两台组建 GPU 集群来运行满血 DeepSeek-R1 建议选 `HCCPNV6.96XLARGE2304`，因为支持 RDMA，可显著提升 DeepSeek 运行性能，token 生成速度大概有 **600~700/s**；单台部署优先考虑 `PNV6.32XLARGE1280` 和 `PNV6.96XLARGE2304` 以节约成本，token 生成速度大概有 **20~40/s**。
 
 ## 镜像说明
 
