@@ -81,9 +81,9 @@ kind: Service
 metadata:
   name: deepseek-r1-api
 spec:
+  type: ClusterIP
   selector:
     app: deepseek-r1
-  type: ClusterIP
   ports:
   - name: api
     protocol: TCP

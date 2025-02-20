@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: deepseek-r1-api
+spec:
+  # highlight-next-line
+  type: LoadBalancer
+  selector:
+    leaderworkerset.sigs.k8s.io/name: deepseek-r1
+    role: leader
+  ports:
+  - name: api
+    protocol: TCP
+    port: 30000
+    targetPort: 30000

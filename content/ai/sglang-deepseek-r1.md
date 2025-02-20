@@ -406,7 +406,20 @@ curl -v http://127.0.0.1:30000/v1/completions -H "Content-Type: application/json
 
 ### 如何对外暴露 API ？
 
-如果希望将 API 对外暴露，可以通过 Ingress 或 Gateway API 来暴露，示例：
+通常对外暴露 API 一般会配置 API 密钥，配置方法是修改本文示例中的 YAML，将密钥配置到 `API_KEY` 环境变量中。
+
+如果希望将 API 对外暴露，最简单的是直接修改 DeepSeek 的 Service 类型为 LoadBalancer，TKE 会自动为其创建公网 CLB 将 API 暴露到公网：
+
+<Tabs>
+  <TabItem value="dubble" label="双机集群部署版">
+    <FileBlock file="ai/deepseek-r1-api-lb-leader-svc.yaml" showLineNumbers />
+  </TabItem>
+  <TabItem value="single" label="单机部署版">
+    <FileBlock file="ai/deepseek-r1-api-lb-svc.yaml" showLineNumbers />
+  </TabItem>
+</Tabs>
+
+如果需要更灵活的方式暴露，比如配置证书通过 HTTPS 协议暴露，或者与其他服务共用网关入口，可以通过 Ingress 或 Gateway API 来暴露，示例：
 
 <Tabs>
 <TabItem value="api-httproute" label="Gateway API">
