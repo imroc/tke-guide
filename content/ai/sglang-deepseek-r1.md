@@ -82,11 +82,11 @@
 
 ### 准备存储与模型文件
 
-满血版 DeepSeek-R1 体积较大，为加快模型下载和加载速度，建议使用性能最强的存储，本文给出本地存储和 CFS 共享存储两种方案的示例。
+满血版 DeepSeek-R1 体积较大，为加快模型下载和加载速度，建议使用性能最强的存储，本文给出 NVME SSD 本地存储和 CFS-Trubo 共享存储两种方案的示例。
 
-#### CFS 共享存储
+#### CFS-Turbo 共享存储
 
-共享存储使用 CFS-Turbo，Turbo 系列性能与规格详情参考 [腾讯云文件存储官方文档](https://cloud.tencent.com/document/product/582/38112#turbo-.E7.B3.BB.E5.88.97)，使用下面的步骤准备 CFS-Turbo 存储和下载大模型文件。
+共享存储使用 CFS-Turbo 性能更好，Turbo 系列性能与规格详情参考 [腾讯云文件存储官方文档](https://cloud.tencent.com/document/product/582/38112#turbo-.E7.B3.BB.E5.88.97)，使用下面的步骤准备 CFS-Turbo 存储和下载大模型文件。
 
 ##### 安装 CFS 插件
 
@@ -253,15 +253,7 @@ spec:
 
 #### 本地存储
 
-##### 配置系统盘
-
-购买服务器时，系统盘容量建议选 1T 以上，并使用**增强型SSD云硬盘**：
-
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F20%2F20250220111326.png)
-
-##### 使用 DaemonSet 下载大模型文件
-
-创建一个 DaemonSet ，让每个节点都下载大模型文件到本地盘：
+如果使用本地存储大模型，可以创建一个下载模型文件的 DaemonSet，相当于给每个节点都下发一个下载 Job：
 
 ```yaml
 apiVersion: apps/v1
@@ -279,7 +271,9 @@ spec:
       labels:
         app: download-model
     spec:
-      restartPolicy: OnFailure
+      restartPolicy: OnFailure # 默认 Always，改成 OnFailure 避免重复下载
+      nodeSelector:
+        nvidia-device-enable: "true" # 只让 GPU 节点下载
       containers:
       - name: sglang
         image: lmsysorg/sglang:latest
