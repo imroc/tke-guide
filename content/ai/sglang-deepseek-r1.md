@@ -453,7 +453,7 @@ curl -v http://127.0.0.1:30000/v1/completions -H "Content-Type: application/json
 
 最后在需要使用 API 的应用中配置 API 地址及其密钥即可。
 
-### 如何使用 OpenWebUI 对话？
+### 如何使用 OpenWebUI 与模型对话？
 
 SGLang 提供了兼容 OpenAI 的 API，部署 OpenWebUI 时，如不需要 Ollama API 可禁用掉，再配置下 OpenAI 的 API 地址，指向 DeepSeek-R1 的地址即可。
 
