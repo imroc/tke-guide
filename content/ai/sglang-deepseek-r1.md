@@ -383,6 +383,7 @@ SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes
 - `MODEL_DIRECTORY` 为模型文件的子目录路径。
 - `MODEL_NAME` 为模型名称，API 调用将使用此模型名称进行交互。
 - 由于是单机部署，无需 RDMA，也无需使用 HostNetwork。
+- 单机部署配置了 `--mem-fraction-static`和 `--max-running-request` 参数，用于避免显存不足导致 SGLang 启动失败。
 - 涉及 OpenAI API 地址配置的地方（如 OpenWebUI），指向这里创建的 Service 的地址（如 `http://deepseek-r1-api:30000/v1`）。
 
 :::
