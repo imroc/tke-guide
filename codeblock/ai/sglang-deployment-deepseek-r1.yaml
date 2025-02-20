@@ -39,7 +39,7 @@ spec:
               EXTRA_ARGS="--api-key $API_KEY"
           fi
           exec python3 -m sglang.launch_server \
-            --model-path /data/$MODEL_DIRECTORY \
+            --model-path /data/model/$MODEL_DIRECTORY \
             --served-model-name $MODEL_NAME \
             --tp $TOTAL_GPU \
             --log-requests \
@@ -64,7 +64,7 @@ spec:
           periodSeconds: 5
         volumeMounts:
         - name: data
-          mountPath: /data
+          mountPath: /data/model
         - name: shm
           mountPath: /dev/shm
       volumes:

@@ -38,12 +38,12 @@ spec:
                 EXTRA_ARGS="--api-key $API_KEY"
             fi
             exec python3 -m sglang.launch_server \
-              --model-path /data/$MODEL_DIRECTORY \
+              --model-path /data/model/$MODEL_DIRECTORY \
               --served-model-name $MODEL_NAME \
               --nnodes $LWS_GROUP_SIZE \
               --tp $TOTAL_GPU \
               --node-rank 0 \
-              --dist-init-addr $(LWS_LEADER_ADDRESS):5000 \
+              --dist-init-addr $LWS_LEADER_ADDRESS:5000 \
               --log-requests \
               --enable-metric \
               --allow-auto-truncate \
@@ -60,7 +60,7 @@ spec:
           volumeMounts:
           - mountPath: /dev/shm
             name: dshm
-          - mountPath: /data
+          - mountPath: /data/model
             name: data
         volumes:
         - name: dshm
@@ -95,12 +95,12 @@ spec:
             set -x
             MODEL_DIRECTORY="${MODEL_DIRECTORY:-MODEL_NAME}"
             exec python3 -m sglang.launch_server \
-              --model-path /data/$MODEL_DIRECTORY \
+              --model-path /data/model/$MODEL_DIRECTORY \
               --served-model-name $MODEL_NAME \
               --nnodes $LWS_GROUP_SIZE \
               --tp $TOTAL_GPU \
               --node-rank $ORDINAL_NUMBER \
-              --dist-init-addr $(LWS_LEADER_ADDRESS):5000 \
+              --dist-init-addr $LWS_LEADER_ADDRESS:5000 \
               --log-requests \
               --enable-metric \
               --allow-auto-truncate \
@@ -113,7 +113,7 @@ spec:
           volumeMounts:
           - mountPath: /dev/shm
             name: dshm
-          - mountPath: /data
+          - mountPath: /data/model
             name: data
         volumes:
         - name: dshm

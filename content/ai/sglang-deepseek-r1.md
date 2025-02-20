@@ -280,11 +280,11 @@ spec:
         command:
         - modelscope
         - download
-        - --local_dir=/data/DeepSeek-R1
+        - --local_dir=/data/model/DeepSeek-R1
         - --model=deepseek-ai/DeepSeek-R1
         volumeMounts:
         - name: model
-          mountPath: /data
+          mountPath: /data/model
       volumes:
       - name: model
         hostPath:
