@@ -19,6 +19,10 @@ spec:
         - name: leader
           image: lmsysorg/sglang:latest
           env:
+          - name: LWS_WORKER_INDEX
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']
           - name: TOTAL_GPU
             value: "16"
           - name: MODEL_DIRECTORY
@@ -42,7 +46,7 @@ spec:
               --served-model-name $MODEL_NAME \
               --nnodes $LWS_GROUP_SIZE \
               --tp $TOTAL_GPU \
-              --node-rank 0 \
+              --node-rank $LWS_WORKER_INDEX \
               --dist-init-addr $LWS_LEADER_ADDRESS:5000 \
               --log-requests \
               --enable-metric \
