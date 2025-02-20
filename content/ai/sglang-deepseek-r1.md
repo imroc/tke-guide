@@ -453,6 +453,27 @@ curl -v http://127.0.0.1:30000/v1/completions -H "Content-Type: application/json
 
 最后在需要使用 API 的应用中配置 API 地址及其密钥即可。
 
+### 如何使用 OpenWebUI 对话？
+
+SGLang 提供了兼容 OpenAI 的 API，部署 OpenWebUI 时，如不需要 Ollama API 可禁用掉，再配置下 OpenAI 的 API 地址，指向 DeepSeek-R1 的地址即可。
+
+如果[使用 helm 部署 OpenWebUI](https://github.com/open-webui/helm-charts)，`values.yaml` 配置示例：
+
+```yaml
+ollama:
+  enabled: false
+openaiBaseApiUrl: "http://deepseek-r1:30000/api/v1"
+```
+
+如果通过 YAML 部署 OpenWebUI，配置下 Pod 环境变量，示例：
+
+```yaml
+env:
+- name: OPENAI_API_BASE_URL
+  value: http://deepseek-r1:30000/api/v1 # vllm 的地址
+- name: ENABLE_OLLAMA_API # 禁用 Ollama API，只保留 OpenAI API
+```
+
 ## 参考资料
 
 - ModelScope 上的 DeepSeek-R1 模型列表: https://www.modelscope.cn/collections/DeepSeek-R1-c8e86ac66ed943
