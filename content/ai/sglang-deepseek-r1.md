@@ -267,15 +267,14 @@ spec:
 
 ### 部署 DeepSeek-R1
 
-下面提供单机部署和双机集群部署两种方式的实例。
-
-:::tip[说明]
-
 使用本文指定的机型，每台有 8 张 GPU 算卡，单机部署也能成功运行，如果并发和吞吐要求较高，建议使用双机集群部署。
 
-:::
+双机（多机）集群部署使用 [LWS](https://github.com/kubernetes-sigs/lws) 中的 `LeaderWorkerSet` 来部署，单机部署则直接使用 `Deployment` 部署。
 
-#### 双机集群部署
+下面提供单机和双机两种部署方式的示例：
+
+<Tabs>
+<TabItem value="lws" title="双机集群部署">
 
 使用 `LeaderWorkerSet` 部署满血版的 DeepSeek-R1 双机集群(2 台 8 卡的 GPU 节点，1 个 leader 和 1 个 worker)：
 
@@ -433,15 +432,10 @@ spec:
 
 部署好后如果像扩容，可以通过调高 `replicas` 来增加 GPU 集群数量（前提是准备好新的 GPU 节点资源）。
 
-#### 单机部署
+</TabItem>
+<TabItem value="deployment" title="单机部署">
 
 使用 `Deployment` 部署单机满血版的 DeepSeek-R1：
-
-:::tip[提示]
-
-单机部署无需 RDMA，可优先选不支持 RDMA 的机型以节约成本。
-
-:::
 
 ```yaml
 apiVersion: apps/v1
@@ -536,6 +530,9 @@ spec:
 
 部署好后如果像扩容，可以通过调高 `replicas` 来增加 DeepSeek-R1 副本数（前提是准备好新的 GPU 节点资源）。
 
+</TabItem>
+</Tabs>
+
 ### 验证 API
 
 Pod 成功跑起来后用 kubectl exec 进入 leader Pod，使用 curl 测试 API：
@@ -554,37 +551,74 @@ curl -v http://127.0.0.1:30000/v1/completions -H "Content-Type: application/json
 如果希望将 API 对外暴露，可以通过 Ingress 或 Gateway API 来暴露，示例：
 
 <Tabs>
-  <TabItem value="api-httproute" label="Gateway API">
+<TabItem value="api-httproute" label="Gateway API">
 
-  :::info[注意]
+:::info[注意]
 
-  使用 Gateway API 需要集群中装有 Gateway API 的实现，如 TKE 应用市场中的 EnvoyGateway，具体 Gateway API 用法参考 [官方文档](https://gateway-api.sigs.k8s.io/guides/)。
+使用 Gateway API 需要集群中装有 Gateway API 的实现，如 TKE 应用市场中的 EnvoyGateway，具体 Gateway API 用法参考 [官方文档](https://gateway-api.sigs.k8s.io/guides/)。
 
-  :::
+:::
 
-  <FileBlock file="ai/deepseek-api-httproute.yaml" showLineNumbers />
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: deepseek-api
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    namespace: envoy-gateway-system
+    name: deepseek
+  hostnames:
+  - "deepseek.your.domain"
+  rules:
+  - backendRefs:
+    - group: ""
+      kind: Service
+      name: deepseek-r1-api
+      port: 30000
+```
 
-  :::tip[说明]
+:::tip[说明]
 
-  1. `parentRefs` 引用定义好的 `Gateway`（通常一个 Gateway 对应一个 CLB）。
-  2. `hostnames` 替换为你自己的域名，确保域名能正常解析到 Gateway 对应的 CLB 地址。
-  3. `backendRefs` 指定 DeepSeek 的 Service。
+1. `parentRefs` 引用定义好的 `Gateway`（通常一个 Gateway 对应一个 CLB）。
+2. `hostnames` 替换为你自己的域名，确保域名能正常解析到 Gateway 对应的 CLB 地址。
+3. `backendRefs` 指定 DeepSeek 的 Service。
 
-  :::
+:::
 
-  </TabItem>
+</TabItem>
 
-  <TabItem value="webui-ingress" label="Ingress">
-    <FileBlock file="ai/deepseek-api-ingress.yaml" showLineNumbers />
+<TabItem value="webui-ingress" label="Ingress">
 
-   :::tip[说明]
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: deepseek-api
+spec:
+  rules:
+  - host: "deepseek.your.domain"
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: deepseek-r1-api
+            port:
+              number: 30000
+```
 
-   1. `host` 替换为你自己的域名，确保域名能正常解析到 Ingress 对应的 CLB 地址。
-   2. `backend.service` 指定 DeepSeek 的 Service。
+:::tip[说明]
 
-   :::
+1. `host` 替换为你自己的域名，确保域名能正常解析到 Ingress 对应的 CLB 地址。
+2. `backend.service` 指定 DeepSeek 的 Service。
 
-  </TabItem>
+:::
+
+</TabItem>
 </Tabs>
 
 ## 常见问题
