@@ -32,7 +32,7 @@ DeepSeek-R1 满血版模型参数是 671B (6710 亿参数)，想要完美的发�
 
 :::
 
-**选型建议**：两台组建 GPU 集群来运行满血 DeepSeek-R1 建议选 `HCCPNV6.96XLARGE2304`，因为支持 RDMA，可显著提升 DeepSeek 运行性能，生成速度大概是 **600~700 token/s**；单台部署优先考虑 `PNV6.32XLARGE1280` 和 `PNV6.96XLARGE2304` 以节约成本，生成速度大概是 **20~40 token/s**。
+**选型建议**：两台组建 GPU 集群来运行满血 DeepSeek-R1，建议选 `HCCPNV6.96XLARGE2304`，因为支持 RDMA，可显著提升 DeepSeek 运行性能，生成速度大概是 **600~700 token/s**；单台部署无需 RDMA，优先考虑 `PNV6.32XLARGE1280` 和 `PNV6.96XLARGE2304` 以节约成本，生成速度大概是 **20~40 token/s**。
 
 ## 操作步骤
 
