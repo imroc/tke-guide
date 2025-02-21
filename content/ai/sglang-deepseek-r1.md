@@ -2,7 +2,7 @@
 
 ## 概述
 
-DeepSeek-R1 满血版模型参数是 671B (6710 亿参数)，[SGLang](https://docs.sglang.ai/) 是性能强悍的 AI 大模型部署工具，且与 DeepSeek 官方合作并专门针对 DeepSeek 进行了深度优化，也是 DeepSeek 官方推荐的部署工具。
+DeepSeek-R1 满血版模型参数是 671B (6710 亿参数)，想要完美的发挥它的性能，推荐使用 [SGLang](https://docs.sglang.ai/) 来部署，SGLang 是性能强悍的 AI 大模型部署工具，且与 DeepSeek 官方合作并专门针对 DeepSeek 进行了深度优化，也是 DeepSeek 官方推荐的部署工具。
 
 本文将基于 SGLang 在 TKE 集群上部署满血版 DeepSeek-R1 模型，提供最佳实践的部署示例。
 
