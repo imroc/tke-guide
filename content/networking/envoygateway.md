@@ -28,7 +28,6 @@ Kubernetes 提供了 `Ingress API` 来接入七层南北向流量，但功能很
   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F27%2F20250227140332.png)
 4. 根据需求配置参数完后，单击**创建**即可将 Envoy Gateway 安装到集群中。
 
-
 #### 方法二：按照 Envoy Gateway 官方文档安装
 
 参考 [Envoy Gateway Installation](https://gateway.envoyproxy.io/docs/install/)。
