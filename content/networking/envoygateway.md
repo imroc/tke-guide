@@ -24,7 +24,7 @@ Kubernetes 提供了 `Ingress API` 来接入七层南北向流量，但功能很
 
 1. 在目标 TKE 集群中新建一个名为 `envoy-gateway-system` 的命名空间。
 2. 在 [TKE 应用市场](https://console.cloud.tencent.com/tke2/helm/market) 搜索并选择 envoygateway。
-3. 单击**创建应用**，选择好目标 TKE 集群，命名空间选 `envoy-gateway-system`。
+3. 单击**创建应用**，选择好目标 TKE 集群，名称建议写 `eg`，命名空间选 `envoy-gateway-system`。
   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F27%2F20250227140332.png)
 4. 根据需求配置参数完后，单击**创建**即可将 Envoy Gateway 安装到集群中。
 
