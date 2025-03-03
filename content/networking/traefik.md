@@ -76,8 +76,17 @@ service:
   <TabItem value="1" label="自动创建">
     <FileBlock file="traefik/dubble-clb-autocreate-values.yaml" showLineNumbers />
   </TabItem>
+
   <TabItem value="2" label="使用已有CLB">
-    <FileBlock file="traefik/dubble-clb-use-exsisted-values.yaml" showLineNumbers />
+
+  :::info[注意]
+  
+  需自行创建内网 CLB，获取实例 ID 并替换配置中的 `lb-xxx`。
+  
+  :::
+
+  <FileBlock file="traefik/dubble-clb-use-exsisted-values.yaml" showLineNumbers />
+
   </TabItem>
 </Tabs>
 
@@ -90,7 +99,15 @@ service:
     <FileBlock file="traefik/dualstack-clb-autocreate-values.yaml" showLineNumbers />
   </TabItem>
   <TabItem value="2" label="使用已有CLB">
-    <FileBlock file="traefik/dualstack-clb-use-exsisted-values.yaml" showLineNumbers />
+
+  :::info[注意]
+  
+  需自行创建 IPV6 的 CLB，获取实例 ID 并替换配置中的 `lb-xxx`。
+  
+  :::
+
+  <FileBlock file="traefik/dualstack-clb-use-exsisted-values.yaml" showLineNumbers />
+
   </TabItem>
 </Tabs>
 
