@@ -96,7 +96,7 @@ service:
 
 :::tip[说明]
 
-更多详情请参考 [在 TKE 上使用 IPv6](ipv6)
+更多详情请参考 [在 TKE 上使用 IPv6](ipv6)。
 
 :::
 
