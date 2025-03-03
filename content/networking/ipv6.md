@@ -81,8 +81,6 @@ metadata:
   name: ipv4-svc
   labels:
     app: foo
-  annotations:
-    service.cloud.tencent.com/direct-access: "true"
 spec:
   type: LoadBalancer
   ports:
@@ -100,9 +98,10 @@ metadata:
   labels:
     app: foo
   annotations:
+    # highlight-add-start
     service.cloud.tencent.com/direct-access: "true"
-    # highlight-add-line
     service.kubernetes.io/service.extensiveParameters: '{"AddressIPVersion":"IPv6FullChain"}'
+    # highlight-add-end
 spec:
   type: LoadBalancer
   ports:
@@ -121,8 +120,6 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  annotations:
-    ingress.cloud.tencent.com/direct-access: "true"
   name: ipv4-ingress
 spec:
   rules:
@@ -142,9 +139,10 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
+    # highlight-add-start
     ingress.cloud.tencent.com/direct-access: "true"
-    # highlight-add-line
     kubernetes.io/ingress.extensiveParameters: '{"AddressIPVersion":"IPv6FullChain"}'
+    # highlight-add-end
   name: ipv6-ingress
 spec:
   rules:
