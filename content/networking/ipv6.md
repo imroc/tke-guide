@@ -123,7 +123,7 @@ kind: Ingress
 metadata:
   annotations:
     ingress.cloud.tencent.com/direct-access: "true"
-  name: foo
+  name: ipv4-ingress
 spec:
   rules:
   - host: example.com
@@ -145,7 +145,7 @@ metadata:
     ingress.cloud.tencent.com/direct-access: "true"
     # highlight-add-line
     kubernetes.io/ingress.extensiveParameters: '{"AddressIPVersion":"IPv6FullChain"}'
-  name: foo
+  name: ipv6-ingress
 spec:
   rules:
   - host: example.com
