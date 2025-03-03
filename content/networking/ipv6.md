@@ -9,7 +9,6 @@
 1. 集群所在 VPC 启用 IPv6，并且使用的子网需获取 IPv6 CIDR。
 2. 如果 Pod 需调度到普通节点或原生节点，在创建集群时，集群 IP 类型选 `IPv4/IPv6双栈`。
 
-
 ### VPC 和子网启用 IPv6 的方法
 
 在[私有网络](https://console.cloud.tencent.com/vpc/vpc)页面，选中集群所使用的 VPC，点击**更多**-**编辑IPv6 CIDR**:
