@@ -1,6 +1,19 @@
+ports:
+  web:
+    expose:
+      default: true
+      # highlight-add-line
+      ipv6: true
+  websecure:
+    expose:
+      default: true
+      # highlight-add-line
+      ipv6: true
 service:
+  # highlight-add-start
   additionalServices:
     ipv6:
       type: LoadBalancer
       annotations:
         service.kubernetes.io/tke-existed-lbid: lb-xxx
+  # highlight-add-end
