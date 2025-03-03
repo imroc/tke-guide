@@ -64,33 +64,17 @@ spec:
 
 后续在集群中创建的任何 Pod 就都会带有 IPv6 了。
 
-## IPV4 和 IPV6 同时接入流量
+## 使用 IPv6 CLB 暴露服务
 
 ### 前提条件
 
-要想将你的服务对外同时接入 IPv4 和 IPv6 的流量，需要 Pod 分配了 IPv6 地址，方法参考前面的**为 Pod 分配 IPv6 地址**。
+要想将你的服务通过 IPv6 对外暴露，可使用 IPv6 CLB，而 IPv6 类型的 CLB 绑定的后端地址需是 IPv6，所以也需要 Pod 分配了 IPv6 地址，方法参考前面的**为 Pod 分配 IPv6 地址**。
 
 ### 通过 LoadBalancer 类型 Service 暴露
 
-为服务定义两个 LoadBalancer 类型的 Service，其中一个通过注解指定使用 IPv6 的 CLB：
+通过注解指定使用 IPv6 的 CLB：
 
 ```yaml showLineNumbers
-apiVersion: v1
-kind: Service
-metadata:
-  name: ipv4-svc
-  labels:
-    app: foo
-spec:
-  type: LoadBalancer
-  ports:
-  - port: 8000
-    protocol: TCP
-    targetPort: 8000
-  selector:
-    app: foo
-
----
 apiVersion: v1
 kind: Service
 metadata:
@@ -114,27 +98,9 @@ spec:
 
 ### 通过 CLB 类型 Ingress 暴露
 
-为服务定义两个 Ingress（TKE 中 Ingress 类型默认是 CLB），其中一个通过注解指定使用 IPv6 的 CLB：
+通过注解指定使用 IPv6 的 CLB：
 
 ```yaml showLineNumbers
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: ipv4-ingress
-spec:
-  rules:
-  - host: example.com
-    http:
-      paths:
-      - backend:
-          service:
-            name: foo
-            port:
-              number: 80
-        path: /
-        pathType: ImplementationSpecific
-
----
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
