@@ -94,6 +94,12 @@ service:
 
 默认创建的是 IPV4 的 CLB，可通过类似如下配置实现 IPV6 和 IPV4 双 CLB 同时接入：
 
+:::tip[说明]
+
+更多详情请参考 [在 TKE 上使用 IPv6](ipv6)
+
+:::
+
 <Tabs>
   <TabItem value="1" label="自动创建">
     <FileBlock file="traefik/dualstack-clb-autocreate-values.yaml" showLineNumbers />
