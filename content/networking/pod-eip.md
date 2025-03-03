@@ -34,7 +34,15 @@ YAML 写法示例：
 
 <Tabs>
   <TabItem value="eip" label="标准集群写法">
-    <FileBlock file="eip/nginx-eip.yaml" showLineNumbers />
+
+  :::info[注意]
+
+  使用 TKE 标准集群，要求 Pod 使用 `VPC-CNI` 网络模式（参考这里的[前提条件和限制](https://cloud.tencent.com/document/product/457/64886)）。
+
+  :::
+
+  <FileBlock file="eip/nginx-eip.yaml" showLineNumbers />
+
   </TabItem>
 
   <TabItem value="eip-serverless" label="Serverless 集群写法">
@@ -42,7 +50,6 @@ YAML 写法示例：
   </TabItem>
 </Tabs>
 
-> 如果是 TKE 标准集群，要求 Pod 使用 `VPC-CNI` 网络模式（参考这里的[前提条件和限制](https://cloud.tencent.com/document/product/457/64886)）。
 
 ## 如何保留 EIP ?
 
@@ -56,7 +63,11 @@ Pod 被删除后 EIP 会被释放，EIP 在未绑定状态下会产生费用（�
 
 首先需要使用 `StatefulSet` 部署或其它第三方有状态工作负载（如 `OpenKruise` 的 `Advanced StatefulSet`、`OpenKruiseGame` 的 `GameServerSet`）。
 
-> 为什么要用有状态工作负载才可以？因为有状态工作负载的 Pod 名称有序号，可通过 Pod 名称与 EIP 的关联关系实现固定 EIP，无状态的 Pod 就无法实现了。
+:::tip[说明]
+
+为什么要用有状态工作负载才可以？因为有状态工作负载的 Pod 名称有序号，可通过 Pod 名称与 EIP 的关联关系实现固定 EIP，无状态的 Pod 就无法实现了。
+
+:::
 
 下面是保留 EIP 的 YAML 示例:
 
