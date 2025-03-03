@@ -50,7 +50,7 @@ spec:
         app: nginx
     spec:
       nodeSelector:
-        node.kubernetes.io/instance-type: eklet # 调度到超级节点
+        node.kubernetes.io/instance-type: eklet # 强制调度到超级节点
       containers:
         - image: nginx:latest
           name: nginx
