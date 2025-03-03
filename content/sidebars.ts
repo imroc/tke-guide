@@ -35,6 +35,7 @@ const sidebars: SidebarsConfig = {
           ],
         },
         'networking/envoygateway',
+        'networking/traefik',
         'networking/traffic-lossless-upgrade',
         'networking/clb-to-pod-directly',
         'networking/pod-eip',
