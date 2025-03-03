@@ -50,17 +50,17 @@ service:
 
 :::
 
-```yaml
-service:
-  annotations:
-    service.kubernetes.io/tke-existed-lbid: lb-xxx
-```
-
 :::info[注意]
 
 注意替换 `lb-xxx` 为已有的 CLB 实例 ID。
 
 :::
+
+```yaml
+service:
+  annotations:
+    service.kubernetes.io/tke-existed-lbid: lb-xxx
+```
 
 ## 操作步骤
 
