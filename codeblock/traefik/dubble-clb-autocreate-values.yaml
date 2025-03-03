@@ -1,0 +1,6 @@
+service:
+  additionalServices:
+    internal:
+      type: LoadBalancer
+      annotations:
+        service.kubernetes.io/qcloud-loadbalancer-internal-subnetid: "subnet-xxxxxxxx" # 配置内网 CLB 的子网

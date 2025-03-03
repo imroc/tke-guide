@@ -1,0 +1,6 @@
+service:
+  additionalServices:
+    ipv6:
+      type: LoadBalancer
+      annotations:
+        service.kubernetes.io/tke-existed-lbid: lb-xxx

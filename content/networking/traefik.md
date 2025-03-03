@@ -62,6 +62,38 @@ service:
     service.kubernetes.io/tke-existed-lbid: lb-xxx
 ```
 
+### 公网和内网同时接入
+
+默认创建的是公网 CLB，可通过类似如下配置实现内网和公网双 CLB 同时接入：
+
+:::info[注意]
+
+自动创建内网 CLB 需指定子网 ID，注意替换 `subnet-xxxxxxxx`。
+
+:::
+
+<Tabs>
+  <TabItem value="1" label="自动创建">
+    <FileBlock file="traefik/dubble-clb-autocreate-values.yaml" showLineNumbers />
+  </TabItem>
+  <TabItem value="2" label="使用已有CLB">
+    <FileBlock file="traefik/dubble-clb-use-exsisted-values.yaml" showLineNumbers />
+  </TabItem>
+</Tabs>
+
+### IPV4 和 IPV6 同时接入
+
+默认创建的是 IPV4 的 CLB，可通过类似如下配置实现 IPV6 和 IPV4 双 CLB 同时接入：
+
+<Tabs>
+  <TabItem value="1" label="自动创建">
+    <FileBlock file="traefik/dualstack-clb-autocreate-values.yaml" showLineNumbers />
+  </TabItem>
+  <TabItem value="2" label="使用已有CLB">
+    <FileBlock file="traefik/dualstack-clb-use-exsisted-values.yaml" showLineNumbers />
+  </TabItem>
+</Tabs>
+
 ## 操作步骤
 
 ### 安装 Traefik

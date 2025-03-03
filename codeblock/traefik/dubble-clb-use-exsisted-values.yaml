@@ -1,0 +1,6 @@
+service:
+  additionalServices:
+    internal:
+      type: LoadBalancer
+      annotations:
+        service.kubernetes.io/tke-existed-lbid: lb-xxx
