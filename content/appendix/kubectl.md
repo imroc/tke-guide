@@ -65,3 +65,24 @@ kubectl get node -o json | jq -r '.items[] | {subnet: .metadata.annotations."eks
 pod="wedata-lineage-service-test-env-48872523-0"
 kubectl get cm static-addresses -o json | jq -r ".data.\"${pod}\"" | xargs kubectl get node -o json | jq -r '{ip: .metadata.labels."eks.tke.cloud.tencent.com/available-ip-count"} |  "\(.ip)"'
 ```
+
+## 节点相关
+
+### 查看可用区分布
+
+<Tabs>
+  <TabItem value="1" label="可用区 ID">
+
+  ```bash
+  kubectl get node -o custom-columns=NAME:.metadata.name,ZONE:".metadata.labels.topology\.kubernetes\.io/zone"
+  ```
+
+  </TabItem>
+  <TabItem value="2" label="可用区名称">
+
+  ```bash
+  kubectl get node -o custom-columns=NAME:.metadata.name,ZONE:".metadata.labels.topology\.com\.tencent\.cloud\.csi\.cbs\/zone"
+  ```
+
+  </TabItem>
+</Tabs>
