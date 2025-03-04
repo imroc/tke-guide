@@ -100,7 +100,7 @@ kubectl get cm static-addresses -o json | jq -r ".data.\"${pod}\"" | xargs kubec
   <TabItem value="2" label="普通节点池">
 
   ```bash
-  kubectl get node -o custom-columns=节点名称:.metadata.name,普通节点池:".metadata.labels.tke\.cloud\.tencent\.com/nodepool-id"
+  kubectl get node -o custom-columns=节点名称:.metadata.name,普通节点池:".metadata.labels.tke\.cloud\.tencent\.com/nodepool-id",伸缩组ID:".metadata.labels.cloud\.tencent\.com/auto-scaling-group-id"
   ```
 
   <TabItem value="3" label="通用">
@@ -111,3 +111,15 @@ kubectl get cm static-addresses -o json | jq -r ".data.\"${pod}\"" | xargs kubec
 
   </TabItem>
 </Tabs>
+
+### 查看节点实例 ID
+
+```bash
+kubectl get node -o custom-columns=节点名称:.metadata.name,实例ID:".metadata.labels.cloud\.tencent\.com/node-instance-id"
+```
+
+### 查看节点机型
+
+```bash
+kubectl get node -o custom-columns=节点名称:.metadata.name,机型:".metadata.labels.node\.kubernetes\.io/instance-type"
+```
