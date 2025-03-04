@@ -39,7 +39,6 @@ const sidebars: SidebarsConfig = {
         'networking/traffic-lossless-upgrade',
         'networking/clb-to-pod-directly',
         'networking/pod-eip',
-        'networking/expose-grpc-with-tcm',
         'networking/migrate-tcm-to-istio',
         'networking/ipv6',
         'networking/tke-extend-network-controller',
