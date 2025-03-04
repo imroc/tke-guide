@@ -103,6 +103,8 @@ kubectl get cm static-addresses -o json | jq -r ".data.\"${pod}\"" | xargs kubec
   kubectl get node -o custom-columns=节点名称:.metadata.name,普通节点池:".metadata.labels.tke\.cloud\.tencent\.com/nodepool-id",伸缩组ID:".metadata.labels.cloud\.tencent\.com/auto-scaling-group-id"
   ```
 
+  </TabItem>
+
   <TabItem value="3" label="通用">
 
   ```bash
