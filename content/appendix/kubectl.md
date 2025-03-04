@@ -81,7 +81,32 @@ kubectl get cm static-addresses -o json | jq -r ".data.\"${pod}\"" | xargs kubec
   <TabItem value="2" label="可用区名称">
 
   ```bash
-  kubectl get node -o custom-columns=NAME:.metadata.name,ZONE:".metadata.labels.topology\.com\.tencent\.cloud\.csi\.cbs\/zone"
+  kubectl get node -o custom-columns=NAME:.metadata.name,ZONE:".metadata.labels.topology\.com\.tencent\.cloud\.csi\.cbs/zone"
+  ```
+
+  </TabItem>
+</Tabs>
+
+### 查看节点池分布
+
+<Tabs>
+  <TabItem value="1" label="原生节点池">
+
+  ```bash
+  kubectl get node -o custom-columns=节点名称:.metadata.name,原生节点池:".metadata.labels.node\.tke\.cloud\.tencent\.com/machineset"
+  ```
+  </TabItem>
+
+  <TabItem value="2" label="普通节点池">
+
+  ```bash
+  kubectl get node -o custom-columns=节点名称:.metadata.name,普通节点池:".metadata.labels.tke\.cloud\.tencent\.com/nodepool-id"
+  ```
+
+  <TabItem value="3" label="通用">
+
+  ```bash
+  kubectl get node -o custom-columns=节点名称:.metadata.name,原生节点池:".metadata.labels.node\.tke\.cloud\.tencent\.com/machineset",普通节点池:".metadata.labels.tke\.cloud\.tencent\.com/nodepool-id"
   ```
 
   </TabItem>
