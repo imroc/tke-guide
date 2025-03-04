@@ -118,8 +118,16 @@ kubectl get cm static-addresses -o json | jq -r ".data.\"${pod}\"" | xargs kubec
 kubectl get node -o custom-columns=节点名称:.metadata.name,实例ID:".metadata.labels.cloud\.tencent\.com/node-instance-id"
 ```
 
-### 查看节点机型
+### 查看节点机型分布
 
 ```bash
 kubectl get node -o custom-columns=节点名称:.metadata.name,机型:".metadata.labels.node\.kubernetes\.io/instance-type"
+```
+
+### 查看节点类型分布
+
+检查集群中原生节点和普通节点的分布情况：
+
+```bash
+kubectl get node -o custom-columns=节点名称:.metadata.name,节点类型:".spec.providerID"
 ```
