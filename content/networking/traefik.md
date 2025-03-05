@@ -117,6 +117,28 @@ service:
   </TabItem>
 </Tabs>
 
+### 启用 Gateway API
+
+默认没启用 Gateway API 的支持，可通过以下配置启用：
+
+```yaml
+providers:
+  kubernetesGateway:
+    enabled: true
+```
+
+如果同时想禁用 Ingress 和 Traefik 自身 CRD 的支持，可以用如下的配置：
+
+```yaml
+providers:
+  kubernetesGateway:
+    enabled: true
+  kubernetesIngress:
+    enabled: false
+  kubernetesCRD:
+    enabled: false
+```
+
 ## 操作步骤
 
 ### 安装 Traefik
