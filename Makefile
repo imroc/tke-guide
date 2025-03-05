@@ -12,5 +12,4 @@ gen:
 	npx docusaurus build --out-dir=./build/out
 push:
 	cd build && git add -A && git commit -m update && git push
-
 update: install gen push
