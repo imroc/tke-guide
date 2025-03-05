@@ -137,6 +137,8 @@ service:
 providers:
   kubernetesGateway:
     enabled: true
+gateway:
+  enabled: false # 禁用自动创建与 traefik 在相同命名空间的 Gateway 对象，建议自行按需创建（1 个或多个，可跨命名空间）。
 ```
 
 如果同时想禁用 Ingress 和 Traefik 自身 CRD 的支持，可以用如下的配置：
@@ -181,7 +183,7 @@ TKE 暂未将 Traefik 产品化，无法直接在 TKE 控制台进行可视化�
 
 :::
 
-## 使用 IngressRoute
+## 使用 Traefik CRD
 
 Traefik 不仅支持标准的 Kubernetes Ingress 资源，也支持 Traefik 特有的 CRD 资源，例如 IngressRoute，可以支持更多 Ingress 不具备的高级功能。IngressRoute 使用示例如下：
 
@@ -206,3 +208,46 @@ spec:
 Traefik 更多用法请参见 [Traefik 官方文档](https://doc.traefik.io/traefik/routing/providers/kubernetes-crd/)。  
 
 :::
+
+## 使用 Gateway API
+
+Traefik 也支持了 [Gateway API](https://gateway-api.sigs.k8s.io/)，如果你启用了 Gateway API 的支持，就可以用 Gateway API 的方式来管理流量，下面给出示例。
+
+首先创建 Gateway 对象（定义的端口会自动映射到对应的 LoadBalancer Service，通过 CLB 监听器暴露）：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: prod-gw
+  namespace: prod
+spec:
+  gatewayClassName: traefik # 指定自动创建出来的 GatewayClass 名称
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 8000
+    allowedRoutes:
+      namespaces:
+        from: All
+```
+
+再定义转发规则（如 `HTTPRoute`），并引用 Gateway 对象：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: foo
+  namespace: prod
+spec:
+  parentRefs: # 引用 Gateway 对象
+  - name: prod-gw
+    namespace: prod
+  hostnames:
+  - "foo.example.com"
+  rules:
+  - backendRefs:
+    - name: foo
+      port: 8000
+```
