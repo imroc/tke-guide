@@ -139,9 +139,7 @@ providers:
     enabled: false
 ```
 
-## 操作步骤
-
-### 安装 Traefik
+## 安装 Traefik
 
 1. 在 [TKE 应用市场](https://console.cloud.tencent.com/tke2/helm/market) 搜索 `traefik`。
 2. 单击 `traefik` 进入应用详情页。
@@ -152,7 +150,7 @@ providers:
 6. 安装完后在[应用管理](https://console.cloud.tencent.com/tke2/helm)中找到 traefik 应用，单击应用名称进入应用详情页，在**Service**中可以查到 traefik 的 CLB 地址信息，将需要用到的域名配置下 DNS 解析，确保域名能解析到 traefik 的 CLB 地址。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F03%2F03%2F20250303171704.png)
 
-### 使用 Ingress
+## 使用 Ingress
 
 Traefik 支持使用 Kubernetes 的 Ingress 资源作为动态配置，可直接在集群中创建 Ingress 资源用于对外暴露集群，需要加上指定的 IngressClass（安装 Traefik 时可自定义，默认为 traefik）。示例如下：
 
@@ -181,7 +179,7 @@ TKE 暂未将 Traefik 产品化，无法直接在 TKE 控制台进行可视化�
 
 :::
 
-### 使用 IngressRoute
+## 使用 IngressRoute
 
 Traefik 不仅支持标准的 Kubernetes Ingress 资源，也支持 Traefik 特有的 CRD 资源，例如 IngressRoute，可以支持更多 Ingress 不具备的高级功能。IngressRoute 使用示例如下：
 
