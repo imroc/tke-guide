@@ -1,18 +1,30 @@
 # 在 TKE 使用 Traefik 流量网关
 
-## 操作场景
+## 概述
 
-[Traefik](https://doc.traefik.io/traefik/) 是一款优秀的反向代理工具，与 Nginx 相比，Traefik 具有以下优势：
+[Traefik](https://doc.traefik.io/traefik/) 是一款现代化的云原生反向代理工具，与 Nginx 相比具有以下显著优势：
 
-- 原生支持动态配置。例如，Kubernetes 的 Ingress 资源或 IngressRoute 等 CRD 资源（Nginx 每次需重新加载完整配置，部分情况下可能会影响连接）。  
-- 原生支持服务发现。使用 Ingress 或 IngressRoute 等动态配置后，会自动 watch 后端 endpoint，同步更新到负载均衡的后端列表中。  
-- 提供美观的 Dashboard 管理页面。  
-- 原生支持 Metrics，与 Prometheus 和 Kubernetes 无缝集成。  
-- 拥有更丰富的高级功能。例如，多版本的灰度发布、流量复制、自动生成 HTTPS 免费证书、中间件等。  
+- 同时支持 Kubernetes Ingress API、Traefik CRD 和 Gateway API 三种流量管理配置方式。
+- 提供功能丰富的 Dashboard 管理界面，支持路由可视化配置与监控。
+- 深度集成 Prometheus 提供完整的 Metrics 数据，便于监控告警。
+- 支持丰富的流量治理功能，包括：多版本灰度发布、流量镜像复制、自动签发 Let's Encrypt HTTPS 证书、灵活的中间件机制等。
 
-本文将介绍如何在 TKE 集群安装 Traefik 和管理流量。
+本文将介绍如何在 TKE 集群中部署 Traefik 并通过多种配置方式管理流量。
 
-## 参数配置
+## 安装 Traefik
+
+1. 在 [TKE 应用市场](https://console.cloud.tencent.com/tke2/helm/market) 搜索 `traefik`。
+2. 单击 `traefik` 进入应用详情页。
+3. 单击**创建应用**。
+4. 应用名称建议填 `traefik`，选择需要安装 traefik 的目标集群。
+  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F03%2F03%2F20250303153635.png)
+5. 可参考后文的**Traefik 参数配置**，根据需求配置完参数后，单击**创建**即可将 traefik 安装到集群中。
+6. 安装完后在[应用管理](https://console.cloud.tencent.com/tke2/helm)中找到 traefik 应用，单击应用名称进入应用详情页，在**Service**中可以查到 traefik 的 CLB 地址信息，将需要用到的域名配置下 DNS 解析，确保域名能解析到 traefik 的 CLB 地址。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F03%2F03%2F20250303171704.png)
+
+后续若想更改配置，可在[应用管理](https://console.cloud.tencent.com/tke2/helm)中找到 traefik 应用，单击**更新应用**并编辑参数即可。
+
+## Traefik 参数配置
 
 以下是关于安装 Traefik 的一些参数配置建议，可根据需求进行修改。
 
@@ -139,16 +151,6 @@ providers:
     enabled: false
 ```
 
-## 安装 Traefik
-
-1. 在 [TKE 应用市场](https://console.cloud.tencent.com/tke2/helm/market) 搜索 `traefik`。
-2. 单击 `traefik` 进入应用详情页。
-3. 单击**创建应用**。
-4. 应用名称建议填 `traefik`，选择需要安装 traefik 的目标集群。
-  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F03%2F03%2F20250303153635.png)
-5. 参考前面的**参数配置**，根据需求配置完参数后，单击**创建**即可将 traefik 安装到集群中。
-6. 安装完后在[应用管理](https://console.cloud.tencent.com/tke2/helm)中找到 traefik 应用，单击应用名称进入应用详情页，在**Service**中可以查到 traefik 的 CLB 地址信息，将需要用到的域名配置下 DNS 解析，确保域名能解析到 traefik 的 CLB 地址。
-    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F03%2F03%2F20250303171704.png)
 
 ## 使用 Ingress
 
