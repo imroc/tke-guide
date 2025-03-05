@@ -154,7 +154,7 @@ providers:
 ```
 
 
-## 使用 Ingress
+## 使用 Ingress 管理流量
 
 Traefik 支持使用 Kubernetes 的 Ingress 资源作为动态配置，可直接在集群中创建 Ingress 资源用于对外暴露集群，需要加上指定的 IngressClass（安装 Traefik 时可自定义，默认为 traefik）。示例如下：
 
@@ -183,7 +183,7 @@ TKE 暂未将 Traefik 产品化，无法直接在 TKE 控制台进行可视化�
 
 :::
 
-## 使用 Traefik CRD
+## 使用 Traefik CRD 管理流量
 
 Traefik 不仅支持标准的 Kubernetes Ingress 资源，也支持 Traefik 特有的 CRD 资源，例如 IngressRoute，可以支持更多 Ingress 不具备的高级功能。IngressRoute 使用示例如下：
 
@@ -209,7 +209,7 @@ Traefik 更多用法请参见 [Traefik 官方文档](https://doc.traefik.io/trae
 
 :::
 
-## 使用 Gateway API
+## 使用 Gateway API 管理流量
 
 Traefik 也支持了 [Gateway API](https://gateway-api.sigs.k8s.io/)，如果你启用了 Gateway API 的支持，就可以用 Gateway API 的方式来管理流量，下面给出示例。
 
