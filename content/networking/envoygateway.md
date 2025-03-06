@@ -219,7 +219,7 @@ apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:
   name: proxy-config
-  namespace: test
+  namespace: envoy-gateway-system
 spec:
   provider:
     type: Kubernetes
@@ -251,22 +251,41 @@ spec:
 * 显式声明使用 VPC-CNI 网络模式且启用 CLB 直连 Pod。
 * 使用已有 CLB，指定了 CLB 的 ID。
 
-相应的，`GatewayClass` 中需引用该 `EnvoyProxy` 配置:
+相应的，`Gateway` 中需引用该 `EnvoyProxy` 配置:
 
 ```yaml showLineNumbers
 apiVersion: gateway.networking.k8s.io/v1
-kind: GatewayClass
+kind: Gateway
 metadata:
-  name: eg
+  name: web
+  namespace: envoy-gateway-system
 spec:
-  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  gatewayClassName: eg
   # highlight-add-start
-  parametersRef:
-    group: gateway.envoyproxy.io
-    kind: EnvoyProxy
-    name: proxy-config
-    namespace: test
+  infrastructure:
+    parametersRef:
+      group: gateway.envoyproxy.io
+      kind: EnvoyProxy
+      name: proxy-config
   # highlight-add-end
+  listeners:
+  - name: https
+    protocol: HTTPS
+    port: 443
+    tls:
+      certificateRefs:
+      - kind: Secret
+        group: ""
+        name: website-crt-secret
+    allowedRoutes:
+      namespaces:
+        from: All
+  - name: http
+    protocol: HTTP
+    port: 80
+    allowedRoutes:
+      namespaces:
+        from: All
 ```
 
 更多 CLB 相关的自定义可参考 [Service Annotation 说明](https://cloud.tencent.com/document/product/457/51258)。
