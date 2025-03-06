@@ -82,6 +82,12 @@ spec:
 
 `Gateway` 创建后，`EnvoyGateway` 会自动为其创建一个 LoadBalancer 类型的 Service，也就是一个 CLB。在 TKE 上，LoadBalancer 类型的 Service 默认是一个公网 CLB，如果要自定义，可参考常见问题中的**如何自定义 CLB**。
 
+:::tip[说明]
+
+Gateway 通过 LoadBalancer 类型的 Service 对外暴露流量，所以 CLB 只会用到四层监听器（TCP/UDP），七层流量也是先进入 CLB 四层监听器，转发给 EnvoyGateway 的 Pod，再由 EnvoyGateway 解析四七层流量并根据配置规则进行转发。
+
+:::
+
 如何获取 `Gateway` 对应的 CLB 地址呢？可以通过 `kubectl get gtw` 查看：
 
 ```bash
