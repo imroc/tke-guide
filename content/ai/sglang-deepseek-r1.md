@@ -16,7 +16,7 @@ DeepSeek-R1 满血版模型参数是 671B (6710 亿参数)，想要完美的发�
 
 ## 机型与部署方案
 
-由于满血版的 DeepSeek-R1 参数量较大，需要用较大显存且支持 FP8 量化的大规格 GPU 实例，目前合适的机型规格有 [HCCPNV6.96XLARGE2304](https://cloud.tencent.com/document/product/1646/81562#HCCPNV6)（[高性能计算集群](https://cloud.tencent.com/product/hcc)）和 [PNV6.32XLARGE1280 / PNV6.96XLARGE2304](https://cloud.tencent.com/document/product/560/19700#PNV6)（[GPU 云服务器](https://cloud.tencent.com/product/gpu)），推荐的部署方案是用两台该机型的节点组建 GPU 集群来运行满血 DeepSeek-R1，如果对并发和性能要求不高，也可以单台部署。
+由于满血版的 DeepSeek-R1 参数量较大，需要用较大显存且支持 FP8 的大规格 GPU 实例，目前合适的机型规格有 [HCCPNV6.96XLARGE2304](https://cloud.tencent.com/document/product/1646/81562#HCCPNV6)（[高性能计算集群](https://cloud.tencent.com/product/hcc)）和 [PNV6.32XLARGE1280 / PNV6.96XLARGE2304](https://cloud.tencent.com/document/product/560/19700#PNV6)（[GPU 云服务器](https://cloud.tencent.com/product/gpu)），推荐的部署方案是用两台该机型的节点组建 GPU 集群来运行满血 DeepSeek-R1，如果对并发和性能要求不高，也可以单台部署。
 
 下面是这几种规格的核心参数：
 
@@ -46,19 +46,7 @@ DeepSeek-R1 满血版模型参数是 671B (6710 亿参数)，想要完美的发�
 
 :::
 
-:::info[注意]
-
-在云服务器页面购买的这两款机型只能按量计费，无法转为包年包月，所以如果正式环境使用包年包月的话，无法将测试环境直接转为正式环境。
-
-:::
-
-正式购买阶段，需通过 [高性能计算平台-工作空间](https://console.cloud.tencent.com/thpc/workspace/index) 购买，包年包月计费，工作空间规格与机型规格的对应关系，以及各自的正式购买入口如下所示：
-
-| 规格              | 机型                 | 购买入口                                   |
-| ----------------- | -------------------- | ------------------------------------------ |
-| 96AS.32XLARGE1280 | PNV6.32XLARGE1280    | 高性能计算平台-工作空间-新建，选择标准空间 |
-| 96AS.32XLARGE1280 | PNV6.96XLARGE2304    | 高性能计算平台-工作空间-新建，选择标准空间 |
-| 96A.96XLARGE2304  | HCCPNV6.96XLARGE2304 | 高性能计算平台-工作空间-新建，选择互联空间 |
+正式购买阶段，需通过 [高性能计算平台-工作空间](https://console.cloud.tencent.com/thpc/workspace/index) 购买，包年包月计费，请联系腾讯云架构师进行开通使用。
 
 ### 创建 TKE 集群
 
@@ -316,7 +304,7 @@ SGLang 多机部署（GPU 集群）需借助 [LWS](https://github.com/kubernetes
 
 :::info[说明]
 
-如需希望使用 kubectl 或 helm 等方式部署 LWS，可请参考 LWS 官方文档（[kubectl 方式安装](https://github.com/kubernetes-sigs/lws/blob/main/docs/setup/install.md) 和 [helm 方式安装](https://github.com/kubernetes-sigs/lws/blob/main/charts/lws/README.md)）。
+如需希望使用 kubectl 或 helm 等方式部署 LWS，可请参考 LWS 官方文档（[kubectl 方式安装](https://lws.sigs.k8s.io/docs/installation/) 和 [helm 方式安装](https://github.com/kubernetes-sigs/lws/blob/main/charts/lws/README.md)）。
 需要注意的是，官方默认使用镜像是 `registry.k8s.io/lws/lws`，这个在国内环境下载不了，可替换镜像地址为 `docker.io/k8smirror/lws`，该镜像为 lws 在 DockerHub 上的 mirror 镜像，长期自动同步，可放心使用（TKE 环境可直接拉取 DockerHub 的镜像），也可以同步到自己的 TCR 或 CCR 镜像仓库，提高镜像下载速度。
 
 :::
