@@ -162,8 +162,8 @@ const sidebars: SidebarsConfig = {
         slug: '/ai'
       },
       items: [
-        'ai/llm',
         'ai/sglang-deepseek-r1',
+        'ai/llm',
         'ai/faq',
       ],
     },
