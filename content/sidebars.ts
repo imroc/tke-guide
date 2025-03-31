@@ -114,6 +114,7 @@ const sidebars: SidebarsConfig = {
         'monitoring/prometheus-scrape-config',
         'monitoring/grafana',
         'monitoring/kube-prometheus-stack',
+        'monitoring/event-alert',
       ],
     },
     {
