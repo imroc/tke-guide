@@ -25,9 +25,11 @@ TKE 支持一键开启事件日志采集，将 Kubernetes 事件日志采集到 
 
 ```txt
 {{- range .QueryLog }}
-集群 cls-bu8a2zw3 发生异常事件:
+集群 cls-xxxxxxxx 发生异常事件:
   {{- range . }}
     {{.content.event.reason}} {{ .content.event.involvedObject.kind }}/{{ .content.event.involvedObject.name }} {{ .content.event.message }}
   {{- end}}
 {{- end}}
 ```
+
+> 注意替换下集群 ID。
