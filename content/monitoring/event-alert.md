@@ -37,11 +37,11 @@ TKE 支持一键开启事件日志采集，将 Kubernetes 事件日志采集到 
 
 ## 告警效果
 
-邮件告警：
+### 邮件告警
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F03%2F31%2F20250331204018.png)
 
-微信告警：
+### 微信告警
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F03%2F31%2F20250331204531.png)
 
