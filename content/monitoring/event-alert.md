@@ -33,3 +33,15 @@ TKE 支持一键开启事件日志采集，将 Kubernetes 事件日志采集到 
 ```
 
 > 注意替换下集群 ID。
+
+其余配置项可按需配置。
+
+## 告警效果
+
+邮件告警：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F03%2F31%2F20250331204018.png)
+
+微信告警：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F03%2F31%2F20250331204531.png)
