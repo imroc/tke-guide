@@ -45,3 +45,7 @@ TKE 支持一键开启事件日志采集，将 Kubernetes 事件日志采集到 
 微信告警：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F03%2F31%2F20250331204531.png)
+
+## 参考资料
+
+- [TKE实践教程：使用 CLS 告警异常资源](https://cloud.tencent.com/document/product/457/82037)
