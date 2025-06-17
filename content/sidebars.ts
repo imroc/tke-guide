@@ -42,6 +42,7 @@ const sidebars: SidebarsConfig = {
         'networking/migrate-tcm-to-istio',
         'networking/ipv6',
         'networking/tke-extend-network-controller',
+        'networking/sign-free-certs-for-dnspod',
       ],
     },
     {
