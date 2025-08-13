@@ -164,7 +164,7 @@ Cilium 的 helm 安装包提供了大量的自定义配置项，上面安装步�
 执行下面的命令可查看所有的安装配置项：
 
 ```bash
-helm show values cilium/cilium
+helm show values cilium/cilium --version 1.18.0
 ```
 
 ### helm 所在环境连不上 cilium 的 helm repo 怎么办？
