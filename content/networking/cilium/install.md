@@ -159,7 +159,9 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.0 c
 
 ### 如何查看 Cilium 全部的默认安装配置？
 
-执行下面的命令：
+Cilium 的 helm 安装包提供了大量的自定义配置项，上面安装步骤只给出了在 TKE 环境中安装 Cilium 的必要配置，实际可根据自身需求调整更多配置。
+
+执行下面的命令可查看所有的安装配置项：
 
 ```bash
 helm show values cilium/cilium
