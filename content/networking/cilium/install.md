@@ -183,6 +183,12 @@ cilium-1.18.0.tgz
 helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.0 cilium ./cilium-1.18.0.tgz
 ```
 
+## TODO
+
+- 基于 FQDN 的网络策略功能验证没过，创建 CiliumNetworkPolicy 后，解析域名 dns 不通。（验证参考 [Locking Down External Access with DNS-Based Policies](https://docs.cilium.io/en/stable/security/dns/)）
+- Overlay 模式安装
+- Cluster Mesh 多集群安装
+
 ## 参考资料
 
 - [Cilium 官方文档: Installation using Helm](https://docs.cilium.io/en/stable/installation/k8s-install-helm/)
