@@ -14,6 +14,18 @@ const sidebars: SidebarsConfig = {
       items: [
         {
           type: 'category',
+          label: '在 TKE 自建 Cilium',
+          collapsed: true,
+          link: {
+            type: 'generated-index',
+            slug: '/networking/cilium'
+          },
+          items: {
+            'networking/cilium/install',
+          }
+        },
+        {
+          type: 'category',
           label: '在 TKE 自建 Nginx Ingress Controller',
           collapsed: true,
           link: {
