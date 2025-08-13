@@ -25,7 +25,9 @@ Cilium 路由支持两种模式：
 
 准备好符合前提条件的 TKE 集群。
 
-## 准备 CNI 配置
+## Native-Routing 模式安装步骤
+
+下面介绍在 TKE 安装 Cilium（Native-Routing）的步骤。
 
 1. 修改 tke-cni-agent 的配置，删除默认的 cni 配置，避免与 cilium 的 cni 配置冲突。
 
@@ -72,15 +74,13 @@ data:
 kubectl apply -f cni-configuration.yaml
 ```
 
-## 使用 helm 安装 Cilium
-
-1. 确保添加 cilium 的 helm repo:
+4. 确保添加 cilium 的 helm repo:
 
 ```bash
 helm repo add cilium https://helm.cilium.io/
 ```
 
-2. 准备安装配置：
+5. 准备安装配置：
 ```yaml title="values.yaml"
 routingMode: "native"
 ipv4NativeRoutingCIDR: "10.0.0.0/8"
@@ -96,7 +96,7 @@ extraConfig:
   local-router-ipv4: 169.254.32.16
   enable-endpoint-routes: "true"
 ```
-3. （可选）如果集群地域在中国大陆，拉取不到 cilium 依赖的的镜像，可以在安装配置指定使用 dockerhub 上的 mirror 镜像（TKE 环境有 dockerhub 的加速，默认就可以直接拉取）：
+6. （可选）如果集群地域在中国大陆，拉取不到 cilium 依赖的的镜像，可以在安装配置指定使用 dockerhub 上的 mirror 镜像（TKE 环境有 dockerhub 的加速，默认就可以直接拉取）：
 ```yaml title="image-values.yaml"
 image:
   repository: "docker.io/cilium/cilium"
@@ -146,7 +146,7 @@ authentication:
           image:
             repository: "docker.io/imroc/spire-server"
 ```
-5. 执行安装（后续配置更新和升级版本都可复用这个命令）：
+7. 执行安装（后续配置更新和升级版本都可复用这个命令）：
 ```bash
 helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.0 cilium cilium/cilium
 ```
@@ -154,7 +154,6 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.0 c
 > ```bash
 > helm upgrade --install --namespace kube-system -f values.yaml -f image-values.yaml --version 1.18.0 cilium cilium/cilium
 > ```
-
 
 ## FAQ
 
