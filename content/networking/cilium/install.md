@@ -167,7 +167,7 @@ Cilium 的 helm 安装包提供了大量的自定义配置项，上面安装步�
 helm show values cilium/cilium --version 1.18.0
 ```
 
-### helm 所在环境连不上 cilium 的 helm repo 怎么办？
+### 连不上 cilium 的 helm repo 怎么办？
 
 使用 helm 安装 cilium 时，helm 会从 cilium 的 helm repo 获取 chart 相关信息并下载，如果连不上则会报错。
 
