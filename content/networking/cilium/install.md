@@ -150,7 +150,7 @@ authentication:
 ```bash
 helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.0 cilium cilium/cilium
 ```
-> 如果集群地域在中国大陆，安装时可额外指定镜像替换的安装配置：
+> 如果集群地域在中国大陆，安装时可额外指定镜像替换的安装配置（`-f` 可指定多次，最终会合并所有的安装配置）：
 > ```bash
 > helm upgrade --install --namespace kube-system -f values.yaml -f image-values.yaml --version 1.18.0 cilium cilium/cilium
 > ```
