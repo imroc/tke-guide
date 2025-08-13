@@ -20,9 +20,9 @@ const sidebars: SidebarsConfig = {
             type: 'generated-index',
             slug: '/networking/cilium'
           },
-          items: {
-            'networking/cilium/install',
-          }
+          items: [
+            'networking/cilium/install'
+          ],
         },
         {
           type: 'category',
