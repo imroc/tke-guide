@@ -61,7 +61,7 @@ resource "tencentcloud_kubernetes_node_pool" "pool" {
 }
 ```
 
-### 准备 helm 安装配置
+### 安装 cilium
 1. 确保添加 cilium 的 helm repo:
 
 ```bash
