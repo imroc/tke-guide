@@ -1,159 +1,107 @@
 # 安装 Cilium
 
-## 概述
+## 操作场景
 
-本文介绍如何在 TKE 集群中安装 Cilium。
+本文介绍如何在 TKE 集群中安装 [cilium](https://cilium.io/)。
 
 ## 前提条件
 
-- 集群版本：1.22 及以上
+- 集群版本：TKE 1.30 及以上，参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)
 - 网络模式：VPC-CNI 或 GlobalRouter
-- 节点类型：普通节点或原生节点
-- 操作系统：TencentOS 4
+- 节点类型：普通节点（原生节点的内核版本较低，会有兼容性问题）
+- 操作系统：TencentOS>=4
+- kube-proxy: 使用 iptables 转发模式或者卸载 kube-proxy 并使用 cilium 替代
 
-## 网络选型：Encapsulation vs Native-Routing
+## 原生路由
 
 Cilium 路由支持两种模式：
 1. Encapsulation（封装模式）：即在原有的网络基础上再做一层网络封包进行转发。优点是兼容性好，可适配各种网络环境，缺点是性能较差。
 2. Native-Routing（原生路由）：Pod IP 直接在底层网络上进行路由转发，Cilium 不管。优点是性能好，缺点是依赖底层网络对 Pod IP 的路由转发的支持，不通用。
 
-在包括 TKE 在内的云上托管的 Kubernetes 集群中，底层网络都已支持 Pod IP 的路由转发，如果对网络转发性能有要求，推荐使用 Native-Routing 模式，如果希望安装更简单通用，可使用 Encapsulation 模式。
+在包括 TKE 在内的云上托管的 Kubernetes 集群中，VPC 底层网络都已支持 Pod IP 的路由转发，无需封包，通常使用 Native-Routing 模式安装 cilium，本文介绍的安装方法也是使用 Native-Routing 的模式。
 
 > 更多详情请参考 Cilium 官方文档：[Routing](https://docs.cilium.io/en/stable/network/concepts/routing/)。
 
-## 准备 TKE 集群
+## 操作步骤
 
-准备好符合前提条件的 TKE 集群。
+### 创建 TKE 集群
 
-## Native-Routing 模式安装步骤
+创建 TKE 标准集群：
+- Kubernetes 版本: 不低于 1.30.0，建议选择最新版。
+- 操作系统：TencentOS 4.0 及以上或者 Ubuntu 24.04 及以上。
+- 容器网络插件：VPC-CNI 共享网卡多 IP 或者 Global Router
+- Kube-proxy 转发模式：iptables
 
-下面介绍在 TKE 安装 Cilium（Native-Routing）的步骤。
+### 新建节点池
 
-1. 修改 tke-cni-agent 的配置，删除默认的 cni 配置，避免与 cilium 的 cni 配置冲突。
+以下是通过 [容器服务控制台](https://console.cloud.tencent.com/tke2/cluster) 创建节点池的步骤：
+1. 在集群列表中，单击集群 ID，进入集群详情页。
+2. 选择左侧菜单栏中的**节点管理**，点击**节点池**进入节点池列表页面。
+3. 点击**新建**。
+4. 选择**普通节点**。
+5. **操作系统**选择**TencentOS 4**或者**Ubuntu 24.04**。
+6. **自定义脚本**配置**节点初始化后**执行的脚本（修改 containerd 配置，添加 quay.io 的镜像加速）:
+  ```bash
+  sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
+  systemctl restart containerd
+  ```
+7. 其余选项根据自身需求自行选择。
+8. 点击**创建节点池**。
 
-```bash
-kubectl -n kube-system patch configmap tke-cni-agent --type json -p='[{"op": "remove", "path": "/data"}]'
+如果你想通过 terraform 来创建，参考以下片段：
+```hcl
+resource "tencentcloud_kubernetes_node_pool" "pool" {
+  name       = "test"
+  cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
+  node_os    = "img-gqmik24x" # TencentOS 4
+  node_config {
+    # 自定义脚本：修改 containerd 配置，添加 quay.io 的镜像加速
+    user_data = "c2VkIC1pICcvXFtwbHVnaW5zXC4iaW8uY29udGFpbmVyZC5ncnBjLnYxLmNyaSJcLnJlZ2lzdHJ5XC5taXJyb3JzXF0vIGFcXCBcIFwgXCBcIFwgXCBcIFtwbHVnaW5zLiJpby5jb250YWluZXJkLmdycGMudjEuY3JpIi5yZWdpc3RyeS5taXJyb3JzLiJxdWF5LmlvIl1cblwgXCBcIFwgXCBcIFwgXCBcIFwgZW5kcG9pbnQgPSBbImh0dHBzOi8vcXVheS50ZW5jZW50Y2xvdWRjci5jb20iXScgL2V0Yy9jb250YWluZXJkL2NvbmZpZy50b21sCnN5c3RlbWN0bCByZXN0YXJ0IGNvbnRhaW5lcmQK"
+  }
+}
 ```
 
-2. 准备 Cilium 自定义的 CNI 配置：
-
-```yaml title="cni-configuration.yaml"
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cni-configuration
-  namespace: kube-system
-data:
-  cni-config: |-
-    {
-      "cniVersion": "0.3.1",
-      "name": "generic-veth",
-      "plugins": [
-        {
-          "name": "multus-cni",
-          "type": "multus",
-          "kubeconfig": "/etc/kubernetes/tke-cni-kubeconfig",
-          "logLevel": "info",
-          "defaultDelegates": "tke-route-eni",
-          "capabilities": {
-            "bandwidth": true,
-            "portMappings": true
-          }
-        },
-        {
-          "type": "cilium-cni",
-          "chaining-mode": "generic-veth"
-        }
-      ]
-    }
-```
-
-3. 创建 Cilium 自定义 CNI 配置：
- 
-```bash
-kubectl apply -f cni-configuration.yaml
-```
-
-4. 确保添加 cilium 的 helm repo:
+### 准备 helm 安装配置
+1. 确保添加 cilium 的 helm repo:
 
 ```bash
 helm repo add cilium https://helm.cilium.io/
 ```
 
-5. 准备安装配置：
-```yaml title="values.yaml"
+2. 准备 cilium 部署配置：
+
+```bash
+# 获取 apiserver 地址
+k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}')
+# 创建 cilium helm chart 的 values 配置（替换 apiserver 地址）
+cat > tke-values.yaml <<EOF
 routingMode: "native"
-ipv4NativeRoutingCIDR: "10.0.0.0/8"
-enableIPv4Masquerade: false
+endpointRoutes:
+  enabled: true
+enableIPv4Masquerade: false # 有 ip-masq-agent 控制 SNAT，cilium 无需参与
 cni:
-  customConf: true
-  configMap: cni-configuration
   chainingMode: generic-veth
-  exclusive: true
+  chainingTarget: "multus-cni"
 ipam:
-  mode: "delegated-plugin"
+  mode: "delegated-plugin" # IP 分配由 VPC-CNI 网络插件完成，cilium 无需负责 IP 分配
+kubeProxyReplacement: "true" # 需使用 cilium 替代 kube-proxy 才能用到 cilium 完整能力
+k8sServiceHost: ${k8sServiceHost} # 关键，替换为 endpoint default/kubernetes 指向的 IP
+k8sServicePort: 60002
 extraConfig:
   local-router-ipv4: 169.254.32.16
-  enable-endpoint-routes: "true"
+EOF
 ```
-6. （可选）如果集群地域在中国大陆，拉取不到 cilium 依赖的的镜像，可以在安装配置指定使用 dockerhub 上的 mirror 镜像（TKE 环境有 dockerhub 的加速，默认就可以直接拉取）：
-```yaml title="image-values.yaml"
-image:
-  repository: "docker.io/cilium/cilium"
-certgen:
-  image:
-    repository: "docker.io/cilium/certgen"
-hubble:
-  relay:
-    image:
-      repository: "docker.io/cilium/hubble-relay"
-  ui:
-    backend:
-      image:
-        repository: "docker.io/cilium/hubble-ui-backend"
-    frontend:
-      image:
-        repository: "docker.io/cilium/hubble-ui"
-envoy:
-  image:
-    repository: "docker.io/imroc/cilium-envoy"
-operator:
-  image:
-    repository: "docker.io/cilium/operator"
-nodeinit:
-  image:
-    repository: "docker.io/cilium/startup-script"
-preflight:
-  image:
-    repository: "docker.io/cilium/cilium"
-  envoy:
-    image:
-      repository: "docker.io/imroc/cilium-envoy"
-clustermesh:
-  apiserver:
-    image:
-      repository: "docker.io/cilium/clustermesh-apiserver"
-authentication:
-  mutual:
-    spire:
-      install:
-        initImage:
-          repository: "docker.io/library/busybox"
-        agent:
-          image:
-            repository: "docker.io/imroc/spire-agent"
-        server:
-          image:
-            repository: "docker.io/imroc/spire-server"
-```
-7. 执行安装（后续配置更新和升级版本都可复用这个命令）：
+
+3. 删除 kube-proxy:
+
 ```bash
-helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.0 cilium cilium/cilium
+kubectl -n kube-system delete ds kube-proxy
 ```
-> 如果集群地域在中国大陆，安装时可额外指定镜像替换的安装配置（`-f` 可指定多次，最终会合并所有的安装配置）：
-> ```bash
-> helm upgrade --install --namespace kube-system -f values.yaml -f image-values.yaml --version 1.18.0 cilium cilium/cilium
-> ```
+
+4. 执行安装（后续配置更新和升级版本都可复用这个命令）：
+```bash
+helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 cilium cilium/cilium
+```
 
 ## FAQ
 
@@ -164,7 +112,7 @@ Cilium 的 helm 安装包提供了大量的自定义配置项，上面安装步�
 执行下面的命令可查看所有的安装配置项：
 
 ```bash
-helm show values cilium/cilium --version 1.18.0
+helm show values cilium/cilium --version 1.18.2
 ```
 
 ### 连不上 cilium 的 helm repo 怎么办？
@@ -173,20 +121,18 @@ helm show values cilium/cilium --version 1.18.0
 
 解决办法是在可以连上的环境下载 chart 压缩包：
 ```bash
-$ helm pull cilium/cilium --version 1.18.0
+$ helm pull cilium/cilium --version 1.18.2
 $ ls cilium-*.tgz
-cilium-1.18.0.tgz
+cilium-1.18.2.tgz
 ```
 
 然后将 chart 压缩包复制到执行 helm 安装的机器上，安装时指定下 chart 压缩包的路径：
 ```bash
-helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.0 cilium ./cilium-1.18.0.tgz
+helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 cilium ./cilium-1.18.2.tgz
 ```
 
 ## TODO
 
-- 基于 FQDN 的网络策略功能验证没过，创建 CiliumNetworkPolicy 后，解析域名 dns 不通。（验证参考 [Locking Down External Access with DNS-Based Policies](https://docs.cilium.io/en/stable/security/dns/)）
-- Overlay 模式安装
 - Cluster Mesh 多集群安装
 
 ## 参考资料
