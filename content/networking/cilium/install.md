@@ -41,14 +41,14 @@ Cilium 路由支持两种模式：
 4. 选择**普通节点**。
 5. **操作系统**选择**TencentOS 4**或者**Ubuntu 24.04**。
 6. **自定义脚本**配置**节点初始化后**执行的脚本（修改 containerd 配置，添加 quay.io 的镜像加速）:
-  ```bash
-  sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
-  systemctl restart containerd
-  ```
+    ```bash
+    sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
+    systemctl restart containerd
+    ```
 7. 其余选项根据自身需求自行选择。
 8. 点击**创建节点池**。
 
-如果你想通过 terraform 来创建，参考以下片段：
+如果你想通过 terraform 来创建节点池，参考以下片段：
 ```hcl
 resource "tencentcloud_kubernetes_node_pool" "pool" {
   name       = "test"
