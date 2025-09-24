@@ -39,8 +39,8 @@ Cilium 路由支持两种模式：
 2. 选择左侧菜单栏中的**节点管理**，点击**节点池**进入节点池列表页面。
 3. 点击**新建**。
 4. 选择**普通节点**。
-5. **操作系统**选择**TencentOS 4**或者**Ubuntu 24.04**。
-6. **自定义脚本**配置**节点初始化后**执行的脚本（修改 containerd 配置，添加 quay.io 的镜像加速）:
+5. **操作系统** 选择 **TencentOS 4** 或者 **Ubuntu 24.04**。
+6. cilium 的官方容器镜像主要在 `quay.io`，如果你的集群在中国大陆或者节点没有公网，可在 **自定义脚本** 配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速:
     ```bash
     sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
     systemctl restart containerd
