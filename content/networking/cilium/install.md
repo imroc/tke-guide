@@ -169,7 +169,7 @@ cni:
 ipam:
   mode: delegated-plugin
 kubeProxyReplacement: true
-k8sServiceHost: ${k8sServiceHost} 
+k8sServiceHost: 169.254.128.27
 k8sServicePort: 60002
 extraConfig:
   local-router-ipv4: 169.254.32.16
