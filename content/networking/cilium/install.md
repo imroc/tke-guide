@@ -158,7 +158,7 @@ cilium 与 kube-proxy ipvs 模式不兼容，详见[这个issue](https://github.
 
 安装时，建议将所有安装配置写到 `values.yaml` 中，如：
 
-```yaml
+```yaml showLineNumbers title="values.yaml"
 routingMode: "native"
 endpointRoutes:
   enabled: true
@@ -173,6 +173,18 @@ k8sServiceHost: ${k8sServiceHost}
 k8sServicePort: 60002
 extraConfig:
   local-router-ipv4: 169.254.32.16
+```
+
+安装和更新配置，都通过执行下面的命令来完成：
+
+```bash
+helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 cilium
+```
+
+如果是更新版本，替换 `--version` 的值即可：
+
+```bash
+helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.3 cilium
 ```
 
 ## TODO
