@@ -169,7 +169,7 @@ cni:
 ipam:
   mode: delegated-plugin
 kubeProxyReplacement: true
-k8sServiceHost: 169.254.128.27
+k8sServiceHost: 169.254.128.27 # 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
 k8sServicePort: 60002
 extraConfig:
   local-router-ipv4: 169.254.32.16
@@ -180,6 +180,8 @@ extraConfig:
 ```bash
 helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 cilium
 ```
+
+> 修改配置通过修改 `values.yaml` 文件来完成，完整配置项通过 `helm show values cilium/cilium --version 1.18.2` 查看。
 
 如果是更新版本，替换 `--version` 的值即可：
 
