@@ -87,7 +87,7 @@ helm repo add cilium https://helm.cilium.io/
     --set extraConfig.local-router-ipv4=169.254.32.16
   ```
 
-  > cilium 与 kube-proxy ipvs 模式不兼容，在 TKE 环境无法与 cilium 共存，参考常见问题中的解释。
+  > cilium 与 kube-proxy ipvs 模式不兼容，在 TKE 环境无法与 cilium 共存，详细请参考常见问题中的解释。
 
   </TabItem>
   <TabItem value="2" label="完全替代 kube-proxy">
