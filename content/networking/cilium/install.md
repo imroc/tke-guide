@@ -68,7 +68,44 @@ resource "tencentcloud_kubernetes_node_pool" "pool" {
 helm repo add cilium https://helm.cilium.io/
 ```
 
-2. 准备 cilium 部署配置：
+2. 安装 cilium（保留和不保留 kube-proxy 两种安装方式）：
+
+<Tabs>
+  <TabItem value="1" label="与 kube-proxy 共存">
+
+  ```bash
+  helm install cilium cilium/cilium --version 1.18.2 \
+    --namespace kube-system \
+    --set routingMode=native \ # 使用原生路由
+    --set endpointRoutes.enabled=true \
+    --set enableIPv4Masquerade=false \ # TKE 中可通过 ip-masq-agent 更灵活的控制 SNAT，cilium 无需参与
+    --set cni.chainingMode=generic-veth \
+    --set cni.chainingTarget=multus-cni \
+    --set ipamd.mode=delegated-plugin \ # IP 分配交给 TKE 的网络插件来做
+    --set extraConfig.local-router-ipv4=169.254.32.16
+  ```
+
+  </TabItem>
+  <TabItem value="2" label="完全替代 kube-proxy">
+
+  ```bash
+  helm install cilium cilium/cilium --version 1.18.2 \
+    --namespace kube-system \
+    --set routingMode=native \ # 使用原生路由
+    --set endpointRoutes.enabled=true \
+    --set enableIPv4Masquerade=false \ # TKE 中可通过 ip-masq-agent 更灵活的控制 SNAT，cilium 无需参与
+    --set cni.chainingMode=generic-veth \
+    --set cni.chainingTarget=multus-cni \
+    --set ipamd.mode=delegated-plugin \ # IP 分配交给 TKE 的网络插件来做
+    --set kubeProxyReplacement=true \ # 启用替代 kube-proxy 的功能
+    --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \ # 替代 kube-proxy 需拿到 apiserver 的实际地址而非虚拟的 ClussterIP 才能与 apiserver 通信（鸡生蛋和蛋生鸡问题）
+    --set k8sServicePort=60002 \
+    --set extraConfig.local-router-ipv4=169.254.32.16
+  ```
+
+  </TabItem>
+</Tabs>
+
 
 ```bash
 # 获取 apiserver 地址
