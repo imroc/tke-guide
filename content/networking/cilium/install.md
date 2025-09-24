@@ -10,7 +10,7 @@
 - 网络模式：VPC-CNI 或 GlobalRouter
 - 节点类型：普通节点（原生节点的内核版本较低，会有兼容性问题）
 - 操作系统：TencentOS>=4 或 Ubuntu>=24.04
-- kube-proxy: 使用 iptables 转发模式或者卸载 kube-proxy 并使用 cilium 替代 (与 kube-proxy ipvs 模式不兼容，详见[这个issue](https://github.com/cilium/cilium/issues/18610))
+- kube-proxy: 使用 iptables 转发模式或者卸载 kube-proxy 并使用 cilium 替代
 
 ## 原生路由
 
@@ -167,6 +167,14 @@ cilium-1.18.2.tgz
 ```bash
 helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 cilium ./cilium-1.18.2.tgz
 ```
+
+### 为什么不能与 kube-proxy ipvs 共存？
+
+cilium 与 kube-proxy ipvs 模式不兼容，详见[这个issue](https://github.com/cilium/cilium/issues/18610)。
+
+在 TKE 环境的具体表现是访问 service 不通。
+
+具体底层细节正在研究中。
 
 ## TODO
 
