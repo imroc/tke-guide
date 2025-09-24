@@ -183,7 +183,7 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 c
 
 > 修改配置通过修改 `values.yaml` 文件来完成，完整配置项通过 `helm show values cilium/cilium --version 1.18.2` 查看。
 
-如果是更新版本，替换 `--version` 的值即可：
+如果是升级版本，替换 `--version` 的值即可：
 
 ```bash
 helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.3 cilium
