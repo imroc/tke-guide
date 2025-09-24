@@ -118,13 +118,6 @@ helm repo add cilium https://helm.cilium.io/
   </TabItem>
 </Tabs>
 
-
-
-4. 执行安装（后续配置更新和升级版本都可复用这个命令）：
-```bash
-helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 cilium cilium/cilium
-```
-
 ## 常见问题
 
 ### 如何查看 Cilium 全部的默认安装配置？
