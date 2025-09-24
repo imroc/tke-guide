@@ -68,7 +68,7 @@ resource "tencentcloud_kubernetes_node_pool" "pool" {
 helm repo add cilium https://helm.cilium.io/
 ```
 
-2. 安装 cilium（保留和不保留 kube-proxy 两种安装方式）：
+2. 安装 cilium，有两种方式，取决于是否需要保留 kube-proxy（推荐不保留，使用 cilium 完全替代 kube-proxy，可减少整体的资源开销并获得更好的 Service 转发性能和）：
 
 <Tabs>
   <TabItem value="1" label="与 kube-proxy 共存">
