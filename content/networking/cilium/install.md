@@ -73,6 +73,8 @@ helm repo add cilium https://helm.cilium.io/
 <Tabs>
   <TabItem value="1" label="与 kube-proxy 共存">
 
+  确保 kube-proxy 使用的是 iptables 转发模式，然后使用 helm 安装 cilium：
+
   ```bash
   helm install cilium cilium/cilium --version 1.18.2 \
     --namespace kube-system \
@@ -85,8 +87,18 @@ helm repo add cilium https://helm.cilium.io/
     --set extraConfig.local-router-ipv4=169.254.32.16
   ```
 
+  > cilium 与 kube-proxy ipvs 模式不兼容，在 TKE 环境无法与 cilium 共存，参考常见问题中的解释。
+
   </TabItem>
   <TabItem value="2" label="完全替代 kube-proxy">
+
+  先卸载 kube-proxy（保险起见，通过加 nodeSelector 方式让 kube-proxy 不部署到任何节点，避免后续升级集群时 kube-proxy 又被重新创建回来）：
+
+  ```bash
+  kubectl -n kube-system patch ds kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+  ```
+
+  然后使用 helm 安装 cilium:
 
   ```bash
   helm install cilium cilium/cilium --version 1.18.2 \
@@ -107,18 +119,13 @@ helm repo add cilium https://helm.cilium.io/
 </Tabs>
 
 
-3. 删除 kube-proxy:
-
-```bash
-kubectl -n kube-system delete ds kube-proxy
-```
 
 4. 执行安装（后续配置更新和升级版本都可复用这个命令）：
 ```bash
 helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 cilium cilium/cilium
 ```
 
-## FAQ
+## 常见问题
 
 ### 如何查看 Cilium 全部的默认安装配置？
 
@@ -153,6 +160,27 @@ cilium 与 kube-proxy ipvs 模式不兼容，详见[这个issue](https://github.
 在 TKE 环境的具体表现是访问 service 不通。
 
 具体底层细节正在研究中。
+
+### 如何修改 cilium 安装配置或升级？
+
+安装时，建议将所有安装配置写到 `values.yaml` 中，如：
+
+```yaml
+routingMode: "native"
+endpointRoutes:
+  enabled: true
+enableIPv4Masquerade: false
+cni:
+  chainingMode: generic-veth
+  chainingTarget: multus-cni
+ipam:
+  mode: delegated-plugin
+kubeProxyReplacement: true
+k8sServiceHost: ${k8sServiceHost} 
+k8sServicePort: 60002
+extraConfig:
+  local-router-ipv4: 169.254.32.16
+```
 
 ## TODO
 
