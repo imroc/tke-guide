@@ -178,7 +178,7 @@ extraConfig:
 安装和更新配置，都通过执行下面的命令来完成：
 
 ```bash
-helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 cilium
+helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 cilium cilium/cilium
 ```
 
 > 修改配置通过修改 `values.yaml` 文件来完成，完整配置项通过 `helm show values cilium/cilium --version 1.18.2` 查看。
@@ -186,7 +186,7 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 c
 如果是升级版本，替换 `--version` 的值即可：
 
 ```bash
-helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.3 cilium
+helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.3 cilium cilium/cilium
 ```
 
 ## TODO
