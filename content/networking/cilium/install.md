@@ -9,8 +9,8 @@
 - 集群版本：TKE 1.30 及以上，参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)
 - 网络模式：VPC-CNI 或 GlobalRouter
 - 节点类型：普通节点（原生节点的内核版本较低，会有兼容性问题）
-- 操作系统：TencentOS>=4
-- kube-proxy: 使用 iptables 转发模式或者卸载 kube-proxy 并使用 cilium 替代
+- 操作系统：TencentOS>=4 或 Ubuntu>=24.04
+- kube-proxy: 使用 iptables 转发模式或者卸载 kube-proxy 并使用 cilium 替代 (与 kube-proxy ipvs 模式不兼容，详见[这个issue](https://github.com/cilium/cilium/issues/18610))
 
 ## 原生路由
 
