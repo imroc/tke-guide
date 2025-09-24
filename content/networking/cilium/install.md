@@ -107,28 +107,6 @@ helm repo add cilium https://helm.cilium.io/
 </Tabs>
 
 
-```bash
-# 获取 apiserver 地址
-k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}')
-# 创建 cilium helm chart 的 values 配置（替换 apiserver 地址）
-cat > tke-values.yaml <<EOF
-routingMode: "native"
-endpointRoutes:
-  enabled: true
-enableIPv4Masquerade: false # 有 ip-masq-agent 控制 SNAT，cilium 无需参与
-cni:
-  chainingMode: generic-veth
-  chainingTarget: "multus-cni"
-ipam:
-  mode: "delegated-plugin" # IP 分配由 VPC-CNI 网络插件完成，cilium 无需负责 IP 分配
-kubeProxyReplacement: "true" # 需使用 cilium 替代 kube-proxy 才能用到 cilium 完整能力
-k8sServiceHost: ${k8sServiceHost} # 关键，替换为 endpoint default/kubernetes 指向的 IP
-k8sServicePort: 60002
-extraConfig:
-  local-router-ipv4: 169.254.32.16
-EOF
-```
-
 3. 删除 kube-proxy:
 
 ```bash
