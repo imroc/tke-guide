@@ -89,6 +89,29 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
 8. 其余选项根据自身需求自行选择。
 9. 点击 **创建节点池**。
 
+如果你想通过 terraform 来创建节点池，参考以下片段：
+```hcl
+resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
+  name       = "cilium"
+  cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
+  annotations { # 添加注解指定原生节点使用 TencentOS 4，以便能够与 cilium 兼容
+    name  = "node.tke.cloud.tencent.com/beta-image"
+    value = "ts4-public"
+  }
+  taints { # 添加污点，让节点上的 cilium 组件 ready 后再调度 pod 上来
+    key    = "node.cilium.io/agent-not-ready"
+    effect = "NoExecute"
+    value  = "true"
+  }
+  native {
+    lifecycle {
+      # 自定义脚本：修改 containerd 配置，添加 quay.io 的镜像加速
+      post_init = "c2VkIC1pICcvXFtwbHVnaW5zXC4iaW8uY29udGFpbmVyZC5ncnBjLnYxLmNyaSJcLnJlZ2lzdHJ5XC5taXJyb3JzXF0vIGFcXCBcIFwgXCBcIFwgXCBcIFtwbHVnaW5zLiJpby5jb250YWluZXJkLmdycGMudjEuY3JpIi5yZWdpc3RyeS5taXJyb3JzLiJxdWF5LmlvIl1cblwgXCBcIFwgXCBcIFwgXCBcIFwgZW5kcG9pbnQgPSBbImh0dHBzOi8vcXVheS50ZW5jZW50Y2xvdWRjci5jb20iXScgL2V0Yy9jb250YWluZXJkL2NvbmZpZy50b21sCnN5c3RlbWN0bCByZXN0YXJ0IGNvbnRhaW5lcmQK"
+    }
+  }
+}
+```
+
 ### 使用 helm 安装 cilium
 1. 确保添加 cilium 的 helm repo:
 
