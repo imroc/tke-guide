@@ -255,6 +255,14 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 c
 helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.3 cilium cilium/cilium
 ```
 
+### Global Router 网络模式的集群能否安装？
+
+测试结论是：不能。
+
+应该是 cilium 不支持 bridge CNI 插件（Global Router 网络插件基于 bridge CNI 插件），相关 issue:
+- [CFP: eBPF with bridge mode](https://github.com/cilium/cilium/issues/35011)
+- [CFP: cilium CNI chaining can support cni-bridge](https://github.com/cilium/cilium/issues/20336)
+
 ## TODO
 
 - Cluster Mesh 多集群安装
