@@ -40,7 +40,7 @@ Cilium 路由支持两种模式：
 3. 点击**新建**。
 4. 选择**普通节点**。
 5. **操作系统** 选择 **TencentOS 4** 或者 **Ubuntu 24.04**。
-6. **高级设置** 中 **新建Taint**: `node.cilium.io/agent-not-ready=true:NoExecute`。
+6. **高级设置** 中 **新建Taint**: `node.cilium.io/agent-not-ready=true:NoExecute`（让节点上的 cilium 组件 ready 后再调度 pod 上来）。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F25%2F20250925155023.png)
 7. cilium 的官方容器镜像主要在 `quay.io`，如果你的集群在中国大陆或者节点没有公网，可在 **高级设置** 的 **自定义脚本** 配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速:
     ```bash
@@ -56,6 +56,11 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
   name       = "cilium"
   cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
   node_os    = "img-gqmik24x" # TencentOS 4 的镜像 ID
+  taints { # 添加 taint，让节点上的 cilium 组件 ready 后再调度 pod 上来
+    key    = "node.cilium.io/agent-not-ready"
+    effect = "NoExecute"
+    value  = "true"
+  }
   node_config {
     # 自定义脚本：修改 containerd 配置，添加 quay.io 的镜像加速
     user_data = "c2VkIC1pICcvXFtwbHVnaW5zXC4iaW8uY29udGFpbmVyZC5ncnBjLnYxLmNyaSJcLnJlZ2lzdHJ5XC5taXJyb3JzXF0vIGFcXCBcIFwgXCBcIFwgXCBcIFtwbHVnaW5zLiJpby5jb250YWluZXJkLmdycGMudjEuY3JpIi5yZWdpc3RyeS5taXJyb3JzLiJxdWF5LmlvIl1cblwgXCBcIFwgXCBcIFwgXCBcIFwgZW5kcG9pbnQgPSBbImh0dHBzOi8vcXVheS50ZW5jZW50Y2xvdWRjci5jb20iXScgL2V0Yy9jb250YWluZXJkL2NvbmZpZy50b21sCnN5c3RlbWN0bCByZXN0YXJ0IGNvbnRhaW5lcmQK"
