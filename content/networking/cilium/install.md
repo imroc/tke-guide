@@ -6,11 +6,11 @@
 
 ## 前提条件
 
-- 集群版本：TKE 1.30 及以上，参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)
-- 网络模式：VPC-CNI
-- 节点类型：普通节点或原生节点
-- 操作系统：TencentOS>=4 或 Ubuntu>=22.04
-- kube-proxy: 使用 iptables 转发模式或者卸载 kube-proxy 并使用 cilium 替代
+- 集群版本：TKE 1.30 及以上，参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)。
+- 网络模式：VPC-CNI 共享网卡多 IP。
+- 节点类型：普通节点或原生节点。
+- 操作系统：TencentOS>=4 或 Ubuntu>=22.04。
+- kube-proxy: 使用 iptables 转发模式或者卸载 kube-proxy 并使用 cilium 替代。
 
 ## 原生路由
 
@@ -87,7 +87,7 @@ Cilium 路由支持两种模式：
   2. 选择左侧菜单栏中的**节点管理**，点击**节点池**进入节点池列表页面。
   3. 点击**新建**。
   4. 选择 **普通节点**。
-  5. **操作系统** 选择 **TencentOS 4** 或者 **Ubuntu 24.04**。
+  5. **操作系统** 选择 **TencentOS 4**、**Ubuntu 22.04** 或 **Ubuntu 24.04**。
   6. 在 **高级设置** 中 **Taints** 点击 **新建Taint**: `node.cilium.io/agent-not-ready=true:NoExecute`（让节点上的 cilium 组件 ready 后再调度 pod 上来）。
       ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F25%2F20250925155023.png)
   7. 在 **高级设置** 的 **自定义脚本** 中，配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速（cilium 的官方容器镜像主要在 `quay.io`，如果你的集群在中国大陆或者节点没有公网，建议配置这个自定义脚本）:
