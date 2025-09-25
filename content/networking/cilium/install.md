@@ -8,7 +8,7 @@
 
 - 集群版本：TKE 1.30 及以上，参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)
 - 网络模式：VPC-CNI 或 GlobalRouter
-- 节点类型：普通节点（原生节点的内核版本较低，会有兼容性问题）
+- 节点类型：普通节点或原生节点
 - 操作系统：TencentOS>=4 或 Ubuntu>=24.04
 - kube-proxy: 使用 iptables 转发模式或者卸载 kube-proxy 并使用 cilium 替代
 
@@ -34,15 +34,18 @@ Cilium 路由支持两种模式：
 
 ### 新建节点池
 
-以下是通过 [容器服务控制台](https://console.cloud.tencent.com/tke2/cluster) 创建节点池的步骤：
+以下是通过 [容器服务控制台](https://console.cloud.tencent.com/tke2/cluster) 创建原生节点池和普通节点池的步骤：
+
+#### 新建普通节点池
+
 1. 在集群列表中，单击集群 ID，进入集群详情页。
 2. 选择左侧菜单栏中的**节点管理**，点击**节点池**进入节点池列表页面。
 3. 点击**新建**。
-4. 选择**普通节点**。
+4. 选择 **普通节点**。
 5. **操作系统** 选择 **TencentOS 4** 或者 **Ubuntu 24.04**。
-6. **高级设置** 中 **新建Taint**: `node.cilium.io/agent-not-ready=true:NoExecute`（让节点上的 cilium 组件 ready 后再调度 pod 上来）。
+6. 在 **高级设置** 中 **Taints** 点击 **新建Taint**: `node.cilium.io/agent-not-ready=true:NoExecute`（让节点上的 cilium 组件 ready 后再调度 pod 上来）。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F25%2F20250925155023.png)
-7. cilium 的官方容器镜像主要在 `quay.io`，如果你的集群在中国大陆或者节点没有公网，可在 **高级设置** 的 **自定义脚本** 配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速:
+7. 在 **高级设置** 的 **自定义脚本** 中，配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速（cilium 的官方容器镜像主要在 `quay.io`，如果你的集群在中国大陆或者节点没有公网，建议配置这个自定义脚本）:
     ```bash
     sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
     systemctl restart containerd
@@ -67,6 +70,24 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
   }
 }
 ```
+
+#### 新建原生节点池
+
+1. 在集群列表中，单击集群 ID，进入集群详情页。
+2. 选择左侧菜单栏中的**节点管理**，点击**节点池**进入节点池列表页面。
+3. 点击**新建**。
+4. 选择 **原生节点**。
+5. 在 **高级设置** 的 Annotations 点击 **新增**：`node.tke.cloud.tencent.com/beta-image=ts4-public`（原生节点默认使用 TencentOS 3.1，与最新版的 cilium 不兼容，通过注解指定原生节点使用 TencentOS 4）。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F25%2F20250925162022.png)
+6. 在 **高级设置** 的 **Taints** 点击 **新建Taint**: `node.cilium.io/agent-not-ready=true:NoExecute`（让节点上的 cilium 组件 ready 后再调度 pod 上来）。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F25%2F20250925155023.png)
+7. 在 **高级设置** 的 **自定义脚本** 中，配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速（cilium 的官方容器镜像主要在 `quay.io`，如果你的集群在中国大陆或者节点没有公网，建议配置这个自定义脚本）:
+    ```bash
+    sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
+    systemctl restart containerd
+    ```
+8. 其余选项根据自身需求自行选择。
+9. 点击 **创建节点池**。
 
 ### 使用 helm 安装 cilium
 1. 确保添加 cilium 的 helm repo:
