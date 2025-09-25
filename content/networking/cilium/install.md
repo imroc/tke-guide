@@ -122,7 +122,7 @@ helm repo add cilium https://helm.cilium.io/
 2. 安装 cilium，有两种方式，取决于是否需要保留 kube-proxy（推荐不保留，使用 cilium 完全替代 kube-proxy，可减少整体的资源开销并获得更好的 Service 转发性能）：
 
 <Tabs>
-  <TabItem value="2" label="完全替代 kube-proxy">
+  <TabItem value="1" label="完全替代 kube-proxy">
 
   先卸载 kube-proxy（保险起见，通过加 nodeSelector 方式让 kube-proxy 不部署到任何节点，避免后续升级集群时 kube-proxy 又被重新创建回来）：
 
@@ -147,15 +147,15 @@ helm repo add cilium https://helm.cilium.io/
     --set extraConfig.local-router-ipv4=169.254.32.16
   ```
 
-  </TabItem>
-
   :::info[注意]
   
   如果 kube-proxy 是 ipvs 模式，且集群中有节点存在，需重启所有节点来清理下 kube-proxy 相关规则，否则可能出现 Service 无法访问的情况。
   
   :::
 
-  <TabItem value="1" label="与 kube-proxy 共存">
+  </TabItem>
+
+  <TabItem value="2" label="与 kube-proxy 共存">
 
   确保 kube-proxy 使用的是 iptables 转发模式，然后使用 helm 安装 cilium：
 
