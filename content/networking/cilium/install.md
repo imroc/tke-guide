@@ -28,7 +28,7 @@ Cilium 路由支持两种模式：
 
 在 [容器服务控制台](https://console.cloud.tencent.com/tke2/cluster) 创建 TKE 标准集群，注意以下关键选项：
 - Kubernetes 版本: 不低于 1.30.0，建议选择最新版。
-- 操作系统：TencentOS 4.0 及以上或者 Ubuntu 22.04 及以上。
+- 操作系统：**TencentOS 4.0** 及以上或者 **Ubuntu 22.04** 及以上。
 - 容器网络插件：VPC-CNI 共享网卡多 IP。
 - Kube-proxy 转发模式：iptables。
 
