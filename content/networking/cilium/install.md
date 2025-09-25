@@ -71,25 +71,6 @@ helm repo add cilium https://helm.cilium.io/
 2. 安装 cilium，有两种方式，取决于是否需要保留 kube-proxy（推荐不保留，使用 cilium 完全替代 kube-proxy，可减少整体的资源开销并获得更好的 Service 转发性能）：
 
 <Tabs>
-  <TabItem value="1" label="与 kube-proxy 共存">
-
-  确保 kube-proxy 使用的是 iptables 转发模式，然后使用 helm 安装 cilium：
-
-  ```bash
-  helm install cilium cilium/cilium --version 1.18.2 \
-    --namespace kube-system \
-    --set routingMode=native \ # 使用原生路由
-    --set endpointRoutes.enabled=true \
-    --set enableIPv4Masquerade=false \ # TKE 中可通过 ip-masq-agent 更灵活的控制 SNAT，cilium 无需参与
-    --set cni.chainingMode=generic-veth \
-    --set cni.chainingTarget=multus-cni \
-    --set ipamd.mode=delegated-plugin \ # IP 分配交给 TKE 的网络插件来做
-    --set extraConfig.local-router-ipv4=169.254.32.16
-  ```
-
-  > cilium 与 kube-proxy ipvs 模式不兼容，在 TKE 环境无法与 cilium 共存，详细请参考常见问题中的解释。
-
-  </TabItem>
   <TabItem value="2" label="完全替代 kube-proxy">
 
   先卸载 kube-proxy（保险起见，通过加 nodeSelector 方式让 kube-proxy 不部署到任何节点，避免后续升级集群时 kube-proxy 又被重新创建回来）：
@@ -103,17 +84,36 @@ helm repo add cilium https://helm.cilium.io/
   ```bash
   helm install cilium cilium/cilium --version 1.18.2 \
     --namespace kube-system \
-    --set routingMode=native \ # 使用原生路由
+    --set routingMode=native \
     --set endpointRoutes.enabled=true \
-    --set enableIPv4Masquerade=false \ # TKE 中可通过 ip-masq-agent 更灵活的控制 SNAT，cilium 无需参与
+    --set enableIPv4Masquerade=false \
     --set cni.chainingMode=generic-veth \
     --set cni.chainingTarget=multus-cni \
-    --set ipamd.mode=delegated-plugin \ # IP 分配交给 TKE 的网络插件来做
-    --set kubeProxyReplacement=true \ # 启用替代 kube-proxy 的功能
-    --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \ # 替代 kube-proxy 需拿到 apiserver 的实际地址而非虚拟的 ClussterIP 才能与 apiserver 通信（鸡生蛋和蛋生鸡问题）
+    --set ipamd.mode=delegated-plugin \
+    --set kubeProxyReplacement=true \
+    --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
     --set k8sServicePort=60002 \
     --set extraConfig.local-router-ipv4=169.254.32.16
   ```
+  </TabItem>
+
+  <TabItem value="1" label="与 kube-proxy 共存">
+
+  确保 kube-proxy 使用的是 iptables 转发模式，然后使用 helm 安装 cilium：
+
+  ```bash
+  helm install cilium cilium/cilium --version 1.18.2 \
+    --namespace kube-system \
+    --set routingMode=native \
+    --set endpointRoutes.enabled=true \
+    --set enableIPv4Masquerade=false \
+    --set cni.chainingMode=generic-veth \
+    --set cni.chainingTarget=multus-cni \
+    --set ipamd.mode=delegated-plugin \
+    --set extraConfig.local-router-ipv4=169.254.32.16
+  ```
+
+  > cilium 与 kube-proxy ipvs 模式不兼容，在 TKE 环境无法与 cilium 共存，详细请参考常见问题中的解释。
 
   </TabItem>
 </Tabs>
