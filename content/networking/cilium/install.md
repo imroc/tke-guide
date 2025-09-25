@@ -120,14 +120,15 @@ Cilium 路由支持两种模式：
   </TabItem>
 </Tabs>
 
-### 使用 helm 安装 cilium
-1. 确保添加 cilium 的 helm repo:
+### 安装 cilium
+1. 确保 [helm](https://helm.sh/zh/docs/intro/install/) 和 [kubectl](https://kubernetes.io/zh-cn/docs/tasks/tools/install-kubectl-linux/) 已安装，并配置好可以连接集群的 kubeconfig（参考 [连接集群](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)）。
+2. 添加 cilium 的 helm repo:
 
 ```bash
 helm repo add cilium https://helm.cilium.io/
 ```
 
-2. 安装 cilium，有两种方式，取决于是否需要保留 kube-proxy（推荐不保留，使用 cilium 完全替代 kube-proxy，可减少整体的资源开销并获得更好的 Service 转发性能）：
+3. 安装 cilium（有两种方式，取决于是否需要保留 kube-proxy，推荐不保留，使用 cilium 完全替代 kube-proxy，可减少整体的资源开销并获得更好的 Service 转发性能）：
 
 <Tabs>
   <TabItem value="1" label="完全替代 kube-proxy">
