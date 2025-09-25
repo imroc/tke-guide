@@ -40,13 +40,15 @@ Cilium 路由支持两种模式：
 3. 点击**新建**。
 4. 选择**普通节点**。
 5. **操作系统** 选择 **TencentOS 4** 或者 **Ubuntu 24.04**。
-6. cilium 的官方容器镜像主要在 `quay.io`，如果你的集群在中国大陆或者节点没有公网，可在 **自定义脚本** 配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速:
+6. **高级设置** 中 **新建Taint**: `node.cilium.io/agent-not-ready=true:NoExecute`。
+    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F25%2F20250925155023.png)
+7. cilium 的官方容器镜像主要在 `quay.io`，如果你的集群在中国大陆或者节点没有公网，可在 **高级设置** 的 **自定义脚本** 配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速:
     ```bash
     sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
     systemctl restart containerd
     ```
-7. 其余选项根据自身需求自行选择。
-8. 点击**创建节点池**。
+8. 其余选项根据自身需求自行选择。
+9. 点击**创建节点池**。
 
 如果你想通过 terraform 来创建节点池，参考以下片段：
 ```hcl
