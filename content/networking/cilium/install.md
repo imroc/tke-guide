@@ -102,7 +102,14 @@ helm repo add cilium https://helm.cilium.io/
     --set k8sServicePort=60002 \
     --set extraConfig.local-router-ipv4=169.254.32.16
   ```
+
   </TabItem>
+
+  :::info[注意]
+  
+  如果 kube-proxy 是 ipvs 模式，且集群中有节点存在，需重启所有节点来清理下 kube-proxy 相关规则，否则可能出现 Service 无法访问的情况。
+  
+  :::
 
   <TabItem value="1" label="与 kube-proxy 共存">
 
