@@ -7,7 +7,7 @@
 ## 前提条件
 
 - 集群版本：TKE 1.30 及以上，参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)
-- 网络模式：VPC-CNI 或 GlobalRouter
+- 网络模式：VPC-CNI
 - 节点类型：普通节点或原生节点
 - 操作系统：TencentOS>=4 或 Ubuntu>=22.04
 - kube-proxy: 使用 iptables 转发模式或者卸载 kube-proxy 并使用 cilium 替代
@@ -29,7 +29,7 @@ Cilium 路由支持两种模式：
 在 [容器服务控制台](https://console.cloud.tencent.com/tke2/cluster) 创建 TKE 标准集群，注意以下关键选项：
 - Kubernetes 版本: 不低于 1.30.0，建议选择最新版。
 - 操作系统：TencentOS 4.0 及以上或者 Ubuntu 22.04 及以上。
-- 容器网络插件：VPC-CNI 共享网卡多 IP 或者 Global Router。
+- 容器网络插件：VPC-CNI 共享网卡多 IP。
 - Kube-proxy 转发模式：iptables。
 
 ### 新建节点池
