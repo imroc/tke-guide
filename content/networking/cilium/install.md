@@ -274,10 +274,6 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.3 c
 
 勾选后，会部署 cilium 组件到集群中（替代 kube-proxy 组件），如果再自己安装 cilium 会造成冲突，而且 DataPlaneV2 所使用的 OS 与 cilium 最新版也不兼容，所以不能勾选此选项。
 
-## TODO
-
-- Cluster Mesh 多集群安装
-
 ## 参考资料
 
 - [Cilium 官方文档: Installation using Helm](https://docs.cilium.io/en/stable/installation/k8s-install-helm/)
