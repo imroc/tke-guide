@@ -264,6 +264,16 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.3 c
 - [CFP: eBPF with bridge mode](https://github.com/cilium/cilium/issues/35011)
 - [CFP: cilium CNI chaining can support cni-bridge](https://github.com/cilium/cilium/issues/20336)
 
+### 能否勾选 DataPlaneV2？
+
+结论是：不能。
+
+选择 VPC-CNI 网络插件时，有个 DataPlaneV2 选项：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F26%2F20250926092351.png)
+
+勾选后，会部署 cilium 组件到集群中（替代 kube-proxy 组件），如果再自己安装 cilium 会造成冲突，而且 DataPlaneV2 所使用的 OS 与 cilium 最新版也不兼容，所以不能勾选此选项。
+
 ## TODO
 
 - Cluster Mesh 多集群安装
