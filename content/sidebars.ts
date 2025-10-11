@@ -40,6 +40,7 @@ const sidebars: SidebarsConfig = {
                     slug: '/networking/cilium/appendix/e2e'
                   },
                   items: [
+                    'networking/cilium/appendix/e2e/method'
                     'networking/cilium/appendix/e2e/iptables-tencentos44'
                   ]
                 }
