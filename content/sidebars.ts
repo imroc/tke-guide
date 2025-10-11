@@ -21,7 +21,30 @@ const sidebars: SidebarsConfig = {
             slug: '/networking/cilium'
           },
           items: [
-            'networking/cilium/install'
+            'networking/cilium/install',
+            {
+              type: 'category',
+              label: '附录',
+              collapsed: true,
+              link: {
+                type: 'generated-index',
+                slug: '/networking/cilium/appendix'
+              },
+              items: [
+                {
+                  type: 'category',
+                  label: 'e2e 测试',
+                  collapsed: true,
+                  link: {
+                    type: 'generated-index',
+                    slug: '/networking/cilium/appendix/e2e'
+                  },
+                  items: [
+                    'networking/cilium/appendix/e2e/iptables-tencentos44'
+                  ]
+                }
+              ]
+            }
           ],
         },
         {
