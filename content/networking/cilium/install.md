@@ -215,6 +215,12 @@ cilium-1.18.2.tgz
 helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 cilium ./cilium-1.18.2.tgz
 ```
 
+### 大规模场景如何优化？
+
+如果集群规模较大，建议开启 [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) 特性，该特性于  1.11 开始引入，当前（1.18.2）仍在 Beta 阶段（详见 [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)），在大规模场景下，该特性可以显著提升 cilium 性能并降低 apiserver 的压力。
+
+启用方法是在使用 helm 安装 cilium 时，通过加 `--set ciliumEndpointSlice.enabled=true` 参数来开启。
+
 ### 为什么不能与 kube-proxy ipvs 共存？
 
 cilium 与 kube-proxy ipvs 模式不兼容，详见[这个issue](https://github.com/cilium/cilium/issues/18610)。
@@ -246,16 +252,25 @@ extraConfig:
 
 安装和更新配置，都通过执行下面的命令来完成：
 
-```bash
-helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 cilium cilium/cilium
+```bash showLineNumbers
+helm upgrade --install \
+  --namespace kube-system \
+  -f values.yaml \
+  --version 1.18.2 \
+  cilium cilium/cilium
 ```
 
 > 修改配置通过修改 `values.yaml` 文件来完成，完整配置项通过 `helm show values cilium/cilium --version 1.18.2` 查看。
 
 如果是升级版本，替换 `--version` 的值即可：
 
-```bash
-helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.3 cilium cilium/cilium
+```bash showLineNumbers
+helm upgrade --install \
+  --namespace kube-system \
+  -f values.yaml \
+  # highlight-next-line
+  --version 1.18.3 \
+  cilium cilium/cilium
 ```
 
 ### Global Router 网络模式的集群能否安装？
