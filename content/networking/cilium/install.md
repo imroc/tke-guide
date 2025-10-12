@@ -131,45 +131,12 @@ helm repo add cilium https://helm.cilium.io/
 3. 安装 cilium（有两种方式，取决于是否需要保留 kube-proxy，推荐不保留，使用 cilium 完全替代 kube-proxy，可减少整体的资源开销并获得更好的 Service 转发性能）：
 
 <Tabs>
-  <TabItem value="1" label="完全替代 kube-proxy">
-
-  先卸载 kube-proxy（保险起见，通过加 nodeSelector 方式让 kube-proxy 不部署到任何节点，避免后续升级集群时 kube-proxy 又被重新创建回来）：
-
-  ```bash
-  kubectl -n kube-system patch ds kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-  ```
-
-  然后使用 helm 安装 cilium:
-
-  ```bash
-  helm install cilium cilium/cilium --version 1.18.2 \
-    --namespace kube-system \
-    --set routingMode=native \
-    --set endpointRoutes.enabled=true \
-    --set enableIPv4Masquerade=false \
-    --set cni.chainingMode=generic-veth \
-    --set cni.chainingTarget=multus-cni \
-    --set ipamd.mode=delegated-plugin \
-    --set kubeProxyReplacement=true \
-    --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
-    --set k8sServicePort=60002 \
-    --set extraConfig.local-router-ipv4=169.254.32.16
-  ```
-
-  :::info[注意]
-  
-  如果 kube-proxy 是 ipvs 模式，且集群中有节点存在，需重启所有节点来清理下 kube-proxy 相关规则，否则可能出现 Service 无法访问的情况。
-  
-  :::
-
-  </TabItem>
-
-  <TabItem value="2" label="与 kube-proxy 共存">
+  <TabItem value="1" label="与 kube-proxy 共存">
 
   确保 kube-proxy 使用的是 iptables 转发模式，然后使用 helm 安装 cilium：
 
-  ```bash
-  helm install cilium cilium/cilium --version 1.18.2 \
+  ```bash showLineNumbers
+  helm upgrade --install cilium cilium/cilium --version 1.18.2 \
     --namespace kube-system \
     --set routingMode=native \
     --set endpointRoutes.enabled=true \
@@ -183,6 +150,41 @@ helm repo add cilium https://helm.cilium.io/
   > cilium 与 kube-proxy ipvs 模式不兼容，在 TKE 环境无法与 cilium 共存，详细请参考常见问题中的解释。
 
   </TabItem>
+  <TabItem value="2" label="完全替代 kube-proxy">
+
+  先卸载 kube-proxy（保险起见，通过加 nodeSelector 方式让 kube-proxy 不部署到任何节点，避免后续升级集群时 kube-proxy 又被重新创建回来）：
+
+  ```bash
+  kubectl -n kube-system patch ds kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+  ```
+
+  然后使用 helm 安装 cilium:
+
+  ```bash showLineNumbers
+  helm upgrade --install cilium cilium/cilium --version 1.18.2 \
+    --namespace kube-system \
+    --set routingMode=native \
+    --set endpointRoutes.enabled=true \
+    --set enableIPv4Masquerade=false \
+    --set cni.chainingMode=generic-veth \
+    --set cni.chainingTarget=multus-cni \
+    --set ipamd.mode=delegated-plugin \
+    # highlight-add-start
+    --set kubeProxyReplacement=true \
+    --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
+    --set k8sServicePort=60002 \
+    # highlight-add-end
+    --set extraConfig.local-router-ipv4=169.254.32.16
+  ```
+
+  :::info[注意]
+  
+  如果 kube-proxy 是 ipvs 模式，且集群中有节点存在，需重启所有节点来清理下 kube-proxy 相关规则，否则可能出现 Service 无法访问的情况。
+  
+  :::
+
+  </TabItem>
+
 </Tabs>
 
 ## 常见问题
