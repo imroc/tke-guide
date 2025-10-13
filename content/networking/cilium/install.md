@@ -143,7 +143,7 @@ helm repo add cilium https://helm.cilium.io/
     --set enableIPv4Masquerade=false \
     --set cni.chainingMode=generic-veth \
     --set cni.chainingTarget=multus-cni \
-    --set ipamd.mode=delegated-plugin \
+    --set ipam.mode=delegated-plugin \
     --set extraConfig.local-router-ipv4=169.254.32.16
   ```
 
@@ -168,7 +168,7 @@ helm repo add cilium https://helm.cilium.io/
     --set enableIPv4Masquerade=false \
     --set cni.chainingMode=generic-veth \
     --set cni.chainingTarget=multus-cni \
-    --set ipamd.mode=delegated-plugin \
+    --set ipam.mode=delegated-plugin \
     # highlight-add-start
     --set kubeProxyReplacement=true \
     --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
