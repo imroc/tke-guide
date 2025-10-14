@@ -41,7 +41,7 @@ kubectl -n kube-system patch ds tke-cni-agent -p '{"spec":{"template":{"spec":{"
 :::tip[说明]
 
 1. 通过加 nodeSelector 方式让 daemonset 不部署到任何节点，等同于卸载，同时也留个退路。
-2. 如果使用 Pod VPC-CNI 网络，可以不需要 tke-cni-agent，卸载以避免 CNI 配置文件冲突。
+2. 如果 Pod 使用 VPC-CNI 网络，可以不需要 tke-cni-agent，卸载以避免 CNI 配置文件冲突。
 
 :::
 
@@ -76,12 +76,6 @@ data:
       ]
     }
 ```
-
-:::tip[说明]
-
-CNI 配置完全自行掌控，不与 TKE 自带的 CNI 配置冲突，还可以实现与 isito 之类的工具集成。
-
-:::
 
 3. 创建 CNI ConfigMap:
 
