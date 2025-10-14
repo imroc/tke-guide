@@ -37,7 +37,12 @@ helm upgrade --install cilium cilium/cilium --version 1.18.2 \
 kubectl -n kube-system patch ds kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 ```
 
-> 保险起见，通过加 nodeSelector 方式让 kube-proxy 不部署到任何节点，避免后续升级集群时 kube-proxy 又被重新创建回来。
+:::tip[说明]
+
+通过加 nodeSelector 方式让 kube-proxy 不部署到任何节点，避免后续升级集群时 kube-proxy 又被重新创建回来。
+
+:::
+
 
 2. 再卸载 tke-cni-agent：
 
@@ -45,7 +50,11 @@ kubectl -n kube-system patch ds kube-proxy -p '{"spec":{"template":{"spec":{"nod
 kubectl -n kube-system delete ds tke-cni-agent
 ```
 
-> 如果使用 Pod VPC-CNI 网络，可以不需要此组件，卸载以避免 CNI 配置文件冲突
+:::tip[说明]
+
+如果使用 Pod VPC-CNI 网络，可以不需要此组件，卸载以避免 CNI 配置文件冲突。
+
+:::
 
 3. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
 
@@ -79,7 +88,11 @@ data:
     }
 ```
 
-> CNI 配置完全自行掌控，不与 TKE 自带的 CNI 配置冲突，还可以实现与 isito 之类的工具集成。
+:::tip[说明]
+
+CNI 配置完全自行掌控，不与 TKE 自带的 CNI 配置冲突，还可以实现与 isito 之类的工具集成。
+
+:::
 
 4. 创建 CNI ConfigMap:
 
