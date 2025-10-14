@@ -31,19 +31,23 @@ helm upgrade --install cilium cilium/cilium --version 1.18.2 \
 
 下面介绍安装步骤：
 
-1. 先卸载 kube-proxy（保险起见，通过加 nodeSelector 方式让 kube-proxy 不部署到任何节点，避免后续升级集群时 kube-proxy 又被重新创建回来）：
+1. 先卸载 kube-proxy：
 
 ```bash
 kubectl -n kube-system patch ds kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 ```
 
-2. 再卸载 tke-cni-agent （如果使用 Pod VPC-CNI 网络，可以不需要此组件，卸载以避免 CNI 配置文件冲突）：
+> 保险起见，通过加 nodeSelector 方式让 kube-proxy 不部署到任何节点，避免后续升级集群时 kube-proxy 又被重新创建回来。
+
+2. 再卸载 tke-cni-agent：
 
 ```bash
 kubectl -n kube-system delete ds tke-cni-agent
 ```
 
-3. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`（CNI 配置完全自行掌控，不与 TKE 自带的 CNI 配置冲突，还可以实现与 isito 之类的工具集成）：
+> 如果使用 Pod VPC-CNI 网络，可以不需要此组件，卸载以避免 CNI 配置文件冲突
+
+3. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
 
 ```yaml title="cni-configuration.yaml"
 apiVersion: v1
@@ -75,7 +79,9 @@ data:
     }
 ```
 
-4. 创建 ConfigMap:
+> CNI 配置完全自行掌控，不与 TKE 自带的 CNI 配置冲突，还可以实现与 isito 之类的工具集成。
+
+4. 创建 CNI ConfigMap:
 
 ```bash
 kubectl apply -f cni-configuration.yaml
@@ -85,16 +91,16 @@ kubectl apply -f cni-configuration.yaml
 
 ```yaml title=”values.yaml“
 routingMode: "native"
+endpointRoutes:
+  enabled: true
+ipam:
+  mode: "delegated-plugin"
 enableIPv4Masquerade: false
 cni:
   chainingMode: generic-veth
   exclusive: false
   customConf: true
   configMap: cni-configuration
-ipam:
-  mode: "delegated-plugin"
-endpointRoutes:
-  enabled: true
 kubeProxyReplacement: "true"
 k8sServiceHost: ${APISERVER_HOST} # kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
 k8sServicePort: 60002
