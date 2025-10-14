@@ -106,7 +106,11 @@ extraConfig:
 
 :::info[注意]
 
-- `k8sServiceHost` 需通过 `kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'` 来获取。
+`k8sServiceHost` 需通过以下命令获取：
+
+```bash
+kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
+````
 
 :::
 
