@@ -43,7 +43,7 @@ kubectl -n kube-system patch ds kube-proxy -p '{"spec":{"template":{"spec":{"nod
 kubectl -n kube-system delete ds tke-cni-agent
 ```
 
-3. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
+3. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`（CNI 配置完全自行掌控，不与 TKE 自带的 CNI 配置冲突，还可以实现与 isito 之类的工具集成）：
 
 ```yaml title="cni-configuration.yaml"
 apiVersion: v1
