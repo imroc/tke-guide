@@ -31,40 +31,7 @@ helm --install cilium cilium/cilium --version 1.18.2 \
 
 下面介绍安装步骤：
 
-1. 为 tke-cni-agent 增加 preStop，用于清理存量节点的 CNI 配置:
-
-```bash
-kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
-  {
-    "op": "add",
-    "path": "/spec/template/spec/containers/0/lifecycle",
-    "value": {
-      "preStop": {
-        "exec": {
-          "command": ["rm", "/host/etc/cni/net.d/00-multus.conf"]
-        }
-      }
-    }
-  }
-]'
-kubectl -n kube-system rollout status daemonset/tke-cni-agent --watch # 等待存量节点的 tke-cni-agent pod 更新完成，确保 preStop 全部成功加上
-```
-
-2. 卸载 tke-cni-agent 和 kube-proxy：
-
-```bash
-kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-```
-
-:::tip[说明]
-
-1. 通过加 nodeSelector 方式让 daemonset 不部署到任何节点，等同于卸载，同时也留个退路。
-2. 如果 Pod 使用 VPC-CNI 网络，可以不需要 tke-cni-agent，卸载以避免 CNI 配置文件冲突。
-
-:::
-
-3. 为 tke-eni-ipamd 增加 cilium 污点的容忍：
+1. 为 tke-eni-ipamd 增加 cilium 污点的容忍：
 
 ```bash
 kubectl patch deployment tke-eni-ipamd -n kube-system --type='json' -p='[
@@ -86,7 +53,7 @@ tke-eni-ipamd 是 TKE VPC-CNI 网络中的关键组件，负责 Pod IP 的分配
 
 :::
 
-4. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
+2. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
 
 ```yaml title="cni-configuration.yaml"
 apiVersion: v1
@@ -118,13 +85,13 @@ data:
     }
 ```
 
-5. 创建 CNI ConfigMap:
+3. 创建 CNI ConfigMap:
 
 ```bash
 kubectl apply -f cni-configuration.yaml
 ```
 
-6. 使用 helm 安装 cilium：
+4. 使用 helm 安装 cilium：
 
 ```bash
 helm install cilium cilium/cilium --version 1.18.2 \
@@ -147,6 +114,39 @@ helm install cilium cilium/cilium --version 1.18.2 \
 :::tip[说明]
 
 `k8sServiceHost` 是 apiserver 地址，通过命令动态获取。
+
+:::
+
+5. 为 tke-cni-agent 增加 preStop，用于清理存量节点的 CNI 配置:
+
+```bash
+kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/lifecycle",
+    "value": {
+      "preStop": {
+        "exec": {
+          "command": ["rm", "/host/etc/cni/net.d/00-multus.conf"]
+        }
+      }
+    }
+  }
+]'
+kubectl -n kube-system rollout status daemonset/tke-cni-agent --watch # 等待存量节点的 tke-cni-agent pod 更新完成，确保 preStop 全部成功加上
+```
+
+6. 卸载 tke-cni-agent 和 kube-proxy：
+
+```bash
+kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+```
+
+:::tip[说明]
+
+1. 通过加 nodeSelector 方式让 daemonset 不部署到任何节点，等同于卸载，同时也留个退路。
+2. 如果 Pod 使用 VPC-CNI 网络，可以不需要 tke-cni-agent，卸载以避免 CNI 配置文件冲突。
 
 :::
 
