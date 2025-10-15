@@ -33,6 +33,7 @@
   ```
 
   </TabItem>
+
   <TabItem value="2" label="fish">
 
   ```fish
@@ -48,4 +49,5 @@
   替换 `NODE` 的值为实际需要监控的节点名称。
   
   :::
+
 </Tabs>
