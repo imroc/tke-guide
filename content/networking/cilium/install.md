@@ -189,7 +189,7 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 c
 
 默认没有启用，启用方法是在使用 helm 安装 cilium 时，通过加 `--set ciliumEndpointSlice.enabled=true` 参数来开启。
 
-### 如何更好的维护配置和升级 cilium 版本？
+### 如何更好的维护 cilium 的配置和版本？
 
 安装时，建议将所有安装配置写到 `values.yaml` 中，如：
 
