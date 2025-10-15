@@ -9,25 +9,41 @@
   ```
 
 3. 为 tke-eni-ipamd 增加 cilium 污点的容忍：
-  ```bash
-  kubectl patch deployment tke-eni-ipamd -n kube-system --type='json' -p='[
-    {
-      "op": "add",
-      "path": "/spec/template/spec/tolerations/-",
-      "value": {
-        "effect": "NoExecute",
-        "key": "node.cilium.io/agent-not-ready",
-        "operator": "Exists"
-      }
+```bash
+kubectl -n kube-system patch deployment tke-eni-ipamd --type='json' -p='[
+  {
+    "op": "add",
+    "path": "/spec/template/spec/tolerations/-",
+    "value": {
+      "effect": "NoExecute",
+      "key": "node.cilium.io/agent-not-ready",
+      "operator": "Exists"
     }
-  ]'
-  ```
+  }
+]'
+```
 
 :::tip[说明]
 
 tke-eni-ipamd 是 TKE VPC-CNI 网络中的关键组件，负责 Pod IP 的分配，使用 HostNetwork，不依赖 cilium-agent 的启动，所以可以加 cilium 污点的容忍。
 
 :::
+
+4. (可选) 如果你将 cilium 依赖镜像同步到了 TCR 私有镜像仓库，且安装了 TCR 扩展组件实现免密拉取 TCR 私有镜像，也需要为这个组件增加 cilium 污点的容忍（避免拉取 cilium 组件镜像和启动 TCR 组件形成循环依赖）：
+
+```bash
+kubectl -n tcr-assistant-system patch deployment tcr-assistant-controller-manager --type='json' -p='[
+  {
+    "op": "add",
+    "path": "/spec/template/spec/tolerations",
+    "value": [{
+      "effect": "NoExecute",
+      "key": "node.cilium.io/agent-not-ready",
+      "operator": "Exists"
+    }]
+  }
+]'
+```
 
 ## 简易安装
 
