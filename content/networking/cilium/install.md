@@ -162,6 +162,10 @@ Cilium 的 helm 安装包提供了大量的自定义配置项，上面安装步�
 helm show values cilium/cilium --version 1.18.2
 ```
 
+### 为什么要加 local-router-ipv4 配置？
+
+cilium 会在每台节点上创建 `cilium_host` 虚拟网卡，并需要配置一个 IP 地址，由于我们要让 cilium 与 TKE VPC-CNI 网络插件共存，IP 分配需要由 TKE VPC-CNI 插件来完成，cilium 就不负责 IP 分配了，所以需要我们通过 `local-router-ipv4` 参数来手动指定一个不会有冲突的 IP 地址，而 `169.254.32.16` 这个 IP 地址在 TKE 上不会与其它 IP 冲突，所以就指定这个 IP 地址。
+
 ### 连不上 cilium 的 helm repo 怎么办？
 
 使用 helm 安装 cilium 时，helm 会从 cilium 的 helm repo 获取 chart 相关信息并下载，如果连不上则会报错。
