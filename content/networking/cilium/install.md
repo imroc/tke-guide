@@ -195,16 +195,18 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 c
 
 ```yaml showLineNumbers title="values.yaml"
 routingMode: "native"
-endpointRoutes:
-  enabled: true
-enableIPv4Masquerade: false
+enableIPv4Masquerade: false # 有 ip-masq-agent 控制 SNAT
 cni:
   chainingMode: generic-veth
-  chainingTarget: multus-cni
+  exclusive: false
+  customConf: true
+  configMap: cni-configuration
 ipam:
-  mode: delegated-plugin
-kubeProxyReplacement: true
-k8sServiceHost: 169.254.128.27 # 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
+  mode: "delegated-plugin"
+endpointRoutes:
+  enabled: true
+kubeProxyReplacement: "true"
+k8sServiceHost: 169.254.128.112 # 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
 k8sServicePort: 60002
 extraConfig:
   local-router-ipv4: 169.254.32.16
