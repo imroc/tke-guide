@@ -115,7 +115,22 @@ helm install cilium cilium/cilium --version 1.18.2 \
 
 :::
 
-4. 为 tke-cni-agent 增加 preStop，用于清理存量节点的 CNI 配置:
+4. 确保 cilium 相关 pod 正常运行：
+
+```bash
+$ kubectl --namespace=kube-system get pod -l app.kubernetes.io/part-of=cilium
+NAME                              READY   STATUS    RESTARTS   AGE
+cilium-5rfrk                      1/1     Running   0          1m
+cilium-9mntb                      1/1     Running   0          1m
+cilium-envoy-4r4x9                1/1     Running   0          1m
+cilium-envoy-kl5cz                1/1     Running   0          1m
+cilium-envoy-sgl5v                1/1     Running   0          1m
+cilium-operator-896cdbf88-jlgt7   1/1     Running   0          1m
+cilium-operator-896cdbf88-nj6jc   1/1     Running   0          1m
+cilium-zrxwn                      1/1     Running   0          1m
+```
+
+5. 为 tke-cni-agent 增加 preStop，用于清理存量节点的 CNI 配置:
 
 ```bash
 kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
@@ -134,7 +149,7 @@ kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
 kubectl -n kube-system rollout status daemonset/tke-cni-agent --watch # 等待存量节点的 tke-cni-agent pod 更新完成，确保 preStop 全部成功加上
 ```
 
-5. 卸载 tke-cni-agent 和 kube-proxy：
+6. 卸载 tke-cni-agent 和 kube-proxy：
 
 ```bash
 kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
