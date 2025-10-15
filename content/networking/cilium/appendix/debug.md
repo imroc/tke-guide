@@ -36,7 +36,7 @@
 
   <TabItem value="fish" label="fish">
 
-  ```fish
+  ```bash
   set NODE 172.22.48.23
   set POD $(kubectl --namespace=kube-system get pod --field-selector spec.nodeName=$NODE -l k8s-app=cilium -o json | jq -r '.items[0].metadata.name')
   kubectl --namespace=kube-system exec -it $POD -- cilium monitor
