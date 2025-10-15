@@ -42,12 +42,11 @@
   kubectl --namespace=kube-system exec -it $POD -- cilium monitor
   ```
 
-  </TabItem>
-
   :::info[注意]
   
   替换 `NODE` 的值为实际需要监控的节点名称。
   
   :::
 
+  </TabItem>
 </Tabs>
