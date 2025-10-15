@@ -1,13 +1,33 @@
 # 安装 cilium
 
-## 准备 helm
+## 前期准备
 
 1. 确保 [helm](https://helm.sh/zh/docs/intro/install/) 和 [kubectl](https://kubernetes.io/zh-cn/docs/tasks/tools/install-kubectl-linux/) 已安装，并配置好可以连接集群的 kubeconfig（参考 [连接集群](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)）。
 2. 添加 cilium 的 helm repo:
+  ```bash
+  helm repo add cilium https://helm.cilium.io/
+  ```
 
-```bash
-helm repo add cilium https://helm.cilium.io/
-```
+3. 为 tke-eni-ipamd 增加 cilium 污点的容忍：
+  ```bash
+  kubectl patch deployment tke-eni-ipamd -n kube-system --type='json' -p='[
+    {
+      "op": "add",
+      "path": "/spec/template/spec/tolerations/-",
+      "value": {
+        "effect": "NoExecute",
+        "key": "node.cilium.io/agent-not-ready",
+        "operator": "Exists"
+      }
+    }
+  ]'
+  ```
+
+:::tip[说明]
+
+tke-eni-ipamd 是 TKE VPC-CNI 网络中的关键组件，负责 Pod IP 的分配，使用 HostNetwork，不依赖 cilium-agent 的启动，所以可以加 cilium 污点的容忍。
+
+:::
 
 ## 简易安装
 
@@ -31,27 +51,6 @@ helm install cilium cilium/cilium --version 1.18.2 \
 
 下面介绍安装步骤：
 
-1. 为 tke-eni-ipamd 增加 cilium 污点的容忍：
-
-```bash
-kubectl patch deployment tke-eni-ipamd -n kube-system --type='json' -p='[
-  {
-    "op": "add",
-    "path": "/spec/template/spec/tolerations/-",
-    "value": {
-      "effect": "NoExecute",
-      "key": "node.cilium.io/agent-not-ready",
-      "operator": "Exists"
-    }
-  }
-]'
-```
-
-:::tip[说明]
-
-tke-eni-ipamd 是 TKE VPC-CNI 网络中的关键组件，负责 Pod IP 的分配，使用 HostNetwork，不依赖 cilium-agent 的启动，所以可以加 cilium 污点的容忍。
-
-:::
 
 2. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
 
