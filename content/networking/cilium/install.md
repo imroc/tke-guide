@@ -45,7 +45,9 @@ kubectl -n kube-system patch ds tke-cni-agent -p '{"spec":{"template":{"spec":{"
 
 :::
 
-2. 为 tke-eni-ipamd 增加 cilium 污点的容忍：
+2. 重启存量节点，清理残留的 kube-proxy 规则和 CNI 配置。
+
+3. 为 tke-eni-ipamd 增加 cilium 污点的容忍：
 
 ```bash
 kubectl patch deployment tke-eni-ipamd -n kube-system --type='json' -p='[
@@ -67,7 +69,7 @@ tke-eni-ipamd 是 TKE VPC-CNI 网络中的关键组件，负责 Pod IP 的分配
 
 :::
 
-3. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
+4. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
 
 ```yaml title="cni-configuration.yaml"
 apiVersion: v1
@@ -99,13 +101,13 @@ data:
     }
 ```
 
-4. 创建 CNI ConfigMap:
+5. 创建 CNI ConfigMap:
 
 ```bash
 kubectl apply -f cni-configuration.yaml
 ```
 
-5. 使用 helm 安装 cilium：
+6. 使用 helm 安装 cilium：
 
 ```bash
 helm install cilium cilium/cilium --version 1.18.2 \
@@ -148,6 +150,7 @@ helm show values cilium/cilium --version 1.18.2
 使用 helm 安装 cilium 时，helm 会从 cilium 的 helm repo 获取 chart 相关信息并下载，如果连不上则会报错。
 
 解决办法是在可以连上的环境下载 chart 压缩包：
+
 ```bash
 $ helm pull cilium/cilium --version 1.18.2
 $ ls cilium-*.tgz
