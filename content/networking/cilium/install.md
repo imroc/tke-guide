@@ -15,7 +15,6 @@ kubectl -n kube-system patch deployment tke-eni-ipamd --type='json' -p='[
     "op": "add",
     "path": "/spec/template/spec/tolerations/-",
     "value": {
-      "effect": "NoExecute",
       "key": "node.cilium.io/agent-not-ready",
       "operator": "Exists"
     }
@@ -37,7 +36,6 @@ kubectl -n tcr-assistant-system patch deployment tcr-assistant-controller-manage
     "op": "add",
     "path": "/spec/template/spec/tolerations",
     "value": [{
-      "effect": "NoExecute",
       "key": "node.cilium.io/agent-not-ready",
       "operator": "Exists"
     }]
