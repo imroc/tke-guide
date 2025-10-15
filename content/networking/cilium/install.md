@@ -51,8 +51,7 @@ helm install cilium cilium/cilium --version 1.18.2 \
 
 下面介绍安装步骤：
 
-
-2. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
+1. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
 
 ```yaml title="cni-configuration.yaml"
 apiVersion: v1
@@ -84,13 +83,13 @@ data:
     }
 ```
 
-3. 创建 CNI ConfigMap:
+2. 创建 CNI ConfigMap:
 
 ```bash
 kubectl apply -f cni-configuration.yaml
 ```
 
-4. 使用 helm 安装 cilium：
+3. 使用 helm 安装 cilium：
 
 ```bash
 helm install cilium cilium/cilium --version 1.18.2 \
@@ -116,7 +115,7 @@ helm install cilium cilium/cilium --version 1.18.2 \
 
 :::
 
-5. 为 tke-cni-agent 增加 preStop，用于清理存量节点的 CNI 配置:
+4. 为 tke-cni-agent 增加 preStop，用于清理存量节点的 CNI 配置:
 
 ```bash
 kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
@@ -135,7 +134,7 @@ kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
 kubectl -n kube-system rollout status daemonset/tke-cni-agent --watch # 等待存量节点的 tke-cni-agent pod 更新完成，确保 preStop 全部成功加上
 ```
 
-6. 卸载 tke-cni-agent 和 kube-proxy：
+5. 卸载 tke-cni-agent 和 kube-proxy：
 
 ```bash
 kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
