@@ -193,7 +193,7 @@ cilium 与 kube-proxy ipvs 模式不兼容，详见[这个issue](https://github.
 
 具体底层细节正在研究中。
 
-### 如何修改 cilium 安装配置或升级？
+### 如何更好的维护配置和升级 cilium 版本？
 
 安装时，建议将所有安装配置写到 `values.yaml` 中，如：
 
@@ -226,7 +226,6 @@ helm upgrade --install  --namespace kube-system  --version 1.18.2 -f values.yaml
 2. 如果是升级版本，替换 `--version` 的值即可。
 
 :::
-
 
 ### Global Router 网络模式的集群能否安装？
 
