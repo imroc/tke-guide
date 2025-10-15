@@ -24,7 +24,7 @@
 ## 监控指定节点的 cilium 网络
 
 <Tabs>
-  <TabItem value="1" label="bash">
+  <TabItem value="bash" label="bash">
 
   ```bash
   NODE=172.22.48.23
@@ -34,7 +34,7 @@
 
   </TabItem>
 
-  <TabItem value="2" label="fish">
+  <TabItem value="fish" label="fish">
 
   ```fish
   set NODE 172.22.48.23
