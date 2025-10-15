@@ -13,8 +13,8 @@ helm repo add cilium https://helm.cilium.io/
 
 使用下面命令可快捷安装 cilium，与 kube-proxy 共存（非满血版 cilium）：
 
-```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.18.2 \
+```bash
+helm --install cilium cilium/cilium --version 1.18.2 \
   --namespace kube-system \
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
@@ -27,7 +27,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.2 \
 
 ## 高级安装
 
-如果想要使用满血版 cilium，可让 cilium 完全替代 kube-proxy，减少整体的资源开销并获得更好的 Service 转发性能，并具有更高的灵活性，可实现与 istio 等其它工具集成。
+如果想要使用满血版 cilium，可让 cilium 完全替代 kube-proxy，减少整体的资源开销并获得更好的 Service 转发性能，并具有更高的灵活性，还可实现与 istio 等其它工具集成。
 
 下面介绍安装步骤：
 
@@ -45,7 +45,29 @@ kubectl -n kube-system patch ds tke-cni-agent -p '{"spec":{"template":{"spec":{"
 
 :::
 
-2. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
+2. 为 tke-eni-ipamd 增加 cilium 污点的容忍：
+
+```bash
+kubectl patch deployment tke-eni-ipamd -n kube-system --type='json' -p='[
+  {
+    "op": "add",
+    "path": "/spec/template/spec/tolerations/-",
+    "value": {
+      "effect": "NoExecute",
+      "key": "node.cilium.io/agent-not-ready",
+      "operator": "Exists"
+    }
+  }
+]'
+```
+
+:::tip[说明]
+
+tke-eni-ipamd 是 TKE VPC-CNI 网络中的关键组件，负责 Pod IP 的分配，使用 HostNetwork，不依赖 cilium-agent 的启动，所以可以加 cilium 污点的容忍。
+
+:::
+
+3. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
 
 ```yaml title="cni-configuration.yaml"
 apiVersion: v1
@@ -77,59 +99,141 @@ data:
     }
 ```
 
-3. 创建 CNI ConfigMap:
+4. 创建 CNI ConfigMap:
 
 ```bash
 kubectl apply -f cni-configuration.yaml
 ```
 
-4. 准备 cilium 安装配置 `values.yaml`：
+5. 使用 helm 安装 cilium：
 
-```yaml title=”values.yaml“
+```bash
+helm install cilium cilium/cilium --version 1.18.2 \
+  --namespace kube-system \
+  --set routingMode=native \
+  --set endpointRoutes.enabled=true \
+  --set enableIPv4Masquerade=false \
+  --set ipam.mode=delegated-plugin \
+  --set cni.chainingMode=generic-veth \
+  --set cni.chainingTarget=multus-cni \
+  --set cni.exclusive=false \
+  --set cni.customConf=true \
+  --set cni.configMap=cni-configuration \
+  --set kubeProxyReplacement=true \
+  --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
+  --set k8sServicePort=60002 \
+  --set extraConfig.local-router-ipv4=169.254.32.16
+```
+
+:::tip[说明]
+
+`k8sServiceHost` 是 apiserver 地址，通过命令动态获取。
+
+:::
+
+## 常见问题
+
+### 如何查看 Cilium 全部的默认安装配置？
+
+Cilium 的 helm 安装包提供了大量的自定义配置项，上面安装步骤只给出了在 TKE 环境中安装 Cilium 的必要配置，实际可根据自身需求调整更多配置。
+
+执行下面的命令可查看所有的安装配置项：
+
+```bash
+helm show values cilium/cilium --version 1.18.2
+```
+
+### 连不上 cilium 的 helm repo 怎么办？
+
+使用 helm 安装 cilium 时，helm 会从 cilium 的 helm repo 获取 chart 相关信息并下载，如果连不上则会报错。
+
+解决办法是在可以连上的环境下载 chart 压缩包：
+```bash
+$ helm pull cilium/cilium --version 1.18.2
+$ ls cilium-*.tgz
+cilium-1.18.2.tgz
+```
+
+然后将 chart 压缩包复制到执行 helm 安装的机器上，安装时指定下 chart 压缩包的路径：
+```bash
+helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 cilium ./cilium-1.18.2.tgz
+```
+
+### 大规模场景如何优化？
+
+如果集群规模较大，建议开启 [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) 特性，该特性于  1.11 开始引入，当前（1.18.2）仍在 Beta 阶段（详见 [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)），在大规模场景下，该特性可以显著提升 cilium 性能并降低 apiserver 的压力。
+
+默认没有启用，启用方法是在使用 helm 安装 cilium 时，通过加 `--set ciliumEndpointSlice.enabled=true` 参数来开启。
+
+### 为什么不能与 kube-proxy ipvs 共存？
+
+cilium 与 kube-proxy ipvs 模式不兼容，详见[这个issue](https://github.com/cilium/cilium/issues/18610)。
+
+在 TKE 环境的具体表现是访问 service 不通。
+
+具体底层细节正在研究中。
+
+### 如何修改 cilium 安装配置或升级？
+
+安装时，建议将所有安装配置写到 `values.yaml` 中，如：
+
+```yaml showLineNumbers title="values.yaml"
 routingMode: "native"
 endpointRoutes:
   enabled: true
-ipam:
-  mode: "delegated-plugin"
 enableIPv4Masquerade: false
 cni:
   chainingMode: generic-veth
-  exclusive: false
-  customConf: true
-  configMap: cni-configuration
-kubeProxyReplacement: "true"
-k8sServiceHost: ${APISERVER_HOST} # kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
+  chainingTarget: multus-cni
+ipam:
+  mode: delegated-plugin
+kubeProxyReplacement: true
+k8sServiceHost: 169.254.128.27 # 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
 k8sServicePort: 60002
 extraConfig:
   local-router-ipv4: 169.254.32.16
 ```
 
-:::info[注意]
+安装和更新配置，都通过执行下面的命令来完成：
 
-`k8sServiceHost` 需通过以下命令获取：
-
-```bash
-kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
-````
-
-:::
-
-5. 使用 helm 安装 cilium：
-
-```bash
+```bash showLineNumbers
 helm upgrade --install \
   --namespace kube-system \
-  --version 1.18.2 \
   -f values.yaml \
+  --version 1.18.2 \
   cilium cilium/cilium
 ```
 
-:::tip[说明]
+> 修改配置通过修改 `values.yaml` 文件来完成，完整配置项通过 `helm show values cilium/cilium --version 1.18.2` 查看。
 
-- 如果要更新配置，可直接修改 `values.yaml` 文件，然后重新执行上述命令进行更新。
-- 如果要升级版本，也可复用上述命令，仅修改 `--version` 参数即可。
+如果是升级版本，替换 `--version` 的值即可：
 
-:::
+```bash showLineNumbers
+helm upgrade --install \
+  --namespace kube-system \
+  -f values.yaml \
+  # highlight-next-line
+  --version 1.18.3 \
+  cilium cilium/cilium
+```
+
+### Global Router 网络模式的集群能否安装？
+
+测试结论是：不能。
+
+应该是 cilium 不支持 bridge CNI 插件（Global Router 网络插件基于 bridge CNI 插件），相关 issue:
+- [CFP: eBPF with bridge mode](https://github.com/cilium/cilium/issues/35011)
+- [CFP: cilium CNI chaining can support cni-bridge](https://github.com/cilium/cilium/issues/20336)
+
+### 能否勾选 DataPlaneV2？
+
+结论是：不能。
+
+选择 VPC-CNI 网络插件时，有个 DataPlaneV2 选项：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F26%2F20250926092351.png)
+
+勾选后，会部署 cilium 组件到集群中（替代 kube-proxy 组件），如果再自己安装 cilium 会造成冲突，而且 DataPlaneV2 所使用的 OS 与 cilium 最新版也不兼容，所以不能勾选此选项。
 
 
 ## 参考资料
