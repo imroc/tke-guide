@@ -9,7 +9,6 @@
 - 网络模式：VPC-CNI 共享网卡多 IP。
 - 节点类型：普通节点或原生节点。
 - 操作系统：TencentOS>=4 或 Ubuntu>=22.04。
-- kube-proxy: 使用 iptables 转发模式或者卸载 kube-proxy 并使用 cilium 替代。
 
 ## 创建 TKE 集群
 
@@ -17,7 +16,6 @@
 - Kubernetes 版本: 不低于 1.30.0，建议选择最新版。
 - 操作系统：**TencentOS 4.0** 及以上或者 **Ubuntu 22.04** 及以上。
 - 容器网络插件：VPC-CNI 共享网卡多 IP。
-- Kube-proxy 转发模式：iptables。
 
 ## 新建节点池
 

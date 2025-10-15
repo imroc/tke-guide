@@ -189,14 +189,6 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 c
 
 默认没有启用，启用方法是在使用 helm 安装 cilium 时，通过加 `--set ciliumEndpointSlice.enabled=true` 参数来开启。
 
-### 为什么不能与 kube-proxy ipvs 共存？
-
-cilium 与 kube-proxy ipvs 模式不兼容，详见[这个issue](https://github.com/cilium/cilium/issues/18610)。
-
-在 TKE 环境的具体表现是访问 service 不通。
-
-具体底层细节正在研究中。
-
 ### 如何更好的维护配置和升级 cilium 版本？
 
 安装时，建议将所有安装配置写到 `values.yaml` 中，如：
