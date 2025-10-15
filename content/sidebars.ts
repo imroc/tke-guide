@@ -34,6 +34,9 @@ const sidebars: SidebarsConfig = {
               },
               items: [
                 {
+                  'networking/cilium/appendix/debug',
+                },
+                {
                   type: 'category',
                   label: 'e2e 测试',
                   collapsed: true,
