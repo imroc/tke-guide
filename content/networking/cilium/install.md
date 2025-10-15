@@ -14,7 +14,7 @@ helm repo add cilium https://helm.cilium.io/
 使用下面命令可快捷安装 cilium，与 kube-proxy 共存（非满血版 cilium）：
 
 ```bash
-helm --install cilium cilium/cilium --version 1.18.2 \
+helm install cilium cilium/cilium --version 1.18.2 \
   --namespace kube-system \
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
