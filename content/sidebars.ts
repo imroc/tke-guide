@@ -24,7 +24,6 @@ const sidebars: SidebarsConfig = {
             'networking/cilium/overview',
             'networking/cilium/prepare',
             'networking/cilium/install',
-            'networking/cilium/faq',
             {
               type: 'category',
               label: '附录',
