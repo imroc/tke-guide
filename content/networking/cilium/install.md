@@ -197,25 +197,16 @@ extraConfig:
 安装和更新配置，都通过执行下面的命令来完成：
 
 ```bash showLineNumbers
-helm upgrade --install \
-  --namespace kube-system \
-  -f values.yaml \
-  --version 1.18.2 \
-  cilium cilium/cilium
+helm upgrade --install  --namespace kube-system  --version 1.18.2 -f values.yaml cilium cilium/cilium
 ```
 
-> 修改配置通过修改 `values.yaml` 文件来完成，完整配置项通过 `helm show values cilium/cilium --version 1.18.2` 查看。
+:::tip[说明]
 
-如果是升级版本，替换 `--version` 的值即可：
+1. 修改配置通过修改 `values.yaml` 文件并再次执行上述命令来完成，完整配置项通过 `helm show values cilium/cilium --version 1.18.2` 查看。
+2. 如果是升级版本，替换 `--version` 的值即可。
 
-```bash showLineNumbers
-helm upgrade --install \
-  --namespace kube-system \
-  -f values.yaml \
-  # highlight-next-line
-  --version 1.18.3 \
-  cilium cilium/cilium
-```
+:::
+
 
 ### Global Router 网络模式的集群能否安装？
 
