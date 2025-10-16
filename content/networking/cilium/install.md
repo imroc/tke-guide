@@ -227,21 +227,31 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 c
 安装时，建议将所有安装配置写到 `values.yaml` 中，如：
 
 ```yaml showLineNumbers title="values.yaml"
-routingMode: "native"
+# 使用 native routing，Pod 直接使用 VPC IP 路由，无需 overlay，参考 native routing: https://docs.cilium.io/en/stable/network/concepts/routing/#native-routing
+routingMode: "native" 
 endpointRoutes:
   enabled: true
 ipam:
+  # TKE Pod IP 分配由 tke-eni-ipamd 组件负责，cilium 无需负责 Pod IP 分配
   mode: "delegated-plugin"
+# 使用 VPC-CNI 无需 IP 伪装
 enableIPv4Masquerade: false
 cni:
+  # 使用 generic-veth 与 VPC-CNI 做 CNI Chaining，参考：https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/
   chainingMode: generic-veth
+  # 不让 cilium 管理整个 CNI 配置目录，避免干扰其它 CNI 配置，有更高的灵活性，比如与 istio 集成：https://docs.cilium.io/en/latest/network/servicemesh/istio/
   exclusive: false
+  # CNI 配置完全自定义
   customConf: true
+  # 存放 CNI 配置的 ConfigMap 名称
   configMap: cni-configuration
+# 替代 kube-proxy，包括 ClusterIP 转发、NodePort 转发，另外还附带了 HostPort 转发的能力
 kubeProxyReplacement: "true"
-k8sServiceHost: 169.254.128.112 # 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
+# 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
+k8sServiceHost: 169.254.128.112 
 k8sServicePort: 60002
 extraConfig:
+  # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
   local-router-ipv4: 169.254.32.16
 ```
 
