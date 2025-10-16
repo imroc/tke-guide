@@ -117,7 +117,6 @@ helm install cilium cilium/cilium --version 1.18.2 \
   --set enableIPv4Masquerade=false \
   --set ipam.mode=delegated-plugin \
   --set cni.chainingMode=generic-veth \
-  --set cni.chainingTarget=multus-cni \
   --set cni.exclusive=false \
   --set cni.customConf=true \
   --set cni.configMap=cni-configuration \
