@@ -120,6 +120,7 @@ helm install cilium cilium/cilium --version 1.18.2 \
   --set cni.exclusive=false \
   --set cni.customConf=true \
   --set cni.configMap=cni-configuration \
+  --set extraArgs="{--devices=eth+}" \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002 \
@@ -252,6 +253,8 @@ k8sServicePort: 60002
 extraConfig:
   # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
   local-router-ipv4: 169.254.32.16
+extraArgs:
+- --devices=eth+ # TKE 节点中 eth 开头的网卡都可能出入流量，需标识为外部网卡，否则可能导致部分场景下网络不通（如跨节点访问 HostPort）
 ```
 
 安装和更新配置，都通过执行下面的命令来完成：
