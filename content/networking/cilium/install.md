@@ -105,7 +105,7 @@ data:
 kubectl apply -f cni-configuration.yaml
 ```
 
-### 安装 cilium
+### 安装 Cilium
 
 使用 helm 执行安装：
 
