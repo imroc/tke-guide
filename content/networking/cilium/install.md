@@ -63,9 +63,11 @@ helm install cilium cilium/cilium --version 1.18.2 \
 
 如果想要使用满血版 cilium，可让 cilium 完全替代 kube-proxy，减少整体的资源开销并获得更好的 Service 转发性能，并具有更高的灵活性，还可实现与 istio 等其它工具集成。
 
-下面介绍安装步骤：
+下面介绍安装步骤。
 
-1. 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
+### 配置 CNI
+
+为 cilium 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
 
 ```yaml title="cni-configuration.yaml"
 apiVersion: v1
@@ -97,13 +99,15 @@ data:
     }
 ```
 
-2. 创建 CNI ConfigMap:
+创建 CNI ConfigMap:
 
 ```bash
 kubectl apply -f cni-configuration.yaml
 ```
 
-3. 使用 helm 安装 cilium：
+### 安装 cilium
+
+使用 helm 执行安装：
 
 ```bash
 helm install cilium cilium/cilium --version 1.18.2 \
@@ -129,7 +133,7 @@ helm install cilium cilium/cilium --version 1.18.2 \
 
 :::
 
-4. 确保 cilium 相关 pod 正常运行：
+确保 cilium 相关 pod 正常运行：
 
 ```bash
 $ kubectl --namespace=kube-system get pod -l app.kubernetes.io/part-of=cilium
@@ -144,7 +148,9 @@ cilium-operator-896cdbf88-nj6jc   1/1     Running   0          1m
 cilium-zrxwn                      1/1     Running   0          1m
 ```
 
-5. 为 tke-cni-agent 增加 preStop，用于清理存量节点的 CNI 配置:
+### 卸载 TKE 组件
+
+为 tke-cni-agent 增加 preStop，用于清理存量节点的 CNI 配置:
 
 ```bash
 kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
@@ -163,7 +169,7 @@ kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
 kubectl -n kube-system rollout status daemonset/tke-cni-agent --watch # 等待存量节点的 tke-cni-agent pod 更新完成，确保 preStop 全部成功加上
 ```
 
-6. 卸载 tke-cni-agent 和 kube-proxy：
+通过 kubectl patch 来清理 tke-cni-agent 和 kube-proxy 所有 pod：
 
 ```bash
 kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
