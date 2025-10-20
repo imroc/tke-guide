@@ -22,7 +22,6 @@ const sidebars: SidebarsConfig = {
           },
           items: [
             'networking/cilium/overview',
-            'networking/cilium/prepare',
             'networking/cilium/install',
             {
               type: 'category',
