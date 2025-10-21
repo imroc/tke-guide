@@ -140,7 +140,6 @@ helm upgrade --install cilium cilium/cilium --version 1.18.2 \
 
 :::tip[说明]
 
-
 以下是是包含各参数解释的 `values.yaml`:
 
 ```yaml showLineNumbers title="values.yaml"
