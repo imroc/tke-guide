@@ -491,6 +491,16 @@ helm upgrade cilium cilium/cilium --version 1.18.2 \
   # highlight-add-end
 ```
 
+:::info[注意]
+
+如果是调整已安装的 cilium 配置，存量节点需重启 cilium daemonset 才能生效：
+
+```bash
+kubectl -n kube-system rollout restart daemonset cilium
+```
+
+:::
+
 :::tip[参数说明]
 
 ```yaml title="values.yaml"
