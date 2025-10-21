@@ -528,6 +528,12 @@ bpf:
 
 :::
 
+### 为什么要自动给新扩的节点加污点？
+
+不管使用哪种节点池扩容节点，都需要配置自动加 `node.cilium.io/agent-not-ready=true:NoExecute` 这个污点，因为 cilium 是核心的网络组件，涉及集群的 CNI 配置和管理，其它 Pod 创建时会通过 CNI 配置容器网络，如果新扩的节点上的 cilium 还未启动就绪，Pod 调度上来可能因为容器网络配置失败而无法成功启动。
+
+但 cilium 启动就绪后会自动移除节点上的这个污点，该污点只是个临时污点，用于确保在节点上的 cilium 组件启动成功后再允许 Pod 调度过来。
+
 ## 参考资料
 
 - [Installation using Helm](https://docs.cilium.io/en/stable/installation/k8s-install-helm/)
