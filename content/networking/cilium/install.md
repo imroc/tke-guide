@@ -308,7 +308,7 @@ spec:
         kind: TKEMachineNodeClass
         name: default # 引用 TKEMachineNodeClass
   limits:
-    cpu: 10
+    cpu: 100 # 限制节点池的最大 CPU 核数
 
 ---
 apiVersion: karpenter.k8s.tke/v1beta1
