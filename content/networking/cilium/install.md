@@ -13,7 +13,7 @@
 - 容器网络插件：VPC-CNI 共享网卡多 IP。
 - 节点：建议不添加任何节点，避免清理存量节点相关配置。
 - 基础组件：取消勾选 ip-masq-agent，避免冲突。
-- 增强组件：如果希望在安装 cilium 后还能让节点按需自动扩缩容，要用 karpenter 节点池来管理节点，需勾选安装 karpenter 组件，否则无需勾选。
+- 增强组件：如果希望在安装 cilium 后还能让节点按需自动扩缩容，要用 Karpenter 节点池来管理节点，需勾选安装 Karpenter 组件，否则无需勾选。
 
 集群创建成功后，需开启集群访问来暴露集群的 apiserver 提供后续使用 helm 安装 cilium 时，helm 命令能正常操作 TKE 集群，参考 [开启集群访问的方法](https://cloud.tencent.com/document/product/457/32191#.E6.93.8D.E4.BD.9C.E6.AD.A5.E9.AA.A4)。
 
@@ -247,14 +247,14 @@ kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"s
 以下三种节点池类型能够适配 cilium:
 - 普通节点池：基于 CVM 和 cluster-autoscaler (CA)，优点是 OS 镜像比较灵活，缺点是安装 cilium 后无法自动扩容节点。
 - 原生节点池：基于原生节点和 cluster-autoscaler (CA)，优点是功能丰富，也是 TKE 推荐的节点类型（参考 [原生节点 VS 普通节点](https://cloud.tencent.com/document/product/457/78197#.E5.8E.9F.E7.94.9F.E8.8A.82.E7.82.B9-vs-.E6.99.AE.E9.80.9A.E8.8A.82.E7.82.B9)），缺点是 OS 只支持 TencentOS，且安装 cilium 后无法自动扩容节点。
-- karpenter 节点池：基于原生节点和 karpenter，优点是安装 cilium 后可以支持自动扩容节点（基于 [Startup Taint](https://karpenter.sh/docs/concepts/nodepools/#cilium-startup-taint)，缺点是 OS 只支持 TencentOS。
+- Karpenter 节点池：基于原生节点和 Karpenter，优点是安装 Cilium 后可以支持自动扩容节点（基于 [Startup Taint](https://karpenter.sh/docs/concepts/nodepools/#cilium-startup-taint)，缺点是 OS 只支持 TencentOS。
 
 
 | 节点池类型       | 节点类型        | 可用 OS 镜像                | 自动扩容                          |
 | ---------------- | --------------- | --------------------------- | --------------------------------- |
 | 普通节点池       | 普通节点（CVM） | Ubuntu/TencentOS/自定义镜像 | ❌ (CA 不支持 Startup Taint)      |
 | 原生节点池       | 原生节点        | TencentOS                   | ❌ (CA 不支持 Startup Taint)      |
-| Karpenter 节点池 | 原生节点        | TencentOS                   | ✅ (karpenter 支持 Startup Taint) |
+| Karpenter 节点池 | 原生节点        | TencentOS                   | ✅ (Karpenter 支持 Startup Taint) |
 
 
 可根据自身情况评估选择合适的节点池类型，以下是选型建议：
@@ -264,11 +264,11 @@ kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"s
 
 以下创建各种节点池的步骤。
 
-### 新建 karpenter 节点池
+### 新建 Karpenter 节点池
 
-在新建 karpenter 节点池之前，确保 karpenter 组件已启用，参考 [tke-karpenter 说明](https://cloud.tencent.com/document/product/457/111805)。
+在新建 Karpenter 节点池之前，确保 Karpenter 组件已启用，参考 [tke-karpenter 说明](https://cloud.tencent.com/document/product/457/111805)。
 
-准备用于配置 karpenter 节点池的 `node-pool.yaml`，以下是示例:
+准备用于配置 Karpenter 节点池的 `node-pool.yaml`，以下是示例:
 
 ```yaml title="node-pool.yaml"
 apiVersion: karpenter.sh/v1
@@ -335,7 +335,7 @@ spec:
   - id: skey-3t01mlvf
 ```
 
-创建 karpenter 节点池：
+创建 Karpenter 节点池：
 
 ```bash
 kubectl apply -f node-pool.yaml
