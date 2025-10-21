@@ -244,21 +244,19 @@ kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"s
 ### 节点池选型
 
 以下三种节点池类型能够适配 cilium:
-- 普通节点池：基于 cvm 和 cluster-autoscaler，优点是 OS 镜像支持多种，缺点是安装 cilium 后无法自动扩容节点。
+- 普通节点池：基于 CVM 和 cluster-autoscaler (CA)，优点是 OS 镜像比较灵活，缺点是安装 cilium 后无法自动扩容节点。
 - 原生节点池：基于原生节点和 cluster-autoscaler，优点是功能丰富，也是 TKE 推荐的节点类型（参考 [原生节点 VS 普通节点](https://cloud.tencent.com/document/product/457/78197#.E5.8E.9F.E7.94.9F.E8.8A.82.E7.82.B9-vs-.E6.99.AE.E9.80.9A.E8.8A.82.E7.82.B9)），缺点是 OS 只支持 TencentOS，且安装 cilium 后无法自动扩容节点。
 - karpenter 节点池：基于原生节点和 karpenter，优点是安装 cilium 后可以支持自动扩容节点，缺点是 OS 只支持 TencentOS。
 
-根据自身情况评估选择合适的节点池类型：
+
+| 节点池类型       | 节点类型        | 可用 OS 镜像                | 自动扩容                             |
+| ---------------- | --------------- | --------------------------- | ------------------------------------ |
+| 普通节点池       | 普通节点（CVM） | Ubuntu/TencentOS/自定义镜像 | ❌ (不支持，CA 不支持 startup taint) |
+| 原生节点池       | 原生节点        | TencentOS                   | ❌ (不支持，CA 不支持 startup taint) |
+| karpenter 节点池 | 原生节点        | TencentOS                   | ✅ 支持 (karpenter startup taint)    |
 
 
-| 节点池类型       | 节点类型        | 可用 OS 镜像                | 自动扩容                                              |
-| ---------------- | --------------- | --------------------------- | ----------------------------------------------------- |
-| 普通节点池       | 普通节点（cvm） | Ubuntu/TencentOS/自定义镜像 | ❌ (不支持，cluster-autoscaler 不支持 startup taint) |
-| 原生节点池       | 原生节点        | TencentOS                   | ❌ (不支持，cluster-autoscaler 不支持 startup taint)  |
-| karpenter 节点池 | 原生节点        | TencentOS                   | ✅ 支持 (karpenter startup taint)                     |
-
-
-选型建议：
+可根据自身情况评估选择合适的节点池类型，以下是选型建议：
 1. 如果需要节点自动扩容，只能使用 karpenter 节点池。
 2. 如果希望使用 TencentOS 之外的操作系统，使用普通节点池。
 3. 其余情况，优先使用原生节点池。
@@ -285,7 +283,8 @@ spec:
   template:
     metadata:
       annotations:
-        beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public # 原生节点默认安装 TencentOS 3，与最新 cilium 版本不兼容，指定该注解安装 TencentOS 4
+        # 原生节点默认安装 TencentOS 3，与最新 cilium 版本不兼容，指定该注解安装 TencentOS 4（未来原生节点会默认安装 TencentOS 4，但当前还不是，需要用这个注解指定下）
+        beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public 
     spec:
       requirements:
       - key: kubernetes.io/arch
@@ -318,9 +317,6 @@ metadata:
   annotations:
     kubernetes.io/description: "General purpose TKEMachineNodeClass"
 spec:
-  internetAccessible: # 节点如需公网，可配置公网计费方式
-    chargeType: TrafficPostpaidByHour
-    maxBandwidthOut: 100
   subnetSelectorTerms: # 节点所属 VPC 子网
   - id: subnet-12sxk3z4
   - id: subnet-b8qyi2dk
