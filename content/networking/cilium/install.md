@@ -295,7 +295,7 @@ spec:
         values: ["linux"]
       - key: karpenter.k8s.tke/instance-family
         operator: In
-        values: ["S5", "SA2"] # 指定期望的机型
+        values: ["S5", "SA2"] # 指定期望使用的机型列表，可在控制台先确认下集群所在地域和相关可用区实际售卖的机型有哪些，完整列表参考: https://cloud.tencent.com/document/product/213/11518#INSTANCETYPE
       - key: karpenter.sh/capacity-type
         operator: In
         values: ["on-demand"]
