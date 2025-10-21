@@ -316,6 +316,13 @@ kind: TKEMachineNodeClass
 metadata:
   name: default
 spec:
+  lifecycleScript:
+    # （可选）配置节点初始化时的自定义脚本：修改 containerd 配置，添加 quay.io 的镜像加速
+    # cilium 依赖镜像在 quay.io，如果希望直接用官方默认镜像，且集群节点没有公网或者在中国大陆，
+    # 可以使用该自定义脚本配置将 quay.io 的 mirror 加到 containerd 配置中，这样就可以拉取到 quay.io 的镜像了
+    postInitScript: |-
+      sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
+      systemctl restart containerd
   subnetSelectorTerms: # 节点所属 VPC 子网
   - id: subnet-12sxk3z4
   - id: subnet-b8qyi2dk
@@ -341,7 +348,7 @@ kubectl apply -f node-pool.yaml
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F25%2F20250925162022.png)
 6. 在 **高级设置** 的 **Taints** 点击 **新建Taint**: `node.cilium.io/agent-not-ready=true:NoExecute`（让节点上的 cilium 组件 ready 后再调度 pod 上来）。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F25%2F20250925155023.png)
-7. 在 **高级设置** 的 **自定义脚本** 中，配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速（cilium 的官方容器镜像主要在 `quay.io`，如果你的集群在中国大陆或者节点没有公网，可以配置这个自定义脚本）:
+7. （可选）在 **高级设置** 的 **自定义脚本** 中，配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速（cilium 依赖镜像在 quay.io，如果希望直接用官方默认镜像，且集群节点没有公网或者在中国大陆，可以使用该自定义脚本配置将 `quay.io` 的 mirror 加到 containerd 配置中，这样就可以拉取到 `quay.io` 的镜像了）:
     ```bash
     sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
     systemctl restart containerd
@@ -389,7 +396,7 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
 5. **操作系统** 选择 **TencentOS 4**、**Ubuntu 22.04** 或 **Ubuntu 24.04**。
 6. 在 **高级设置** 中 **Taints** 点击 **新建Taint**: `node.cilium.io/agent-not-ready=true:NoExecute`（让节点上的 cilium 组件 ready 后再调度 pod 上来）。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F25%2F20250925155023.png)
-7. 在 **高级设置** 的 **自定义脚本** 中，配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速（cilium 的官方容器镜像主要在 `quay.io`，如果你的集群在中国大陆或者节点没有公网，建议配置这个自定义脚本）:
+7. 在 **高级设置** 的 **自定义脚本** 中，配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速（cilium 依赖镜像在 quay.io，如果希望直接用官方默认镜像，且集群节点没有公网或者在中国大陆，可以使用该自定义脚本配置将 `quay.io` 的 mirror 加到 containerd 配置中，这样就可以拉取到 `quay.io` 的镜像了）:
     ```bash
     sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
     systemctl restart containerd
