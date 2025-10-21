@@ -482,7 +482,7 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 c
 如果是节点本身有公网带宽，希望 Pod 能直接利用节点的公网能力出公网，需要在部署 cilium 时做一些配置调整：
 
 ```bash showLineNumbers
-helm upgrade --version 1.18.2 cilium cilium/cilium \
+helm upgrade cilium cilium/cilium --version 1.18.2 \
   --namespace kube-system \
   --reuse-values \
   # highlight-add-start
