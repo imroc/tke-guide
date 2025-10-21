@@ -12,7 +12,8 @@
 - 操作系统：**TencentOS 4.0** 及以上或者 **Ubuntu 22.04** 及以上。
 - 容器网络插件：VPC-CNI 共享网卡多 IP。
 - 节点：建议不添加任何节点，避免清理存量节点相关配置。
-- 组件：使用 karpenter 节点池需勾选安装 karpenter 组件（如果希望在安装 cilium 后还能让节点按需自动扩缩容，需要使用 karpenter 节点池来管理节点）。
+- 基础组件：取消勾选 ip-masq-agent，避免冲突。
+- 增强组件：如果希望在安装 cilium 后还能让节点按需自动扩缩容，要用 karpenter 节点池来管理节点，需勾选安装 karpenter 组件，否则无需勾选。
 
 集群创建成功后，需开启集群访问来暴露集群的 apiserver 提供后续使用 helm 安装 cilium 时，helm 命令能正常操作 TKE 集群，参考 [开启集群访问的方法](https://cloud.tencent.com/document/product/457/32191#.E6.93.8D.E4.BD.9C.E6.AD.A5.E9.AA.A4)。
 
@@ -30,7 +31,7 @@ helm repo add cilium https://helm.cilium.io/
 
 ## 安装 cilium
 
-### 添加 tolerations
+### 添加容忍
 
 1. 为 tke-eni-ipamd 增加 cilium 污点的容忍：
 ```bash
