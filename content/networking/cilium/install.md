@@ -477,6 +477,34 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 c
 
 ### Pod 如何出公网？
 
+可以创建公网 NAT 网关，然后在集群所在 VPC 的路由表中新建路由规则，让访问外网的流量转发到公网 NAT 网关，并确保路由表关联到了集群使用的子网，参考 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)。
+
+如果是节点本身有公网带宽，希望 Pod 能直接利用节点的公网能力出公网，需要在部署 cilium 时做一些配置调整：
+
+```bash showLineNumbers
+helm upgrade --version 1.18.2 cilium cilium/cilium \
+  --namespace kube-system \
+  --reuse-values \
+  --set enableIPv4Masquerade=true \
+  --set ipv4NativeRoutingCIDR="VPC_CIDR" \
+  --set bpf.masquerade=true
+```
+
+:::tip[参数说明]
+
+```yaml title="values.yaml"
+# 启用 cilium 的 IP MASQUERADE 功能
+enableIPv4Masquerade: true
+# 指定集群所在 VPC 的 CIDR（注意替换为集群所在 VPC 的实际 CIDR），表示 VPC 内的流量不做 SNAT，其余的流量要做 SNAT。
+# 这样 Pod 访问公网时就会 SNAT 成节点 IP，就可以利用节点的公网能力访问公网。
+ipv4NativeRoutingCIDR: 172.22.0.0/16
+bpf:
+  # cilium 的 IP MASQUERADE 功能有 bpf 和 iptables 两个版本，在 TKE 环境需使用 bpf 版本。参考 https://docs.cilium.io/en/stable/network/concepts/masquerading/
+  masquerade: true
+```
+
+:::
+
 ## 参考资料
 
 - [Installation using Helm](https://docs.cilium.io/en/stable/installation/k8s-install-helm/)
