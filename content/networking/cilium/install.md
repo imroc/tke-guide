@@ -249,11 +249,11 @@ kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"s
 - karpenter 节点池：基于原生节点和 karpenter，优点是安装 cilium 后可以支持自动扩容节点，缺点是 OS 只支持 TencentOS。
 
 
-| 节点池类型       | 节点类型        | 可用 OS 镜像                | 自动扩容                             |
-| ---------------- | --------------- | --------------------------- | ------------------------------------ |
-| 普通节点池       | 普通节点（CVM） | Ubuntu/TencentOS/自定义镜像 | ❌ (不支持，CA 不支持 startup taint) |
-| 原生节点池       | 原生节点        | TencentOS                   | ❌ (不支持，CA 不支持 startup taint) |
-| karpenter 节点池 | 原生节点        | TencentOS                   | ✅ 支持 (karpenter startup taint)    |
+| 节点池类型       | 节点类型        | 可用 OS 镜像                | 自动扩容                          |
+| ---------------- | --------------- | --------------------------- | --------------------------------- |
+| 普通节点池       | 普通节点（CVM） | Ubuntu/TencentOS/自定义镜像 | ❌ (CA 不支持 startup taint)      |
+| 原生节点池       | 原生节点        | TencentOS                   | ❌ (CA 不支持 startup taint)      |
+| karpenter 节点池 | 原生节点        | TencentOS                   | ✅ (karpenter 支持 startup taint) |
 
 
 可根据自身情况评估选择合适的节点池类型，以下是选型建议：
