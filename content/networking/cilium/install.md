@@ -485,9 +485,11 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 c
 helm upgrade --version 1.18.2 cilium cilium/cilium \
   --namespace kube-system \
   --reuse-values \
+  # highlight-add-start
   --set enableIPv4Masquerade=true \
   --set ipv4NativeRoutingCIDR="VPC_CIDR" \
   --set bpf.masquerade=true
+  # highlight-add-end
 ```
 
 :::tip[参数说明]
