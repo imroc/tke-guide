@@ -247,7 +247,7 @@ kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"s
 以下三种节点池类型能够适配 cilium:
 - 普通节点池：基于 CVM 和 cluster-autoscaler (CA)，优点是 OS 镜像比较灵活，缺点是安装 cilium 后无法自动扩容节点。
 - 原生节点池：基于原生节点和 cluster-autoscaler (CA)，优点是功能丰富，也是 TKE 推荐的节点类型（参考 [原生节点 VS 普通节点](https://cloud.tencent.com/document/product/457/78197#.E5.8E.9F.E7.94.9F.E8.8A.82.E7.82.B9-vs-.E6.99.AE.E9.80.9A.E8.8A.82.E7.82.B9)），缺点是 OS 只支持 TencentOS，且安装 cilium 后无法自动扩容节点。
-- Karpenter 节点池：基于原生节点和 Karpenter，优点是安装 Cilium 后可以支持自动扩容节点（基于 [Startup Taint](https://karpenter.sh/docs/concepts/nodepools/#cilium-startup-taint)，缺点是 OS 只支持 TencentOS。
+- Karpenter 节点池：基于原生节点和 Karpenter，优点是安装 Cilium 后可以支持自动扩容节点（基于 [Startup Taint](https://karpenter.sh/docs/concepts/nodepools/#cilium-startup-taint)），缺点是 OS 只支持 TencentOS。
 
 
 | 节点池类型       | 节点类型        | 可用 OS 镜像                | 自动扩容                          |
