@@ -284,7 +284,8 @@ spec:
   template:
     metadata:
       annotations:
-        # 原生节点默认安装 TencentOS 3，与最新 cilium 版本不兼容，指定该注解安装 TencentOS 4（未来原生节点会默认安装 TencentOS 4，但当前还不是，需要用这个注解指定下）
+        # 原生节点默认安装 TencentOS 3，与最新 cilium 版本不兼容，指定该注解安装 TencentOS 4
+        #（未来原生节点会默认安装 TencentOS 4，但当前还不是，需要用这个注解指定下）
         beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public 
     spec:
       requirements:
@@ -296,7 +297,9 @@ spec:
         values: ["linux"]
       - key: karpenter.k8s.tke/instance-family
         operator: In
-        values: ["S5", "SA2"] # 指定期望使用的机型列表，可在控制台先确认下集群所在地域和相关可用区实际售卖的机型有哪些，完整列表参考: https://cloud.tencent.com/document/product/213/11518#INSTANCETYPE
+        # 指定期望使用的机型列表，可在控制台先确认下集群所在地域和相关可用区实际售卖的机型有哪些
+        # 完整列表参考: https://cloud.tencent.com/document/product/213/11518#INSTANCETYPE
+        values: ["S5", "SA2"]
       - key: karpenter.sh/capacity-type
         operator: In
         values: ["on-demand"]
