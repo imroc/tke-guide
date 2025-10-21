@@ -233,6 +233,12 @@ kubectl -n kube-system rollout status daemonset/tke-cni-agent --watch # 等待�
 
 :::
 
+如果创建集群时没有取消勾选 ip-masq-agent，可以卸载下：
+
+```bash
+kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+```
+
 ## 新建节点池
 
 ### 节点池选型
