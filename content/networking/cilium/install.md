@@ -503,6 +503,8 @@ kubectl -n kube-system rollout restart daemonset cilium
 
 :::tip[参数说明]
 
+以下是是包含相关参数解释的 `values.yaml`:
+
 ```yaml title="values.yaml"
 # 启用 cilium 的 IP MASQUERADE 功能
 enableIPv4Masquerade: true
