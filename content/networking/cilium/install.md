@@ -113,6 +113,12 @@ kubectl apply -f cni-configuration.yaml
 
 使用 helm 执行安装：
 
+:::info[注意]
+
+`k8sServiceHost` 是 apiserver 地址，通过命令动态获取。
+
+:::
+
 ```bash
 helm upgrade --install cilium cilium/cilium --version 1.18.2 \
   --namespace kube-system \
@@ -134,7 +140,6 @@ helm upgrade --install cilium cilium/cilium --version 1.18.2 \
 
 :::tip[说明]
 
-`k8sServiceHost` 是 apiserver 地址，通过命令动态获取。
 
 以下是是包含各参数解释的 `values.yaml`:
 
