@@ -114,7 +114,7 @@ kubectl apply -f cni-configuration.yaml
 使用 helm 执行安装：
 
 ```bash
-helm install cilium cilium/cilium --version 1.18.2 \
+helm upgrade --install cilium cilium/cilium --version 1.18.2 \
   --namespace kube-system \
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
@@ -124,16 +124,59 @@ helm install cilium cilium/cilium --version 1.18.2 \
   --set cni.exclusive=false \
   --set cni.customConf=true \
   --set cni.configMap=cni-configuration \
-  --set extraArgs="{--devices=eth+}" \
+  --set cni.externalRouting=true \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002 \
+  --set extraArgs="{--devices=eth+}" \
   --set extraConfig.local-router-ipv4=169.254.32.16
 ```
 
 :::tip[说明]
 
 `k8sServiceHost` 是 apiserver 地址，通过命令动态获取。
+
+以下是是包含各参数解释的 `values.yaml`:
+
+```yaml showLineNumbers title="values.yaml"
+# 使用 native routing，Pod 直接使用 VPC IP 路由，无需 overlay，参考 native routing: https://docs.cilium.io/en/stable/network/concepts/routing/#native-routing
+routingMode: "native" 
+endpointRoutes:
+  # 使用 native routing，此选项必须置为 true。表示转发 Pod 流量时，直接路由到 veth 设备而不需要经过 cilium_host 网卡
+  enabled: true 
+ipam:
+  # TKE Pod IP 分配由 tke-eni-ipamd 组件负责，cilium 无需负责 Pod IP 分配
+  mode: "delegated-plugin"
+# 使用 VPC-CNI 无需 IP 伪装
+enableIPv4Masquerade: false
+cni:
+  # 使用 generic-veth 与 VPC-CNI 做 CNI Chaining，参考：https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/
+  chainingMode: generic-veth
+  # 不让 cilium 管理整个 CNI 配置目录，避免干扰其它 CNI 配置，有更高的灵活性，比如与 istio 集成：https://docs.cilium.io/en/latest/network/servicemesh/istio/
+  exclusive: false
+  # CNI 配置完全自定义
+  customConf: true
+  # 存放 CNI 配置的 ConfigMap 名称
+  configMap: cni-configuration
+  # VPC-CNI 会自动配置 Pod 路由，cilium 不需要配置
+  externalRouting: true
+# 替代 kube-proxy，包括 ClusterIP 转发、NodePort 转发，另外还附带了 HostPort 转发的能力
+kubeProxyReplacement: "true"
+# 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
+k8sServiceHost: 169.254.128.112 
+k8sServicePort: 60002
+extraConfig:
+  # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
+  local-router-ipv4: 169.254.32.16
+extraArgs:
+- --devices=eth+ # TKE 节点中 eth 开头的网卡都可能出入流量，需标识为外部网卡，让 cilium ebpf 程序挂上去，否则可能导致部分场景下网络不通（如跨节点访问 HostPort）
+```
+
+生产环境部署建议将参数保存到 `values.yaml`，然后在安装或更新时，都可以执行下面的命令（如果要升级版本，替换 `--version` 即可）：
+
+```bash
+helm upgrade --install cilium cilium/cilium --version 1.18.2 --namespace=kube-system -f values.yaml
+```
 
 :::
 
@@ -402,54 +445,6 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 c
 
 默认没有启用，启用方法是在使用 helm 安装 cilium 时，通过加 `--set ciliumEndpointSlice.enabled=true` 参数来开启。
 
-### 如何更好的维护 cilium 的配置和版本？
-
-安装时，建议将所有安装配置写到 `values.yaml` 中，如：
-
-```yaml showLineNumbers title="values.yaml"
-# 使用 native routing，Pod 直接使用 VPC IP 路由，无需 overlay，参考 native routing: https://docs.cilium.io/en/stable/network/concepts/routing/#native-routing
-routingMode: "native" 
-endpointRoutes:
-  enabled: true
-ipam:
-  # TKE Pod IP 分配由 tke-eni-ipamd 组件负责，cilium 无需负责 Pod IP 分配
-  mode: "delegated-plugin"
-# 使用 VPC-CNI 无需 IP 伪装
-enableIPv4Masquerade: false
-cni:
-  # 使用 generic-veth 与 VPC-CNI 做 CNI Chaining，参考：https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/
-  chainingMode: generic-veth
-  # 不让 cilium 管理整个 CNI 配置目录，避免干扰其它 CNI 配置，有更高的灵活性，比如与 istio 集成：https://docs.cilium.io/en/latest/network/servicemesh/istio/
-  exclusive: false
-  # CNI 配置完全自定义
-  customConf: true
-  # 存放 CNI 配置的 ConfigMap 名称
-  configMap: cni-configuration
-# 替代 kube-proxy，包括 ClusterIP 转发、NodePort 转发，另外还附带了 HostPort 转发的能力
-kubeProxyReplacement: "true"
-# 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
-k8sServiceHost: 169.254.128.112 
-k8sServicePort: 60002
-extraConfig:
-  # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
-  local-router-ipv4: 169.254.32.16
-extraArgs:
-- --devices=eth+ # TKE 节点中 eth 开头的网卡都可能出入流量，需标识为外部网卡，否则可能导致部分场景下网络不通（如跨节点访问 HostPort）
-```
-
-安装和更新配置，都通过执行下面的命令来完成：
-
-```bash showLineNumbers
-helm upgrade --install  --namespace kube-system  --version 1.18.2 -f values.yaml cilium cilium/cilium
-```
-
-:::tip[说明]
-
-1. 修改配置通过修改 `values.yaml` 文件并再次执行上述命令来完成，完整配置项通过 `helm show values cilium/cilium --version 1.18.2` 查看。
-2. 如果是升级版本，替换 `--version` 的值即可。
-
-:::
-
 ### Global Router 网络模式的集群能否安装？
 
 测试结论是：不能。
@@ -468,6 +463,7 @@ helm upgrade --install  --namespace kube-system  --version 1.18.2 -f values.yaml
 
 勾选后，会部署 cilium 组件到集群中（替代 kube-proxy 组件），如果再自己安装 cilium 会造成冲突，而且 DataPlaneV2 所使用的 OS 与 cilium 最新版也不兼容，所以不能勾选此选项。
 
+### Pod 如何出公网？
 
 ## 参考资料
 
