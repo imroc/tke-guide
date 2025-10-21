@@ -314,8 +314,6 @@ apiVersion: karpenter.k8s.tke/v1beta1
 kind: TKEMachineNodeClass
 metadata:
   name: default
-  annotations:
-    kubernetes.io/description: "General purpose TKEMachineNodeClass"
 spec:
   subnetSelectorTerms: # 节点所属 VPC 子网
   - id: subnet-12sxk3z4
