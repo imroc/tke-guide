@@ -124,8 +124,9 @@ helm upgrade --install cilium cilium/cilium --version 1.18.2 \
   --namespace kube-system \
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
-  --set enableIPv4Masquerade=false \
   --set ipam.mode=delegated-plugin \
+  --set enableIPv4Masquerade=false \
+  --set devices=eth+ \
   --set cni.chainingMode=generic-veth \
   --set cni.exclusive=false \
   --set cni.customConf=true \
@@ -134,7 +135,6 @@ helm upgrade --install cilium cilium/cilium --version 1.18.2 \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002 \
-  --set extraArgs="{--devices=eth+}" \
   --set extraConfig.local-router-ipv4=169.254.32.16
 ```
 
@@ -153,6 +153,9 @@ ipam:
   mode: "delegated-plugin"
 # 使用 VPC-CNI 无需 IP 伪装
 enableIPv4Masquerade: false
+# TKE 节点中 eth 开头的网卡都可能出入流量（Pod 流量走辅助网卡，eth1, eth2 ...），用这个参数让所有 eth 开头的网卡都挂载 cilium ebpf 程序，
+# 以便让报文能够根据 conntrack 被正常反向 nat， 否则可能导致部分场景下网络不通（如跨节点访问 HostPort）
+devices: eth+
 cni:
   # 使用 generic-veth 与 VPC-CNI 做 CNI Chaining，参考：https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/
   chainingMode: generic-veth
@@ -172,8 +175,6 @@ k8sServicePort: 60002
 extraConfig:
   # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
   local-router-ipv4: 169.254.32.16
-extraArgs:
-- --devices=eth+ # TKE 节点中 eth 开头的网卡都可能出入流量，需标识为外部网卡，让 cilium ebpf 程序挂上去，否则可能导致部分场景下网络不通（如跨节点访问 HostPort）
 ```
 
 生产环境部署建议将参数保存到 `values.yaml`，然后在安装或更新时，都可以执行下面的命令（如果要升级版本，替换 `--version` 即可）：
