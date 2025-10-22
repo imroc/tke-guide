@@ -9,7 +9,7 @@
 在 [容器服务控制台](https://console.cloud.tencent.com/tke2/cluster) 创建 TKE 集群，注意以下关键选项：
 - 集群类型：标准集群
 - Kubernetes 版本: 不低于 1.30.0，建议选择最新版。
-- 操作系统：**TencentOS 4** 或者 **Ubuntu** >= 22.04。
+- 操作系统：TencentOS 4 或者 Ubuntu >= 22.04。
 - 容器网络插件：VPC-CNI 共享网卡多 IP。
 - 节点：建议不添加任何节点，避免清理存量节点相关配置。
 - 基础组件：取消勾选 ip-masq-agent，避免冲突。
