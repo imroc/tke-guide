@@ -43,7 +43,6 @@ const sidebars: SidebarsConfig = {
                   },
                   items: [
                     'networking/cilium/appendix/e2e/method',
-                    'networking/cilium/appendix/e2e/iptables-tencentos44'
                   ]
                 }
               ]
