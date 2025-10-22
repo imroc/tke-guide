@@ -21,4 +21,3 @@ Cilium 路由支持两种模式：
 - 网络模式：VPC-CNI 共享网卡多 IP。
 - 节点类型：普通节点或原生节点。
 - 操作系统：TencentOS>=4 或 Ubuntu>=22.04。
-- kube-proxy: 使用 iptables 转发模式或者卸载 kube-proxy 并使用 cilium 替代。

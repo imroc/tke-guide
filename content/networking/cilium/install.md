@@ -9,7 +9,7 @@
 在 [容器服务控制台](https://console.cloud.tencent.com/tke2/cluster) 创建 TKE 集群，注意以下关键选项：
 - 集群类型：标准集群
 - Kubernetes 版本: 不低于 1.30.0，建议选择最新版。
-- 操作系统：**TencentOS 4.0** 及以上或者 **Ubuntu 22.04** 及以上。
+- 操作系统：**TencentOS 4** 或者 **Ubuntu** >= 22.04。
 - 容器网络插件：VPC-CNI 共享网卡多 IP。
 - 节点：建议不添加任何节点，避免清理存量节点相关配置。
 - 基础组件：取消勾选 ip-masq-agent，避免冲突。
@@ -343,6 +343,7 @@ kubectl apply -f node-pool.yaml
 
 ### 新建原生节点池
 
+以下是通过 [容器服务控制台](https://console.cloud.tencent.com/tke2) 新建原生节点池的步骤：
 1. 在集群列表中，单击集群 ID，进入集群详情页。
 2. 选择左侧菜单栏中的**节点管理**，点击**节点池**进入节点池列表页面。
 3. 点击**新建**。
@@ -365,7 +366,7 @@ kubectl apply -f node-pool.yaml
 8. 其余选项根据自身需求自行选择。
 9. 点击 **创建节点池**。
 
-如果你想通过 terraform 来创建节点池，参考以下片段：
+如果你想通过 terraform 来创建原生节点池，参考以下代码片段：
 
 ```hcl
 resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
@@ -392,6 +393,7 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
 ```
 ### 新建普通节点池
 
+以下是通过 [容器服务控制台](https://console.cloud.tencent.com/tke2) 新建普通节点池的步骤：
 1. 在集群列表中，单击集群 ID，进入集群详情页。
 2. 选择左侧菜单栏中的**节点管理**，点击**节点池**进入节点池列表页面。
 3. 点击**新建**。
@@ -407,7 +409,7 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
 8. 其余选项根据自身需求自行选择。
 9. 点击**创建节点池**。
 
-如果你想通过 terraform 来创建节点池，参考以下片段：
+如果你想通过 terraform 来创建普通节点池，参考以下代码片段：
 
 ```hcl
 resource "tencentcloud_kubernetes_node_pool" "cilium" {
