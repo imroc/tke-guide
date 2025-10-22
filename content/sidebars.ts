@@ -33,18 +33,7 @@ const sidebars: SidebarsConfig = {
               },
               items: [
                 'networking/cilium/appendix/debug',
-                {
-                  type: 'category',
-                  label: 'e2e 测试',
-                  collapsed: true,
-                  link: {
-                    type: 'generated-index',
-                    slug: '/networking/cilium/appendix/e2e'
-                  },
-                  items: [
-                    'networking/cilium/appendix/e2e/method',
-                  ]
-                }
+                'networking/cilium/appendix/e2e',
               ]
             }
           ],
