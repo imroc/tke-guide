@@ -9,8 +9,8 @@
 - [ ] e2e 性能测试
 - [ ] 探索与 kube-proxy 共存方案
 - [ ] 支持使用 ENI Trunking 网络模式自建 cilium
-- [ ] ipamd 默认容忍 cilium 污点
-- [ ] tke-eni-agent 避开使用 cilium 的路由表 ID （2003/2004）
+- [ ] TKE 侧适配：ipamd 默认容忍 cilium 污点
+- [ ] TKE 侧适配：tke-eni-agent 避开使用 cilium 的路由表 ID （2003/2004）
 - [ ] 使用 Cilium Hubble 提升可观测性
 - [ ] Promtheus 与 Grafana 集成
 - [ ] 与 istio 共存方案
