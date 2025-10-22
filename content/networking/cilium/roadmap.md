@@ -1,8 +1,8 @@
 # Roadmap
 
 - [x] 概述
-- [x] 可以适配 cilium 的 TKE 集群创建指引
-- [x] 可以适配 cilium 节点池创建指引：原生节点池、普通节点池、Karpenter 节点池
+- [x] 适配自建 cilium 的 TKE 集群创建指引
+- [x] 适配自建 cilium 的节点池创建指引：原生节点池、普通节点池、Karpenter 节点池
 - [x] 核心：支持使用 TKE VPC-CNI 共享网卡模式集群自建单集群 cilium
 - [x] 常见问题
 - [x] e2e 功能测试，确保各项功能没有问题
