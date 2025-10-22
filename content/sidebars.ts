@@ -23,6 +23,7 @@ const sidebars: SidebarsConfig = {
           items: [
             'networking/cilium/overview',
             'networking/cilium/install',
+            'networking/cilium/roadmap',
             {
               type: 'category',
               label: '附录',
