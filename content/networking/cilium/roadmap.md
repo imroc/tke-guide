@@ -15,7 +15,7 @@
 - [ ] Promtheus 与 Grafana 集成
 - [ ] 与 istio 共存方案
 - [ ] Cilium 多集群组网（Cluster Mesh）
-- [ ] Cilium [MCS](https://multicluster.sigs.k8s.io/guides/)
+- [ ] Cilium [Multi-Cluster Services](https://docs.cilium.io/en/latest/network/clustermesh/mcsapi/)
 - [ ] Gateway API 启用
 - [ ] Egress Gateway
 - [ ] 场景与实践案例
