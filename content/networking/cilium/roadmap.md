@@ -1,6 +1,7 @@
 # Roadmap
 
 - [x] 支持使用 TKE VPC-CNI 共享网卡模式集群自建单集群 cilium
+- [ ] 探索与 kube-proxy 共存方案
 - [ ] 支持使用 ENI Trunking 网络自建 cilium
 - [ ] ipamd 默认容忍 cilium 污点
 - [ ] tke-eni-agent 避开使用 cilium 的路由表 ID （2003/2004）
