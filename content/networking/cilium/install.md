@@ -31,44 +31,6 @@ helm repo add cilium https://helm.cilium.io/
 
 ## 安装 cilium
 
-### 添加容忍
-
-1. 为 tke-eni-ipamd 增加 cilium 污点的容忍：
-```bash
-kubectl -n kube-system patch deployment tke-eni-ipamd --type='json' -p='[
-  {
-    "op": "add",
-    "path": "/spec/template/spec/tolerations/-",
-    "value": {
-      "key": "node.cilium.io/agent-not-ready",
-      "operator": "Exists"
-    }
-  }
-]'
-```
-
-:::tip[说明]
-
-tke-eni-ipamd 是 TKE VPC-CNI 网络中的关键组件，负责 Pod IP 的分配，使用 HostNetwork，不依赖 cilium-agent 的启动，所以可以加 cilium 污点的容忍。
-
-:::
-
-2. (可选) 如果你将 cilium 依赖镜像同步到了 TCR 私有镜像仓库，且安装了 TCR 扩展组件实现免密拉取 TCR 私有镜像，也需要为这个组件增加 cilium 污点的容忍（避免拉取 cilium 组件镜像和启动 TCR 组件形成循环依赖）：
-
-```bash
-kubectl -n tcr-assistant-system patch deployment tcr-assistant-controller-manager --type='json' -p='[
-  {
-    "op": "add",
-    "path": "/spec/template/spec/tolerations",
-    "value": [{
-      "key": "node.cilium.io/agent-not-ready",
-      "operator": "Exists"
-    }]
-  }
-]'
-```
-
-
 ### 配置 CNI
 
 为 cilium 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
@@ -245,22 +207,18 @@ kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"s
 ### 节点池选型
 
 以下三种节点池类型能够适配 cilium:
-- 普通节点池：基于普通节点（CVM）和 [cluster-autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) (CA)，OS 镜像比较灵活，安装 cilium 后无法实现自动扩容节点。
-- 原生节点池：基于原生节点和 [cluster-autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) (CA)，原生节点功能很丰富，也是 TKE 推荐的节点类型（参考 [原生节点 VS 普通节点](https://cloud.tencent.com/document/product/457/78197#.E5.8E.9F.E7.94.9F.E8.8A.82.E7.82.B9-vs-.E6.99.AE.E9.80.9A.E8.8A.82.E7.82.B9)），OS 固定使用 TencentOS，安装 cilium 后也无法实现自动扩容节点。
-- Karpenter 节点池：基于原生节点和 [Karpenter](https://github.com/kubernetes-sigs/karpenter)，安装 Cilium 后可以支持自动扩容节点（基于 [Startup Taint](https://karpenter.sh/docs/concepts/nodepools/#cilium-startup-taint)），OS 固定使用 TencentOS。
+- 原生节点池：基于原生节点，原生节点功能很丰富，也是 TKE 推荐的节点类型（参考 [原生节点 VS 普通节点](https://cloud.tencent.com/document/product/457/78197#.E5.8E.9F.E7.94.9F.E8.8A.82.E7.82.B9-vs-.E6.99.AE.E9.80.9A.E8.8A.82.E7.82.B9)），OS 固定使用 TencentOS。
+- 普通节点池：基于普通节点（CVM），OS 镜像比较灵活。
+- Karpenter 节点池：与原生节点池类似，基于原生节点，OS 固定使用 TencentOS，只是节点管理使用的功能更强大的 [Karpenter](https://karpenter.sh/) 而非普通节点池与原生节点池所使用的 [cluster-autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) (CA)。
 
+以下是这几种节点池的对比，根据自身情况选择合适的节点池类型：
 
-| 节点池类型       | 节点类型        | 可用 OS 镜像                | 自动扩容                          |
-| ---------------- | --------------- | --------------------------- | --------------------------------- |
-| 普通节点池       | 普通节点（CVM） | Ubuntu/TencentOS/自定义镜像 | ❌ (CA 不支持 Startup Taint)      |
-| 原生节点池       | 原生节点        | TencentOS                   | ❌ (CA 不支持 Startup Taint)      |
-| Karpenter 节点池 | 原生节点        | TencentOS                   | ✅ (Karpenter 支持 Startup Taint) |
+| 节点池类型       | 节点类型        | 可用 OS 镜像                | 节点扩缩容组件     |
+| ---------------- | --------------- | --------------------------- | ------------------ |
+| 原生节点池       | 原生节点        | TencentOS                   | cluster-autoscaler |
+| 普通节点池       | 普通节点（CVM） | Ubuntu/TencentOS/自定义镜像 | cluster-autoscaler |
+| Karpenter 节点池 | 原生节点        | TencentOS                   | Karpenter          |
 
-
-可根据自身情况评估选择合适的节点池类型，以下是选型建议：
-1. 如果需要节点自动扩容，只能使用 karpenter 节点池。
-2. 如果希望使用 TencentOS 之外的操作系统，使用普通节点池。
-3. 其余情况，优先使用原生节点池。
 
 以下创建各种节点池的步骤。
 
@@ -350,9 +308,7 @@ kubectl apply -f node-pool.yaml
 4. 选择 **原生节点**。
 5. 在 **高级设置** 的 Annotations 点击 **新增**：`node.tke.cloud.tencent.com/beta-image=ts4-public`（原生节点默认使用 TencentOS 3.1，与最新版的 cilium 不兼容，通过注解指定原生节点使用 TencentOS 4）。
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F25%2F20250925162022.png)
-6. 在 **高级设置** 的 **Taints** 点击 **新建Taint**: `node.cilium.io/agent-not-ready=true:NoExecute`（让节点上的 cilium 组件 ready 后再调度 pod 上来）。
-    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F25%2F20250925155023.png)
-7. （可选）在 **高级设置** 的 **自定义脚本** 中，配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速（cilium 依赖镜像在 quay.io，如果希望直接用官方默认镜像，且集群节点没有公网或者在中国大陆，可以使用该自定义脚本配置将 `quay.io` 的 mirror 加到 containerd 配置中，这样就可以拉取到 `quay.io` 的镜像了）:
+6. （可选）在 **高级设置** 的 **自定义脚本** 中，配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速（cilium 依赖镜像在 quay.io，如果希望直接用官方默认镜像，且集群节点没有公网或者在中国大陆，可以使用该自定义脚本配置将 `quay.io` 的 mirror 加到 containerd 配置中，这样就可以拉取到 `quay.io` 的镜像了）:
     ```bash
     sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
     systemctl restart containerd
@@ -363,8 +319,8 @@ kubectl apply -f node-pool.yaml
     2. 如果集群不在中国大陆，且节点都可以访问公网，也可以忽略该步骤。
     
     :::
-8. 其余选项根据自身需求自行选择。
-9. 点击 **创建节点池**。
+7. 其余选项根据自身需求自行选择。
+8. 点击 **创建节点池**。
 
 如果你想通过 terraform 来创建原生节点池，参考以下代码片段：
 
@@ -376,11 +332,6 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
   annotations { # 添加注解指定原生节点使用 TencentOS 4，以便能够与 cilium 兼容
     name  = "node.tke.cloud.tencent.com/beta-image"
     value = "ts4-public"
-  }
-  taints { # 添加污点，让节点上的 cilium 组件 ready 后再调度 pod 上来
-    key    = "node.cilium.io/agent-not-ready"
-    effect = "NoExecute"
-    value  = "true"
   }
   native {
     lifecycle {
@@ -399,15 +350,13 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
 3. 点击**新建**。
 4. 选择 **普通节点**。
 5. **操作系统** 选择 **TencentOS 4**、**Ubuntu 22.04** 或 **Ubuntu 24.04**。
-6. 在 **高级设置** 中 **Taints** 点击 **新建Taint**: `node.cilium.io/agent-not-ready=true:NoExecute`（让节点上的 cilium 组件 ready 后再调度 pod 上来）。
-    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F09%2F25%2F20250925155023.png)
-7. 在 **高级设置** 的 **自定义脚本** 中，配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速（cilium 依赖镜像在 quay.io，如果希望直接用官方默认镜像，且集群节点没有公网或者在中国大陆，可以使用该自定义脚本配置将 `quay.io` 的 mirror 加到 containerd 配置中，这样就可以拉取到 `quay.io` 的镜像了）:
+6. 在 **高级设置** 的 **自定义脚本** 中，配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速（cilium 依赖镜像在 quay.io，如果希望直接用官方默认镜像，且集群节点没有公网或者在中国大陆，可以使用该自定义脚本配置将 `quay.io` 的 mirror 加到 containerd 配置中，这样就可以拉取到 `quay.io` 的镜像了）:
     ```bash
     sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
     systemctl restart containerd
     ```
-8. 其余选项根据自身需求自行选择。
-9. 点击**创建节点池**。
+7. 其余选项根据自身需求自行选择。
+8. 点击**创建节点池**。
 
 如果你想通过 terraform 来创建普通节点池，参考以下代码片段：
 
@@ -416,11 +365,6 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
   name       = "cilium"
   cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
   node_os    = "img-gqmik24x" # TencentOS 4 的镜像 ID
-  taints { # 添加 taint，让节点上的 cilium 组件 ready 后再调度 pod 上来
-    key    = "node.cilium.io/agent-not-ready"
-    effect = "NoExecute"
-    value  = "true"
-  }
   node_config {
     # 自定义脚本：修改 containerd 配置，添加 quay.io 的镜像加速
     user_data = "c2VkIC1pICcvXFtwbHVnaW5zXC4iaW8uY29udGFpbmVyZC5ncnBjLnYxLmNyaSJcLnJlZ2lzdHJ5XC5taXJyb3JzXF0vIGFcXCBcIFwgXCBcIFwgXCBcIFtwbHVnaW5zLiJpby5jb250YWluZXJkLmdycGMudjEuY3JpIi5yZWdpc3RyeS5taXJyb3JzLiJxdWF5LmlvIl1cblwgXCBcIFwgXCBcIFwgXCBcIFwgZW5kcG9pbnQgPSBbImh0dHBzOi8vcXVheS50ZW5jZW50Y2xvdWRjci5jb20iXScgL2V0Yy9jb250YWluZXJkL2NvbmZpZy50b21sCnN5c3RlbWN0bCByZXN0YXJ0IGNvbnRhaW5lcmQK"
@@ -529,12 +473,6 @@ bpf:
 ```
 
 :::
-
-### 为什么要给新扩的节点自动加污点？
-
-不管使用哪种节点池扩容节点，都需要配置自动加 `node.cilium.io/agent-not-ready=true:NoExecute` 这个污点，因为 cilium 是核心的网络组件，涉及集群的 CNI 配置和管理，其它 Pod 创建时会通过 CNI 配置容器网络，如果新扩的节点上的 cilium 还未启动就绪，Pod 调度上来可能因为容器网络配置失败而无法成功启动。
-
-该污点只是个临时污点，节点 cilium 组件启动就绪后会自动移除节点上的这个污点，用于确保在节点上的 cilium 组件启动成功后才允许 Pod 调度过来。
 
 ## 参考资料
 
