@@ -8,7 +8,7 @@
 - [x] e2e 功能测试，确保各项功能没有问题
 - [ ] e2e 性能测试
 - [ ] 探索与 kube-proxy 共存方案
-- [ ] 支持使用 ENI Trunking 网络自建 cilium
+- [ ] 支持使用 ENI Trunking 网络模式自建 cilium
 - [ ] ipamd 默认容忍 cilium 污点
 - [ ] tke-eni-agent 避开使用 cilium 的路由表 ID （2003/2004）
 - [ ] 使用 Cilium Hubble 提升可观测性
