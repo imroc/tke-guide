@@ -486,7 +486,7 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 c
 
 勾选后，会部署 cilium 组件到集群中（替代 kube-proxy 组件），如果再自己安装 cilium 会造成冲突，而且 DataPlaneV2 所使用的 OS 与 cilium 最新版也不兼容，所以不能勾选此选项。
 
-### Pod 如何出公网？
+### Pod 如何访问公网？
 
 可以创建公网 NAT 网关，然后在集群所在 VPC 的路由表中新建路由规则，让访问外网的流量转发到公网 NAT 网关，并确保路由表关联到了集群使用的子网，参考 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)。
 
