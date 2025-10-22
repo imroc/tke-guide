@@ -1,6 +1,10 @@
 # Roadmap
 
-- [x] 支持使用 TKE VPC-CNI 共享网卡模式集群自建单集群 cilium
+- [x] 概述
+- [x] 核心：支持使用 TKE VPC-CNI 共享网卡模式集群自建单集群 cilium
+- [x] e2e 功能测试，确保各项功能没有问题
+- [x] 节点池适配：原生节点池、普通节点池、Karpenter 节点池
+- [ ] e2e 性能测试
 - [ ] 探索与 kube-proxy 共存方案
 - [ ] 支持使用 ENI Trunking 网络自建 cilium
 - [ ] ipamd 默认容忍 cilium 污点
