@@ -14,4 +14,3 @@ cilium 早期使用 ginkgo 框架做 e2e 测试，参考 [End-To-End Testing Fra
 ## 参考资料
 
 - [End-To-End Connectivity Testing](https://docs.cilium.io/en/stable/contributing/testing/e2e/)
-

@@ -223,9 +223,9 @@ kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"s
 
 在新建 Karpenter 节点池之前，确保 Karpenter 组件已启用，参考 [tke-karpenter 说明](https://cloud.tencent.com/document/product/457/111805)。
 
-准备用于配置 Karpenter 节点池的 `node-pool.yaml`，以下是示例:
+准备用于配置 Karpenter 节点池的 `nodepool.yaml`，以下是示例:
 
-```yaml title="node-pool.yaml"
+```yaml title="nodepool.yaml"
 apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
@@ -293,7 +293,7 @@ spec:
 创建 Karpenter 节点池：
 
 ```bash
-kubectl apply -f node-pool.yaml
+kubectl apply -f nodepool.yaml
 ```
 
 ### 新建原生节点池
