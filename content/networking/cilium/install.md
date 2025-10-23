@@ -90,7 +90,6 @@ helm upgrade --install cilium cilium/cilium --version 1.18.2 \
   --set enableIPv4Masquerade=false \
   --set devices=eth+ \
   --set cni.chainingMode=generic-veth \
-  --set cni.exclusive=false \
   --set cni.customConf=true \
   --set cni.configMap=cni-configuration \
   --set cni.externalRouting=true \
@@ -121,8 +120,6 @@ devices: eth+
 cni:
   # 使用 generic-veth 与 VPC-CNI 做 CNI Chaining，参考：https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/
   chainingMode: generic-veth
-  # 不让 cilium 管理整个 CNI 配置目录，避免干扰其它 CNI 配置，有更高的灵活性，比如与 istio 集成：https://docs.cilium.io/en/latest/network/servicemesh/istio/
-  exclusive: false
   # CNI 配置完全自定义
   customConf: true
   # 存放 CNI 配置的 ConfigMap 名称
