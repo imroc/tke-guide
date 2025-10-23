@@ -39,7 +39,7 @@ helm repo add cilium https://helm.cilium.io/
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: cni-configuration
+  name: cni-config
   namespace: kube-system
 data:
   cni-config: |-
@@ -91,7 +91,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.2 \
   --set devices=eth+ \
   --set cni.chainingMode=generic-veth \
   --set cni.customConf=true \
-  --set cni.configMap=cni-configuration \
+  --set cni.configMap=cni-config \
   --set cni.externalRouting=true \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
