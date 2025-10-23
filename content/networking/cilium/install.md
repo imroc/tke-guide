@@ -11,7 +11,7 @@
 - Kubernetes 版本: 不低于 1.30.0，建议选择最新版。
 - 操作系统：TencentOS 4 或者 Ubuntu >= 22.04。
 - 容器网络插件：VPC-CNI 共享网卡多 IP。
-- 节点：建议不添加任何节点，避免清理存量节点相关配置。
+- 节点：安装前不向集群添加任何普通节点或原生节点，避免残留相关规则和配置，等安装完成后再添加。
 - 基础组件：取消勾选 ip-masq-agent，避免冲突。
 - 增强组件：如果希望在安装 cilium 后还能让节点按需自动扩缩容，要用 Karpenter 节点池来管理节点，需勾选安装 Karpenter 组件，否则无需勾选。
 
@@ -33,9 +33,9 @@ helm repo add cilium https://helm.cilium.io/
 
 ### 配置 CNI
 
-为 cilium 准备 CNI 配置的 ConfigMap `cni-configuration.yaml`：
+为 cilium 准备 CNI 配置的 ConfigMap `cni-config.yaml`：
 
-```yaml title="cni-configuration.yaml"
+```yaml title="cni-config.yaml"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -68,7 +68,7 @@ data:
 创建 CNI ConfigMap:
 
 ```bash
-kubectl apply -f cni-configuration.yaml
+kubectl apply -f cni-config.yaml
 ```
 
 ### 使用 helm 安装 cilium
