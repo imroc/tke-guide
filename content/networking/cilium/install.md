@@ -361,16 +361,16 @@ kubectl apply -f nodepool.yaml
 4. 选择 **原生节点**。
 5. 在 **高级设置** 的 Annotations 点击 **新增**：`node.tke.cloud.tencent.com/beta-image=ts4-public`（原生节点默认使用 TencentOS 3.1，与最新版的 cilium 不兼容，通过注解指定原生节点使用 TencentOS 4）。
 6. （可选）在 **高级设置** 的 **自定义脚本** 中，配置 **节点初始化后** 执行的脚本来修改 containerd 配置，添加 `quay.io` 的镜像加速（cilium 依赖镜像在 quay.io，如果希望直接用官方默认镜像，且集群节点没有公网或者在中国大陆，可以使用该自定义脚本配置将 `quay.io` 的 mirror 加到 containerd 配置中，这样就可以拉取到 `quay.io` 的镜像了）:
-    ```bash
-    sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
-    systemctl restart containerd
-    ```
     :::tip[说明]
     
     1. 如果计划将 cilium 依赖镜像同步到自己的镜像仓库来使用（如 TCR 镜像仓库），可以忽略该步骤。
     2. 如果集群不在中国大陆，且节点都可以访问公网，也可以忽略该步骤。
     
     :::
+    ```bash
+    sed -i '/\[plugins\."io.containerd.grpc.v1.cri"\.registry\.mirrors\]/ a\\ \ \ \ \ \ \ \ [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]\n\ \ \ \ \ \ \ \ \ \ endpoint = ["https://quay.tencentcloudcr.com"]' /etc/containerd/config.toml
+    systemctl restart containerd
+    ```
 7. 其余选项根据自身需求自行选择。
 8. 点击 **创建节点池**。
 
