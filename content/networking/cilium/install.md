@@ -10,7 +10,7 @@
 
 在 [容器服务控制台](https://console.cloud.tencent.com/tke2/cluster) 创建 TKE 集群，注意以下关键选项：
 - 集群类型：标准集群
-- Kubernetes 版本: 不低于 1.30.0，建议选择最新版。
+- Kubernetes 版本: 不低于 1.30.0，建议选择最新版（参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)）。
 - 操作系统：TencentOS 4 或者 Ubuntu >= 22.04。
 - 容器网络插件：VPC-CNI 共享网卡多 IP。
 - 节点：安装前不要向集群添加任何普通节点或原生节点，避免残留相关规则和配置，等安装完成后再添加。
@@ -55,7 +55,7 @@
 
    # 构造新镜像名称（保留仓库路径，替换 tag）
    REPOSITORY=${CURRENT_IMAGE%%:*}
-   NEW_IMAGE="${REPOSITORY}:v3.7.1-rc.0"
+   NEW_IMAGE="${REPOSITORY}:v3.8.0-rc.0"
 
    # 升级 tke-eni-agent 镜像
    kubectl patch daemonset tke-eni-agent -n kube-system \
@@ -75,7 +75,7 @@
    set -l repository (echo $current_image | awk -F: '{print $1}')
    
    # 构造新镜像名称
-   set -l new_image "$repository:v3.7.1-rc.0"
+   set -l new_image "$repository:v3.8.0-rc.0"
    
    # 升级 tke-eni-agent 镜像
    kubectl patch daemonset tke-eni-agent -n kube-system \
