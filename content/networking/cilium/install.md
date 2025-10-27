@@ -27,9 +27,9 @@
 
 1. 确保 [helm](https://helm.sh/zh/docs/intro/install/) 和 [kubectl](https://kubernetes.io/zh-cn/docs/tasks/tools/install-kubectl-linux/) 已安装，并配置好可以连接集群的 kubeconfig（参考 [连接集群](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)）。
 2. 添加 cilium 的 helm repo:
-```bash
-helm repo add cilium https://helm.cilium.io/
-```
+  ```bash
+  helm repo add cilium https://helm.cilium.io/
+  ```
 
 ## 安装 cilium
 
