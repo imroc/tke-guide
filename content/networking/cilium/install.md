@@ -2,7 +2,9 @@
 
 本文介绍如何在 TKE 集群中安装 cilium。
 
-## 准备 TKE 集群
+## 前期准备
+
+### 准备 TKE 集群
 
 安装 cilium 是对集群一个很重大的变更，不建议在有生产业务运行的集群中安装，否则安装过程中可能会影响线上业务的正常运行，建议在新创建的 TKE 集群中安装 cilium。
 
@@ -21,7 +23,7 @@
 1. 如果可以互通就开启内网访问。
 2. 如果不能互通就开启公网访问。当前开启公网访问需要向集群下发 `kubernetes-proxy` 组件作为中转，依赖集群中需要有节点存在（未来可能会取消该依赖，但当前现状是需要依赖），如果要使用公网访问方式，建议向集群先添加个超级节点，以便 `kubernetes-proxy` 的 pod 能够正常调度，等 cilium 安装完成后，再删除该超级节点。
 
-## 准备 helm 环境
+### 准备 helm 环境
 
 1. 确保 [helm](https://helm.sh/zh/docs/intro/install/) 和 [kubectl](https://kubernetes.io/zh-cn/docs/tasks/tools/install-kubectl-linux/) 已安装，并配置好可以连接集群的 kubeconfig（参考 [连接集群](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)）。
 2. 添加 cilium 的 helm repo:
