@@ -138,7 +138,7 @@ kubectl apply -f cni-config.yaml
 :::
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.18.2 \
+helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
@@ -195,7 +195,7 @@ extraConfig:
 生产环境部署建议将参数保存到 `values.yaml`，然后在安装或更新时，都可以执行下面的命令（如果要升级版本，替换 `--version` 即可）：
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.18.2 --namespace=kube-system -f values.yaml
+helm upgrade --install cilium cilium/cilium --version 1.18.3 --namespace=kube-system -f values.yaml
 ```
 
 :::
@@ -434,7 +434,7 @@ Cilium 的 helm 安装包提供了大量的自定义配置项，上面安装步�
 执行下面的命令可查看所有的安装配置项：
 
 ```bash
-helm show values cilium/cilium --version 1.18.2
+helm show values cilium/cilium --version 1.18.3
 ```
 
 ### 为什么要加 local-router-ipv4 配置？
@@ -448,19 +448,19 @@ cilium 会在每台节点上创建 `cilium_host` 虚拟网卡，并需要配置�
 解决办法是在可以连上的环境下载 chart 压缩包：
 
 ```bash
-$ helm pull cilium/cilium --version 1.18.2
+$ helm pull cilium/cilium --version 1.18.3
 $ ls cilium-*.tgz
-cilium-1.18.2.tgz
+cilium-1.18.3.tgz
 ```
 
 然后将 chart 压缩包复制到执行 helm 安装的机器上，安装时指定下 chart 压缩包的路径：
 ```bash
-helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 cilium ./cilium-1.18.2.tgz
+helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.3 cilium ./cilium-1.18.3.tgz
 ```
 
 ### 大规模场景如何优化？
 
-如果集群规模较大，建议开启 [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) 特性，该特性于  1.11 开始引入，当前（1.18.2）仍在 Beta 阶段（详见 [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)），在大规模场景下，该特性可以显著提升 cilium 性能并降低 apiserver 的压力。
+如果集群规模较大，建议开启 [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) 特性，该特性于  1.11 开始引入，当前（1.18.3）仍在 Beta 阶段（详见 [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)），在大规模场景下，该特性可以显著提升 cilium 性能并降低 apiserver 的压力。
 
 默认没有启用，启用方法是在使用 helm 安装 cilium 时，通过加 `--set ciliumEndpointSlice.enabled=true` 参数来开启。
 
@@ -489,7 +489,7 @@ helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.2 c
 如果是节点本身有公网带宽，希望 Pod 能直接利用节点的公网能力出公网，需要在部署 cilium 时做一些配置调整：
 
 ```bash showLineNumbers
-helm upgrade cilium cilium/cilium --version 1.18.2 \
+helm upgrade cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
   --reuse-values \
   # highlight-add-start
