@@ -58,7 +58,7 @@ helm repo add cilium https://helm.cilium.io/
   </TabItem>
   <TabItem value="2" label="fish">
 
-   ```fish
+   ```bash
    # 获取当前镜像
    set -l current_image (kubectl get daemonset tke-eni-agent -n kube-system \
      -o jsonpath="{.spec.template.spec.containers[0].image}")
