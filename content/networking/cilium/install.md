@@ -35,6 +35,12 @@ helm repo add cilium https://helm.cilium.io/
 
 由于 cilium 固定使用了 2004 和 2005 两个路由表 ID，可能会与 TKE 的 VPC-CNI 网络模式所使用的路由表 ID 冲突，新版 VPC-CNI 网络模式将会调整路由表 ID 生成的算法，避免与 cilium 的路由表 ID 冲突，但目前还没正式发版（v3.7.1 版本），所以这里可以先手动升级镜像版本到 v3.7.1 的 rc 版。
 
+:::info[注意]
+
+如果 eniipamd 组件正式发布 v3.7.1，在组件管理中操作升级 eniipamd 后，这里做的手动升级操作会被覆盖。
+
+:::
+
 通过以下脚本升级 tke-eni-agent 镜像版本：
 
 <Tabs>
