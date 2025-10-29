@@ -6,7 +6,7 @@
 1. 使用 cilium 替代 kube-proxy 方式部署
 2. 启用 ip masquerade，且使用 bpf 进行 masquerade。
 
-使用 helm 启用 Egress Gateway：
+启用 Egress Gateway 的 cilium 安装方法：
 
 :::info[注意]
 
@@ -14,17 +14,27 @@
 
 :::
 
-```bash
-helm upgrade cilium cilium/cilium --version 1.18.3 \
-   --namespace kube-system \
-   --reuse-values \
-   --set egressGateway.enabled=true \
-   --set enableIPv4Masquerade=true \
-   --set ipv4NativeRoutingCIDR="VPC_CIDR" \
-   --set bpf.masquerade=true \
-   --set kubeProxyReplacement=true \
-   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
-   --set k8sServicePort=60002
+```bash showLineNumbers
+helm upgrade --install cilium cilium/cilium --version 1.18.3 \
+  --namespace kube-system \
+  --set routingMode=native \
+  --set endpointRoutes.enabled=true \
+  --set ipam.mode=delegated-plugin \
+  --set devices=eth+ \
+  --set cni.chainingMode=generic-veth \
+  --set cni.customConf=true \
+  --set cni.configMap=cni-config \
+  --set cni.externalRouting=true \
+  --set extraConfig.local-router-ipv4=169.254.32.16 \
+  --set kubeProxyReplacement=true \
+  --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
+  --set k8sServicePort=60002 \
+  # highlight-add-start
+  --set egressGateway.enabled=true \
+  --set enableIPv4Masquerade=true \
+  --set ipv4NativeRoutingCIDR="VPC_CIDR" \
+  --set bpf.masquerade=true
+  # highlight-add-end
 ```
 
 然后重启 cilium 组件生效：
