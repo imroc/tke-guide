@@ -2,14 +2,23 @@
 
 ## 启用 Egress Gateway
 
-如果要启用 Egress Gateway，需要使用 cilium 替代 kube-proxy 方式部署，另外还需要启用 bpf masquerade 功能，如果使用 [安装cilium](install.md) 中的默认安装参数，可通过以下方式启用 Egress Gateway:
+如果要启用 Egress Gateway，需满足以下条件：
+1. 使用 cilium 替代 kube-proxy 方式部署
+2. 启用 ip masquerade，且使用 bpf 进行 masquerade。
+
+使用 helm 启用 Egress Gateway：
 
 ```bash
 helm upgrade cilium cilium/cilium --version 1.18.3 \
    --namespace kube-system \
    --reuse-values \
    --set egressGateway.enabled=true \
-   --set bpf.masquerade=true 
+   --set enableIPv4Masquerade=true \
+   --set ipv4NativeRoutingCIDR="172.22.0.0/16" \
+   --set bpf.masquerade=true \
+   --set kubeProxyReplacement=true \
+   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
+   --set k8sServicePort=60002
 ```
 
 然后重启 cilium 组件生效：
