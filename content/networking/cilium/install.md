@@ -23,6 +23,32 @@
 1. 如果可以互通就开启内网访问。
 2. 如果不能互通就开启公网访问。当前开启公网访问需要向集群下发 `kubernetes-proxy` 组件作为中转，依赖集群中需要有节点存在（未来可能会取消该依赖，但当前现状是需要依赖），如果要使用公网访问方式，建议向集群先添加个超级节点，以便 `kubernetes-proxy` 的 pod 能够正常调度，等 cilium 安装完成后，再删除该超级节点。
 
+如果使用 terraform 创建集群，参考以下代码片段：
+
+:::info[注意]
+
+如果使用 terraform 创建，当前还不支持取消 ip-masq-agent 安装（未来将会支持），需在集群创建后卸载 ip-masq-agent（后面的卸载步骤会有提到）。
+
+:::
+
+```hcl
+resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
+  # 标准集群
+  cluster_deploy_type = "MANAGED_CLUSTER"
+  # Kubernetes 版本 >= 1.30.0
+  cluster_version = "1.32.2"
+  # 操作系统， TencentOS 4 的镜像 ID，当前普通节点使用该镜像还需要开白
+  cluster_os = "img-gqmik24x" 
+  # 容器网络插件: VPC-CNI
+  network_type = "VPC-CNI"
+  # 集群 APIServer 开启访问
+  cluster_internet = true
+  # 通过内网 CLB 暴露 APIServer，需指定 CLB 所在子网 ID
+  cluster_intranet_subnet_id = "subnet-xxx" 
+  # 省略其它必要但不相关配置
+}
+```
+
 ### 准备 helm 环境
 
 1. 确保 [helm](https://helm.sh/zh/docs/intro/install/) 和 [kubectl](https://kubernetes.io/zh-cn/docs/tasks/tools/install-kubectl-linux/) 已安装，并配置好可以连接集群的 kubeconfig（参考 [连接集群](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)）。

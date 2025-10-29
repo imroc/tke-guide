@@ -1,4 +1,10 @@
-# 使用 Egress Gateway 控制集群外部访问
+# 使用 Egress Gateway 控制外访流量
+
+## 已知问题
+
+使用 Cilium 的 Egress Gateway 功能存在以下已知问题：
+1. 对新 Pod 执行 Egress 策略有延迟。新 Pod 启动后，如果该 Pod 命中 Egress 策略，期望 Pod 的外访流量走指定出口网关出去，但实际上在 Pod 刚启动的一段时间内，该策略可能并未生效。
+2. 与 Cilium 的 Cluster Mesh 和 CiliumEndpointSlice 功能不兼容。
 
 ## 启用 Egress Gateway
 
@@ -229,9 +235,44 @@ NAME            STATUS   ROLES    AGE     VERSION         INTERNAL-IP     EXTERN
 172.22.48.64    Ready    <none>   3h17m   v1.32.2-tke.6   172.22.48.64    43.134.178.226   TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
 ```
 
-## 指定工作负载出口 IP
+## 配置 CiliumEgressGatewayPolicy
 
-通过配置 `CiliumEgressGatewayPolicy` 来指定工作负载使用指定出口 IP：
+通过配置 `CiliumEgressGatewayPolicy` 可以灵活的定义哪些 Pod 的流量走哪些网关的出口 IP 出集群，配置方法参考官方文档 [Writing egress gateway policies](https://docs.cilium.io/en/stable/network/egress-gateway/egress-gateway/#writing-egress-gateway-policies)。
+
+## 案例
+### 指定工作负载出口 IP
+
+部署一个 `debug` 工作负载：
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: debug
+  namespace: default
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: debug
+  template:
+    metadata:
+      labels:
+        app: debug
+    spec:
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: debug
+      containers:
+      - name: debug
+        image: imroc/net-tools:latest
+```
+
+通过配置 `CiliumEgressGatewayPolicy` 来指定该工作负载使用指定出口 IP 访问公网：
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -240,7 +281,7 @@ metadata:
   name: egress-test
 spec:
   selectors:
-  - podSelector: # 指定该 egress 针对哪些 Pod 生效
+  - podSelector: # 指定该 egress 策略针对哪些源 Pod 生效
       matchLabels:
         app: debug # 指定带 app=debug 标签的 Pod
         io.kubernetes.pod.namespace: default # 指定命名空间
