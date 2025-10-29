@@ -8,13 +8,19 @@
 
 使用 helm 启用 Egress Gateway：
 
+:::info[注意]
+
+`VPC_CIDR` 需替换为 TKE 集群所在 VPC 的实际 ipv4 网段。
+
+:::
+
 ```bash
 helm upgrade cilium cilium/cilium --version 1.18.3 \
    --namespace kube-system \
    --reuse-values \
    --set egressGateway.enabled=true \
    --set enableIPv4Masquerade=true \
-   --set ipv4NativeRoutingCIDR="172.22.0.0/16" \
+   --set ipv4NativeRoutingCIDR="VPC_CIDR" \
    --set bpf.masquerade=true \
    --set kubeProxyReplacement=true \
    --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
