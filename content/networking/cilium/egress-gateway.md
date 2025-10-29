@@ -23,7 +23,7 @@ kubectl rollout restart deploy cilium-operator -n kube-system
 
 创建一个节点池作为 Egress Gateway 使用的节点池，后续可以配置让某些 Pod 出集群的流量经过这些节点出去，创建方法参考 [安装cilium](install.md) 中 **新建节点池** 部分。
 
-需要注意的是，要为节点分配公网 IP 并打上用以标识的 label（如 `cilium.io/egress-gateway=true`）。
+需要注意的是，要为节点分配公网 IP 并打上用以标识的 label（如 `cilium.io/egress-gateway=true`），如果不希望普通 Pod 调度过去，可以加下污点。
 
 以下是操作创建节点池的具体注意事项参考。
 
@@ -47,10 +47,16 @@ kubectl rollout restart deploy cilium-operator -n kube-system
       value = "ts4-public"
     }
     # highlight-add-start
+    # 给扩出来的 Node 打上这个 label
     labels {
-      # 给扩出来的 Node 打上这个 label
       name = "cilium.io/egress-gateway"
       value = "true"
+    }
+    # （可选）给节点加污点，避免普通 Pod 调度到 Egress Gateway 节点
+    taints {
+      key    = "cilium.io/egress-gateway"
+      effect = "NoSchedule"
+      value  = "true"
     }
     # highlight-add-end
     native {
@@ -100,6 +106,13 @@ kubectl rollout restart deploy cilium-operator -n kube-system
       "cilium.io/egress-gateway" = "true"
     }
     # highlight-add-end
+
+    # （可选）给节点加污点，避免普通 Pod 调度到 Egress Gateway 节点
+    taints {
+      key    = "cilium.io/egress-gateway"
+      effect = "NoSchedule"
+      value  = "true"
+    }
   ```
 
   </TabItem>
@@ -122,9 +135,16 @@ kubectl rollout restart deploy cilium-operator -n kube-system
       metadata:
         annotations:
           beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public 
+        # highlight-add-start
+        # 给扩出来的 Node 打上这个 label
         labels:
-          # highlight-add-line
-          cilium.io/egress-gateway: "true" # 给扩出来的 Node 打上这个 label
+          cilium.io/egress-gateway: "true"
+        # （可选）给节点加污点，避免普通 Pod 调度到 Egress Gateway 节点
+        taints:
+        - key: cilium.io/egress-gateway
+          effect: NoSchedule
+          value: "true"
+        # highlight-add-end
       spec:
         requirements:
         - key: kubernetes.io/arch
@@ -190,31 +210,22 @@ NAME            STATUS   ROLES    AGE    VERSION         INTERNAL-IP     EXTERNA
 apiVersion: cilium.io/v2
 kind: CiliumEgressGatewayPolicy
 metadata:
-  name: egress-sample
+  name: egress-test
 spec:
-  # Specify which pods should be subject to the current policy.
-  # Multiple pod selectors can be specified.
   selectors:
-  - podSelector:
+  - podSelector: # 指定该 egress 针对哪些 Pod 生效
       matchLabels:
-        org: empire
-        class: mediabot
-        # The following label selects default namespace
-        io.kubernetes.pod.namespace: default
-    nodeSelector: # optional, if not specified the policy applies to all nodes
-      matchLabels:
-        node.kubernetes.io/name: node1 # only traffic from this node will be SNATed
-  # Specify which destination CIDR(s) this policy applies to.
-  # Multiple CIDRs can be specified.
+        app: debug # 指定带 app=debug 标签的 Pod
+        io.kubernetes.pod.namespace: default # 指定命名空间
   destinationCIDRs:
   - "0.0.0.0/0"
   - "::/0"
-
-  # Configure the gateway node.
   egressGateway:
+    # 选中 Egress Gateway 节点
     nodeSelector:
       matchLabels:
         cilium.io/egress-gateway: "true"
+    # 使用指定的 IP 出去，此 IP 必须在 Egress Gateway 其中一台节点上存在
     egressIP: 43.156.74.191
 ```
 
