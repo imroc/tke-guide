@@ -23,7 +23,10 @@ kubectl rollout restart deploy cilium-operator -n kube-system
 
 创建一个节点池作为 Egress Gateway 使用的节点池，后续可以配置让某些 Pod 出集群的流量经过这些节点出去，创建方法参考 [安装cilium](install.md) 中 **新建节点池** 部分。
 
-需要注意的是，要为节点分配公网 IP 并打上用以标识的 label（如 `cilium.io/egress-gateway=true`），如果不希望普通 Pod 调度过去，可以加下污点。
+需要注意的是：
+1. 要通过节点池为扩出来的节点打上 label（如 `cilium.io/egress-gateway=true`）用以标识的用于 Egress Gateway。
+2. 如果需要出公网，要为节点分配公网 IP。
+3. 如果不希望普通 Pod 调度过去，可以加下污点。
 
 以下是操作创建节点池的具体注意事项参考。
 
@@ -205,6 +208,8 @@ NAME            STATUS   ROLES    AGE    VERSION         INTERNAL-IP     EXTERNA
 ```
 
 ## 指定工作负载出口 IP
+
+通过配置 `CiliumEgressGatewayPolicy` 来指定工作负载使用指定出口 IP：
 
 ```yaml
 apiVersion: cilium.io/v2
