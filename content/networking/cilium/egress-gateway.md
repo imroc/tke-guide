@@ -212,14 +212,11 @@ kubectl rollout restart deploy cilium-operator -n kube-system
 节点池创建并初始化节点后，通过如下方式查看哪些节点是 Egress Gateway 使用的节点，以及分配的公网 IP 是什么：
 
 ```bash
-$ kubectl get nodes -o wide -L cilium.io/egress-gateway
-NAME            STATUS   ROLES    AGE    VERSION         INTERNAL-IP     EXTERNAL-IP      OS-IMAGE               KERNEL-VERSION           CONTAINER-RUNTIME          EGRESS-GATEWAY
-172.22.48.125   Ready    <none>   131m   v1.32.2-tke.6   172.22.48.125   43.134.181.245   TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8   true
-172.22.48.48    Ready    <none>   131m   v1.32.2-tke.6   172.22.48.48    43.156.74.191    TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8   true
-172.22.48.64    Ready    <none>   131m   v1.32.2-tke.6   172.22.48.64    43.134.178.226   TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8   true
-172.22.48.71    Ready    <none>   133m   v1.32.2-tke.6   172.22.48.71    43.163.94.93     TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
-172.22.48.91    Ready    <none>   133m   v1.32.2-tke.6   172.22.48.91    43.134.241.64    TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
-172.22.48.98    Ready    <none>   133m   v1.32.2-tke.6   172.22.48.98    43.134.102.75    TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
+$ kubectl get nodes -o wide -l cilium.io/egress-gateway=true
+NAME            STATUS   ROLES    AGE     VERSION         INTERNAL-IP     EXTERNAL-IP      OS-IMAGE               KERNEL-VERSION           CONTAINER-RUNTIME
+172.22.48.125   Ready    <none>   3h17m   v1.32.2-tke.6   172.22.48.125   43.134.181.245   TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
+172.22.48.48    Ready    <none>   3h17m   v1.32.2-tke.6   172.22.48.48    43.156.74.191    TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
+172.22.48.64    Ready    <none>   3h17m   v1.32.2-tke.6   172.22.48.64    43.134.178.226   TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
 ```
 
 ## 指定工作负载出口 IP
