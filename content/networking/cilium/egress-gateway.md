@@ -3,8 +3,8 @@
 ## 启用 Egress Gateway
 
 如果要启用 Egress Gateway，需满足以下条件：
-1. 使用 cilium 替代 kube-proxy 方式部署
-2. 启用 ip masquerade，且使用 bpf 进行 masquerade。
+1. 启用 cilium 替代 kube-proxy。
+2. 启用 ip masquerade，且使用 bpf 的实现进行 masquerade 而非默认的 iptables 实现。
 
 启用 Egress Gateway 的 cilium 安装方法：
 
