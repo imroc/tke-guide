@@ -19,13 +19,13 @@ kubectl rollout restart ds cilium -n kube-system
 kubectl rollout restart deploy cilium-operator -n kube-system
 ```
 
-## 新建 Egress Gateway 节点池
+## 为 Egress Gateway 新建节点池
 
-创建一个节点池作为 Egress Gateway 使用的节点池，可以让出集群的流量经过这些节点出去，创建方法参考 [安装cilium](install.md) 中 **新建节点池** 部分。
+创建一个节点池作为 Egress Gateway 使用的节点池，后续可以配置让某些 Pod 出集群的流量经过这些节点出去，创建方法参考 [安装cilium](install.md) 中 **新建节点池** 部分。
 
 需要注意的是，要为节点分配公网 IP 并打上用以标识的 label（如 `cilium.io/egress-gateway=true`）。
 
-以下是操作创建节点池的具体注意事项参考：
+以下是操作创建节点池的具体注意事项参考。
 
 <Tabs>
   <TabItem value="1" label="原生节点池">
@@ -158,7 +158,7 @@ kubectl rollout restart deploy cilium-operator -n kube-system
     internetAccessible:
       chargeType: TrafficPostpaidByHour # 按流量计费
       maxBandwidthOut: 100 # 最大出带宽 100Mbps
-    # highlight-end-start
+    # highlight-add-end
     subnetSelectorTerms:
     - id: subnet-12sxk3z4
     - id: subnet-b8qyi2dk
@@ -170,6 +170,53 @@ kubectl rollout restart deploy cilium-operator -n kube-system
 
   </TabItem>
 </Tabs>
+
+节点池创建并初始化节点后，通过如下方式查看哪些节点是 Egress Gateway 使用的节点，以及分配的公网 IP 是什么：
+
+```bash
+$ kubectl get nodes -o wide -L cilium.io/egress-gateway
+NAME            STATUS   ROLES    AGE    VERSION         INTERNAL-IP     EXTERNAL-IP      OS-IMAGE               KERNEL-VERSION           CONTAINER-RUNTIME          EGRESS-GATEWAY
+172.22.48.125   Ready    <none>   131m   v1.32.2-tke.6   172.22.48.125   43.134.181.245   TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8   true
+172.22.48.48    Ready    <none>   131m   v1.32.2-tke.6   172.22.48.48    43.156.74.191    TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8   true
+172.22.48.64    Ready    <none>   131m   v1.32.2-tke.6   172.22.48.64    43.134.178.226   TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8   true
+172.22.48.71    Ready    <none>   133m   v1.32.2-tke.6   172.22.48.71    43.163.94.93     TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
+172.22.48.91    Ready    <none>   133m   v1.32.2-tke.6   172.22.48.91    43.134.241.64    TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
+172.22.48.98    Ready    <none>   133m   v1.32.2-tke.6   172.22.48.98    43.134.102.75    TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
+```
+
+## 指定工作负载出口 IP
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumEgressGatewayPolicy
+metadata:
+  name: egress-sample
+spec:
+  # Specify which pods should be subject to the current policy.
+  # Multiple pod selectors can be specified.
+  selectors:
+  - podSelector:
+      matchLabels:
+        org: empire
+        class: mediabot
+        # The following label selects default namespace
+        io.kubernetes.pod.namespace: default
+    nodeSelector: # optional, if not specified the policy applies to all nodes
+      matchLabels:
+        node.kubernetes.io/name: node1 # only traffic from this node will be SNATed
+  # Specify which destination CIDR(s) this policy applies to.
+  # Multiple CIDRs can be specified.
+  destinationCIDRs:
+  - "0.0.0.0/0"
+  - "::/0"
+
+  # Configure the gateway node.
+  egressGateway:
+    nodeSelector:
+      matchLabels:
+        cilium.io/egress-gateway: "true"
+    egressIP: 43.156.74.191
+```
 
 ## 参考资料
 
