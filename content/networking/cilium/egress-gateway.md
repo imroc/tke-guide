@@ -242,37 +242,30 @@ NAME            STATUS   ROLES    AGE     VERSION         INTERNAL-IP     EXTERN
 ## 案例
 ### 指定工作负载出口 IP
 
-部署一个 `debug` 工作负载：
+部署一个 `nginx` 工作负载：
 
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: debug
+  name: nginx
   namespace: default
 spec:
-  replicas: 5
+  replicas: 1
   selector:
     matchLabels:
-      app: debug
+      app: nginx
   template:
     metadata:
       labels:
-        app: debug
+        app: nginx
     spec:
-      topologySpreadConstraints:
-      - maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: ScheduleAnyway
-        labelSelector:
-          matchLabels:
-            app: debug
       containers:
-      - name: debug
-        image: imroc/net-tools:latest
+      - name: nginx
+        image: nginx:latest
 ```
 
-通过配置 `CiliumEgressGatewayPolicy` 来指定该工作负载使用指定出口 IP 访问公网：
+通过配置 `CiliumEgressGatewayPolicy` 来指定该工作负载使用指定 Egress Gateway 节点访问公网：
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -281,10 +274,10 @@ metadata:
   name: egress-test
 spec:
   selectors:
-  - podSelector: # 指定该 egress 策略针对哪些源 Pod 生效
+  - podSelector: # 指定该 egress 策略针对哪些 Pod 生效
       matchLabels:
-        app: debug # 指定带 app=debug 标签的 Pod
-        io.kubernetes.pod.namespace: default # 指定命名空间
+        app: nginx # 指定带 app=nginx 标签的 Pod
+        io.kubernetes.pod.namespace: default # 指定 default 命名空间
   destinationCIDRs:
   - "0.0.0.0/0"
   - "::/0"
@@ -293,9 +286,27 @@ spec:
     nodeSelector:
       matchLabels:
         cilium.io/egress-gateway: "true"
-    # 使用指定的 IP 出去，此 IP 必须在 Egress Gateway 其中一台节点上存在，如果不指定，则会任选一台节点的 IP
-    egressIP: 43.156.74.191
+    # 指定使用 Egress Gateway 节点的内网 IP 出去
+    # （即使是出公网，也是指定节点内网 IP，不能直接使用公网 IP）
+    egressIP: "172.22.49.119"
 ```
+
+查看 Egress Gateway 节点：
+
+```bash
+$ kubectl get nodes -o wide 172.22.49.119
+NAME            STATUS   ROLES    AGE   VERSION         INTERNAL-IP     EXTERNAL-IP    OS-IMAGE               KERNEL-VERSION           CONTAINER-RUNTIME
+172.22.49.119   Ready    <none>   69m   v1.32.2-tke.6   172.22.49.119   129.226.84.9   TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
+```
+
+可以看到该节点的公网 IP 为 `129.226.84.9`，进入 Pod 测试当前出口 IP：
+
+```bash
+$ kubectl -n default exec -it deployment/nginx -- curl ifconfig.me
+129.226.84.9
+```
+
+可以看到最终的出口 IP 就是 `129.226.84.9`，符合预期。
 
 ## 参考资料
 
