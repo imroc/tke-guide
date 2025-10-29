@@ -237,9 +237,9 @@ NAME            STATUS   ROLES    AGE     VERSION         INTERNAL-IP     EXTERN
 
 ## 配置 CiliumEgressGatewayPolicy
 
-通过配置 `CiliumEgressGatewayPolicy` 可以灵活的定义哪些 Pod 的流量走哪些网关的出口 IP 出集群，配置方法参考官方文档 [Writing egress gateway policies](https://docs.cilium.io/en/stable/network/egress-gateway/egress-gateway/#writing-egress-gateway-policies)。
+通过配置 `CiliumEgressGatewayPolicy` 可以灵活的定义哪些 Pod 的流量走哪些网关的出口 IP 出集群，配置方法参考官方文档 [Writing egress gateway policies](https://docs.cilium.io/en/stable/network/egress-gateway/egress-gateway/#writing-egress-gateway-policies)。
 
-## 案例
+## 使用案例
 ### 指定工作负载出口 IP
 
 部署一个 `nginx` 工作负载：
