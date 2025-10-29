@@ -230,7 +230,7 @@ spec:
     nodeSelector:
       matchLabels:
         cilium.io/egress-gateway: "true"
-    # 使用指定的 IP 出去，此 IP 必须在 Egress Gateway 其中一台节点上存在
+    # 使用指定的 IP 出去，此 IP 必须在 Egress Gateway 其中一台节点上存在，如果不指定，则会任选一台节点的 IP
     egressIP: 43.156.74.191
 ```
 
