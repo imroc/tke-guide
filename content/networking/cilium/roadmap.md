@@ -8,6 +8,7 @@
 - [x] e2e 功能测试，确保各项功能没有问题
 - [ ] TKE 侧适配：ipamd 默认容忍 cilium 污点
 - [ ] TKE 侧适配：tke-eni-agent 避开使用 cilium 的路由表 ID （2003/2004）
+- [ ] 为工作负载指定出口 IP 的方案
 - [ ] e2e 性能测试
 - [ ] 探索与 kube-proxy 共存方案
 - [ ] 支持使用 ENI Trunking 网络模式自建 cilium
