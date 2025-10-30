@@ -45,3 +45,19 @@ Image versions         cilium             quay.tencentcloudcr.com/cilium/cilium:
                        cilium-operator    quay.tencentcloudcr.com/cilium/operator-generic:v1.18.3@sha256:b5a0138e1a38e4437c5215257ff4e35373619501f4877dbaf92c89ecfad81797: 2
                        hubble-relay       quay.tencentcloudcr.com/cilium/hubble-relay:v1.18.3@sha256:e53e00c47fe4ffb9c086bad0c1c77f23cb968be4385881160683d9e15aa34dc3: 1
 ```
+
+
+## 安装 Hubble 客户端
+
+参考 [Install the Hubble Client](https://docs.cilium.io/en/stable/observability/hubble/setup/#install-the-hubble-client) 将 `hubble` 二进制 (Hubble 客户端) 安装到本机。
+
+安装完成后，验证下客户端可正常访问 Hubble API：
+
+```bash
+$ hubble status -P
+Healthcheck (via 127.0.0.1:4245): Ok
+Current/Max Flows: 12,285/12,285 (100.00%)
+Flows/s: 26.42
+Connected Nodes: 3/3
+
+```
