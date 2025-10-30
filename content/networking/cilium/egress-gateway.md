@@ -55,7 +55,7 @@ kubectl rollout restart deploy cilium-operator -n kube-system
 
 :::tip[备注]
 
-如果你是使用 [安装cilium](install.md) 中 **使用 helm 安装 cilium** 给的安装方法进行了安装，可通过以下方式开启 Egress Gateway：
+如果你是使用 [安装cilium](install.md) 中 **使用 helm 安装 cilium** 给的安装方法进行了安装，启用 Egress Gateway 的命令可以简化成如下所示：
 
 ```bash
 helm upgrade cilium cilium/cilium --version 1.18.3 \
