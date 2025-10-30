@@ -447,9 +447,9 @@ spec:
     egressIP: 172.22.49.119
 ```
 
-### 不同业务的外访流量走不同 Egress 节点出去
+### 不同环境或不同业务 Pod 的外访流量走不同 Egress 节点出去
 
-如果不同业务通过 namespace 隔离，可以指定某 namespace 下 Pod 的外访流量走指定 Egress 节点出去：
+如果不同环境或不同业务的 Pod 通过 namespace 隔离，可以指定某 namespace 下 Pod 的外访流量走指定 Egress 节点出去：
 
 ```yaml showLineNumbers
 apiVersion: cilium.io/v2
@@ -462,6 +462,29 @@ spec:
       matchLabels:
         # highlight-add-line
         io.kubernetes.pod.namespace: prod # 指定 prod 命名空间下所有 Pod
+  destinationCIDRs:
+  - "0.0.0.0/0"
+  - "::/0"
+  egressGateway:
+    nodeSelector:
+      matchLabels:
+        kubernetes.io/hostname: 172.22.49.119
+    egressIP: 172.22.49.119
+```
+
+如果通过 label 来区分不同业务，可以指定所有 namespace 下指定 label 的 Pod 的外访流量走指定 Egress 节点出去：
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumEgressGatewayPolicy
+metadata:
+  name: egress-test
+spec:
+  selectors:
+  - podSelector:
+      matchLabels:
+        # highlight-add-line
+        business: mall # 指定所有含 business=mall 的 Pod
   destinationCIDRs:
   - "0.0.0.0/0"
   - "::/0"
