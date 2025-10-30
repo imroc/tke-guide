@@ -1,4 +1,4 @@
-# 使用 Egress Gateway 控制外访流量
+# 使用 Egress Gateway 控制集群外访流量
 
 ## 已知问题
 
