@@ -89,8 +89,8 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
   如果通过控制台创建，注意勾选**创建弹性公网IP**:
   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F29%2F20251029142955.png)
 
-  新增一下 Labels:
-  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F29%2F20251029143056.png)
+  新增一下 Labels 和 Taints (可选):
+  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F30%2F20251030140442.png)
 
   如果通过 terraform 创建，参考以下代码片段：
   ```hcl showLineNumbers
@@ -108,7 +108,7 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
       name = "egress-node"
       value = "true"
     }
-    # （可选）给节点加污点，避免普通 Pod 调度到 Egress Gateway 节点
+    # （可选）给节点加污点，避免普通 Pod 调度到 Egress 节点
     taints {
       key    = "egress-node"
       effect = "NoSchedule"
@@ -135,8 +135,8 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
   如果通过控制台创建，注意勾选**分配免费公网IP**:
   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F29%2F20251029142148.png)
 
-  新增一下 Labels:
-  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F29%2F20251029142311.png)
+  新增一下 Labels 和 Taints (可选):
+  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F30%2F20251030140442.png)
 
   如果通过 terraform 创建，参考以下代码片段：
 
@@ -167,7 +167,7 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
     }
     # highlight-add-end
 
-    # （可选）给节点加污点，避免普通 Pod 调度到 Egress Gateway 节点
+    # （可选）给节点加污点，避免普通 Pod 调度到 Egress 节点
     taints {
       key    = "egress-node"
       effect = "NoSchedule"
@@ -199,7 +199,7 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
         # 给扩出来的 Node 打上这个 label
         labels:
           egress-node: "true"
-        # （可选）给节点加污点，避免普通 Pod 调度到 Egress Gateway 节点
+        # （可选）给节点加污点，避免普通 Pod 调度到 Egress 节点
         taints:
         - key: egress-node
           effect: NoSchedule
@@ -251,7 +251,7 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
   </TabItem>
 </Tabs>
 
-节点池创建并初始化节点后，通过如下方式查看哪些节点是 Egress Gateway 使用的节点，以及分配的公网 IP 是什么：
+节点池创建并初始化节点后，通过如下方式查看哪些节点是 egress 节点，以及分配的公网 IP 是什么：
 
 ```bash
 $ kubectl get nodes -o wide -l egress-node=true
@@ -293,7 +293,7 @@ spec:
         image: nginx:latest
 ```
 
-通过配置 `CiliumEgressGatewayPolicy` 来指定该工作负载使用指定 Egress Gateway 节点访问公网：
+通过配置 `CiliumEgressGatewayPolicy` 来指定该工作负载使用指定 egress 节点访问公网：
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -319,7 +319,7 @@ spec:
     egressIP: 172.22.49.119
 ```
 
-查看 Egress Gateway 节点：
+查看 egress 节点：
 
 ```bash
 $ kubectl get nodes -o wide 172.22.49.119
