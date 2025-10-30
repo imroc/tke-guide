@@ -31,6 +31,7 @@ $ cilium status
 DaemonSet              cilium                   Desired: 3, Ready: 3/3, Available: 3/3
 DaemonSet              cilium-envoy             Desired: 3, Ready: 3/3, Available: 3/3
 Deployment             cilium-operator          Desired: 2, Ready: 2/2, Available: 2/2
+                       # highlight-next-line
 Deployment             hubble-relay             Desired: 1, Ready: 1/1, Available: 1/1
 Containers:            cilium                   Running: 3
                        cilium-envoy             Running: 3
