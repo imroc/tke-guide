@@ -23,6 +23,9 @@
 ```bash showLineNumbers
 helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
+  --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
+  --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
+  --set operator.image.repository=quay.tencentcloudcr.com/cilium/operator \
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
   --set ipam.mode=delegated-plugin \
@@ -50,12 +53,28 @@ kubectl rollout restart ds cilium -n kube-system
 kubectl rollout restart deploy cilium-operator -n kube-system
 ```
 
-## 为 Egress Gateway 新建节点池
+:::tip[备注]
 
-创建一个节点池作为 Egress Gateway 使用的节点池，后续可以配置让某些 Pod 出集群的流量经过这些节点出去，创建方法参考 [安装cilium](install.md) 中 **新建节点池** 部分。
+如果你是使用 [安装cilium](install.md) 中 **使用 helm 安装 cilium** 给的安装方法进行了安装，可通过以下方式开启 Egress Gateway：
+
+```bash
+helm upgrade cilium cilium/cilium --version 1.18.3 \
+  --namespace kube-system \
+  --reuse-values \
+  --set egressGateway.enabled=true \
+  --set enableIPv4Masquerade=true \
+  --set ipv4NativeRoutingCIDR="VPC_CIDR" \
+  --set bpf.masquerade=true
+```
+
+:::
+
+## 创建 Egress 节点
+
+可以创建一个节点池作为 Egress 节点池，后续可以配置让某些 Pod 出集群的流量经过这些节点出去，创建方法参考 [安装cilium](install.md) 中 **新建节点池** 部分。
 
 需要注意的是：
-1. 要通过节点池为扩出来的节点打上 label（如 `cilium.io/egress-gateway=true`）用以标识的用于 Egress Gateway。
+1. 要通过节点池为扩出来的节点打上 label（如 `egress-node=true`）用以标识的用于 Egress Gateway。
 2. 如果需要出公网，要为节点分配公网 IP。
 3. 如果不希望普通 Pod 调度过去，可以加下污点。
 
@@ -83,12 +102,12 @@ kubectl rollout restart deploy cilium-operator -n kube-system
     # highlight-add-start
     # 给扩出来的 Node 打上这个 label
     labels {
-      name = "cilium.io/egress-gateway"
+      name = "egress-node"
       value = "true"
     }
     # （可选）给节点加污点，避免普通 Pod 调度到 Egress Gateway 节点
     taints {
-      key    = "cilium.io/egress-gateway"
+      key    = "egress-node"
       effect = "NoSchedule"
       value  = "true"
     }
@@ -137,13 +156,13 @@ kubectl rollout restart deploy cilium-operator -n kube-system
     # highlight-add-start
     labels = {
       # 给扩出来的 Node 打上这个 label
-      "cilium.io/egress-gateway" = "true"
+      "egress-node" = "true"
     }
     # highlight-add-end
 
     # （可选）给节点加污点，避免普通 Pod 调度到 Egress Gateway 节点
     taints {
-      key    = "cilium.io/egress-gateway"
+      key    = "egress-node"
       effect = "NoSchedule"
       value  = "true"
     }
@@ -172,10 +191,10 @@ kubectl rollout restart deploy cilium-operator -n kube-system
         # highlight-add-start
         # 给扩出来的 Node 打上这个 label
         labels:
-          cilium.io/egress-gateway: "true"
+          egress-node: "true"
         # （可选）给节点加污点，避免普通 Pod 调度到 Egress Gateway 节点
         taints:
-        - key: cilium.io/egress-gateway
+        - key: egress-node
           effect: NoSchedule
           value: "true"
         # highlight-add-end
@@ -228,7 +247,7 @@ kubectl rollout restart deploy cilium-operator -n kube-system
 节点池创建并初始化节点后，通过如下方式查看哪些节点是 Egress Gateway 使用的节点，以及分配的公网 IP 是什么：
 
 ```bash
-$ kubectl get nodes -o wide -l cilium.io/egress-gateway=true
+$ kubectl get nodes -o wide -l egress-node=true
 NAME            STATUS   ROLES    AGE     VERSION         INTERNAL-IP     EXTERNAL-IP      OS-IMAGE               KERNEL-VERSION           CONTAINER-RUNTIME
 172.22.48.125   Ready    <none>   3h17m   v1.32.2-tke.6   172.22.48.125   43.134.181.245   TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
 172.22.48.48    Ready    <none>   3h17m   v1.32.2-tke.6   172.22.48.48    43.156.74.191    TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
@@ -240,7 +259,9 @@ NAME            STATUS   ROLES    AGE     VERSION         INTERNAL-IP     EXTERN
 通过配置 `CiliumEgressGatewayPolicy` 可以灵活的定义哪些 Pod 的流量走哪些网关的出口 IP 出集群，配置方法参考官方文档 [Writing egress gateway policies](https://docs.cilium.io/en/stable/network/egress-gateway/egress-gateway/#writing-egress-gateway-policies)。
 
 ## 使用案例
-### 指定工作负载出口 IP
+### 外访流量走固定的 Egress 节点出去
+
+如果希望让外访流量通过固定的 Egress 节点出去（出公网时，出口源 IP 将固定是 Egress 节点绑定的公网 IP），可参考下面的方法配置。
 
 部署一个 `nginx` 工作负载：
 
@@ -282,13 +303,13 @@ spec:
   - "0.0.0.0/0"
   - "::/0"
   egressGateway:
-    # 选中 Egress Gateway 节点
     nodeSelector:
       matchLabels:
-        cilium.io/egress-gateway: "true"
-    # 指定使用 Egress Gateway 节点的内网 IP 出去
-    # （即使是出公网，也是指定节点内网 IP，不能直接使用公网 IP）
-    egressIP: "172.22.49.119"
+        kubernetes.io/hostname: 172.22.49.119 # egress 节点名称
+    # 重要：经测试在 TKE 环境这里必须指定使用 egress 节点的内网 IP，
+    # 用于决定 egress 节点转发外访流量时使用什么源 IP，不管是转发内网
+    # 还是公网流量，出 egress 节点时使用的源 IP 都是使用节点的内网 IP。
+    egressIP: 172.22.49.119
 ```
 
 查看 Egress Gateway 节点：
@@ -307,6 +328,81 @@ $ kubectl -n default exec -it deployment/nginx -- curl ifconfig.me
 ```
 
 可以看到最终的出口 IP 就是 `129.226.84.9`，符合预期。
+
+### 外访流量走一组 Egress 节点出去
+
+如果希望让外访流量通过固定的一组 Egress 节点出去（出公网时，出口源 IP 将固定是 Egress 节点绑定的公网 IP），可参考下面的方法配置。
+
+部署一个 `nginx` 工作负载：
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: default
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+```
+
+通过配置 `CiliumEgressGatewayPolicy` 来指定该工作负载通过一组 Egress 节点进行流量外访：
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumEgressGatewayPolicy
+metadata:
+  name: egress-test
+spec:
+  selectors:
+  - podSelector: # 指定该 egress 针对哪些 Pod 生效
+      matchLabels:
+        app: nginx # 指定带 app=nginx 标签的 Pod
+        io.kubernetes.pod.namespace: default # 指定命名空间
+  destinationCIDRs:
+  - "0.0.0.0/0"
+  - "::/0"
+  egressGateway: # 该字段是必填的，如果要指定多个 egress 节点，这里还是必须要指定一个，不然会报错： spec.egressGateway: Required value
+    nodeSelector:
+      matchLabels:
+        kubernetes.io/hostname: 172.22.49.20 # egress 节点名称
+    egressIP: 172.22.49.20 # egress 节点内网 IP
+  egressGateways: # 其余的 egress 节点追加到这个列表
+  - nodeSelector:
+      matchLabels:
+        kubernetes.io/hostname: 172.22.49.147
+    egressIP: 172.22.49.147
+  - nodeSelector:
+      matchLabels:
+        kubernetes.io/hostname: 172.22.49.119
+    egressIP: 172.22.49.119
+```
+
+测试可以看到工作负载中各个 Pod 使用的出口公网 IP 可能不同，但都使用的当前定义的这组 Egress 节点绑定的公网 IP：
+
+```bash
+$ kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} sh -c 'kubectl exec -n default -it {} -- curl -s ifconfig.me 2>/dev/null || echo "Failed"; printf ":\t%s\n" "{}"'
+129.226.84.9:   nginx-54c98b4f84-5wlpc
+43.156.123.70:  nginx-54c98b4f84-6jx8n
+43.156.123.70:  nginx-54c98b4f84-82wmq
+129.226.84.9:   nginx-54c98b4f84-8ptvh
+129.226.84.9:   nginx-54c98b4f84-jfr2x
+129.226.84.9:   nginx-54c98b4f84-jlrr7
+43.156.123.70:  nginx-54c98b4f84-mpvpz
+129.226.84.9:   nginx-54c98b4f84-s7q4s
+43.156.123.70:  nginx-54c98b4f84-vsnng
+43.156.123.70:  nginx-54c98b4f84-xt8bs
+```
 
 ## 参考资料
 

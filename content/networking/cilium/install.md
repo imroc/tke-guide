@@ -166,6 +166,9 @@ kubectl apply -f cni-config.yaml
 ```bash
 helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
+  --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
+  --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
+  --set operator.image.repository=quay.tencentcloudcr.com/cilium/operator \
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
   --set ipam.mode=delegated-plugin \
@@ -221,7 +224,20 @@ extraConfig:
 生产环境部署建议将参数保存到 `values.yaml`，然后在安装或更新时，都可以执行下面的命令（如果要升级版本，替换 `--version` 即可）：
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.18.3 --namespace=kube-system -f values.yaml
+helm upgrade --install cilium cilium/cilium --version 1.18.3 \
+  --namespace=kube-system \
+  -f values.yaml
+```
+
+如果自定义的配置较多，建议拆成多个 yaml 文件维护，比如替换镜像地址的配置放到 `image-values.yaml`，用于启用 Egress Gateway 的配置放到 `egress-values.yaml`，配置容器 request 与 limit 的放到 `resources-values.yaml`，更新配置时通过加多个 `-f` 参数来合并多个 yaml 文件：
+
+```bash
+helm upgrade --install cilium cilium/cilium --version 1.18.3 \
+  --namespace=kube-system \
+  -f values.yaml \
+  -f image-values.yaml \
+  -f egress-values.yaml \
+  -f resources-values.yaml
 ```
 
 :::
