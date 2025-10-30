@@ -8,7 +8,7 @@
 
 ## 启用 Hubble Ralay
 
-Hubble 包含 Hubble Server 和 Hubble Relay 两个组件，其中 Hubble Server 已内置到每个节点的 cilium-agent 中并默认开启，Hubble Relay 是一个需要单独部署的组件，用于聚合集群所有节点 Hubble Server 的数据，提供统一的 API 接口。
+Hubble 包括 Hubble Server 和 Hubble Relay，其中 Hubble Server 已内置到每个节点的 cilium-agent 中并默认开启，Hubble Relay 是一个需要单独部署的组件，用于聚合集群所有节点 Hubble Server 的数据，提供统一的 API 接口。
 
 使用下面的命令启用 Hubble Relay：
 
