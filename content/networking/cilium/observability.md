@@ -82,3 +82,21 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
    --set hubble.ui.frontend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui
 ```
 
+
+确认 Hubble UI 的 Pod 正常运行：
+
+```bash
+$ kubectl --namespace=kube-system get pod -l app.kubernetes.io/name=hubble-ui
+NAME                         READY   STATUS    RESTARTS   AGE
+hubble-ui-5dd5877df5-8c69k   2/2     Running   0          5m41s
+
+```
+
+然后就可以执行 `cilium hubble ui` 自动打开浏览器查看集群的服务拓扑了。
+
+```bash
+$ cilium hubble ui
+ℹ  Opening "http://localhost:12000" in your browser...
+```
+
+更多请参考 [Network Observability with Hubble / Service Map & Hubble UI](https://docs.cilium.io/en/stable/observability/hubble/hubble-ui/)。
