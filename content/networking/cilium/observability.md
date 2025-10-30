@@ -6,7 +6,11 @@
 
 :::
 
-## 启用 Hubble
+## 启用 Hubble Ralay
+
+Hubble 包含 Hubble Server 和 Hubble Relay 两个组件，其中 Hubble Server 已内置到每个节点的 cilium-agent 中并默认开启，Hubble Relay 是一个需要单独部署的组件，用于聚合集群所有节点 Hubble Server 的数据，提供统一的 API 接口。
+
+使用下面的命令启用 Hubble Relay：
 
 ```bash
 helm upgrade cilium cilium/cilium --version 1.18.3 \
@@ -50,9 +54,9 @@ Image versions         cilium             quay.tencentcloudcr.com/cilium/cilium:
 
 ## 安装 Hubble 客户端
 
-参考 [Install the Hubble Client](https://docs.cilium.io/en/stable/observability/hubble/setup/#install-the-hubble-client) 将 `hubble` 二进制 (Hubble 客户端) 安装到本机。
+Hubble 客户端用于与 Hubble Ralay 提供的接口进行交互，参考 [Install the Hubble Client](https://docs.cilium.io/en/stable/observability/hubble/setup/#install-the-hubble-client) 将 `hubble` 二进制 (Hubble 客户端) 安装到本机。
 
-安装完成后，验证下客户端可正常访问 Hubble API：
+安装完成后，验证下 Hubble 客户端可正常访问 Hubble API：
 
 ```bash
 $ hubble status -P
@@ -60,5 +64,20 @@ Healthcheck (via 127.0.0.1:4245): Ok
 Current/Max Flows: 12,285/12,285 (100.00%)
 Flows/s: 26.42
 Connected Nodes: 3/3
+```
 
+## 启用 Hubble UI
+
+Hubble UI 可用于可视化查看集群中的服务拓扑。
+
+使用下面的命令启用 Hubble UI：
+
+```bash
+helm upgrade cilium cilium/cilium --version 1.18.3 \
+   --namespace kube-system \
+   --reuse-values \
+   --set hubble.relay.enabled=true \
+   --set hubble.ui.enabled=true \
+   --set hubble.ui.backend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui-backend \
+   --set hubble.ui.frontend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui
 ```
