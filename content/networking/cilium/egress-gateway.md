@@ -414,6 +414,39 @@ NAME            EXTERNAL-IP
 172.22.49.20    43.163.1.23
 ```
 
+### 集群所有外访流量统一走 Egress 节点出去
+
+如果要让集群中所有 Pod 的外访流量统一走 Egress 节点出去，可以使用 `podSelector: {}` 选中集群全部 Pod：
+
+```yaml showLineNumbers
+apiVersion: cilium.io/v2
+kind: CiliumEgressGatewayPolicy
+metadata:
+  name: egress-test
+spec:
+  # highlight-add-start
+  selectors:
+  - podSelector: {} # 选中集群全部 Pod
+  # highlight-add-end
+  destinationCIDRs:
+  - "0.0.0.0/0"
+  - "::/0"
+  egressGateway: # 该字段是必填的，如果要指定多个 egress 节点，这里还是必须要指定一个，不然会报错： spec.egressGateway: Required value
+    nodeSelector:
+      matchLabels:
+        kubernetes.io/hostname: 172.22.49.20 # egress 节点名称
+    egressIP: 172.22.49.20 # egress 节点内网 IP
+  egressGateways: # 其余的 egress 节点追加到这个列表
+  - nodeSelector:
+      matchLabels:
+        kubernetes.io/hostname: 172.22.49.147
+    egressIP: 172.22.49.147
+  - nodeSelector:
+      matchLabels:
+        kubernetes.io/hostname: 172.22.49.119
+    egressIP: 172.22.49.119
+```
+
 ## 常见问题
 
 ### 配置策略后网络不通
