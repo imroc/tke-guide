@@ -189,6 +189,15 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
 以下是是包含各参数解释的 `values.yaml`:
 
 ```yaml showLineNumbers title="values.yaml"
+# 替换 cilium, cilium-envoy 和 cilium-operator 的镜像为 TKE 上可以直接拉取到的 mirror 地址
+image:
+  repository: quay.tencentcloudcr.com/cilium/cilium
+envoy:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/cilium-envoy
+operator:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/operator
 # 使用 native routing，Pod 直接使用 VPC IP 路由，无需 overlay，参考 native routing: https://docs.cilium.io/en/stable/network/concepts/routing/#native-routing
 routingMode: "native" 
 endpointRoutes:
@@ -462,7 +471,9 @@ cilium-1.18.3.tgz
 
 然后将 chart 压缩包复制到执行 helm 安装的机器上，安装时指定下 chart 压缩包的路径：
 ```bash
-helm upgrade --install --namespace kube-system -f values.yaml --version 1.18.3 cilium ./cilium-1.18.3.tgz
+helm upgrade --install cilium ./cilium-1.18.3.tgz \
+  --namespace kube-system \
+  -f values.yaml
 ```
 
 ### 大规模场景如何优化？
@@ -534,6 +545,101 @@ bpf:
 :::
 
 如果有更高级的流量外访需求（比如指定某些 Pod 用某个公网 IP 访问公网），可以参考 [使用 Egress Gateway 控制集群外访流量](egress-gateway.md)。
+
+### 镜像拉取失败？
+
+cilium 依赖的大部分镜像在 `quay.io`，如果安装时没使用本文给的替换镜像地址的参数配置，可能导致 cilium 相关镜像拉取失败（比如节点没有访问公网的能力，或者集群在中国大陆）。
+
+在 TKE 环境中，提供了 `quay.tencentcloudcr.com` 这个 mirror 地址，用于下载 `quay.io` 域名下的镜像，直接将原镜像地址中 `quay.io` 域名替换为 `quay.tencentcloudcr.com` 即可，拉取时走内网，无需节点有公网能力，也没有地域限制。
+
+如果你配置了更多安装的参数，可能会涉及更多的镜像依赖，用以下命令可替换并更新所有 cilium 依赖镜像为在 TKE 环境中可直接内网拉取的镜像地址：
+
+```bash
+helm upgrade cilium cilium/cilium --version 1.18.3 \
+  --namespace kube-system \
+  --reuse-values \
+  --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
+  --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
+  --set operator.image.repository=quay.tencentcloudcr.com/cilium/operator \
+  --set certgen.image.repository=quay.tencentcloudcr.com/cilium/certgen \
+  --set hubble.relay.image.repository=quay.tencentcloudcr.com/cilium/hubble-relay \
+  --set hubble.ui.backend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui-backend \
+  --set hubble.ui.frontend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui \
+  --set nodeinit.image.repository=quay.tencentcloudcr.com/cilium/startup-script \
+  --set preflight.image.repository=quay.tencentcloudcr.com/cilium/cilium \
+  --set preflight.envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
+  --set clustermesh.apiserver.image.repository=quay.tencentcloudcr.com/cilium/clustermesh-apiserver \
+  --set authentication.mutual.spire.install.agent.image.repository=docker.io/k8smirror/spire-agent \
+  --set authentication.mutual.spire.install.server.image.repository=docker.io/k8smirror/spire-server
+```
+
+如果你使用 yaml 管理配置，可以将镜像替换的配置保存到 `image-values.yaml`:
+
+```yaml title="image-values.yaml"
+image:
+  repository: quay.tencentcloudcr.com/cilium/cilium
+
+envoy:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/cilium-envoy
+
+operator:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/operator
+
+certgen:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/certgen
+
+hubble:
+  relay:
+    image:
+      repository: quay.tencentcloudcr.com/cilium/hubble-relay
+  ui:
+    backend:
+      image:
+        repository: quay.tencentcloudcr.com/cilium/hubble-ui-backend
+    frontend:
+      image:
+        repository: quay.tencentcloudcr.com/cilium/hubble-ui
+
+nodeinit:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/startup-script
+
+preflight:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/cilium
+  envoy:
+    image:
+      repository: quay.tencentcloudcr.com/cilium/cilium-envoy
+
+clustermesh:
+  apiserver:
+    image:
+      repository: quay.tencentcloudcr.com/cilium/clustermesh-apiserver
+
+authentication:
+  mutual:
+    spire:
+      install:
+        agent:
+          image:
+            repository: docker.io/k8smirror/spire-agent
+        server:
+          image:
+            repository: docker.io/k8smirror/spire-server
+```
+
+更新 cilium 时使用 `-f` 将镜像替换的配置追加进去：
+
+```bash showLineNumbers
+helm upgrade --install cilium cilium/cilium --version 1.18.3 \
+  --namespace=kube-system \
+  -f values.yaml \
+  # highlight-add-line
+  -f image-values.yaml
+```
 
 ## 参考资料
 
