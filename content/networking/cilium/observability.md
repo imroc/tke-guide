@@ -81,3 +81,4 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
    --set hubble.ui.backend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui-backend \
    --set hubble.ui.frontend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui
 ```
+
