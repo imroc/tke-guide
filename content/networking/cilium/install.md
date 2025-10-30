@@ -631,7 +631,7 @@ authentication:
             repository: docker.io/k8smirror/spire-server
 ```
 
-更新 cilium 时使用 `-f` 将镜像替换的配置追加进去：
+更新 cilium 时追加一个 `-f image-values.yaml` 将镜像替换的配置加上：
 
 ```bash showLineNumbers
 helm upgrade --install cilium cilium/cilium --version 1.18.3 \
