@@ -552,7 +552,7 @@ cilium 依赖的大部分镜像在 `quay.io`，如果安装时没使用本文给
 
 在 TKE 环境中，提供了 `quay.tencentcloudcr.com` 这个 mirror 地址，用于下载 `quay.io` 域名下的镜像，直接将原镜像地址中 `quay.io` 域名替换为 `quay.tencentcloudcr.com` 即可，拉取时走内网，无需节点有公网能力，也没有地域限制。
 
-如果你配置了更多安装的参数，可能会涉及更多的镜像依赖，用以下命令可替换并更新所有 cilium 依赖镜像为在 TKE 环境中可直接内网拉取的镜像地址：
+如果你配置了更多安装的参数，可能会涉及更多的镜像依赖，没有配置镜像地址替换的话可能导致镜像拉取失败，用以下命令可将所有 cilium 依赖镜像一键替换为 TKE 环境中可直接内网拉取的 mirror 地址：
 
 ```bash
 helm upgrade cilium cilium/cilium --version 1.18.3 \
