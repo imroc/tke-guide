@@ -189,7 +189,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
 以下是是包含各参数解释的 `values.yaml`:
 
 ```yaml showLineNumbers title="values.yaml"
-# 替换 cilium, cilium-envoy 和 cilium-operator 的镜像为 TKE 上可以直接拉取到的 mirror 地址
+# 替换 cilium, cilium-envoy 和 cilium-operator 的镜像为 TKE 上可以直接拉取到的 mirror 仓库地址
 image:
   repository: quay.tencentcloudcr.com/cilium/cilium
 envoy:
@@ -550,9 +550,9 @@ bpf:
 
 cilium 依赖的大部分镜像在 `quay.io`，如果安装时没使用本文给的替换镜像地址的参数配置，可能导致 cilium 相关镜像拉取失败（比如节点没有访问公网的能力，或者集群在中国大陆）。
 
-在 TKE 环境中，提供了 `quay.tencentcloudcr.com` 这个 mirror 地址，用于下载 `quay.io` 域名下的镜像，直接将原镜像地址中 `quay.io` 域名替换为 `quay.tencentcloudcr.com` 即可，拉取时走内网，无需节点有公网能力，也没有地域限制。
+在 TKE 环境中，提供了 `quay.tencentcloudcr.com` 这个 mirror 仓库地址，用于下载 `quay.io` 域名下的镜像，直接将原镜像地址中 `quay.io` 域名替换为 `quay.tencentcloudcr.com` 即可，拉取时走内网，无需节点有公网能力，也没有地域限制。
 
-如果你配置了更多安装的参数，可能会涉及更多的镜像依赖，没有配置镜像地址替换的话可能导致镜像拉取失败，用以下命令可将所有 cilium 依赖镜像一键替换为 TKE 环境中可直接内网拉取的 mirror 地址：
+如果你配置了更多安装的参数，可能会涉及更多的镜像依赖，没有配置镜像地址替换的话可能导致镜像拉取失败，用以下命令可将所有 cilium 依赖镜像一键替换为 TKE 环境中可直接内网拉取的 mirror 仓库地址：
 
 ```bash
 helm upgrade cilium cilium/cilium --version 1.18.3 \
@@ -643,7 +643,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
 
 :::tip[说明]
 
-使用 TKE 提供的 mirror 地址拉取外部镜像，本身不提供 SLA 保障，某些时候可能也会拉取失败，通常最终会自动重试成功。
+使用 TKE 提供的 mirror 仓库地址拉取外部镜像，本身不提供 SLA 保障，某些时候可能也会拉取失败，通常最终会自动重试成功。
 
 如果希望拉取镜像具备更高的可用性，可将 cilium 依赖镜像同步到了自己的 [TCR 镜像仓库](https://cloud.tencent.com/product/tcr)，然后参考这里的依赖镜像替换的配置，将相应镜像再替换为自己同步后的镜像地址。
 
