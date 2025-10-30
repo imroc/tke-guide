@@ -416,7 +416,7 @@ NAME            EXTERNAL-IP
 
 ## 常见问题
 
-### 配置 CiliumEgressGatewayPolicy 后网络不通
+### 配置策略后网络不通
 
 首先确认 CiliumEgressGatewayPolicy 配置方法是否正确，在 TKE 环境下，确保 egressGateway 的 nodeSelector 只选中一个 node，egressIP 必须配置该 node 的内网 IP，否则可能就会出现不通的问题。
 
@@ -445,7 +445,7 @@ Source IP      Destination CIDR   Egress IP       Gateway IP
 
 ### 出口 IP 不符预期
 
-通常是跟 NAT 网关冲突，如果 VPC 路由表配置了公网走 NAT 网关，最终就可能走 NAT 网关出公网而不是用 egress 节点绑定的公网 IP  出去。
+通常是跟 NAT 网关冲突，如果 VPC 路由表配置了公网走 NAT 网关，最终就可能走 NAT 网关出公网而不是用 egress 节点绑定的公网 IP  出去，所以可以检查下 VPC 路由表，是否有配置发往 NAT 网关的路由规则。
 
 ## 参考资料
 
