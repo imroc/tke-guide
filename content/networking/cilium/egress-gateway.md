@@ -443,6 +443,10 @@ Source IP      Destination CIDR   Egress IP       Gateway IP
 
 `Source IP` 是 Pod IP，`Egress IP` 是走当前节点出去使用的源 IP， `0.0.0.0` 表示当前节点没有转发对应 Pod IP 的流量，如果全都为 `0.0.0.0` 表示没有 egress 规则选中当前节点。
 
+### 出口 IP 不符预期
+
+通常是跟 NAT 网关冲突，如果 VPC 路由表配置了公网走 NAT 网关，最终就可能走 NAT 网关出公网而不是用 egress 节点绑定的公网 IP  出去。
+
 ## 参考资料
 
 - [Egress Gateway](https://docs.cilium.io/en/stable/network/egress-gateway/egress-gateway/)
