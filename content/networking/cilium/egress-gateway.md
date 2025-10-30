@@ -407,7 +407,7 @@ $ kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | 
 但都使用的当前定义的这组 egress 节点所绑定的公网 IP：
 
 ```bash
-$ kubectl get nodes -o custom-columns="NAME:.metadata.name,EXTERNAL-IP:.status.addresses[?(@.type=='ExternalIP')].address" -l cilium.io/egress-gateway=true
+$ kubectl get nodes -o custom-columns="NAME:.metadata.name,EXTERNAL-IP:.status.addresses[?(@.type=='ExternalIP')].address" -l egress-node=true
 NAME            EXTERNAL-IP
 172.22.49.119   129.226.84.9
 172.22.49.147   43.156.123.70
@@ -449,4 +449,4 @@ Source IP      Destination CIDR   Egress IP       Gateway IP
 
 ## 参考资料
 
-- [Egress Gateway](https://docs.cilium.io/en/stable/network/egress-gateway/egress-gateway/)
+- [Cilium Egress Gateway](https://docs.cilium.io/en/stable/network/egress-gateway/egress-gateway/)
