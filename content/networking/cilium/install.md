@@ -641,6 +641,12 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   -f image-values.yaml
 ```
 
+:::tip[备注]
+
+如果将依赖镜像同步到了自己的镜像仓库（如 [TCR](https://cloud.tencent.com/product/tcr)），也可以参考这里的依赖镜像替换的配置，将相应镜像再替换为自己同步的镜像地址。
+
+:::
+
 ## 参考资料
 
 - [Installation using Helm](https://docs.cilium.io/en/stable/installation/k8s-install-helm/)
