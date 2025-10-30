@@ -641,9 +641,11 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   -f image-values.yaml
 ```
 
-:::tip[备注]
+:::tip[说明]
 
-如果将依赖镜像同步到了自己的镜像仓库（如 [TCR](https://cloud.tencent.com/product/tcr)），也可以参考这里的依赖镜像替换的配置，将相应镜像再替换为自己同步的镜像地址。
+使用 TKE 提供的 mirror 地址拉取外部镜像，本身不提供 SLA 保障，某些时候可能也会拉取失败，通常最终会自动重试成功。
+
+如果希望拉取镜像具备更高的可用性，可将 cilium 依赖镜像同步到了自己的 [TCR 镜像仓库](https://cloud.tencent.com/product/tcr)，然后参考这里的依赖镜像替换的配置，将相应镜像再替换为自己同步后的镜像地址。
 
 :::
 
