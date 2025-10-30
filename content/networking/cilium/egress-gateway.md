@@ -388,7 +388,7 @@ spec:
     egressIP: 172.22.49.119
 ```
 
-测试可以看到工作负载中各个 Pod 使用的出口公网 IP 可能不同，但都使用的当前定义的这组 Egress 节点绑定的公网 IP：
+测试可以看到工作负载中各个 Pod 使用的出口公网 IP 可能不同：
 
 ```bash
 $ kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} sh -c 'kubectl exec -n default -it {} -- curl -s ifconfig.me 2>/dev/null || echo "Failed"; printf ":\t%s\n" "{}"'
@@ -403,6 +403,45 @@ $ kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | 
 43.156.123.70:  nginx-54c98b4f84-vsnng
 43.156.123.70:  nginx-54c98b4f84-xt8bs
 ```
+
+但都使用的当前定义的这组 egress 节点所绑定的公网 IP：
+
+```bash
+$ kubectl get nodes -o custom-columns="NAME:.metadata.name,EXTERNAL-IP:.status.addresses[?(@.type=='ExternalIP')].address" -l cilium.io/egress-gateway=true
+NAME            EXTERNAL-IP
+172.22.49.119   129.226.84.9
+172.22.49.147   43.156.123.70
+172.22.49.20    43.163.1.23
+```
+
+## 常见问题
+
+### 配置 CiliumEgressGatewayPolicy 后网络不通
+
+首先确认 CiliumEgressGatewayPolicy 配置方法是否正确，在 TKE 环境下，确保 egressGateway 的 nodeSelector 只选中一个 node，egressIP 必须配置该 node 的内网 IP，否则可能就会出现不通的问题。
+
+另外还可以登录 egress 节点所在的 cilium pod，执行 `cilium-dbg bpf egress list` 查看当前节点上的 egress bpf 规则：
+
+```bash
+$ kubectl -n kube-systme exec -it cilium-nz5hd -- bash
+root@VM-49-119-tencentos:/home/cilium# cilium-dbg bpf egress list
+Source IP      Destination CIDR   Egress IP       Gateway IP
+172.22.48.4    0.0.0.0/0          172.22.49.119   172.22.49.119
+172.22.48.10   0.0.0.0/0          0.0.0.0         172.22.49.147
+172.22.48.14   0.0.0.0/0          0.0.0.0         172.22.49.147
+172.22.48.37   0.0.0.0/0          0.0.0.0         172.22.49.147
+172.22.48.38   0.0.0.0/0          172.22.49.119   172.22.49.119
+172.22.48.39   0.0.0.0/0          172.22.49.119   172.22.49.119
+172.22.48.41   0.0.0.0/0          0.0.0.0         172.22.49.147
+172.22.48.42   0.0.0.0/0          0.0.0.0         172.22.49.147
+172.22.48.43   0.0.0.0/0          172.22.49.119   172.22.49.119
+172.22.48.44   0.0.0.0/0          172.22.49.119   172.22.49.119
+172.22.48.45   0.0.0.0/0          172.22.49.119   172.22.49.119
+172.22.48.46   0.0.0.0/0          0.0.0.0         172.22.49.147
+172.22.48.47   0.0.0.0/0          0.0.0.0         172.22.49.147
+```
+
+`Source IP` 是 Pod IP，`Egress IP` 是走当前节点出去使用的源 IP， `0.0.0.0` 表示当前节点没有转发对应 Pod IP 的流量，如果全都为 `0.0.0.0` 表示没有 egress 规则选中当前节点。
 
 ## 参考资料
 
