@@ -5,7 +5,7 @@
 ## 已知问题
 
 使用 Cilium 的 Egress Gateway 功能存在以下已知问题：
-1. 对新 Pod 执行 Egress 策略有延迟。新 Pod 启动后，如果该 Pod 命中 Egress 策略，期望 Pod 的外访流量走指定出口网关出去，但实际上在 Pod 刚启动的一段时间内，该策略可能并未生效。
+1. 对新 Pod 执行 Egress 策略有延迟。新 Pod 启动后，如果该 Pod 命中 Egress 策略，期望 Pod 的外访流量走指定出口网关出去，但实际上在 Pod 刚启动的一段时间内，该策略可能并未生效，不过这个时间通常会很短，大部分场景不受影响。
 2. 与 Cilium 的 Cluster Mesh 和 CiliumEndpointSlice 功能不兼容。
 
 ## 启用 Egress Gateway
