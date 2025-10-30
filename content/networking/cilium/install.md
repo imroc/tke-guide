@@ -25,12 +25,6 @@
 
 如果使用 terraform 创建集群，参考以下代码片段：
 
-:::info[注意]
-
-如果使用 terraform 创建，当前还不支持取消 ip-masq-agent 安装（未来将会支持），需在集群创建后卸载 ip-masq-agent（后面的卸载步骤会有提到）。
-
-:::
-
 ```hcl
 resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   # 标准集群
@@ -45,6 +39,8 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   cluster_internet = true
   # 通过内网 CLB 暴露 APIServer，需指定 CLB 所在子网 ID
   cluster_intranet_subnet_id = "subnet-xxx" 
+  # 不安装 ip-masq-agent （disable_addons 要求 tencentcloud provider 版本 1.82.33+）
+  disable_addons = ["ip-masq-agent"]
   # 省略其它必要但不相关配置
 }
 ```
