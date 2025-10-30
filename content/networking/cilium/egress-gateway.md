@@ -77,6 +77,7 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
 1. 要通过节点池为扩出来的节点打上 label（如 `egress-node=true`）用以标识的用于 Egress Gateway。
 2. 如果需要出公网，要为节点分配公网 IP。
 3. 如果不希望普通 Pod 调度过去，可以加下污点。
+4. Egress 节点池通常不启用自动伸缩，设置固定数量的节点。
 
 以下是操作创建节点池的具体注意事项参考。
 
@@ -114,6 +115,8 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
     # highlight-add-end
     native {
       # highlight-add-start
+      # 设置 egress 节点副本数量
+      replicas = 1
       internet_accessible {
         # 按流量计费
         charge_type       = "TRAFFIC_POSTPAID_BY_HOUR"
@@ -137,9 +140,11 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
 
   ```hcl showLineNumbers
   resource "tencentcloud_kubernetes_node_pool" "cilium" {
-    name       = "cilium"
-    cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
-    node_os    = "img-gqmik24x"
+    name              = "cilium"
+    cluster_id        = tencentcloud_kubernetes_cluster.tke_cluster.id
+    node_os           = "img-gqmik24x" # TencentOS 4，普通节点池使用该镜像目前还需开白
+    enable_auto_scale = false # 禁用自动伸缩
+    desired_capacity  = 3 # 设置 egress 节点数量
 
     auto_scaling_config {
       # highlight-add-start
