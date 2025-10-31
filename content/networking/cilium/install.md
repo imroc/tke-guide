@@ -580,19 +580,15 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
 ```yaml title="image-values.yaml"
 image:
   repository: quay.tencentcloudcr.com/cilium/cilium
-
 envoy:
   image:
     repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-
 operator:
   image:
     repository: quay.tencentcloudcr.com/cilium/operator
-
 certgen:
   image:
     repository: quay.tencentcloudcr.com/cilium/certgen
-
 hubble:
   relay:
     image:
@@ -604,23 +600,19 @@ hubble:
     frontend:
       image:
         repository: quay.tencentcloudcr.com/cilium/hubble-ui
-
 nodeinit:
   image:
     repository: quay.tencentcloudcr.com/cilium/startup-script
-
 preflight:
   image:
     repository: quay.tencentcloudcr.com/cilium/cilium
   envoy:
     image:
       repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-
 clustermesh:
   apiserver:
     image:
       repository: quay.tencentcloudcr.com/cilium/clustermesh-apiserver
-
 authentication:
   mutual:
     spire:
