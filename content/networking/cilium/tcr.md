@@ -113,8 +113,8 @@ source_images=$(helm template cilium cilium/cilium --version 1.18.3 \
 
 echo "将会进行以下的镜像同步操作："
 while IFS= read -r source_image; do
-  if [[ -n "${source_image}" ]]; then # 跳过空行
-    image_name=$(echo "$source_image" | sed 's|^[^/]*/||')
+  if [[ -n "${source_image}" ]]; then
+    image_name=$(basename "$source_image")
     target_image="${TARGET_REGISTRY}/${image_name}"
     echo "${source_image} --> ${target_image}"
   fi
@@ -127,8 +127,8 @@ if [ "$confirm" != "y" ]; then
 fi
 
 while IFS= read -r source_image; do
-  if [[ -n "${source_image}" ]]; then # 跳过空行
-    image_name=$(echo "$source_image" | sed 's|^[^/]*/||')
+  if [[ -n "${source_image}" ]]; then
+    image_name=$(basename "$source_image")
     target_image="${TARGET_REGISTRY}/${image_name}"
     echo "同步镜像 ${source_image} 到 ${target_image}"
     skopeo copy -a "docker://${source_image}" "docker://${target_image}"
