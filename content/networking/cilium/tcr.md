@@ -151,9 +151,9 @@ chmod +x sync-cilium-images.sh
 helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
   # highlight-add-start
-  --set image.repository=roc-sg.tencentcloudcr.com/cilium/cilium/cilium \
-  --set envoy.image.repository=roc-sg.tencentcloudcr.com/cilium/cilium/cilium-envoy \
-  --set operator.image.repository=roc-sg.tencentcloudcr.com/cilium/cilium/operator \
+  --set image.repository=roc-sg.tencentcloudcr.com/cilium/cilium \
+  --set envoy.image.repository=roc-sg.tencentcloudcr.com/cilium/cilium-envoy \
+  --set operator.image.repository=roc-sg.tencentcloudcr.com/cilium/operator \
   # highlight-add-end
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
@@ -176,7 +176,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
 helm upgrade cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
   --reuse-values \
-  --set image.repository=roc-sg.tencentcloudcr.com/cilium/cilium/cilium \
-  --set envoy.image.repository=roc-sg.tencentcloudcr.com/cilium/cilium/cilium-envoy \
-  --set operator.image.repository=roc-sg.tencentcloudcr.com/cilium/cilium/operator
+  --set image.repository=roc-sg.tencentcloudcr.com/cilium/cilium \
+  --set envoy.image.repository=roc-sg.tencentcloudcr.com/cilium/cilium-envoy \
+  --set operator.image.repository=roc-sg.tencentcloudcr.com/cilium/operator
 ```
