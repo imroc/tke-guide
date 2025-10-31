@@ -38,7 +38,7 @@ TCR 镜像仓库创建完成后，新建一个命名空间：
 
 上传 Cilium 镜像前，需要先配置 TCR 的访问凭证，参考 [用户级账号管理](https://cloud.tencent.com/document/product/1141/41829) 和 [服务级账号管理](https://cloud.tencent.com/document/product/1141/89137)，获取一个可以登录 TCR 镜像仓库的访问凭证。
 
-## 搬运 Cilium 镜像到 TCR 镜像仓库
+## 搬运 Cilium 镜像
 
 上传 Cilium 镜像之前，得先确认当前的安装配置依赖了哪些镜像，可以使用 `helm template` 并加上计划添加的安装参数，看渲染出来的 YAML 实际使用了哪些镜像：
 
@@ -143,9 +143,9 @@ chmod +x sync-cilium-images.sh
 ./sync-cilium-images.sh
 ```
 
-## 安装 Cilium 指定 TCR 镜像
+## 使用 TCR 镜像安装 Cilium
 
-参考 [安装 cilium](https://imroc.cc/tke/networking/cilium/install)，替换下依赖镜像为 TCR 镜像仓库中对应的镜像地址：
+参考 [安装 cilium](https://imroc.cc/tke/networking/cilium/install) 进行安装，替换下依赖镜像为 TCR 镜像仓库中对应的镜像地址：
 
 ```bash showLineNumbers
 helm upgrade --install cilium cilium/cilium --version 1.18.3 \
