@@ -35,7 +35,7 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   cluster_deploy_type = "MANAGED_CLUSTER"
   # Kubernetes 版本 >= 1.30.0
   cluster_version = "1.32.2"
-  # 操作系统， TencentOS 4 的镜像 ID，当前普通节点使用该镜像还需要开白
+  # 操作系统， TencentOS 4 的镜像 ID，当前使用该镜像还需要提工单申请
   cluster_os = "img-gqmik24x" 
   # 容器网络插件: VPC-CNI
   network_type = "VPC-CNI"
@@ -349,7 +349,7 @@ spec:
     metadata:
       annotations:
         # 原生节点默认安装 TencentOS 3，与最新 cilium 版本不兼容，指定该注解安装 TencentOS 4
-        #（未来原生节点会默认安装 TencentOS 4，但当前还不是，需要用这个注解指定下）
+        # 注意：当前使用该系统镜像还需要提工单申请
         beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public 
     spec:
       requirements:
@@ -416,7 +416,7 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
   name       = "cilium"
   cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
   type       = "Native"
-  annotations { # 添加注解指定原生节点使用 TencentOS 4，以便能够与 cilium 兼容
+  annotations { # 添加注解指定原生节点使用 TencentOS 4，以便能够与 cilium 兼容，当前使用该系统镜像还需要提工单申请
     name  = "node.tke.cloud.tencent.com/beta-image"
     value = "ts4-public"
   }
@@ -439,7 +439,7 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
 resource "tencentcloud_kubernetes_node_pool" "cilium" {
   name       = "cilium"
   cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
-  node_os    = "img-gqmik24x" # TencentOS 4 的镜像 ID，当前普通节点使用该镜像还需要开白
+  node_os    = "img-gqmik24x" # TencentOS 4 的镜像 ID，当前使用该系统镜像还需要提工单申请
 }
 ```
 
@@ -650,6 +650,12 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
 如果希望拉取镜像具备更高的可用性，可将 cilium 依赖镜像同步到了自己的 [TCR 镜像仓库](https://cloud.tencent.com/product/tcr)，然后参考这里的依赖镜像替换的配置，将相应镜像再替换为自己同步后的镜像地址。
 
 :::
+
+### 无法使用 TencentOS 4？
+
+TencentOS 4 系统镜像目前内测中，需要 [提交工单](https://console.cloud.tencent.com/workorder/category) 进行申请。
+
+如果没有申请，添加普通节点将无法选择到 TencentOS 4 的系统镜像，原生节点如果指定了注解使用 TencentOS 4，节点将无法成功初始化。
 
 ## 参考资料
 
