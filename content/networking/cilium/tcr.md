@@ -80,7 +80,7 @@ skopeo copy -a docker://quay.io/cilium/cilium:v1.18.3  docker://roc-sg.tencentcl
 skopeo copy -a docker://quay.io/cilium/operator-generic:v1.18.3  docker://roc-sg.tencentcloudcr.com/cilium/operator-generic:v1.18.3
 ```
 
-如果你的安装配置所依赖镜像较多，也可以通过脚本来实现一键将所有依赖镜像全部同步到 TCR 镜像仓库中，保存下面的脚本到 `sync-cilium-images.sh`:
+如果你的安装配置所依赖镜像较多，也可以通过脚本来实现一键将所有依赖镜像全部同步到 TCR 镜像仓库中，保存下面的脚本内容到 `sync-cilium-images.sh` 文件中:
 
 :::info[注意]
 
