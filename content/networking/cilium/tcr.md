@@ -1,4 +1,4 @@
-# 使用 TCR 管理 Cilium 镜像
+# 使用 TCR 托管 Cilium 镜像
 
 ## 概述
 
@@ -164,5 +164,4 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002 \
   --set extraConfig.local-router-ipv4=169.254.32.16
-
 ```
