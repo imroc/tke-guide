@@ -145,6 +145,8 @@ chmod +x sync-cilium-images.sh
 
 ## 安装 Cilium 指定 TCR 镜像
 
+参考 [安装 cilium](https://imroc.cc/tke/networking/cilium/install)，替换下依赖镜像为 TCR 镜像仓库中对应的镜像地址：
+
 ```bash showLineNumbers
 helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
@@ -166,4 +168,15 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002 \
   --set extraConfig.local-router-ipv4=169.254.32.16
+```
+
+如果已经执行过安装，可通过以下方式修改依赖镜像地址：
+
+```bash
+helm upgrade cilium cilium/cilium --version 1.18.3 \
+  --namespace kube-system \
+  --reuse-values \
+  --set image.repository=roc-sg.tencentcloudcr.com/cilium/cilium/cilium \
+  --set envoy.image.repository=roc-sg.tencentcloudcr.com/cilium/cilium/cilium-envoy \
+  --set operator.image.repository=roc-sg.tencentcloudcr.com/cilium/cilium/operator
 ```
