@@ -651,7 +651,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
 
 :::
 
-### 无法使用 TencentOS 4？
+### 无法使用 TencentOS 4 ？
 
 TencentOS 4 系统镜像目前内测中，需要 [提交工单](https://console.cloud.tencent.com/workorder/category) 进行申请。
 
