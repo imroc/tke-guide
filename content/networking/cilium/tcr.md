@@ -75,9 +75,9 @@ skopeo login xxx.tencentcloudcr.com --username xxx --password xxx
 最后使用 skopeo 将 cilium 依赖镜像都同步到 TCR 镜像仓库中：
 
 ```bash
-skopeo copy -a docker://quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222  docker://roc-sg.tencentcloudcr.com/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222
-skopeo copy -a docker://quay.io/cilium/cilium:v1.18.3  docker://roc-sg.tencentcloudcr.com/cilium/cilium:v1.18.3
-skopeo copy -a docker://quay.io/cilium/operator-generic:v1.18.3  docker://roc-sg.tencentcloudcr.com/cilium/operator-generic:v1.18.3
+skopeo copy -a docker://quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222  docker://your-tcr-name.tencentcloudcr.com/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222
+skopeo copy -a docker://quay.io/cilium/cilium:v1.18.3  docker://your-tcr-name.tencentcloudcr.com/cilium/cilium:v1.18.3
+skopeo copy -a docker://quay.io/cilium/operator-generic:v1.18.3  docker://your-tcr-name.tencentcloudcr.com/cilium/operator-generic:v1.18.3
 ```
 
 如果你的安装配置所依赖镜像较多，也可以通过脚本来实现一键将所有依赖镜像全部同步到 TCR 镜像仓库中，保存下面的脚本内容到 `sync-cilium-images.sh` 文件中:
@@ -92,7 +92,7 @@ skopeo copy -a docker://quay.io/cilium/operator-generic:v1.18.3  docker://roc-sg
  ```bash title="sync-cilium-images.sh"
 #!/bin/bash
 
-TARGET_REGISTRY="roc-sg.tencentcloudcr.com/cilium"
+TARGET_REGISTRY="your-tcr-name.tencentcloudcr.com/cilium"
 
 source_images=$(helm template cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
@@ -151,9 +151,9 @@ chmod +x sync-cilium-images.sh
 helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
   # highlight-add-start
-  --set image.repository=roc-sg.tencentcloudcr.com/cilium/cilium \
-  --set envoy.image.repository=roc-sg.tencentcloudcr.com/cilium/cilium-envoy \
-  --set operator.image.repository=roc-sg.tencentcloudcr.com/cilium/operator \
+  --set image.repository=your-tcr-name.tencentcloudcr.com/cilium/cilium \
+  --set envoy.image.repository=your-tcr-name.tencentcloudcr.com/cilium/cilium-envoy \
+  --set operator.image.repository=your-tcr-name.tencentcloudcr.com/cilium/operator \
   # highlight-add-end
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
@@ -176,7 +176,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
 helm upgrade cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
   --reuse-values \
-  --set image.repository=roc-sg.tencentcloudcr.com/cilium/cilium \
-  --set envoy.image.repository=roc-sg.tencentcloudcr.com/cilium/cilium-envoy \
-  --set operator.image.repository=roc-sg.tencentcloudcr.com/cilium/operator
+  --set image.repository=your-tcr-name.tencentcloudcr.com/cilium/cilium \
+  --set envoy.image.repository=your-tcr-name.tencentcloudcr.com/cilium/cilium-envoy \
+  --set operator.image.repository=your-tcr-name.tencentcloudcr.com/cilium/operator
 ```
