@@ -34,7 +34,7 @@ TCR 镜像仓库创建完成后，新建一个命名空间：
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F31%2F20251031144916.png)
 
-## 配置访问凭证
+## 配置并获取访问凭证
 
 上传 Cilium 镜像前，需要先配置 TCR 的访问凭证，参考 [用户级账号管理](https://cloud.tencent.com/document/product/1141/41829) 和 [服务级账号管理](https://cloud.tencent.com/document/product/1141/89137)，获取一个可以登录 TCR 镜像仓库的访问凭证。
 
