@@ -67,7 +67,9 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
 
 :::info[注意]
 
-如果 eniipamd 组件正式发布 v3.8.0，在组件管理中操作升级 eniipamd 后，这里做的手动升级操作会被覆盖。
+等 eniipamd 组件正式发布 v3.8.0 后，可以在组件管理中操作升级 eniipamd。
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F31%2F20251031120006.png)
 
 :::
 
