@@ -148,9 +148,11 @@ chmod +x sync-cilium-images.sh
 ```bash showLineNumbers
 helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
+  # highlight-add-start
   --set image.repository=roc-sg.tencentcloudcr.com/cilium/cilium/cilium \
   --set envoy.image.repository=roc-sg.tencentcloudcr.com/cilium/cilium/cilium-envoy \
   --set operator.image.repository=roc-sg.tencentcloudcr.com/cilium/cilium/operator \
+  # highlight-add-end
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
   --set ipam.mode=delegated-plugin \
