@@ -1,6 +1,14 @@
 # NetworkPolicy 应用实践
 
-## 默认拒绝 egress 流量
+## 三层网络策略
+
+:::tip[备注]
+
+更多请参考官方文档 [Layer 3 Examples](https://docs.cilium.io/en/stable/security/policy/language/)。
+
+:::
+
+### 默认拒绝 egress 流量
 
 集群默认拒绝 egress 流量（dns 解析除外，kube-system 命名空间中的 pod 除外），严格控制集群 Pod 的网络访问权限：
 
@@ -12,17 +20,17 @@ metadata:
 spec:
   description: "Block all the traffic (except DNS) by default"
   egress:
-  - toEndpoints:
+  - toEndpoints: # 允许集群所有 Pod 通过 coredns 解析域名
     - matchLabels:
         io.kubernetes.pod.namespace: kube-system
         k8s-app: kube-dns
     toPorts:
     - ports:
-      - port: '53'
-        protocol: UDP
+      - port: "53"
+        protocol: ANY
       rules:
         dns:
-        - matchPattern: '*'
+        - matchPattern: "*"
   endpointSelector:
     matchExpressions:
     - key: io.kubernetes.pod.namespace
@@ -31,7 +39,7 @@ spec:
       - kube-system
  ```
 
-## 允许部分 Pod 访问 apiserver
+### 允许部分 Pod 访问 apiserver
 
 允许 `test` 命名空间下所有 pod 访问 apiserver:
 
@@ -65,7 +73,7 @@ spec:
     - kube-apiserver
 ```
 
-## 允许 A 访问 B
+### 允许 A 访问 B
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -82,10 +90,10 @@ spec:
         app: b
 ```
 
-## 限制 B 只能被 A 访问
+### 限制 B 只能被 A 访问
 
 ```yaml
-apiVersion: "cilium.io/v2"
+apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
   name: ingress-a-to-b
@@ -99,7 +107,7 @@ spec:
         app: a
 ```
 
-## 允许 A 访问同名空间下的所有 Pod 
+### 允许 A 访问同名空间下的所有 Pod 
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -116,7 +124,7 @@ spec:
 ```
 
 
-## 禁止 A 访问 B
+### 禁止 A 访问 B
 
 
 ```yaml
@@ -137,7 +145,7 @@ spec:
         app: b
 ```
 
-## 允许 A 被集群外部访问
+### 允许 A 被集群外部访问
 
 
 ```yaml
@@ -152,4 +160,37 @@ spec:
   ingress:
   - fromEntities:
     - world
+```
+
+### 允许 A 访问指定域名的服务
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: from-a-to-domains
+spec:
+  endpointSelector:
+    matchLabels:
+      app: a
+  egress:
+  - toFQDNs:
+    - matchName: 'imroc.cc'
+    - matchPattern: '*.imroc.cc'
+    - matchPattern: '*.*.*.myqcloud.com'
+    - matchPattern: '*.tencent.com'
+    - matchPattern: '*.*.tencent.com'
+    - matchPattern: '*.*.*.tencent.com'
+    - matchPattern: '*.*.*.*.tencent.com'
+    - matchPattern: '*.*.*.*.*.tencent.com'
+    - matchPattern: '*.tencentcloudapi.com'
+    - matchPattern: '*.*.tencentcloudapi.com'
+    - matchPattern: '*.*.*.tencentcloudapi.com'
+    - matchPattern: '*.*.*.*.tencentcloudapi.com'
+    - matchPattern: '*.*.*.*.*.tencentcloudapi.com'
+    - matchPattern: '*.tencentyun.com'
+    - matchPattern: '*.*.tencentyun.com'
+    - matchPattern: '*.*.*.tencentyun.com'
+    - matchPattern: '*.*.*.*.tencentyun.com'
+    - matchPattern: '*.*.*.*.*.tencentyun.com'
 ```
