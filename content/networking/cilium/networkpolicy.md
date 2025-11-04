@@ -102,3 +102,19 @@ spec:
     - matchLabels:
         app: a
 ```
+
+## 允许 A 访问同名空间下的所有 Pod 
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-all-from-a
+spec:
+  endpointSelector:
+    matchLabels:
+      app: a
+  egress:
+  - toEndpoints:
+    - {}
+```
