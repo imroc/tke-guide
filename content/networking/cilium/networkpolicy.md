@@ -33,7 +33,7 @@ spec:
 
 ## 统一管理 infrastructure 命名空间网络策略
 
-集群中可能会部署许多基础设施应用，分散在多个命名空间，我们可以用 CiliumClusterwideNetworkPolicy + namespace label 来统一设置这些命名空间的网络策略（假设都打上了 `role=infrastructure` 这个 label）：
+集群中可能会部署许多基础设施应用，分散在多个命名空间，我们可以用 CiliumClusterwideNetworkPolicy + namespace label 来统一设置这些命名空间的网络策略（假设这些命名空间都打上了 `role=infrastructure` 这个 label）：
 
  ```yaml
 apiVersion: cilium.io/v2
