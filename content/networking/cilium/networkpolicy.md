@@ -2,7 +2,7 @@
 
 ## 默认拒绝 egress 流量
 
-集群默认拒绝 egress 流量（dns 解析除外，kube-system 命名空间中的 pod 除外）：
+集群默认拒绝 egress 流量（dns 解析除外，kube-system 命名空间中的 pod 除外），严格控制集群 Pod 的网络访问权限：
 
  ```yaml title="default-deny.yaml"
 apiVersion: cilium.io/v2
