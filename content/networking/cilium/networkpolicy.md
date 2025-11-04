@@ -233,6 +233,33 @@ spec:
     - matchPattern: '*.*.*.*.*.tencentyun.com'
 ```
 
+
+## 允许 B 的 `GET /public` 接口被 A 访问
+
+ ```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: from-a-to-b-api
+spec:
+  description: "Allow HTTP GET /public from a to b"
+  endpointSelector:
+    matchLabels:
+      role: b
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        role: a
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+      rules:
+        http:
+        - method: "GET"
+          path: "/public"
+ ```
+
 ## 参考资料
 
 - [Cilium NetworkPolicy Examples](https://docs.cilium.io/en/stable/security/policy/language/)
