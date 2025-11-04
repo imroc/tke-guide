@@ -242,7 +242,7 @@ kind: CiliumNetworkPolicy
 metadata:
   name: from-a-to-b-api
 spec:
-  description: "Allow HTTP GET /public from a to b"
+  description: "Allow HTTP from a to b"
   endpointSelector:
     matchLabels:
       role: b
