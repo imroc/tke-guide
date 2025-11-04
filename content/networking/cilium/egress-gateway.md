@@ -1,4 +1,6 @@
-# 使用 Egress Gateway 控制集群外访流量
+# Egress Gateway 应用实践
+
+## 概述
 
 本文介绍如何使用 Cilium 的 Egress Gateway 和 CiliumEgressGatewayPolicy 来灵活控制哪些集群外访流量用哪个出口 IP 出去。
 

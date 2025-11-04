@@ -567,7 +567,7 @@ bpf:
 
 :::
 
-如果有更高级的流量外访需求（比如指定某些 Pod 用某个公网 IP 访问公网），可以参考 [使用 Egress Gateway 控制集群外访流量](egress-gateway.md)。
+如果有更高级的流量外访需求（比如指定某些 Pod 用某个公网 IP 访问公网），可以参考 [Egress Gateway 应用实践](egress-gateway.md)。
 
 ### 镜像拉取失败？
 
