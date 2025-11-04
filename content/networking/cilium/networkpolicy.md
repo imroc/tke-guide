@@ -48,7 +48,7 @@ spec:
     - kube-apiserver
 ```
 
-允许 `test` 命名空间下有 `app=test` 的 pod 请求 apiserver:
+允许 `test` 命名空间下的 A 服务访问 apiserver:
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -59,7 +59,7 @@ metadata:
 spec:
   endpointSelector:
     matchLabels:
-      app: test
+      app: a
   egress:
   - toEntities:
     - kube-apiserver
@@ -74,7 +74,6 @@ apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
   name: egress-a-to-b
-  namespace: test
 spec:
   endpointSelector:
     matchLabels:
