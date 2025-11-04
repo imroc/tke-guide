@@ -239,9 +239,9 @@ operator:
   - key: "node.cloudprovider.kubernetes.io/uninitialized"
     operator: Exists
   # 容忍 TKE 的污点，避免循环依赖
-  - key: tke.cloud.tencent.com/uninitialized 
+  - key: "tke.cloud.tencent.com/uninitialized" 
     operator: Exists
-  - key: tke.cloud.tencent.com/eni-ip-unavailable 
+  - key: "tke.cloud.tencent.com/eni-ip-unavailable" 
     operator: Exists
 extraConfig:
   # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
