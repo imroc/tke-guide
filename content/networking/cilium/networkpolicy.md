@@ -39,7 +39,7 @@ spec:
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: allow-apiserver
+  name: default-allow-apiserver
   namespace: test
 spec:
   endpointSelector: {}
@@ -54,7 +54,7 @@ spec:
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: from-debug-to-apiserver
+  name: from-a-to-apiserver
   namespace: test
 spec:
   endpointSelector:
