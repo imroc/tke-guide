@@ -67,8 +67,6 @@ spec:
 
 ## 允许 A 访问 B
 
-允许 A 服务访问 B 服务：
-
 ```yaml
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
@@ -85,8 +83,6 @@ spec:
 ```
 
 ## 限制 B 只能被 A 访问
-
-限制 B 服务只能被 A 服务访问：
 
 ```yaml
 apiVersion: "cilium.io/v2"
@@ -123,8 +119,6 @@ spec:
 ## 禁止 A 访问 B
 
 
-禁止 A 服务访问 B 服务：
-
 ```yaml
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
@@ -141,4 +135,21 @@ spec:
   - toEndpoints:
     - matchLabels:
         app: b
+```
+
+## 允许 A 被集群外部访问
+
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: from-world-to-a
+spec:
+  endpointSelector:
+    matchLabels:
+      app: a
+  ingress:
+  - fromEntities:
+    - world
 ```
