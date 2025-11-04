@@ -180,10 +180,12 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --set cni.customConf=true \
   --set cni.configMap=cni-config \
   --set cni.externalRouting=true \
+  --set extraConfig.local-router-ipv4=169.254.32.16 \
+  --set operator.tolerations[4].key="tke.cloud.tencent.com/uninitialized" \
+  --set operator.tolerations[4].operator="Exists" \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
-  --set k8sServicePort=60002 \
-  --set extraConfig.local-router-ipv4=169.254.32.16
+  --set k8sServicePort=60002
 ```
 
 :::tip[说明]
@@ -222,14 +224,26 @@ cni:
   configMap: cni-configuration
   # VPC-CNI 会自动配置 Pod 路由，cilium 不需要配置
   externalRouting: true
+operator:
+  tolerations:
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: Exists
+  - key: "node-role.kubernetes.io/master"
+    operator: Exists
+  - key: "node.kubernetes.io/not-ready"
+    operator: Exists
+  - key: "node.cloudprovider.kubernetes.io/uninitialized"
+    operator: Exists
+  - key: tke.cloud.tencent.com/uninitialized # 容忍 TKE 节点未初始化完成的污点。避免首次安装时节点 kubelet 等 cilium-agent 生成 cni 配置， cilium-agent 又等 cilium-operator 创建 CRDs 资源，导致节点迟迟不能 Ready
+    operator: Exists
+extraConfig:
+  # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
+  local-router-ipv4: 169.254.32.16
 # 替代 kube-proxy，包括 ClusterIP 转发、NodePort 转发，另外还附带了 HostPort 转发的能力
 kubeProxyReplacement: "true"
 # 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
 k8sServiceHost: 169.254.128.112 
 k8sServicePort: 60002
-extraConfig:
-  # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
-  local-router-ipv4: 169.254.32.16
 ```
 
 生产环境部署建议将参数保存到 `values.yaml`，然后在安装或更新时，都可以执行下面的命令（如果要升级版本，替换 `--version` 即可）：
