@@ -24,7 +24,7 @@ spec:
         dns:
         - matchPattern: "*"
   endpointSelector:
-    matchExpressions:
+    matchExpressions: # 不限制 kube-system 命名空间中 Pod 的 egress 流量
     - key: io.kubernetes.pod.namespace
       operator: NotIn
       values:
