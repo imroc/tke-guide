@@ -25,8 +25,8 @@ const sidebars: SidebarsConfig = {
             'networking/cilium/install',
             'networking/cilium/tcr',
             'networking/cilium/egress-gateway',
-            'networking/cilium/observability',
             'networking/cilium/networkpolicy',
+            'networking/cilium/observability',
             'networking/cilium/roadmap',
             {
               type: 'category',
