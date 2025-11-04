@@ -238,8 +238,7 @@ operator:
     operator: Exists
   - key: "node.cloudprovider.kubernetes.io/uninitialized"
     operator: Exists
-  # 容忍 TKE 节点未初始化完成的一些污点。
-  # 避免首次安装时节点 kubelet 等 cilium-agent 生成 cni 配置， cilium-agent 又等 cilium-operator 创建 CRDs 资源，导致节点迟迟不能 Ready
+  # 容忍 TKE 的污点，避免循环依赖
   - key: tke.cloud.tencent.com/uninitialized 
     operator: Exists
   - key: tke.cloud.tencent.com/eni-ip-unavailable 
