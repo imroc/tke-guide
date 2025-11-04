@@ -31,6 +31,52 @@ spec:
       - kube-system
  ```
 
+## 统一管理 infrastructure 命名空间网络策略
+
+集群中可能会部署许多基础设施应用，分散在多个命名空间，我们可以用 CiliumClusterwideNetworkPolicy + namespace label 来统一设置这些命名空间的网络策略（假设都打上了 `role=infrastructure` 这个 label）：
+
+ ```yaml
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: default-infrastructure
+spec:
+  endpointSelector: # 选中所有基础设施命名空间中的 Pod
+    matchLabels:
+      io.cilium.k8s.namespace.labels.role: infrastructure
+  egress:
+  - toEndpoints: # 允许访问所有基础设施命名空间中的 Pod
+    - matchLabels:
+        io.cilium.k8s.namespace.labels.role: infrastructure
+  - toFQDNs: # 允许调用腾讯云相关 API
+    - matchPattern: '*.tencent.com'
+    - matchPattern: '*.*.tencent.com'
+    - matchPattern: '*.*.*.tencent.com'
+    - matchPattern: '*.*.*.*.tencent.com'
+    - matchPattern: '*.*.*.*.*.tencent.com'
+    - matchPattern: '*.tencentcloudapi.com'
+    - matchPattern: '*.*.tencentcloudapi.com'
+    - matchPattern: '*.*.*.tencentcloudapi.com'
+    - matchPattern: '*.*.*.*.tencentcloudapi.com'
+    - matchPattern: '*.*.*.*.*.tencentcloudapi.com'
+    - matchPattern: '*.tencentyun.com'
+    - matchPattern: '*.*.tencentyun.com'
+    - matchPattern: '*.*.*.tencentyun.com'
+    - matchPattern: '*.*.*.*.tencentyun.com'
+    - matchPattern: '*.*.*.*.*.tencentyun.com'
+  - toCIDR: # 169.254 是腾讯云上的保留网段，一些内部服务会使用这个 IP，如 TKE 集群 apiserver 的 VIP、COS 存储、镜像仓库等。
+    - 169.254.0.0/16
+  - toEntities: # 允许访问 apiserver
+    - kube-apiserver
+  - toEntities: # 允许访问集群中所有节点的 10250 端口，可用于监控指标采集
+    - host
+    - remote-node
+    toPorts:
+    - ports:
+      - port: "10250"
+        protocol: TCP
+ ```
+
 ## 允许部分 Pod 访问 apiserver
 
 允许 `test` 命名空间下所有 pod 访问 apiserver:
