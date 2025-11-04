@@ -181,8 +181,12 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --set cni.configMap=cni-config \
   --set cni.externalRouting=true \
   --set extraConfig.local-router-ipv4=169.254.32.16 \
-  --set operator.tolerations[4].key="tke.cloud.tencent.com/uninitialized" \
-  --set operator.tolerations[4].operator="Exists" \
+  --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
+  --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
+  --set operator.tolerations[2].key="node.kubernetes.io/not-ready",operator.tolerations[2].operator="Exists" \
+  --set operator.tolerations[3].key="node.cloudprovider.kubernetes.io/uninitialized",operator.tolerations[3].operator="Exists" \
+  --set operator.tolerations[4].key="tke.cloud.tencent.com/uninitialized",operator.tolerations[4].operator="Exists" \
+  --set operator.tolerations[5].key="tke.cloud.tencent.com/eni-ip-unavailable",operator.tolerations[5].operator="Exists" \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002
@@ -234,7 +238,11 @@ operator:
     operator: Exists
   - key: "node.cloudprovider.kubernetes.io/uninitialized"
     operator: Exists
-  - key: tke.cloud.tencent.com/uninitialized # 容忍 TKE 节点未初始化完成的污点。避免首次安装时节点 kubelet 等 cilium-agent 生成 cni 配置， cilium-agent 又等 cilium-operator 创建 CRDs 资源，导致节点迟迟不能 Ready
+  # 容忍 TKE 节点未初始化完成的一些污点。
+  # 避免首次安装时节点 kubelet 等 cilium-agent 生成 cni 配置， cilium-agent 又等 cilium-operator 创建 CRDs 资源，导致节点迟迟不能 Ready
+  - key: tke.cloud.tencent.com/uninitialized 
+    operator: Exists
+  - key: tke.cloud.tencent.com/eni-ip-unavailable 
     operator: Exists
 extraConfig:
   # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
