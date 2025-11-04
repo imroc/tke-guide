@@ -1,14 +1,6 @@
 # NetworkPolicy 应用实践
 
-## 三层网络策略
-
-:::tip[备注]
-
-更多请参考官方文档 [Layer 3 Examples](https://docs.cilium.io/en/stable/security/policy/language/)。
-
-:::
-
-### 默认拒绝 egress 流量
+## 默认拒绝 egress 流量
 
 集群默认拒绝 egress 流量（dns 解析除外，kube-system 命名空间中的 pod 除外），严格控制集群 Pod 的网络访问权限：
 
@@ -39,7 +31,7 @@ spec:
       - kube-system
  ```
 
-### 允许部分 Pod 访问 apiserver
+## 允许部分 Pod 访问 apiserver
 
 允许 `test` 命名空间下所有 pod 访问 apiserver:
 
@@ -73,7 +65,7 @@ spec:
     - kube-apiserver
 ```
 
-### 允许 A 访问 B
+## 允许 A 访问 B
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -90,7 +82,7 @@ spec:
         app: b
 ```
 
-### 限制 B 只能被 A 访问
+## 限制 B 只能被 A 访问
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -107,7 +99,7 @@ spec:
         app: a
 ```
 
-### 允许 A 访问同名空间下的所有 Pod 
+## 允许 A 访问同名空间下的所有 Pod 
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -124,7 +116,7 @@ spec:
 ```
 
 
-### 禁止 A 访问 B
+## 禁止 A 访问 B
 
 
 ```yaml
@@ -145,7 +137,7 @@ spec:
         app: b
 ```
 
-### 允许 A 被集群外部访问
+## 允许 A 被集群外部访问
 
 
 ```yaml
@@ -162,7 +154,7 @@ spec:
     - world
 ```
 
-### 允许 A 访问指定域名的服务
+## 允许 A 访问指定域名的服务
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -194,3 +186,8 @@ spec:
     - matchPattern: '*.*.*.*.tencentyun.com'
     - matchPattern: '*.*.*.*.*.tencentyun.com'
 ```
+
+## 参考资料
+
+- [Cilium NetworkPolicy Examples](https://docs.cilium.io/en/stable/security/policy/language/)
+
