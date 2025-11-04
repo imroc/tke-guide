@@ -118,3 +118,27 @@ spec:
   - toEndpoints:
     - {}
 ```
+
+
+## 禁止 A 访问 B
+
+
+禁止 A 服务访问 B 服务：
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: deny-a-to-b
+spec:
+  endpointSelector:
+    matchLabels:
+      app: a
+  egress:
+  - toEntities:
+    - all
+  egressDeny:
+  - toEndpoints:
+    - matchLabels:
+        app: b
+```
