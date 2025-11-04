@@ -64,3 +64,42 @@ spec:
   - toEntities:
     - kube-apiserver
 ```
+
+## 允许 A 访问 B
+
+允许 A 服务访问 B 服务：
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: egress-a-to-b
+  namespace: test
+spec:
+  endpointSelector:
+    matchLabels:
+      app: a
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        app: b
+```
+
+## 限制 B 只能被 A 访问
+
+限制 B 服务只能被 A 服务访问：
+
+```yaml
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: ingress-a-to-b
+spec:
+  endpointSelector:
+    matchLabels:
+      app: b
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app: a
+```
