@@ -439,7 +439,7 @@ spec:
         protocol: TCP
 ```
 
-#### A 只能访问指定端口范围
+#### A 只能访问指定端口范围的服务
 
 ```yaml
 apiVersion: cilium.io/v2
