@@ -44,21 +44,27 @@ TCR 镜像仓库创建完成后，新建一个命名空间：
 
 ```bash
 $ helm template cilium cilium/cilium --version 1.18.3 \
-    --namespace kube-system \
-    --set routingMode=native \
-    --set endpointRoutes.enabled=true \
-    --set ipam.mode=delegated-plugin \
-    --set enableIPv4Masquerade=false \
-    --set devices=eth+ \
-    --set cni.chainingMode=generic-veth \
-    --set cni.customConf=true \
-    --set cni.configMap=cni-config \
-    --set cni.externalRouting=true \
-    --set kubeProxyReplacement=true \
-    --set k8sServiceHost=169.254.128.125 \
-    --set k8sServicePort=60002 \
-    --set extraConfig.local-router-ipv4=169.254.32.16 \
-    | grep image: | awk -F 'image: "' '/image:/ {gsub(/@sha256:[^"]+"/, ""); print $2}' | sort | uniq
+  --namespace kube-system \
+  --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
+  --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
+  --set operator.tolerations[2].key="node.kubernetes.io/not-ready",operator.tolerations[2].operator="Exists" \
+  --set operator.tolerations[3].key="node.cloudprovider.kubernetes.io/uninitialized",operator.tolerations[3].operator="Exists" \
+  --set operator.tolerations[4].key="tke.cloud.tencent.com/uninitialized",operator.tolerations[4].operator="Exists" \
+  --set operator.tolerations[5].key="tke.cloud.tencent.com/eni-ip-unavailable",operator.tolerations[5].operator="Exists" \
+  --set routingMode=native \
+  --set endpointRoutes.enabled=true \
+  --set ipam.mode=delegated-plugin \
+  --set enableIPv4Masquerade=false \
+  --set devices=eth+ \
+  --set cni.chainingMode=generic-veth \
+  --set cni.customConf=true \
+  --set cni.configMap=cni-config \
+  --set cni.externalRouting=true \
+  --set extraConfig.local-router-ipv4=169.254.32.16 \
+  --set kubeProxyReplacement=true \
+  --set k8sServiceHost=169.254.128.125 \
+  --set k8sServicePort=60002 \
+  | grep image: | awk -F 'image: "' '/image:/ {gsub(/@sha256:[^"]+"/, ""); print $2}' | sort | uniq
 quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222
 quay.io/cilium/cilium:v1.18.3
 quay.io/cilium/operator-generic:v1.18.3
@@ -75,9 +81,9 @@ skopeo login xxx.tencentcloudcr.com --username xxx --password xxx
 最后使用 skopeo 将 cilium 依赖镜像都同步到 TCR 镜像仓库中：
 
 ```bash
-skopeo copy -a docker://quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222  docker://your-tcr-name.tencentcloudcr.com/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222
-skopeo copy -a docker://quay.io/cilium/cilium:v1.18.3  docker://your-tcr-name.tencentcloudcr.com/cilium/cilium:v1.18.3
-skopeo copy -a docker://quay.io/cilium/operator-generic:v1.18.3  docker://your-tcr-name.tencentcloudcr.com/cilium/operator-generic:v1.18.3
+skopeo copy -a docker://quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222
+skopeo copy -a docker://quay.io/cilium/cilium:v1.18.3  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium:v1.18.3
+skopeo copy -a docker://quay.io/cilium/operator-generic:v1.18.3  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/operator-generic:v1.18.3
 ```
 
 如果你的安装配置所依赖镜像较多，也可以通过脚本来实现一键将所有依赖镜像全部同步到 TCR 镜像仓库中，保存下面的脚本内容到 `sync-cilium-images.sh` 文件中:
@@ -92,10 +98,18 @@ skopeo copy -a docker://quay.io/cilium/operator-generic:v1.18.3  docker://your-t
  ```bash title="sync-cilium-images.sh"
 #!/bin/bash
 
-TARGET_REGISTRY="your-tcr-name.tencentcloudcr.com/cilium"
+set -e
+
+TARGET_REGISTRY="your-tcr-name.tencentcloudcr.com"
 
 source_images=$(helm template cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
+  --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
+  --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
+  --set operator.tolerations[2].key="node.kubernetes.io/not-ready",operator.tolerations[2].operator="Exists" \
+  --set operator.tolerations[3].key="node.cloudprovider.kubernetes.io/uninitialized",operator.tolerations[3].operator="Exists" \
+  --set operator.tolerations[4].key="tke.cloud.tencent.com/uninitialized",operator.tolerations[4].operator="Exists" \
+  --set operator.tolerations[5].key="tke.cloud.tencent.com/eni-ip-unavailable",operator.tolerations[5].operator="Exists" \
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
   --set ipam.mode=delegated-plugin \
@@ -105,17 +119,21 @@ source_images=$(helm template cilium cilium/cilium --version 1.18.3 \
   --set cni.customConf=true \
   --set cni.configMap=cni-config \
   --set cni.externalRouting=true \
+  --set extraConfig.local-router-ipv4=169.254.32.16 \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=169.254.128.125 \
-  --set k8sServicePort=60002 \
-  --set extraConfig.local-router-ipv4=169.254.32.16 |
+  --set k8sServicePort=60002 |
   grep image: | awk -F 'image: "' '/image:/ {gsub(/@sha256:[^"]+"/, ""); print $2}' | sort | uniq)
+
+if [[ -z "${source_images}" ]]; then
+  echo "没有找到任何镜像"
+  exit 1
+fi
 
 echo "将会进行以下的镜像同步操作："
 while IFS= read -r source_image; do
   if [[ -n "${source_image}" ]]; then
-    image_name=$(basename "$source_image")
-    target_image="${TARGET_REGISTRY}/${image_name}"
+    target_image="${TARGET_REGISTRY}/${source_image}"
     echo "${source_image} --> ${target_image}"
   fi
 done <<<"${source_images}"
@@ -128,8 +146,7 @@ fi
 
 while IFS= read -r source_image; do
   if [[ -n "${source_image}" ]]; then
-    image_name=$(basename "$source_image")
-    target_image="${TARGET_REGISTRY}/${image_name}"
+    target_image="${TARGET_REGISTRY}/${source_image}"
     echo "同步镜像 ${source_image} 到 ${target_image}"
     skopeo copy -a "docker://${source_image}" "docker://${target_image}"
   fi
@@ -151,10 +168,16 @@ chmod +x sync-cilium-images.sh
 helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
   # highlight-add-start
-  --set image.repository=your-tcr-name.tencentcloudcr.com/cilium/cilium \
-  --set envoy.image.repository=your-tcr-name.tencentcloudcr.com/cilium/cilium-envoy \
-  --set operator.image.repository=your-tcr-name.tencentcloudcr.com/cilium/operator \
+  --set image.repository=your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium \
+  --set envoy.image.repository=your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium-envoy \
+  --set operator.image.repository=your-tcr-name.tencentcloudcr.com/quay.io/cilium/operator \
   # highlight-add-end
+  --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
+  --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
+  --set operator.tolerations[2].key="node.kubernetes.io/not-ready",operator.tolerations[2].operator="Exists" \
+  --set operator.tolerations[3].key="node.cloudprovider.kubernetes.io/uninitialized",operator.tolerations[3].operator="Exists" \
+  --set operator.tolerations[4].key="tke.cloud.tencent.com/uninitialized",operator.tolerations[4].operator="Exists" \
+  --set operator.tolerations[5].key="tke.cloud.tencent.com/eni-ip-unavailable",operator.tolerations[5].operator="Exists" \
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
   --set ipam.mode=delegated-plugin \
@@ -164,10 +187,10 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --set cni.customConf=true \
   --set cni.configMap=cni-config \
   --set cni.externalRouting=true \
+  --set extraConfig.local-router-ipv4=169.254.32.16 \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
-  --set k8sServicePort=60002 \
-  --set extraConfig.local-router-ipv4=169.254.32.16
+  --set k8sServicePort=60002
 ```
 
 如果已经执行过安装，可通过以下方式修改依赖镜像地址：
@@ -176,7 +199,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
 helm upgrade cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
   --reuse-values \
-  --set image.repository=your-tcr-name.tencentcloudcr.com/cilium/cilium \
-  --set envoy.image.repository=your-tcr-name.tencentcloudcr.com/cilium/cilium-envoy \
-  --set operator.image.repository=your-tcr-name.tencentcloudcr.com/cilium/operator
+  --set image.repository=your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium \
+  --set envoy.image.repository=your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium-envoy \
+  --set operator.image.repository=your-tcr-name.tencentcloudcr.com/quay.io/cilium/operator
 ```
