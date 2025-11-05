@@ -158,9 +158,9 @@ spec:
       - kube-system
  ```
 
-### 统一管理 infrastructure 命名空间网络策略
+### 统一管控基础设施的网络策略
 
-集群中可能会部署许多基础设施应用，分散在多个命名空间，我们可以用 CiliumClusterwideNetworkPolicy + namespace label 来统一设置这些命名空间的网络策略（假设这些命名空间都打上了 `role=infrastructure` 这个 label）：
+集群中可能会部署许多基础设施相关应用，分散在多个命名空间，我们可以用 CiliumClusterwideNetworkPolicy 和命名空间标签来统一设置这些命名空间的网络策略（假设这些命名空间都打上了 `role=infrastructure` 这个 label）：
 
  ```yaml
 apiVersion: cilium.io/v2
@@ -171,7 +171,7 @@ spec:
   endpointSelector: # 选中所有基础设施命名空间中的 Pod
     matchLabels:
       io.cilium.k8s.namespace.labels.role: infrastructure
-  egress:
+  egress: # 配置 egress 策略
   - toEndpoints: # 允许访问所有基础设施命名空间中的 Pod
     - matchLabels:
         io.cilium.k8s.namespace.labels.role: infrastructure
