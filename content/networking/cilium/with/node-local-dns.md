@@ -2,7 +2,9 @@
 
 ## 概述
 
-本文介绍安装了 Cilium 的集群如何实现与 Nodelocal DNSCache 共存。
+[Nodelocal DNS Cache](https://github.com/kubernetes/kubernetes/tree/master/cluster/addons/dns/nodelocaldns) 用于 DNS 缓存和加速，可减轻 coredns 压力并提高 DNS 查询性能。
+
+本文介绍安装 Cilium 的 TKE 集群如何实现与 Nodelocal DNSCache 共存。
 
 ## 与 TKE 的 NodeLocalDNSCache 插件不兼容
 
