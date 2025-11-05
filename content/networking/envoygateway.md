@@ -680,7 +680,7 @@ spec:
           value: header-add-3
 ```
 
-### 使用 EnvoyGateway 来暴露 apiserver
+### 暴露 apiserver
 
 参考以下配置：
 
