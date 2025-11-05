@@ -237,7 +237,9 @@ spec:
         family: IPv4
 ```
 
-### 允许部分 Pod 访问 apiserver
+### 限制 apiserver 的访问
+
+如需严格限制 apiserver 的访问，可先配置一个全局的默认拒绝规则（参考前面的 `安全基线：默认拒绝` 示例），然后在按需配置允许哪些 Pod 访问。
 
 允许 `test` 命名空间下所有 pod 访问 apiserver:
 
