@@ -17,7 +17,7 @@ Kubernetes 提供了 `Ingress API` 来接入七层南北向流量，但功能很
 ## 前提条件
 
 1. 确保 [helm](https://helm.sh/zh/docs/intro/install/) 和 [kubectl](https://kubernetes.io/zh-cn/docs/tasks/tools/install-kubectl-linux/) 已安装，并配置好可以连接集群的 kubeconfig（参考 [连接集群](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)）。
-2. 确保 EnvoyGateway 支持当前的集群版本，参考 [EnvoyGateway Compatibility Matrix](https://gateway.envoyproxy.io/news/releases/matrix/)。（当前最新 v1.5 需集群版本 >= 1.30）。
+2. 确保 EnvoyGateway 支持当前的集群版本，参考 EnvoyGateway 官方文档 [Compatibility Matrix](https://gateway.envoyproxy.io/news/releases/matrix/)。（当前最新 v1.5 需集群版本 >= 1.30）。
 
 ## 安装 EnvoyGateway
 
@@ -43,7 +43,7 @@ helm install eg oci://docker.io/envoyproxy/gateway-helm \
   --create-namespace
 ```
 
-> 参考 [EnvoyGateway: Install with Helm](https://gateway.envoyproxy.io/docs/install/)。
+> 参考 EnvoyGateway 官方文档 [Install with Helm](https://gateway.envoyproxy.io/docs/install/)。
 
 ## 基础用法
 ### 创建 GatewayClass
