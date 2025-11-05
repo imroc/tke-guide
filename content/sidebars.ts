@@ -30,7 +30,7 @@ const sidebars: SidebarsConfig = {
             'networking/cilium/roadmap',
             {
               type: 'category',
-              label: '与其它组件共存',
+              label: '组件共存方案',
               collapsed: true,
               link: {
                 type: 'generated-index',
