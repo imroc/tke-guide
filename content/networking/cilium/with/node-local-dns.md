@@ -88,6 +88,27 @@ PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
 
 最后新开终端重新执行安装命令即可。
 
+### 无法创建 CiliumLocalRedirectPolicy
+
+CiliumLocalRedirectPolicy 的能力没有默认开启，需在安装时加参数 `--set localRedirectPolicies.enabled=true` 来开启。
+
+若 Cilium 已安装，通过以下方式更新 Cilium 配置来开启：
+
+```bash
+
+helm upgrade cilium cilium/cilium --version 1.18.3 \
+  --namespace kube-system \
+  --reuse-values \
+  --set localRedirectPolicies.enabled=true
+```
+
+再需重启下 operator 和 agent 生效:
+
+```bash
+kubectl rollout restart deploy cilium-operator -n kube-system
+kubectl rollout restart ds cilium -n kube-system
+```
+
 ## 参考资料
 
 - [Local Redirect Policy Use Cases: Node-local DNS cache](https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/#node-local-dns-cache)

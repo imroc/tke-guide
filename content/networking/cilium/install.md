@@ -187,6 +187,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --set cni.configMap=cni-config \
   --set cni.externalRouting=true \
   --set extraConfig.local-router-ipv4=169.254.32.16 \
+  --set localRedirectPolicies.enabled=true \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002
@@ -246,6 +247,9 @@ operator:
 extraConfig:
   # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
   local-router-ipv4: 169.254.32.16
+# 启用 CiliumLocalRedirectPolicy 的能力，参考 https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
+localRedirectPolicies:
+  enabled: true
 # 替代 kube-proxy，包括 ClusterIP 转发、NodePort 转发，另外还附带了 HostPort 转发的能力
 kubeProxyReplacement: "true"
 # 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
