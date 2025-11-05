@@ -127,7 +127,7 @@ CiliumNetworkPolicy 和 CiliumClusterwideNetworkPolicy 的核心区别在于作�
 
 :::tip[备注]
 
-通常 ingress 流量不设置全局的默认拒绝，可针对敏感业务单独设置 ingress 策略（如只允许某些服务访问）。
+通常 ingress 流量不设置全局的默认拒绝，可针对敏感业务单独设置 ingress 策略（如 A 只允许被 B 访问）。
 
 :::
 
