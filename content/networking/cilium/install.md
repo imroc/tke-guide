@@ -19,7 +19,7 @@
 - 容器网络插件：VPC-CNI 共享网卡多 IP。
 - 节点：安装前不要向集群添加任何普通节点或原生节点，避免残留相关规则和配置，等安装完成后再添加。
 - 基础组件：取消勾选 ip-masq-agent，避免冲突。
-- 增强组件：如果希望在安装 cilium 后还能让节点按需自动扩缩容，要用 Karpenter 节点池来管理节点，需勾选安装 Karpenter 组件，否则无需勾选。
+- 增强组件：如果节点池希望使用 Karpenter 节点池，需勾选安装 Karpenter 组件，否则无需勾选（参考后文的节点池选型）。
 
 集群创建成功后，需开启集群访问来暴露集群的 apiserver 提供后续使用 helm 安装 cilium 时，helm 命令能正常操作 TKE 集群，参考 [开启集群访问的方法](https://cloud.tencent.com/document/product/457/32191#.E6.93.8D.E4.BD.9C.E6.AD.A5.E9.AA.A4)。
 
@@ -238,7 +238,7 @@ operator:
     operator: Exists
   - key: "node.cloudprovider.kubernetes.io/uninitialized"
     operator: Exists
-  # 容忍 TKE 的污点，避免循环依赖
+  # 容忍 TKE 的污点，避免首次安装时循环依赖
   - key: "tke.cloud.tencent.com/uninitialized" 
     operator: Exists
   - key: "tke.cloud.tencent.com/eni-ip-unavailable" 
@@ -669,6 +669,12 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
 TencentOS 4 系统镜像目前内测中，需要 [提交工单](https://console.cloud.tencent.com/workorder/category) 进行申请。
 
 如果没有申请，添加普通节点将无法选择到 TencentOS 4 的系统镜像，原生节点如果指定了注解使用 TencentOS 4，节点将无法成功初始化。
+
+### cilium-operator 在超级节点无法就绪？
+
+cilium-operator 使用 hostNetwork 并配置了就绪探针，在超级节点上使用 hostNetwork 时探测请求不通，所以 cilium-operator 无法就绪。
+
+安装 cilium 的集群不建议使用超级节点，可以移除掉，如果一定要用，可给超级节点打上污点，再给需要调度到超级节点的 Pod 加上对应的容忍。
 
 ## 参考资料
 
