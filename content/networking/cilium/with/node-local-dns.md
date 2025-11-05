@@ -32,7 +32,7 @@ Cilium 官方给出了通过配置 CiliumLocalRedirectPolicy 来实现与 Nodelo
     kubectl apply -f node-local-dns.yaml
     ```
 
-3. 报错以下内容到文件 `localdns-redirect-policy.yaml`:
+3. 保持以下内容到文件 `localdns-redirect-policy.yaml`:
     ```yaml title="localdns-redirect-policy.yaml"
     apiVersion: cilium.io/v2
     kind: CiliumLocalRedirectPolicy
