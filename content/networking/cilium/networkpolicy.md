@@ -278,9 +278,7 @@ spec:
        io.cilium.k8s.namespace.labels.tenant-id: "001"
 ```
 
-### 保护敏感服务
-
-#### 限制 apiserver 的访问
+### 限制 apiserver 的访问
 
 如需严格限制 apiserver 的访问，可先配置一个全局的默认拒绝规则（参考前面的 `安全基线：默认拒绝` 示例），然后在按需配置允许哪些 Pod 访问。
 
@@ -316,6 +314,8 @@ spec:
     - kube-apiserver
 ```
 
+
+### 限制业务的入流量：保护敏感服务
 #### 限制 A 只能被 B 访问，且只能访问 80/TCP 端口
 
 ```yaml
@@ -385,7 +385,7 @@ spec:
     - world
 ```
 
-### 限制业务的外访流量
+### 限制业务的出流量
 #### A 只能访问 B
 
 ```yaml
