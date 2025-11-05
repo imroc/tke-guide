@@ -334,7 +334,7 @@ spec:
         protocol: TCP
 ```
 
-### 禁止 A 访问 B
+### 显式禁止 A 访问 B
 
 ```yaml
 apiVersion: cilium.io/v2
