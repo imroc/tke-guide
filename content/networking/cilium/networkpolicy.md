@@ -131,7 +131,7 @@ CiliumNetworkPolicy 和 CiliumClusterwideNetworkPolicy 的核心区别在于作�
 
 :::
 
- ```yaml title="default-deny.yaml"
+ ```yaml
 apiVersion: cilium.io/v2
 kind: CiliumClusterwideNetworkPolicy
 metadata:
