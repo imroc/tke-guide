@@ -204,6 +204,28 @@ spec:
         protocol: TCP
  ```
 
+### 配置节点防火墙
+
+```yaml
+apiVersion: "cilium.io/v2"
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: default-host-firewall
+spec:
+  nodeSelector: {} # 选中所有节点
+  ingress:
+  - fromEntities:
+    - cluster # 不限制集群内的流量
+  - toPorts:
+    - ports: # 允许 ssh 访问
+      - port: "22"
+        protocol: TCP
+  - icmps: # 允许 ping 请求
+    - fields:
+      - type: EchoRequest
+        family: IPv4
+```
+
 ### 允许部分 Pod 访问 apiserver
 
 允许 `test` 命名空间下所有 pod 访问 apiserver:
