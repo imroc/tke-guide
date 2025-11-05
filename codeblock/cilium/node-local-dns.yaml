@@ -77,6 +77,9 @@ data:
         prometheus :9253
         }
     .:53 {
+        template ANY HINFO . {
+            rcode NXDOMAIN
+        }
         errors
         cache 30
         reload

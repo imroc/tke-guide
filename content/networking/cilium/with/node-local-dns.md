@@ -18,7 +18,7 @@ Cilium 官方给出了通过配置 CiliumLocalRedirectPolicy 来实现与 Nodelo
 
 :::tip[说明]
 
-以下内容是根据 Ciium 官方文档 [Node-local DNS cache](https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/#node-local-dns-cache) 中的 **Manual Configuration** 方式，将 node-local-dns 官方的部署 YAML 文件 [nodelocaldns.yaml](https://raw.githubusercontent.com/kubernetes/kubernetes/refs/heads/master/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml) 修改而来，另外替换了镜像地址为 dockerhub 上的 mirror 镜像，方便在 TKE 环境中直接内网拉取到。
+以下内容是根据 Ciium 官方文档 [Node-local DNS cache](https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/#node-local-dns-cache) 中的 **Manual Configuration** 方式，将 node-local-dns 官方的部署 YAML 文件 [nodelocaldns.yaml](https://raw.githubusercontent.com/kubernetes/kubernetes/refs/heads/master/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml) 修改而来，另外替换镜像地址成 dockerhub 上的 mirror 镜像，方便在 TKE 环境中直接内网拉取到，并且禁用了 HINFO 请求避免日志一直报错（VPC 的 DNS 服务不支持 HINFO 请求）。
 
 :::
 
@@ -49,12 +49,12 @@ spec:
       matchLabels:
         k8s-app: node-local-dns
     toPorts:
-      - port: "53"
-        name: dns
-        protocol: UDP
-      - port: "53"
-        name: dns-tcp
-        protocol: TCP
+    - port: "53"
+      name: dns
+      protocol: UDP
+    - port: "53"
+      name: dns-tcp
+      protocol: TCP
 ```
 
 ## 常见问题
