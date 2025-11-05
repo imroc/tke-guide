@@ -122,8 +122,8 @@ source_images=$(helm template cilium cilium/cilium --version 1.18.3 \
   --set extraConfig.local-router-ipv4=169.254.32.16 \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=169.254.128.125 \
-  --set k8sServicePort=60002 |
-  grep image: | awk -F 'image: "' '/image:/ {gsub(/@sha256:[^"]+"/, ""); print $2}' | sort | uniq)
+  --set k8sServicePort=60002 \
+  | grep image: | awk -F 'image: "' '/image:/ {gsub(/@sha256:[^"]+"/, ""); print $2}' | sort | uniq)
 
 if [[ -z "${source_images}" ]]; then
   echo "没有找到任何镜像"
