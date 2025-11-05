@@ -246,6 +246,7 @@ apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
   name: allow-same-namespace
+  namespace: tenant-001
 spec:
   endpointSelector: {}
   ingress:
