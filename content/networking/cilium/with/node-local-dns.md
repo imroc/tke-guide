@@ -1,0 +1,64 @@
+# Cilium 与 Nodelocal DNSCache 共存
+
+## 概述
+
+本文介绍安装了 Cilium 的集群如何实现与 Nodelocal DNSCache 共存。
+
+## 与 TKE 的 NodeLocalDNSCache 插件不兼容
+
+安装 Cilium 并替代了 kube-proxy，访问 coredns 的请求会被 cilium 的 ebpf 程序拦截并转发，无法被节点上的 `node-local-dns` Pod 拦截，也就无法直接实现 DNS 缓存的能力，该插件的能力将会失效。
+
+Cilium 官方给出了通过配置 CiliumLocalRedirectPolicy 来实现与 Nodelocal DNSCache 共存的方法，但如果使用的是 TKE 的 [NodeLocalDNSCache](https://cloud.tencent.com/document/product/457/40613) 插件， 即使通过配置 CiliumLocalRedirectPolicy 也无法实现与 NodeLocalDNSCache 共存，因为该插件使用了 HostNetwork 网络且不监听 节点/Pod IP （监听的是 `169.254.20.10` 和 `kube-dns` 的 Cluster IP），导致 DNS 流量无法被 CiliumLocalRedirectPolicy 重定向到本机的 `node-local-dns` Pod。
+
+所以，若想在安装 Cilium 的集群使用 Nodelocal DNSCache，建议自建 Nodelocal DNSCache，具体方法参考下文。
+
+## 自建 Nodelocal DNSCache
+
+1. 保存以下内容到文件 `node-local-dns.yaml`:
+
+:::tip[说明]
+
+以下内容是根据 Ciium 官方文档 [Node-local DNS cache](https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/#node-local-dns-cache) 中的 **Manual Configuration** 方式，将 node-local-dns 官方的部署 YAML 文件 [nodelocaldns.yaml](https://raw.githubusercontent.com/kubernetes/kubernetes/refs/heads/master/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml) 修改而来，另外替换了镜像地址为 dockerhub 上的 mirror 镜像，方便在 TKE 环境中直接内网拉取到。
+
+:::
+
+<FileBlock file="cilium/node-local-dns.yaml" />
+
+2. 安装：
+
+```bash
+kubedns=$(kubectl get svc kube-dns -n kube-system -o jsonpath={.spec.clusterIP}) && sed -i "s/__PILLAR__DNS__SERVER__/$kubedns/g;" node-local-dns.yaml
+kubectl apply -f node-local-dns.yaml
+```
+
+## 常见问题
+
+### sed 报错: extra characters at the end of n command
+
+macOS 下执行安装 Nodelocal DNSCache 时，sed 报错：
+
+```bash
+$ kubedns=$(kubectl get svc kube-dns -n kube-system -o jsonpath={.spec.clusterIP}) && sed -i "s/__PILLAR__DNS__SERVER__/$kubedns/g;" node-local-dns.yaml
+
+sed: 1: "node-local-dns.yaml
+": extra characters at the end of n command
+```
+
+是因为 macOS 自带的 sed 命令不是标准的（GNU），语法有些不一样，可安装 GNU 版的 sed：
+
+```bash
+brew install gnu-sed
+```
+
+并设置下 PATH：
+
+```bash
+PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
+```
+
+最后新开终端重新执行安装命令即可。
+
+## 参考资料
+
+- [Local Redirect Policy Use Cases: Node-local DNS cache](https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/#node-local-dns-cache)
+- [在 Kubernetes 集群中使用 NodeLocal DNSCache](https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/nodelocaldns/)
