@@ -25,37 +25,41 @@ Cilium 官方给出了通过配置 CiliumLocalRedirectPolicy 来实现与 Nodelo
 <FileBlock file="cilium/node-local-dns.yaml" />
 
 2. 安装：
+    ```bash
+    kubedns=$(kubectl get svc kube-dns -n kube-system -o jsonpath={.spec.clusterIP}) && sed -i "s/__PILLAR__DNS__SERVER__/$kubedns/g;" node-local-dns.yaml
+    kubectl apply -f node-local-dns.yaml
+    ```
 
-```bash
-kubedns=$(kubectl get svc kube-dns -n kube-system -o jsonpath={.spec.clusterIP}) && sed -i "s/__PILLAR__DNS__SERVER__/$kubedns/g;" node-local-dns.yaml
-kubectl apply -f node-local-dns.yaml
-```
-
-3. 配置 CiliumLocalRedirectPolicy (将 dns 的请求重定向到本机的 node-local-dns pod)：
-
-```yaml title="localdns-redirect-policy.yaml"
-apiVersion: cilium.io/v2
-kind: CiliumLocalRedirectPolicy
-metadata:
-  name: nodelocaldns
-  namespace: kube-system
-spec:
-  redirectFrontend:
-    serviceMatcher:
-      serviceName: kube-dns
+3. 报错以下内容到文件 `localdns-redirect-policy.yaml`:
+    ```yaml title="localdns-redirect-policy.yaml"
+    apiVersion: cilium.io/v2
+    kind: CiliumLocalRedirectPolicy
+    metadata:
+      name: nodelocaldns
       namespace: kube-system
-  redirectBackend:
-    localEndpointSelector:
-      matchLabels:
-        k8s-app: node-local-dns
-    toPorts:
-    - port: "53"
-      name: dns
-      protocol: UDP
-    - port: "53"
-      name: dns-tcp
-      protocol: TCP
-```
+    spec:
+      redirectFrontend:
+        serviceMatcher:
+          serviceName: kube-dns
+          namespace: kube-system
+      redirectBackend:
+        localEndpointSelector:
+          matchLabels:
+            k8s-app: node-local-dns
+        toPorts:
+        - port: "53"
+          name: dns
+          protocol: UDP
+        - port: "53"
+          name: dns-tcp
+          protocol: TCP
+    ```
+
+4. 创建 CiliumLocalRedirectPolicy (将 dns 的请求重定向到本机的 node-local-dns pod)：
+    ```bash
+    kubectl apply -f localdns-redirect-policy.yaml
+    ```
+
 
 ## 常见问题
 
