@@ -45,7 +45,7 @@ helm install eg oci://docker.io/envoyproxy/gateway-helm \
 
 > 参考 [EnvoyGateway: Install with Helm](https://gateway.envoyproxy.io/docs/install/)。
 
-## 使用 Gateway API 管理南北向流量
+## 基础用法
 ### 创建 GatewayClass
 
 类似 `Ingress` 需要指定 `IngressClass`，Gateway API 中每个 `Gateway` 都需要引用一个 `GatewayClass`，`GatewayClass` 相当于是网关实例除监听器外的配置（如部署方式、网关 Pod 的 template、副本数量、关联的 Service 等），所以先创建一个 `GatewayClass`：
@@ -218,9 +218,9 @@ spec:
         from: All
 ```
 
-## 常见问题
+## 使用案例
 
-### 如何自定义 CLB？
+### 自定义 CLB
 
 可通过创建 `EnvoyProxy` 自定义资源来自定义，下面是示例：
 
@@ -305,7 +305,7 @@ spec:
 2. 通过 `service.kubernetes.io/qcloud-loadbalancer-internal-subnetid` 注解指定 CLB 内网 IP，实现自动创建内网 CLB 来接入流量。
 3. 通过 `service.kubernetes.io/service.extensiveParameters` 注解自定义自动创建的 CLB 更多属性，如指定运营商、带宽上限、实例规格、网络计费模式等。
 
-### 多个 HTTPRoute 如何复用同一个 CLB？
+### 多个 HTTPRoute 复用同一个 CLB
 
 通常一个 `Gateway` 对象就对应一个 CLB，只要不同 `HTTPRoute` 的 `parentRefs` 引用的是同一个 `Gateway` 对象，那么它们就会复用同一个 CLB。
 
@@ -363,7 +363,7 @@ spec:
           port: 80
 ```
 
-### 如何实现四七层共用同一个 CLB？
+### 四七层共用同一个 CLB
 
 使用 TKE 自带的 `LoadBalancer` 类型的 `Service`，可以实现多个 `Service` 复用同一个 CLB，也就是多个四层端口（TCP/UDP）复用同一个 CLB；使用 TKE 自带的 `Ingress` （CLB Ingress），无法与任何其它 `Ingress` 和 `LoadBalancer` 类型的 `Service` 复用同一个 CLB。所以，如果需要实现四七层共用同一个 CLB，直接使用 TKE 自带的 CLB Service 和 CLB Ingress 无法实现，而如果你安装了 `EnvoyGateway` 的话就可以实现。
 
@@ -486,7 +486,7 @@ spec:
       port: 6000
 ```
 
-### 如何实现自动重定向？
+### 自动重定向
 
 通过配置 `HTTPRoute` 的 `filters` 可实现自动重定向，下面给出示例。
 
@@ -582,7 +582,7 @@ spec:
 
 > `http://test.example.com/foo` 会被重定向到 `https://test.example.com/foo`
 
-### 如何配置 HTTPS 或 TLS？
+### 配置 HTTPS 与 TLS
 
 将证书和密钥存储在 Kubernetes 的 Secret 中：
 
@@ -641,7 +641,7 @@ spec:
         name: test-cert
 ```
 
-### 如何修改 HTTP Header？
+### 修改 HTTP Header
 
 在 `HTTPRoute` 中使用 `RequestHeaderModifier` 这个 filter 可以修改 HTTP 请求的 Header。
 
@@ -680,7 +680,7 @@ spec:
           value: header-add-3
 ```
 
-### 如何使用 EnvoyGateway 来暴露 apiserver？
+### 使用 EnvoyGateway 来暴露 apiserver
 
 参考以下配置：
 
