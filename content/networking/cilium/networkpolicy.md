@@ -277,7 +277,7 @@ spec:
         app: b
 ```
 
-### 限制 B 只能被 A 访问
+### 限制 B 只能被 A 访问，且只能访问 80/TCP 端口
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -292,6 +292,10 @@ spec:
   - fromEndpoints:
     - matchLabels:
         app: a
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
 ```
 
 ### 允许 A 访问同名空间下的所有 Pod 
@@ -310,9 +314,27 @@ spec:
     - {}
 ```
 
+### 允许 A 访问 192.0.2.0/24 网段下的 80/TCP 端口
+
+```yaml
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-a-to-cidr
+spec:
+  endpointSelector:
+    matchLabels:
+      role: a
+  egress:
+  - toCIDR:
+    - 192.0.2.0/24
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+```
 
 ### 禁止 A 访问 B
-
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -323,17 +345,16 @@ spec:
   endpointSelector:
     matchLabels:
       app: a
-  egress:
-  - toEntities:
-    - all
   egressDeny:
-  - toEndpoints:
+  - toEndpoints: # 显式禁止 A 访问 B
     - matchLabels:
         app: b
+  egress:
+  - toEntities: # 允许 A 的其它流量
+    - all
 ```
 
 ### 允许 A 被集群外部访问
-
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -347,6 +368,25 @@ spec:
   ingress:
   - fromEntities:
     - world
+```
+
+### 只允许 A 访问 80-444 的 TCP 端口
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-a-ports
+spec:
+  endpointSelector:
+    matchLabels:
+      app: a
+  egress:
+    - toPorts:
+      - ports: # 只能发送目标端口在 80-444 的 TCP 端口
+        - port: "80"
+          endPort: 444
+          protocol: TCP
 ```
 
 ### 允许 A 访问指定域名的服务
