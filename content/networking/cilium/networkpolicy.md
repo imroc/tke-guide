@@ -237,7 +237,9 @@ spec:
         family: IPv4
 ```
 
-### 限制 apiserver 的访问
+### 保护敏感服务
+
+#### 限制 apiserver 的访问
 
 如需严格限制 apiserver 的访问，可先配置一个全局的默认拒绝规则（参考前面的 `安全基线：默认拒绝` 示例），然后在按需配置允许哪些 Pod 访问。
 
@@ -273,7 +275,77 @@ spec:
     - kube-apiserver
 ```
 
-### 允许 A 访问 B
+#### 限制 A 只能被 B 访问，且只能访问 80/TCP 端口
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: from-b-to-a
+spec:
+  endpointSelector:
+    matchLabels:
+      app: a
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app: b
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+```
+
+#### 限制 A 只能被 B 访问，且只能访问部分接口
+
+ ```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: from-b-to-a-api
+spec:
+  description: "Allow HTTP API from a to b"
+  endpointSelector:
+    matchLabels:
+      role: a
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        role: b
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+      rules:
+        http:
+        - method: "GET" # 允许 GET /public
+          path: "/public"
+        - method: "PUT" # 允许 PUT /avatar，但需要携带 X-My-Header: true 的 header
+          path: "/avatar$" 
+          headers:
+          - 'X-My-Header: true'
+ ```
+
+#### 限制 A 只能被集群外部访问
+
+如果 A 对外提供服务， CLB 直连  Pod，处理来自公网的请求，不允许其它流量（如来自集群内 Pod 或节点），可配置如下策略：
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: from-world-to-a
+spec:
+  endpointSelector:
+    matchLabels:
+      app: a
+  ingress:
+  - fromEntities:
+    - world
+```
+
+### 限制业务的外访流量
+#### A 只能访问 B
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -290,28 +362,7 @@ spec:
         app: b
 ```
 
-### 限制 B 只能被 A 访问，且只能访问 80/TCP 端口
-
-```yaml
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: ingress-a-to-b
-spec:
-  endpointSelector:
-    matchLabels:
-      app: b
-  ingress:
-  - fromEndpoints:
-    - matchLabels:
-        app: a
-    toPorts:
-    - ports:
-      - port: "80"
-        protocol: TCP
-```
-
-### 允许 A 访问同名空间下的所有 Pod 
+#### A 只能访问同名空间下的 Pod 
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -327,10 +378,10 @@ spec:
     - {}
 ```
 
-### 允许 A 访问 192.0.2.0/24 网段下的 80/TCP 端口
+#### A 只能访问指定网段下的服务
 
 ```yaml
-apiVersion: "cilium.io/v2"
+apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
   name: allow-a-to-cidr
@@ -347,43 +398,7 @@ spec:
         protocol: TCP
 ```
 
-### 显式禁止 A 访问 B
-
-```yaml
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: deny-a-to-b
-spec:
-  endpointSelector:
-    matchLabels:
-      app: a
-  egressDeny:
-  - toEndpoints: # 显式禁止 A 访问 B
-    - matchLabels:
-        app: b
-  egress:
-  - toEntities: # 允许 A 的其它流量
-    - all
-```
-
-### 允许 A 被集群外部访问
-
-```yaml
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: from-world-to-a
-spec:
-  endpointSelector:
-    matchLabels:
-      app: a
-  ingress:
-  - fromEntities:
-    - world
-```
-
-### 只允许 A 访问 80-444 的 TCP 端口
+#### A 只能访问指定端口范围
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -402,7 +417,7 @@ spec:
           protocol: TCP
 ```
 
-### 允许 A 访问指定域名的服务
+####  A 只能访问指定域名的服务
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -446,36 +461,25 @@ spec:
     - matchPattern: '*.*.*.*.*.tencentyun.com'
 ```
 
+#### 显式禁止：A 不能访问 B
 
-### 允许 B 的部分接口被 A 访问
-
- ```yaml
+```yaml
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: from-a-to-b-api
+  name: deny-a-to-b
 spec:
-  description: "Allow HTTP API from a to b"
   endpointSelector:
     matchLabels:
-      role: b
-  ingress:
-  - fromEndpoints:
+      app: a
+  egressDeny:
+  - toEndpoints: # 显式禁止 A 访问 B
     - matchLabels:
-        role: a
-    toPorts:
-    - ports:
-      - port: "80"
-        protocol: TCP
-      rules:
-        http:
-        - method: "GET" # 允许 GET /public
-          path: "/public"
-        - method: "PUT" # 允许 PUT /avatar，但需要携带 X-My-Header: true 的 header
-          path: "/avatar$" 
-          headers:
-          - 'X-My-Header: true'
- ```
+        app: b
+  egress:
+  - toEntities: # 允许 A 的其它流量
+    - all
+```
 
 ## 参考资料
 
