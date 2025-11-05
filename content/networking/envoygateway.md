@@ -14,11 +14,16 @@ Kubernetes 提供了 `Ingress API` 来接入七层南北向流量，但功能很
 
 :::
 
-## 操作步骤
+## 前提条件
 
-### 安装 EnvoyGateway
+1. 确保 [helm](https://helm.sh/zh/docs/intro/install/) 和 [kubectl](https://kubernetes.io/zh-cn/docs/tasks/tools/install-kubectl-linux/) 已安装，并配置好可以连接集群的 kubeconfig（参考 [连接集群](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)）。
+2. 确保 EnvoyGateway 支持当前的集群版本，参考 [EnvoyGateway Compatibility Matrix](https://gateway.envoyproxy.io/news/releases/matrix/)。（当前最新 v1.5 需集群版本 >= 1.30）。
 
-#### 方法一：通过应用市场安装
+## 安装 EnvoyGateway
+
+可以通过 TKE 应用市场安装，也可以使用 helm 直接安装，推荐有动手能力的直接使用 helm 安装，可使用社区最新版（TKE 应用市场的版本通常会及时更新，也不保证最新）。
+
+### 方法一：通过应用市场安装
 
 在 [TKE 应用市场](https://console.cloud.tencent.com/tke2/helm/market) 搜索或在 `网络` 分类中找到 `envoygateway`，点击【创建应用】，命名空间选 `envoy-gateway-system`，若没有则先新建一个，完成其余配置后点击【创建】即可将 envoygateway 安装到集群中。
 
@@ -28,14 +33,19 @@ Kubernetes 提供了 `Ingress API` 来接入七层南北向流量，但功能很
   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F27%2F20250227140332.png)
 4. 根据需求配置完参数后，单击**创建**即可将 Envoy Gateway 安装到集群中。
 
-#### 方法二：按照 Envoy Gateway 官方文档安装
+### 方法二：使用 helm 安装
 
-参考 [Envoy Gateway Installation](https://gateway.envoyproxy.io/docs/install/)。
 
-### 配置 kubectl 访问集群
+```bash
+helm install eg oci://docker.io/envoyproxy/gateway-helm \
+  --version v1.5.4 \
+  -n envoy-gateway-system \
+  --create-namespace
+```
 
-EnvoyGateway 使用的是 Gateway API 而不是 Ingress API，在 TKE 控制台无法直接创建，可通过 kubectl 命令进行创建，参考 [连接集群](https://cloud.tencent.com/document/product/457/32191) 这篇文档配置 kubectl。
+> 参考 [EnvoyGateway: Install with Helm](https://gateway.envoyproxy.io/docs/install/)。
 
+## 使用 Gateway API 管理南北向流量
 ### 创建 GatewayClass
 
 类似 `Ingress` 需要指定 `IngressClass`，Gateway API 中每个 `Gateway` 都需要引用一个 `GatewayClass`，`GatewayClass` 相当于是网关实例除监听器外的配置（如部署方式、网关 Pod 的 template、副本数量、关联的 Service 等），所以先创建一个 `GatewayClass`：
@@ -668,6 +678,77 @@ spec:
           value: header-add-2
         - name: X-Header-Add-3
           value: header-add-3
+```
+
+### 如何使用 EnvoyGateway 来暴露 apiserver？
+
+参考以下配置：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: eg
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        replicas: 3 # 指定 EnvoyGateway 网关 Pod 的数量
+      envoyService:
+        annotations:
+          service.cloud.tencent.com/direct-access: "true" # 启用 CLB 直连 EnvoyGateway 网关 Pod
+
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: eg
+  namespace: envoy-gateway-system
+spec:
+  gatewayClassName: eg
+  infrastructure:
+    parametersRef:
+      group: gateway.envoyproxy.io
+      kind: EnvoyProxy
+      name: eg
+  listeners: # 指定 CLB 对外的监听端口
+  - name: apiserver
+    protocol: TCP
+    port: 443
+    allowedRoutes:
+      namespaces:
+        from: All
+
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: apiserver
+  namespace: default
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: eg
+    namespace: envoy-gateway-system
+    sectionName: apiserver # 引用 Gateway
+  rules:
+  - backendRefs: # 后端指向 default/kubernetes 这个 apiserver 的 service
+    - group: ""
+      kind: Service
+      name: kubernetes
+      port: 443
+      weight: 1
 ```
 
 ## 探索更多用法
