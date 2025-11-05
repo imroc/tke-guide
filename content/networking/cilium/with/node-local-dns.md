@@ -31,6 +31,32 @@ kubedns=$(kubectl get svc kube-dns -n kube-system -o jsonpath={.spec.clusterIP})
 kubectl apply -f node-local-dns.yaml
 ```
 
+3. 配置 CiliumLocalRedirectPolicy (将 dns 的请求重定向到本机的 node-local-dns pod)：
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumLocalRedirectPolicy
+metadata:
+  name: nodelocaldns
+  namespace: kube-system
+spec:
+  redirectFrontend:
+    serviceMatcher:
+      serviceName: kube-dns
+      namespace: kube-system
+  redirectBackend:
+    localEndpointSelector:
+      matchLabels:
+        k8s-app: node-local-dns
+    toPorts:
+      - port: "53"
+        name: dns
+        protocol: UDP
+      - port: "53"
+        name: dns-tcp
+        protocol: TCP
+```
+
 ## 常见问题
 
 ### sed 报错: extra characters at the end of n command
