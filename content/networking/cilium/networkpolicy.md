@@ -175,6 +175,17 @@ spec:
   - toEndpoints: # 允许访问所有基础设施命名空间中的 Pod
     - matchLabels:
         io.cilium.k8s.namespace.labels.role: infrastructure
+  - toEndpoints: # 允许 访问 coredns 解析域名
+    - matchLabels:
+        io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: ANY
+      rules:
+        dns:
+        - matchPattern: "*"
   - toFQDNs: # 允许调用腾讯云相关 API
     - matchPattern: '*.tencent.com'
     - matchPattern: '*.*.tencent.com'
@@ -191,8 +202,8 @@ spec:
     - matchPattern: '*.*.*.tencentyun.com'
     - matchPattern: '*.*.*.*.tencentyun.com'
     - matchPattern: '*.*.*.*.*.tencentyun.com'
-  - toCIDR: # 169.254 是腾讯云上的保留网段，一些内部服务会使用这个 IP，如 TKE 集群 apiserver 的 VIP、COS 存储、镜像仓库等。
-    - 169.254.0.0/16
+  - toCIDR: # 允许访问腾讯云上的平台服务
+    - 169.254.0.0/16 # 169.254.0.0/16 是腾讯云上的保留网段，一些平台服务会使用这个 IP，如 TKE 集群 apiserver 的 VIP、COS 存储、镜像仓库等。
   - toEntities: # 允许访问 apiserver
     - kube-apiserver
   - toEntities: # 允许访问集群中所有节点的 10250 端口，可用于监控指标采集
@@ -401,6 +412,17 @@ spec:
     matchLabels:
       app: a
   egress:
+  - toEndpoints:
+    - matchLabels:
+        io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: ANY
+      rules:
+        dns:
+        - matchPattern: "*"
   - toFQDNs:
     - matchName: 'imroc.cc'
     - matchPattern: '*.imroc.cc'
