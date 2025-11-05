@@ -39,7 +39,7 @@ const sidebars: SidebarsConfig = {
               items: [
                 'networking/cilium/with/node-local-dns',
               ]
-            }
+            },
             {
               type: 'category',
               label: '附录',
