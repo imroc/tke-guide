@@ -22,7 +22,7 @@ Cilium 官方给出了通过配置 CiliumLocalRedirectPolicy 来实现与 Nodelo
 
 :::
 
-<FileBlock file="cilium/node-local-dns.yaml" />
+   <FileBlock file="cilium/node-local-dns.yaml" />
 
 2. 安装：
     ```bash
