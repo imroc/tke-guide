@@ -237,6 +237,46 @@ spec:
         family: IPv4
 ```
 
+### 多租户隔离
+
+很多时候集群是多租户共享，如果每个租户使用一个命名空间，平台可以使用 CiliumNetworkPolicy 限制租户的业务 Pod 只能在同名空间下互访：
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-same-namespace
+spec:
+  endpointSelector: {}
+  ingress:
+  - fromEndpoints:
+    - {}
+  egress:
+  - toEndpoints:
+    - {}
+```
+
+如果是每个租户的业务 Pod 分布有多个命名空间，但有相同的命名空间标签来标识租户，这可以使用 CiliumClusterwideNetworkPolicy 来实现：
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+ name: tenant-001
+spec:
+ endpointSelector: # 选中租户 001 所有命名空间下的 Pod
+   matchLabels:
+     io.cilium.k8s.namespace.labels.tenant-id: "001"
+ egress: # 只允许租户 001 的 Pod 访问自己的业务 Pod
+ - toEndpoints:
+   - matchLabels:
+       io.cilium.k8s.namespace.labels.tenant-id: "001"
+ ingress: # 只允许租户 001 的 Pod 被自己的业务 Pod 访问
+ - fromEndpoints:
+   - matchLabels:
+       io.cilium.k8s.namespace.labels.tenant-id: "001"
+```
+
 ### 保护敏感服务
 
 #### 限制 apiserver 的访问
