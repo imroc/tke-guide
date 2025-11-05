@@ -156,50 +156,7 @@ TCPRoute 和 UDPRoute 的所有字段参考 [API Specification: TCPRoute](https:
 
 :::
 
-下面是 `TCPRoute` 的示例：
-
-```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
-kind: TCPRoute
-metadata:
-  name: foo
-spec:
-  parentRefs:
-  - namespace: test
-    name: test-gw
-    sectionName: foo
-  rules:
-  - backendRefs:
-    - name: foo
-      port: 6000
-```
-
-:::info[注意]
-
-1. `parentRefs` 指定要引用的`Gateway`(CLB)，表示将该 TCP 要监听到这个 `Gateway` 中。通常只使用 `Gateway` 中的一个端口，所以指定 `sectionName` 来指定使用哪个监听器暴露。
-2. `backendRefs` 定义该条转发规则对应的后端 Service。
-
-:::
-
-下面是 `UDPRoute` 的示例，与 `TCPRoute` 类似：
-
-```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
-kind: UDPRoute
-metadata:
-  name: bar
-spec:
-  parentRefs:
-  - namespace: test
-    name: test-gw
-    sectionName: bar
-  rules:
-  - backendRefs:
-    - name: bar
-      port: 6000
-```
-
-引用的 `Gateway` 示例：
+首先确保 Gateway 上有定义 TCP 和 UDP 的端口：
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -223,6 +180,60 @@ spec:
       namespaces:
         from: All
 ```
+
+然后 `TCPRoute` 和 `UDPRoute` 可引用该 Gateway，的示例：
+
+<Tabs>
+  <TabItem value="1" label="TCPRoute">
+
+  ```yaml
+  apiVersion: gateway.networking.k8s.io/v1alpha2
+  kind: TCPRoute
+  metadata:
+    name: foo
+  spec:
+    parentRefs:
+    - namespace: test
+      name: test-gw
+      sectionName: foo
+    rules:
+    - backendRefs:
+      - name: foo
+        port: 6000
+  ```
+
+  </TabItem>
+  <TabItem value="2" label="UDPRoute">
+
+  ```yaml
+  apiVersion: gateway.networking.k8s.io/v1alpha2
+  kind: UDPRoute
+  metadata:
+    name: bar
+  spec:
+    parentRefs:
+    - namespace: test
+      name: test-gw
+      sectionName: bar
+    rules:
+    - backendRefs:
+      - name: bar
+        port: 6000
+  ```
+
+  ```yaml
+  ```
+
+  </TabItem>
+</Tabs>
+
+:::info[注意]
+
+1. `parentRefs` 指定要引用的`Gateway`(CLB)，表示将该 TCP 要监听到这个 `Gateway` 中。通常只使用 `Gateway` 中的一个端口，所以指定 `sectionName` 来指定使用哪个监听器暴露。
+2. `backendRefs` 定义该条转发规则对应的后端 Service。
+
+:::
+
 
 ## 使用案例
 
