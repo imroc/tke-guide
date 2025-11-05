@@ -30,6 +30,18 @@ const sidebars: SidebarsConfig = {
             'networking/cilium/roadmap',
             {
               type: 'category',
+              label: '与其它组件共存',
+              collapsed: true,
+              link: {
+                type: 'generated-index',
+                slug: '/networking/cilium/with'
+              },
+              items: [
+                'networking/cilium/with/node-local-dns',
+              ]
+            }
+            {
+              type: 'category',
               label: '附录',
               collapsed: true,
               link: {
