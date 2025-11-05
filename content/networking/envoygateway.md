@@ -116,7 +116,7 @@ test-gw   eg      139.155.64.52   True         358d
 
 :::tip[说明]
 
-HTTPRoute 的所有字段参考[API Specification: HTTPRoute](https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io/v1.HTTPRoute)
+HTTPRoute 的所有字段参考 [API Specification: HTTPRoute](https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io/v1.HTTPRoute)
 
 :::
 
@@ -149,6 +149,12 @@ spec:
 ### 创建 TCPRoute 和 UDPRoute
 
 `TCPRoute` 和 `UDPRoute` 用于定义 TCP 和 UDP 转发规则（四层流量），类似 `LoadBalancer` 类型的 `Service`。
+
+:::tip[说明]
+
+TCPRoute 和 UDPRoute 的所有字段参考 [API Specification: TCPRoute](https://gateway-api.sigs.k8s.io/reference/spec/#tcproute) 和 [API Specification: UDPRoute](https://gateway-api.sigs.k8s.io/reference/spec/#udproute)。
+
+:::
 
 下面是 `TCPRoute` 的示例：
 
