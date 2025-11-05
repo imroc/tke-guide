@@ -411,7 +411,7 @@ spec:
       app: a
   egress:
     - toPorts:
-      - ports: # 只能发送目标端口在 80-444 的 TCP 端口
+      - ports: # 只能发送目标端口在 80-444 的 TCP 流量
         - port: "80"
           endPort: 444
           protocol: TCP
