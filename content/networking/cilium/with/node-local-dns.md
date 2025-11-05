@@ -92,3 +92,4 @@ PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
 
 - [Local Redirect Policy Use Cases: Node-local DNS cache](https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/#node-local-dns-cache)
 - [在 Kubernetes 集群中使用 NodeLocal DNSCache](https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/nodelocaldns/)
+- [TKE DNS 最佳实践](https://cloud.tencent.com/document/product/457/78005)
