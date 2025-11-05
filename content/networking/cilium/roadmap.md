@@ -6,7 +6,7 @@
 - [x] 核心：支持使用 TKE VPC-CNI 共享网卡模式集群自建单集群 cilium
 - [x] 常见问题
 - [x] e2e 功能测试，确保各项功能没有问题
-- [x] Egress Gateway
+- [x] Egress Gateway 应用实践
 - [x] NetworkPolicy 应用实践
 - [x] Cilium 与 Nodelocal DNSCache 共存
 - [ ] 使用 Cilium 增强可观测性
