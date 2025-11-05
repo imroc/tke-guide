@@ -8,6 +8,7 @@
 - [x] e2e 功能测试，确保各项功能没有问题
 - [x] Egress Gateway
 - [x] NetworkPolicy 应用实践
+- [x] Cilium 与 Nodelocal DNSCache 共存
 - [ ] 使用 Cilium 增强可观测性
 - [ ] TKE 侧适配：ipamd 默认容忍 cilium 污点
 - [ ] TKE 侧适配：tke-eni-agent 避开使用 cilium 的路由表 ID （2003/2004）
