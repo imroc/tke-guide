@@ -423,7 +423,7 @@ spec:
 ```
 
 
-### 允许 B 的指定接口被 A 访问
+### 允许 B 的部分接口被 A 访问
 
  ```yaml
 apiVersion: cilium.io/v2
