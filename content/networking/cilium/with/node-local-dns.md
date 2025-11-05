@@ -33,7 +33,7 @@ kubectl apply -f node-local-dns.yaml
 
 3. 配置 CiliumLocalRedirectPolicy (将 dns 的请求重定向到本机的 node-local-dns pod)：
 
-```yaml
+```yaml title="localdns-redirect-policy.yaml"
 apiVersion: cilium.io/v2
 kind: CiliumLocalRedirectPolicy
 metadata:
