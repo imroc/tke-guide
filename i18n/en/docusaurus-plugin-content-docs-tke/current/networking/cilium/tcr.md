@@ -1,46 +1,46 @@
-# 使用 TCR 托管 Cilium 镜像
+# Using TCR to Host Cilium Images
 
-## 概述
+## Overview
 
-如果对集群有较高的可用性要求，需要确保扩容节点时能够快速完成初始化并就绪，建议将 Cilium 的依赖镜像同步到 TCR 镜像仓库，安装 Cilium 时也指定使用 TCR 镜像仓库中的镜像，避免因 Cilium 镜像拉取慢或拉取不到导致节点迟迟不能 Ready。
+If you have high availability requirements for your cluster and need to ensure that nodes can complete initialization and become ready quickly during scaling, it is recommended to synchronize Cilium's dependency images to a TCR image repository. When installing Cilium, specify the use of images from the TCR image repository to avoid delays in node readiness caused by slow or failed Cilium image pulls.
 
-本文将介绍如何实现将 Cilium 的依赖镜像改为用 TCR 镜像仓库托管。
+This article will describe how to change Cilium's dependency images to be hosted by the TCR image repository.
 
-## 创建 TCR 镜像仓库
+## Create TCR Image Repository
 
-要想快速拉取镜像，肯定要在集群所在地域创建 TCR 镜像仓库，如果你在多个地域都有集群需要安装 Cilium，可以利用 TCR 的 [同实例多地域复制镜像](https://cloud.tencent.com/document/product/1141/52095) 或 [跨实例（账号）同步镜像](https://cloud.tencent.com/document/product/1141/41945) 的能力来实现将 Cilium 依赖镜像上传到一个镜像仓库后自动同步到其它地域的镜像仓库中。
+To achieve fast image pulls, you must create a TCR image repository in the same region as your cluster. If you have clusters in multiple regions that need to install Cilium, you can utilize TCR's [Cross-Region Image Replication](https://cloud.tencent.com/document/product/1141/52095) or [Cross-Instance (Account) Image Synchronization](https://cloud.tencent.com/document/product/1141/41945) capabilities to automatically synchronize Cilium dependency images to other regional image repositories after uploading them to one repository.
 
-## 新建命名空间
+## Create Namespace
 
-TCR 镜像仓库创建完成后，新建一个命名空间：
-1. **名称**: cilium。
-1. **访问级别**：公开。
+After the TCR image repository is created, create a new namespace:
+1. **Name**: cilium
+1. **Access Level**: Public
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F31%2F20251031125444.png)
 
-## 配置访问控制
+## Configure Access Control
 
-上传 Cilium 镜像需要让上传镜像的客户端能访问到 TCR 镜像仓库：
-1. 从公网推送镜像：参考 [配置公网访问控制](https://cloud.tencent.com/document/product/1141/41837) 开启镜像仓库的公网访问能力。
-2. 从内网推送镜像：参考 [配置内网访问控制](https://cloud.tencent.com/document/product/1141/41838) 开启镜像仓库的内网访问能力，确保上传 Cilium 的客户端所在 VPC 与 TCR 镜像仓库建立内网访问链路。
+Uploading Cilium images requires that the client uploading the images can access the TCR image repository:
+1. For public network image pushes: Refer to [Configuring Public Network Access Control](https://cloud.tencent.com/document/product/1141/41837) to enable the image repository's public network access capability.
+2. For private network image pushes: Refer to [Configuring Private Network Access Control](https://cloud.tencent.com/document/product/1141/41838) to enable the image repository's private network access capability, ensuring that the VPC where the Cilium upload client is located establishes a private network access link with the TCR image repository.
 
-另外 TKE 集群节点拉取 Cilium 依赖镜像也需要让节点能访问到 TCR 镜像仓库，参考 [配置内网访问控制](https://cloud.tencent.com/document/product/1141/41838) 开启镜像仓库与 TKE 集群所在 VPC 建立内网访问能力，确保上传 Cilium 的客户端所在 VPC 与 TCR 镜像仓库建立内网访问链路，并确保勾选 **自动解析**：
+Additionally, TKE cluster nodes pulling Cilium dependency images also need to be able to access the TCR image repository. Refer to [Configuring Private Network Access Control](https://cloud.tencent.com/document/product/1141/41838) to enable private network access between the image repository and the VPC where the TKE cluster is located, ensure that the VPC where the Cilium upload client is located establishes a private network access link with the TCR image repository, and make sure to check **Auto Resolution**:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F31%2F20251031140032.png)
 
-## 安装 TCR 插件
+## Install TCR Plugin
 
-在集群 **组件管理** 页面搜索 tcr，安装该组件，参数配置中点开 **高级设置**，确保 **内网访问链路** 显示链路正常，不要勾选 **启用内网解析功能**（前面我们配置了 TCR 内网访问链路时，已经设置了自动解析，无需向节点下发 hosts 来实现 TCR 域名解析）：
+In the cluster's **Component Management** page, search for tcr, install this component, open **Advanced Settings** in the parameter configuration, ensure that the **Private Network Access Link** shows the link is normal, and do not check **Enable Private Network Resolution Function** (we have already configured auto resolution when we set up the TCR private network access link earlier, so there's no need to deploy hosts to nodes for TCR domain name resolution):
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F31%2F20251031144916.png)
 
-## 配置并获取访问凭证
+## Configure and Obtain Access Credentials
 
-上传 Cilium 镜像前，需要先配置 TCR 的访问凭证，参考 [用户级账号管理](https://cloud.tencent.com/document/product/1141/41829) 和 [服务级账号管理](https://cloud.tencent.com/document/product/1141/89137)，获取一个可以登录 TCR 镜像仓库的访问凭证。
+Before uploading Cilium images, you need to configure TCR access credentials. Refer to [User Account Management](https://cloud.tencent.com/document/product/1141/41829) and [Service Account Management](https://cloud.tencent.com/document/product/1141/89137) to obtain access credentials that can log in to the TCR image repository.
 
-## 搬运 Cilium 镜像
+## Transfer Cilium Images
 
-上传 Cilium 镜像之前，得先确认当前的安装配置依赖了哪些镜像，可以使用 `helm template` 并加上计划添加的安装参数，看渲染出来的 YAML 实际使用了哪些镜像：
+Before uploading Cilium images, you need to confirm which images your current installation configuration depends on. You can use `helm template` with the planned installation parameters to see which images are actually used in the rendered YAML:
 
 ```bash
 $ helm template cilium cilium/cilium --version 1.18.3 \
@@ -70,15 +70,15 @@ quay.io/cilium/cilium:v1.18.3
 quay.io/cilium/operator-generic:v1.18.3
 ```
 
-接着准备上传镜像，可以使用 [skopeo](https://github.com/containers/skopeo) 这个工具将 cilium 依赖镜像搬运到 TCR 镜像仓库中，参考 [Installing Skopeo](https://github.com/containers/skopeo/blob/main/install.md) 进行安装。
+Next, prepare to upload the images. You can use [skopeo](https://github.com/containers/skopeo) to transfer Cilium dependency images to the TCR image repository. Refer to [Installing Skopeo](https://github.com/containers/skopeo/blob/main/install.md) for installation instructions.
 
-然后用 skopeo 登录 TCR 镜像仓库（注意替换仓库域名以及用户名和密码）：
+Then use skopeo to log in to the TCR image repository (replace the repository domain, username, and password):
 
 ```bash
 skopeo login xxx.tencentcloudcr.com --username xxx --password xxx
 ```
 
-最后使用 skopeo 将 cilium 依赖镜像都同步到 TCR 镜像仓库中：
+Finally, use skopeo to synchronize all Cilium dependency images to the TCR image repository:
 
 ```bash
 skopeo copy -a docker://quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222
@@ -86,12 +86,12 @@ skopeo copy -a docker://quay.io/cilium/cilium:v1.18.3  docker://your-tcr-name.te
 skopeo copy -a docker://quay.io/cilium/operator-generic:v1.18.3  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/operator-generic:v1.18.3
 ```
 
-如果你的安装配置所依赖镜像较多，也可以通过脚本来实现一键将所有依赖镜像全部同步到 TCR 镜像仓库中，保存下面的脚本内容到 `sync-cilium-images.sh` 文件中:
+If your installation configuration depends on many images, you can also use a script to synchronize all dependency images to the TCR image repository with one click. Save the following script content to a file named `sync-cilium-images.sh`:
 
-:::info[注意]
+:::info[Note]
 
-1. `TARGET_REGISTRY` 是目标 TCR 镜像仓库地址，替换成自己仓库的地址。
-2. 根据自己实际需要的部署配置，修改下 `helm template` 后面使用的安装参数。
+1. `TARGET_REGISTRY` is the target TCR image repository address, replace it with your own repository address.
+2. Modify the installation parameters used after `helm template` according to your actual deployment configuration needs.
 
 :::
 
@@ -126,11 +126,11 @@ source_images=$(helm template cilium cilium/cilium --version 1.18.3 \
   | grep image: | awk -F 'image: "' '/image:/ {gsub(/@sha256:[^"]+"/, ""); print $2}' | sort | uniq)
 
 if [[ -z "${source_images}" ]]; then
-  echo "没有找到任何镜像"
+  echo "No images found"
   exit 1
 fi
 
-echo "将会进行以下的镜像同步操作："
+echo "The following image synchronization operations will be performed:"
 while IFS= read -r source_image; do
   if [[ -n "${source_image}" ]]; then
     target_image="${TARGET_REGISTRY}/${source_image}"
@@ -138,31 +138,31 @@ while IFS= read -r source_image; do
   fi
 done <<<"${source_images}"
 
-read -p "确认开始同步? (y/n): " confirm
+read -p "Confirm to start synchronization? (y/n): " confirm
 if [ "$confirm" != "y" ]; then
-  echo "已取消"
+  echo "Cancelled"
   exit 0
 fi
 
 while IFS= read -r source_image; do
   if [[ -n "${source_image}" ]]; then
     target_image="${TARGET_REGISTRY}/${source_image}"
-    echo "同步镜像 ${source_image} 到 ${target_image}"
+    echo "Synchronizing image ${source_image} to ${target_image}"
     skopeo copy -a "docker://${source_image}" "docker://${target_image}"
   fi
 done <<<"${source_images}"
 ```
 
-赋予执行权限并执行：
+Grant execution permissions and execute:
 
 ```bash
 chmod +x sync-cilium-images.sh
 ./sync-cilium-images.sh
 ```
 
-## 使用 TCR 镜像安装 Cilium
+## Install Cilium Using TCR Images
 
-参考 [安装 cilium](https://imroc.cc/tke/networking/cilium/install) 进行安装，替换下依赖镜像为 TCR 镜像仓库中对应的镜像地址：
+Refer to [Installing Cilium](https://imroc.cc/tke/networking/cilium/install) for installation, replacing the dependency images with the corresponding image addresses from the TCR image repository:
 
 ```bash showLineNumbers
 helm upgrade --install cilium cilium/cilium --version 1.18.3 \
@@ -193,7 +193,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --set k8sServicePort=60002
 ```
 
-如果已经执行过安装，可通过以下方式修改依赖镜像地址：
+If you have already performed the installation, you can modify the dependency image addresses in the following way:
 
 ```bash
 helm upgrade cilium cilium/cilium --version 1.18.3 \

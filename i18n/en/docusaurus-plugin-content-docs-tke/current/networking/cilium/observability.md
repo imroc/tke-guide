@@ -1,16 +1,16 @@
-# 使用 Cilium 增强可观测性
+# Enhancing Observability with Cilium
 
-:::info[注意]
+:::info[Note]
 
-本文正在起草中，请等完善后再参考。
+This article is currently being drafted. Please wait for it to be completed before referencing.
 
 :::
 
-## 启用 Hubble Ralay
+## Enable Hubble Relay
 
-Hubble 包括 Hubble Server 和 Hubble Relay，其中 Hubble Server 已内置到每个节点的 cilium-agent 中并默认开启，Hubble Relay 是一个需要单独部署的组件，用于聚合集群所有节点 Hubble Server 的数据，提供统一的 API 入口。
+Hubble includes Hubble Server and Hubble Relay. Hubble Server is built into each node's cilium-agent and is enabled by default. Hubble Relay is a component that needs to be deployed separately to aggregate data from all Hubble Servers in the cluster and provide a unified API entry point.
 
-使用下面的命令启用 Hubble Relay：
+Use the following command to enable Hubble Relay:
 
 ```bash
 helm upgrade cilium cilium/cilium --version 1.18.3 \
@@ -20,7 +20,7 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
    --set hubble.relay.enabled=true
 ```
 
-通过 `cilium status` 可验证 hubble 开启并正常运行：
+Verify that Hubble is enabled and running normally using `cilium status`:
 
 ```bash showLineNumbers
 $ cilium status
@@ -52,11 +52,11 @@ Image versions         cilium             quay.tencentcloudcr.com/cilium/cilium:
 ```
 
 
-## 安装 Hubble 客户端
+## Install Hubble Client
 
-Hubble 客户端用于与 Hubble Ralay 提供的接口进行交互，参考 [Install the Hubble Client](https://docs.cilium.io/en/stable/observability/hubble/setup/#install-the-hubble-client) 将 `hubble` 二进制 (Hubble 客户端) 安装到本机。
+The Hubble client is used to interact with the API provided by Hubble Relay. Refer to [Install the Hubble Client](https://docs.cilium.io/en/stable/observability/hubble/setup/#install-the-hubble-client) to install the `hubble` binary (Hubble client) on your local machine.
 
-安装完成后，验证下 Hubble 客户端可正常访问 Hubble API：
+After installation, verify that the Hubble client can access the Hubble API normally:
 
 ```bash
 $ hubble status -P
@@ -66,11 +66,11 @@ Flows/s: 26.42
 Connected Nodes: 3/3
 ```
 
-## 启用 Hubble UI
+## Enable Hubble UI
 
-Hubble UI 可用于可视化查看集群中的服务拓扑。
+Hubble UI can be used to visualize service topology in the cluster.
 
-使用下面的命令启用 Hubble UI：
+Use the following command to enable Hubble UI:
 
 ```bash
 helm upgrade cilium cilium/cilium --version 1.18.3 \
@@ -83,7 +83,7 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
 ```
 
 
-确认 Hubble UI 的 Pod 正常运行：
+Confirm that the Hubble UI Pod is running normally:
 
 ```bash
 $ kubectl --namespace=kube-system get pod -l app.kubernetes.io/name=hubble-ui
@@ -92,11 +92,11 @@ hubble-ui-5dd5877df5-8c69k   2/2     Running   0          5m41s
 
 ```
 
-然后就可以执行 `cilium hubble ui` 自动打开浏览器查看集群的服务拓扑了。
+Then you can execute `cilium hubble ui` to automatically open a browser and view the cluster's service topology:
 
 ```bash
 $ cilium hubble ui
 ℹ  Opening "http://localhost:12000" in your browser...
 ```
 
-更多请参考 [Network Observability with Hubble / Service Map & Hubble UI](https://docs.cilium.io/en/stable/observability/hubble/hubble-ui/)。
+For more information, refer to [Network Observability with Hubble / Service Map & Hubble UI](https://docs.cilium.io/en/stable/observability/hubble/hubble-ui/).
