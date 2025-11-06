@@ -76,11 +76,9 @@ const config: Config = {
           sidebarPath: require.resolve('./sidebars.ts'),
           // 每个文档左下角 "编辑此页" 的链接
           editUrl: ({ locale, versionDocsDirPath, docPath }) => {
-            // Link to Crowdin for French docs
             if (locale !== DefaultLocale) {
               return `https://github.com/imroc/tke-guide/edit/main/i18n/${locale}/docusaurus-plugin-content-docs/current/${docPath}`;
             }
-            // Link to GitHub for English docs
             return `https://github.com/imroc/tke-guide/edit/main/docs/${docPath}`;
           },
         },
