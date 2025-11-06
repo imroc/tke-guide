@@ -14,12 +14,12 @@ Installing Cilium is a major change to the cluster. It is not recommended to ins
 
 Create a TKE cluster in the [TKE Console](https://console.cloud.tencent.com/tke2/cluster), paying attention to the following key options:
 - Cluster Type: Managed Cluster
-- Kubernetes Version: Not lower than 1.30.0, latest version recommended (refer to [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)).
+- Kubernetes Version: >= 1.30.0, latest version recommended (refer to [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)).
 - Operating System: TencentOS 4 or Ubuntu >= 22.04.
-- Container Network Plugin: VPC-CNI with shared ENI multiple IPs.
+- Container network add-on: VPC-CNI.
 - Nodes: Do not add any general nodes or native nodes to the cluster before installation to avoid residual rules and configurations. Add them after installation is complete.
-- Basic Components: Uncheck ip-masq-agent to avoid conflicts.
-- Enhanced Components: If you want to use Karpenter node pools, check to install the Karpenter component; otherwise, leave it unchecked (refer to the node pool selection below).
+- Basic add-on: Uncheck ip-masq-agent to avoid conflicts.
+- Enhanced add-on: If you want to use Karpenter node pools, check to install the Karpenter component; otherwise, leave it unchecked (refer to the node pool selection below).
 
 After the cluster is created successfully, enable cluster access to expose the cluster's apiserver so that the helm command can operate the TKE cluster properly when installing Cilium. Refer to [How to Enable Cluster Access](https://cloud.tencent.com/document/product/457/32191#.E6.93.8D.E4.BD.9C.E6.AD.A5.E9.AA.A4).
 
