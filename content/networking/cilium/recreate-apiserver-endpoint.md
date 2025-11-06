@@ -15,7 +15,7 @@ time=2025-11-03T04:11:44.43042462Z level=error msg="Failed to start hive" subsys
 
 ## 问题复现
 
-1. 参考 [安装 cilium](../install.md) 中默认的方式安装 cilium，唯一区别在于 `k8sServiceHost` 的配置使用指向开启集群内网访问后的 CLB VIP 或域名而非 `169.254.x.x` 这个 APIServer 的 IP。
+1. 参考 安装 cilium 中默认的方式安装 cilium，唯一区别在于 `k8sServiceHost` 的配置使用指向开启集群内网访问后的 CLB VIP 或域名而非 `169.254.x.x` 这个 APIServer 的 IP。
 2. 备份 `default/kubernetes-intranet` 这个 endpoint，删除并重建这个 endpoint：
     ```bash
     kubectl -n default get endpoints kubernetes-intranet -o yaml | kubectl neat > ep.yaml

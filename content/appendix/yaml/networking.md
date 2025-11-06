@@ -8,7 +8,7 @@
 
 ## EIP
 
-> 更详细的说明请参考 [Pod 绑 EIP](../networking/pod-eip.md)。
+> 更详细的说明请参考 [Pod 绑 EIP](../../networking/pod-eip.md)。
 
 ### 声明使用 EIP
 

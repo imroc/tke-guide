@@ -40,19 +40,7 @@ const sidebars: SidebarsConfig = {
                 'networking/cilium/with/node-local-dns',
               ]
             },
-            {
-              type: 'category',
-              label: '附录',
-              collapsed: true,
-              link: {
-                type: 'generated-index',
-                slug: '/networking/cilium/appendix'
-              },
-              items: [
-                'networking/cilium/appendix/debug',
-                'networking/cilium/appendix/e2e',
-              ]
-            }
+            'networking/cilium/debug',
           ],
         },
         {

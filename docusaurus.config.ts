@@ -21,9 +21,19 @@ const config: Config = {
 
   i18n: {
     // 默认语言用中文
-    defaultLocale: 'zh-CN',
+    defaultLocale: 'zh',
     // 不需要多语言支持的话，就只填中文
-    locales: ['zh-CN'],
+    locales: ['zh', 'en'],
+    localeConfigs: {
+      zh: {
+        label: '中文',
+        htmlLang: 'zh-CN',
+      },
+      en: {
+        label: 'English',
+        htmlLang: 'en-US',
+      },
+    }
   },
 
   plugins: [
@@ -104,6 +114,10 @@ const config: Config = {
           {
             href: 'https://github.com/imroc/tke-guide', // 改成自己的仓库地址
             label: 'GitHub',
+            position: 'right',
+          },
+          {
+            type: 'localeDropdown',
             position: 'right',
           },
         ],
