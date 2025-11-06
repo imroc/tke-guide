@@ -664,7 +664,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
 
 Using TKE-provided mirror repository addresses to pull external images does not provide SLA guarantees. Sometimes pulling may fail, but usually will eventually succeed automatically after retry.
 
-If you want higher availability for image pulling, you can [Use TCR to Host Cilium Images](tcr.md) to sync Cilium-dependent images to your own [TCR image repository](https://cloud.tencent.com/product/tcr), then refer to the dependency image replacement configuration here to replace corresponding images with your synced image addresses.
+If you want higher availability for image pulling, you can [Host Cilium Images Using TCR](tcr.md) to sync Cilium-dependent images to your own [TCR image repository](https://cloud.tencent.com/product/tcr), then refer to the dependency image replacement configuration here to replace corresponding images with your synced image addresses.
 
 :::
 
