@@ -309,22 +309,6 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: '常用 YAML',
-      collapsed: true,
-      link: {
-        type: 'generated-index',
-        slug: '/yaml'
-      },
-      items: [
-        'yaml/service',
-        'yaml/ingress',
-        'yaml/workload',
-        'yaml/scheduling',
-        'yaml/networking',
-      ],
-    },
-    {
-      type: 'category',
       label: '附录',
       collapsed: true,
       link: {
@@ -332,7 +316,35 @@ const sidebars: SidebarsConfig = {
         slug: '/appendix'
       },
       items: [
-        'appendix/kubectl',
+        {
+          type: 'category',
+          label: '实用 YAML',
+          collapsed: true,
+          link: {
+            type: 'generated-index',
+            slug: '/yaml'
+          },
+          items: [
+            'appendix/yaml/service',
+            'appendix/yaml/ingress',
+            'appendix/yaml/workload',
+            'appendix/yaml/scheduling',
+            'appendix/yaml/networking',
+          ],
+        },
+        {
+          type: 'category',
+          label: '实用 kubectl 脚本',
+          collapsed: true,
+          link: {
+            type: 'generated-index',
+            slug: '/appendix/kubectl'
+          },
+          items: [
+            'appendix/kubectl/network',
+            'appendix/kubectl/node',
+          ],
+        },
         'appendix/ingress-error-code',
         'appendix/eks-note',
       ],
