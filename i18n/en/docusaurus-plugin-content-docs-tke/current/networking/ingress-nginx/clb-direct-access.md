@@ -1,69 +1,69 @@
-# 启用 CLB 直连
+# Enabling CLB Direct Access
 
-## 概述
+## Overview
 
-流量从 CLB 转发到 Nginx Ingress 这段链路可以直连（不走 NodePort），带来更好的性能，也可以实现获取真实源 IP 的需求。
+The traffic link from CLB to Nginx Ingress can be direct (not going through NodePort), bringing better performance and meeting the requirement of obtaining the real source IP.
 
-如果你使用的 TKE Serverless 集群或者能确保所有 Nginx Ingress Pod 调度到超级节点，这时本身就是直连的，无需进行额外的配置。
+If you are using a TKE Serverless cluster or can ensure that all Nginx Ingress Pods are scheduled to super nodes, this link is already direct by default and no additional configuration is needed.
 
-其它情况下，这段链路中间默认会走 NodePort，以下是启用直连的方法（根据自己的集群环境对号入座）。
+In other cases, this link goes through NodePort by default. Below are the methods to enable direct access (choose according to your cluster environment).
 
-> 参考[使用 LoadBalancer 直连 Pod 模式 Service](https://cloud.tencent.com/document/product/457/41897)。
+> Reference: [Using LoadBalancer Direct to Pod Mode Service](https://cloud.tencent.com/document/product/457/41897).
 
-## GlobalRouter+VPC-CNI 网络模式启用直连
+## Enabling Direct Access with GlobalRouter+VPC-CNI Network Mode
 
-如果集群网络模式是 GlobalRouter，且启用了 VPC-CNI：
+If the cluster network mode is GlobalRouter with VPC-CNI enabled:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F21%2F20240321194833.png)
 
-这种情况建议为 Nginx Ingress 声明用 VPC-CNI 网络，同时启用 CLB 直连，`values.yaml` 配置方法：
+In this case, it is recommended to declare VPC-CNI network for Nginx Ingress while enabling CLB direct access. Configuration method in `values.yaml`:
 
 ```yaml
 controller:
   podAnnotations:
-    tke.cloud.tencent.com/networks: tke-route-eni # 声明使用 VPC-CNI 网络
-  resources: #  resources 里声明使用弹性网卡
+    tke.cloud.tencent.com/networks: tke-route-eni # Declare using VPC-CNI network
+  resources: # Declare using elastic network interface in resources
     requests:
       tke.cloud.tencent.com/eni-ip: "1"
     limits:
       tke.cloud.tencent.com/eni-ip: "1"
   service:
     annotations:
-      service.cloud.tencent.com/direct-access: "true" # 启用 CLB 直通
+      service.cloud.tencent.com/direct-access: "true" # Enable CLB direct access
 ```
 
-## GlobalRouter 网络模式启用直连
+## Enabling Direct Access with GlobalRouter Network Mode
 
-如果集群网络是 GlobalRouter，但没有启用 VPC-CNI，建议最好是为集群开启 VPC-CNI，然后按照上面的方法启用 CLB 直连。如果实在不好开启，且腾讯云账号是带宽上移类型（参考[账号类型说明](https://cloud.tencent.com/document/product/1199/49090)），也可以有方法启用直连，只是有一些限制 (具体参考 [GlobalRouter 直连使用限制](https://cloud.tencent.com/document/product/457/41897#.E4.BD.BF.E7.94.A8.E9.99.90.E5.88.B62))。
+If the cluster network is GlobalRouter but VPC-CNI is not enabled, it is recommended to enable VPC-CNI for the cluster first, then enable CLB direct access using the method above. If enabling VPC-CNI is not feasible and your Tencent Cloud account is of bandwidth upper shift type (refer to [Account Type Description](https://cloud.tencent.com/document/product/1199/49090)), there is also a method to enable direct access, but with some limitations (refer to [GlobalRouter Direct Access Usage Limitations](https://cloud.tencent.com/document/product/457/41897#.E4.BD.BF.E7.94.A8.E9.99.90.E5.88.B62) for details).
 
-如果确认满足条件且接受使用限制，参考以下步骤启用直连：
+If you confirm that the conditions are met and accept the usage limitations, follow these steps to enable direct access:
 
-1. 修改 configmap 开启 GlobalRouter 集群维度的直连能力:
+1. Modify the configmap to enable GlobalRouter cluster-level direct access capability:
 
 ```bash
 kubectl edit configmap tke-service-controller-config -n kube-system
 ```
 
-将 `GlobalRouteDirectAccess` 置为 true:
+Set `GlobalRouteDirectAccess` to true:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F21%2F20240321200716.png)
 
-2. 配置 `values.yaml` 启用 CLB 直连：
+2. Configure `values.yaml` to enable CLB direct access:
 
 ```yaml
 controller:
   service:
     annotations:
-      service.cloud.tencent.com/direct-access: "true" # 启用 CLB 直通
+      service.cloud.tencent.com/direct-access: "true" # Enable CLB direct access
 ```
 
-## VPC-CNI 网络模式启用直连
+## Enabling Direct Access with VPC-CNI Network Mode
 
-如果集群网络本身就是 VPC-CNI，那就比较简单了，直接配置 `values.yaml` 启用 CLB 直连即可：
+If the cluster network itself is VPC-CNI, it is quite simple. Just configure `values.yaml` to enable CLB direct access:
 
 ```yaml
 controller:
   service:
     annotations:
-      service.cloud.tencent.com/direct-access: "true" # 启用 CLB 直通
+      service.cloud.tencent.com/direct-access: "true" # Enable CLB direct access
 ```

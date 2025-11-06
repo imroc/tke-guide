@@ -1,12 +1,12 @@
-# 高可用配置优化
+# High Availability Configuration Optimization
 
-## 概述
+## Overview
 
-本文介绍 Nginx Ingress 的高可用部署配置方法。
+This article describes high availability deployment configuration methods for Nginx Ingress.
 
-## 调高副本数
+## Increasing Replica Count
 
-配置自动扩缩容：
+Configure autoscaling:
 
 ```yaml
 controller:
@@ -16,35 +16,35 @@ controller:
     maxReplicas: 100
     targetCPUUtilizationPercentage: 50
     targetMemoryUtilizationPercentage: 50
-    behavior: # 快速扩容应对流量洪峰，缓慢缩容预留 buffer 避免流量异常
+    behavior: # Rapid scale-up to handle traffic spikes, slow scale-down to reserve buffer for traffic anomalies
       scaleUp:
         stabilizationWindowSeconds: 300
         policies:
           - type: Percent
             value: 900
-            periodSeconds: 15 # 每 15s 最多允许扩容 9 倍于当前副本数
+            periodSeconds: 15 # Allow scaling up to 9 times the current replica count at most every 15s
       scaleDown:
         stabilizationWindowSeconds: 300
         policies:
           - type: Pods
             value: 1
-            periodSeconds: 600 # 每 10 分钟最多只允许缩掉 1 个 Pod
+            periodSeconds: 600 # Allow scaling down by at most 1 Pod every 10 minutes
 ```
 
-如果希望固定副本数，直接配置 `replicaCount`:
+If you want to fix the replica count, configure `replicaCount` directly:
 
 ```yaml
 controller:
   replicaCount: 50
 ```
 
-## 打散调度
+## Distributing Pods Across Nodes
 
-使用拓扑分布约束将 Pod 打散以支持容灾，避免单点故障：
+Use topology spread constraints to distribute Pods for disaster recovery and avoid single points of failure:
 
 ```yaml
 controller:
-  topologySpreadConstraints: # 尽量打散的策略
+  topologySpreadConstraints: # Policy for distributing as much as possible
     - labelSelector:
         matchLabels:
           app.kubernetes.io/name: '{{ include "ingress-nginx.name" . }}'
@@ -63,11 +63,11 @@ controller:
       whenUnsatisfiable: ScheduleAnyway
 ```
 
-## 调度专用节点
+## Scheduling to Dedicated Nodes
 
-通常 Nginx Ingress Controller 的负载跟流量成正比，而 Nginx Ingress Controller 作为网关又特别重要，可以考虑将其调度到专用的节点或者超级节点，避免干扰业务 Pod 或被业务 Pod 干扰。
+Typically, the load on Nginx Ingress Controller is proportional to traffic volume. Since Nginx Ingress Controller serves as a gateway and is particularly important, consider scheduling it to dedicated nodes or super nodes to avoid interference with business Pods or being interfered with by business Pods.
 
-调度到指定节点池：
+Schedule to a specified node pool:
 
 ```yaml
 controller:
@@ -77,13 +77,13 @@ controller:
 
 :::info
 
-超级节点的效果更好，所有 Pod 独占虚拟机，不会相互干扰。如果使用的是 Serverless 集群，则不需要配这里的调度策略，只会调度到超级节点。
+Super nodes provide better results as all Pods occupy exclusive virtual machines without mutual interference. If using a Serverless cluster, there's no need to configure scheduling policies here, as they will only be scheduled to super nodes.
 
 :::
 
-## 合理设置 request limit
+## Setting Reasonable Request and Limit
 
-如果 Nginx Ingress 不是调度到超级节点，需合理设置下 request 和 limit，保证有足够的资源的同时，也保证不要用太多的资源导致节点负载过高:
+If Nginx Ingress is not scheduled to super nodes, set request and limit reasonably to ensure sufficient resources while avoiding excessive resource usage that leads to high node load:
 
 ```yaml
 controller:
@@ -96,7 +96,7 @@ controller:
       memory: 1Gi
 ```
 
-如果是用的超级节点或 Serverless 集群，只需要定义下 requests，即声明每个 Pod 的虚拟机规格：
+If using super nodes or Serverless clusters, only define requests to declare the VM specification for each Pod:
 
 ```yaml
 controller:

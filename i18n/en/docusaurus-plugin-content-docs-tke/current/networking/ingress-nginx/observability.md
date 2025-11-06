@@ -1,36 +1,36 @@
-# 可观测性集成
+# Observability Integration
 
-## 概述
+## Overview
 
-本文介绍如何配置 Nginx Ingress 来集成监控和日志系统来提升可观测性，包括与腾讯云上托管的 Prometheus、Grafana 和 CLS 这些产品的集成，也包括与自建的 Prometheus 和 Grafana 的集成。
+This article describes how to configure Nginx Ingress to integrate with monitoring and logging systems to enhance observability, including integration with Tencent Cloud's managed Prometheus, Grafana, and CLS products, as well as integration with self-built Prometheus and Grafana.
 
-## 集成 Prometheus 监控
+## Integrating Prometheus Monitoring
 
-如果你使用了 [腾讯云 Prometheus 监控服务关联 TKE 集群](https://cloud.tencent.com/document/product/1416/72037)，或者是自己安装了 Prometheus Operator 来监控集群，都可以启用 ServiceMonitor 来采集 Nginx Ingress 的监控数据，只需在 `values.yaml` 中打开这个开关即可：
+If you use [Tencent Cloud Prometheus Monitoring Service associated with TKE cluster](https://cloud.tencent.com/document/product/1416/72037), or have installed Prometheus Operator yourself to monitor the cluster, you can enable ServiceMonitor to collect Nginx Ingress monitoring data. Simply turn on this switch in `values.yaml`:
 
 ```yaml
 commonLabels:
-  prom_id: prom-xxx # 通过这个 label 指定 Prometheus 实例的 ID，以便被 Prometheus 实例识别到 ServiceMonitor
+  prom_id: prom-xxx # Specify Prometheus instance ID through this label so the ServiceMonitor can be recognized by the Prometheus instance
 controller:
   metrics:
-    enabled: true # 专门创建一个 service 给 Prometheus 用作 Nginx Ingress 的服务发现
+    enabled: true # Create a dedicated service for Prometheus to use for Nginx Ingress service discovery
     serviceMonitor:
-      enabled: true # 下发 ServiceMonitor 自定义资源，启用监控采集规则
+      enabled: true # Deploy ServiceMonitor custom resource to enable monitoring collection rules
 ```
 
-## 集成 Grafana 监控面板
+## Integrating Grafana Monitoring Dashboards
 
-如果你使用了 [腾讯云 Prometheus 监控服务关联 TKE 集群](https://cloud.tencent.com/document/product/1416/72037) 且关联了 [腾讯云 Grafana 服务](https://cloud.tencent.com/product/tcmg) ，可以直接在 Prometheus 集成中心安装 Nginx Ingress 的监控面板：
+If you use [Tencent Cloud Prometheus Monitoring Service associated with TKE cluster](https://cloud.tencent.com/document/product/1416/72037) and have associated [Tencent Cloud Grafana Service](https://cloud.tencent.com/product/tcmg), you can directly install Nginx Ingress monitoring dashboards in the Prometheus integration center:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F22%2F20240322194119.png)
 
-如果是自建的 Grafana，直接将 Nginx Ingress 官方提供的 [Grafana Dashboards](https://github.com/kubernetes/ingress-nginx/tree/main/deploy/grafana/dashboards) 中两个监控面板 (json文件) 导入 Grafana 即可。
+If using self-built Grafana, simply import the two monitoring dashboards (json files) from Nginx Ingress's official [Grafana Dashboards](https://github.com/kubernetes/ingress-nginx/tree/main/deploy/grafana/dashboards) into Grafana.
 
-## 集成 CLS 日志服务
+## Integrating CLS Log Service
 
-下面介绍如何将 Nginx Ingress Controller 的 access log 采集到 CLS，并结合 CLS 的仪表盘分析日志。
+Below describes how to collect Nginx Ingress Controller's access logs to CLS and analyze logs using CLS dashboards.
 
-1. 在 `values.yaml` 中配一下 nginx 访问日志的格式，也设置下时区以便时间戳能展示当地时间（增强可读性）：
+1. Configure the nginx access log format in `values.yaml`, and set the timezone so timestamps display local time (enhancing readability):
 
 ```yaml
 controller:
@@ -45,41 +45,40 @@ controller:
       value: Asia/Shanghai
 ```
 
-2. 确保集群启用了日志采集功能，参考官方文档 [开启日志采集](https://cloud.tencent.com/document/product/457/83871#.E5.BC.80.E5.90.AF.E6.97.A5.E5.BF.97.E9.87.87.E9.9B.86)。
+2. Ensure log collection is enabled for the cluster. Refer to official documentation [Enabling Log Collection](https://cloud.tencent.com/document/product/457/83871#.E5.BC.80.E5.90.AF.E6.97.A5.E5.BF.97.E9.87.87.E9.9B.86).
 
-3. 为 Nginx Ingress Controller 准备好 CLS 日志集和日志主题，如果没有，可以去 [CLS 控制台](https://console.cloud.tencent.com/cls/topic) 根据自己的需求来创建，然后记录下日志主题的 ID。
+3. Prepare CLS logset and log topic for Nginx Ingress Controller. If you don't have them, go to [CLS Console](https://console.cloud.tencent.com/cls/topic) to create them according to your needs, then record the log topic ID.
 
-4. 按照截图指引为日志主题开启索引：
-    * 进入日志主题的【索引配置】页面，点击【编辑】：
+4. Follow the screenshot guide to enable indexing for the log topic:
+    * Enter the log topic's **Index Configuration** page and click **Edit**:
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F26%2F20240326201551.png)
-    * 启用索引，全文分词符为：`@&?|#()='",;:<>[]{}/ \n\t\r\\`：
+    * Enable indexing, full-text delimiters: `@&?|#()='",;:<>[]{}/ \n\t\r\\`:
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F26%2F20240326201658.png)
-    * 批量添加索引字段 (与截图中配置保持一致)：
+    * Batch add index fields (keep configuration consistent with the screenshot):
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F26%2F20240326201739.png)
-    * 高级设置：
+    * Advanced settings:
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F26%2F20240326201802.png)
 
-5. 创建 TKE 日志采集规则：
+5. Create TKE log collection rules:
 
 <Tabs>
-  <TabItem value="stdout" label="采集标准输出">
+  <TabItem value="stdout" label="Collect Standard Output">
     <FileBlock file="nginx-ingress-logconfig-stdout.yaml" showLineNumbers />
   </TabItem>
 
-  <TabItem value="file" label="采集日志文件">
+  <TabItem value="file" label="Collect Log Files">
     <FileBlock file="nginx-ingress-logconfig-files.yaml" showLineNumbers />
   </TabItem>
 </Tabs>
-    * 必须替换的配置是 `topicId`，即日志主题 ID，表示采集的日志将会吐到该 CLS 日志主题里。
-    * 根据自己实际情况选择配置采集标准输出还是日志文件，nginx ingress 默认是将日志输出到标准输出，但也可以像 [日志轮转](high-concurrency.md#日志轮转) 这里介绍的一样将日志落盘到日志文件。
+    * The configuration that must be replaced is `topicId`, i.e., the log topic ID, indicating that collected logs will be sent to this CLS log topic.
+    * Choose to configure collection of standard output or log files according to your actual situation. Nginx ingress outputs logs to standard output by default, but you can also write logs to log files as described in [Log Rotation](high-concurrency.md#log-rotation).
 
-6. 测试一波 Ingress 请求，产生日志数据。
-7. 进入日志服务控制台的 [检索分析](https://console.cloud.tencent.com/cls/search) 页面，选择 nginx ingress 所使用的日志主题，确认日志能够被正常检索。
-8. 如果一切正常，可以使用日志服务的 [Nginx 访问大盘](https://console.cloud.tencent.com/cls/dashboard/d?templateId=nginx-ingress-access-dashboard&var-ds=&time=now-d,now) 和 [Nginx 监控大盘](https://console.cloud.tencent.com/cls/dashboard/d?templateId=nginx-ingress-monitor-dashboard&var-ds=&time=now-d,now) 两个预置仪表盘并选择 nginx ingress 所使用的日志主题来展示nginx访问日志的分析面板:
+6. Test Ingress requests to generate log data.
+7. Go to the [Search and Analysis](https://console.cloud.tencent.com/cls/search) page in the log service console, select the log topic used by nginx ingress, and confirm logs can be searched normally.
+8. If everything is normal, you can use the log service's [Nginx Access Dashboard](https://console.cloud.tencent.com/cls/dashboard/d?templateId=nginx-ingress-access-dashboard&var-ds=&time=now-d,now) and [Nginx Monitoring Dashboard](https://console.cloud.tencent.com/cls/dashboard/d?templateId=nginx-ingress-monitor-dashboard&var-ds=&time=now-d,now) preset dashboards and select the log topic used by nginx ingress to display nginx access log analysis panels:
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F26%2F20240326203343.png)
 
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F26%2F20240326203353.png)
 
-你甚至还可以直接通过面板来设置告警规则：
+You can even set up alert rules directly through the dashboard:
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F26%2F20240326203154.png)
-

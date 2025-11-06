@@ -1,84 +1,84 @@
-# 自定义负载均衡器(CLB)
+# Customizing Cloud Load Balancer (CLB)
 
-## 概述
+## Overview
 
-默认安装会自动创建出一个公网 CLB 来接入流量，但你也可以利用 TKE 的 Service 注解对 Nginx Ingress Controller 的 CLB 进行自定义，本文介绍自定义的方法。
+By default, installation will automatically create a public CLB for traffic access, but you can also use TKE Service annotations to customize the CLB of Nginx Ingress Controller. This article describes the customization methods.
 
-## 使用内网 CLB
+## Using Internal CLB
 
-比如改成内网 CLB，在 `values.yaml` 中这样定义:
-
-```yaml showLineNumbers
-controller:
-  service:
-    annotations:
-      service.kubernetes.io/qcloud-loadbalancer-internal-subnetid: 'subnet-xxxxxx' # 内网 CLB 需指定 CLB 实例所在的子网 ID
-```
-
-## 使用已有 CLB
-
-你也可以直接在 [CLB 控制台](https://console.cloud.tencent.com/clb/instance) 根据自身需求创建一个 CLB （比如自定义实例规格、运营商类型、计费模式、带宽上限等），然后在 `values.yaml` 中用注解复用这个 CLB:
+For example, to change to internal CLB, define it in `values.yaml` as follows:
 
 ```yaml showLineNumbers
 controller:
   service:
     annotations:
-      service.kubernetes.io/tke-existed-lbid: 'lb-xxxxxxxx' # 指定已有 CLB 的实例 ID
+      service.kubernetes.io/qcloud-loadbalancer-internal-subnetid: 'subnet-xxxxxx' # Internal CLB requires specifying the subnet ID where the CLB instance is located
 ```
 
-> 参考文档 [Service 使用已有 CLB](https://cloud.tencent.com/document/product/457/45491)。
+## Using Existing CLB
 
-:::info[注意]
+You can also create a CLB directly in the [CLB Console](https://console.cloud.tencent.com/clb/instance) according to your needs (such as customizing instance specifications, operator type, billing mode, bandwidth limit, etc.), and then reuse this CLB with an annotation in `values.yaml`:
 
-在 CLB 控制台创建 CLB 实例时，选择的 VPC 需与集群一致。
+```yaml showLineNumbers
+controller:
+  service:
+    annotations:
+      service.kubernetes.io/tke-existed-lbid: 'lb-xxxxxxxx' # Specify the instance ID of the existing CLB
+```
+
+> Reference documentation: [Service Using Existing CLB](https://cloud.tencent.com/document/product/457/45491).
+
+:::info[Note]
+
+When creating a CLB instance in the CLB console, the selected VPC must be consistent with the cluster.
 
 :::
 
-## 公网和内网 IP 同时接入
+## Accessing Both Public and Internal IPs Simultaneously
 
-有时需要让 nginx ingress 同时使用公网和内网的 IP 来接入流量，有以下两种方案可以实现。
+Sometimes you need nginx ingress to use both public and internal IPs for traffic access. There are two solutions to achieve this.
 
-### 方案一：双 Service
+### Solution 1: Dual Service
 
-第一种思路是配置 nginx ingress 使用两个 service，默认是创建一个公网 CLB Service， 如果还需要一个内网 CLB 的 Service，可以配置 internal service：
+The first approach is to configure nginx ingress with two services. By default, one public CLB Service is created. If you also need an internal CLB Service, you can configure the internal service:
 
 ```yaml showLineNumbers
 controller:
   service:
     internal:
       # highlight-start
-      enabled: true # 创建内网 CLB Service
+      enabled: true # Create internal CLB Service
       annotations:
-        service.kubernetes.io/qcloud-loadbalancer-internal-subnetid: "subnet-xxxxxxxx" # 配置内网 CLB 的子网
+        service.kubernetes.io/qcloud-loadbalancer-internal-subnetid: "subnet-xxxxxxxx" # Configure subnet for internal CLB
       # highlight-end
 ```
 
-### 方案二：内网 CLB 绑 EIP
+### Solution 2: Internal CLB Binding EIP
 
-另一种思路是 [使用内网 CLB](#使用内网-clb)，然后再跳转到 CLB 控制台，给 CLB 再绑个 EIP（参考 CLB 官方文档：[内网负载均衡实例绑定 EIP](https://cloud.tencent.com/document/product/214/65682)）。
+Another approach is to [use internal CLB](#using-internal-clb), then go to the CLB console and bind an EIP to the CLB (refer to CLB official documentation: [Internal Load Balancer Instance Binding EIP](https://cloud.tencent.com/document/product/214/65682)).
 
-:::tip[注意]
+:::tip[Note]
 
-该功能是 CLB 的内测功能，需要提工单申请开通。
+This feature is a beta feature of CLB and requires submitting a ticket to apply for activation.
 
 :::
 
-## CLB 跨域绑定
+## CLB Cross-Region Binding
 
-如果你想使用其它地域或 VPC 的 CLB 来接入流量，可以利用 CLB 的 [跨地域绑定2.0](https://cloud.tencent.com/document/product/214/48180) 和 TKE 的 [Service 跨域绑定](https://cloud.tencent.com/document/product/457/59094) 能力来实现，需要满足以下前提条件:
-1. 账号是带宽上移类型。
-2. 两个 VPC 通过云联网打通了。
-3. 开通了CLB的跨地域绑定2.0 功能(提工单开通)。
+If you want to use a CLB from another region or VPC for traffic access, you can use CLB's [Cross-Region Binding 2.0](https://cloud.tencent.com/document/product/214/48180) and TKE's [Service Cross-Region Binding](https://cloud.tencent.com/document/product/457/59094) capabilities. The following prerequisites must be met:
+1. The account is of bandwidth upper shift type.
+2. The two VPCs are connected through CCN.
+3. CLB's cross-region binding 2.0 feature is enabled (apply via ticket).
 
-然后将 CLB 的 ID、所在地域和 VPC 信息配在注解里:
+Then configure the CLB ID, region, and VPC information in the annotations:
 
 ```yaml showLineNumbers
 controller:
   service:
     # highlight-start
     annotations:
-      service.cloud.tencent.com/cross-region-id: "ap-guangzhou"  # 如果CLB在其它地域，指定下CLB所在地域
-      service.cloud.tencent.com/cross-vpc-id: "vpc-xxx" # 指定CLB所在VPC
-      service.kubernetes.io/tke-existed-lbid: "lb-xxx" # 如果使用已有CLB，指定下CLB ID
+      service.cloud.tencent.com/cross-region-id: "ap-guangzhou"  # If CLB is in another region, specify the region where CLB is located
+      service.cloud.tencent.com/cross-vpc-id: "vpc-xxx" # Specify the VPC where CLB is located
+      service.kubernetes.io/tke-existed-lbid: "lb-xxx" # If using an existing CLB, specify the CLB ID
     # highlight-end
 ```

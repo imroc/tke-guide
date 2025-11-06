@@ -1,18 +1,18 @@
-# 安装多个 Nginx Ingress Controller
+# Installing Multiple Nginx Ingress Controllers
 
-## 概述
+## Overview
 
-如果你需要部署多个 Nginx Ingress Controller，即希望不同的 Ingress 规则可能使用不同的流量入口：
+If you need to deploy multiple Nginx Ingress Controllers, i.e., different Ingress rules may use different traffic entry points:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F01%2F20240401143628.png)
 
-你可以为集群部署多个 Nginx Ingress Controler，不同的 Ingress 指定不同的 `ingressClassName` 来实现。
+You can deploy multiple Nginx Ingress Controllers for the cluster, with different Ingress resources specifying different `ingressClassName` to achieve this.
 
-本文介绍安装多个 Nginx Ingress Controller 的配置方法。
+This article describes the configuration method for installing multiple Nginx Ingress Controllers.
 
-## 配置方法
+## Configuration Method
 
-如果要安装多个 Nginx Ingress Controller，需要在 `values.yaml` 指定下 `ingressClass` (注意不要冲突)：
+If you want to install multiple Nginx Ingress Controllers, you need to specify `ingressClass` in `values.yaml` (note to avoid conflicts):
 
 ```yaml showLineNumbers
 controller:
@@ -27,11 +27,11 @@ controller:
 
 :::tip
 
-三个字段需同时改。
+All three fields need to be changed together.
 
 :::
 
-另外多实例的 release 名称也不能与已安装的相同，**即便是 namespace 不同，release 名称也不能相同**（避免 ClusterRole 冲突），示例：
+Additionally, the release names for multiple instances cannot be the same as already installed ones, **even if the namespaces are different, release names cannot be the same** (to avoid ClusterRole conflicts). Example:
 
 ```bash
 helm upgrade --install prod ingress-nginx/ingress-nginx \
@@ -39,7 +39,7 @@ helm upgrade --install prod ingress-nginx/ingress-nginx \
   -f values.yaml
 ```
 
-创建 Ingress 资源时也指定对应的 `ingressClassName`：
+When creating Ingress resources, also specify the corresponding `ingressClassName`:
 
 ```yaml showLineNumbers
 apiVersion: networking.k8s.io/v1

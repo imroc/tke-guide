@@ -1,5 +1,5 @@
-# values.yaml 完整配置示例
+# Complete values.yaml Configuration Example
 
-以下是比较完整的 `values.yaml` 配置示例，可复制下来然后并根据自己需求来进行增删改：
+Below is a more complete `values.yaml` configuration example. You can copy it and modify it according to your needs:
 
 <FileBlock file="nginx-ingress-values.yaml" showLineNumbers title="values.yaml" />

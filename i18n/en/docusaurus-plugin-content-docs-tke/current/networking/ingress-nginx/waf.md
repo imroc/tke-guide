@@ -1,27 +1,27 @@
-# 接入腾讯云 WAF
+# Integrating Tencent Cloud WAF
 
-## 背景
+## Background
 
-[腾讯云 WAF](https://cloud.tencent.com/product/waf) (Web 应用防火墙) 支持接入腾讯云负载均衡（CLB），但需要使用七层的监听器（HTTP/HTTPS），而 Nginx Ingress 默认使用四层的 CLB 监听器：
+[Tencent Cloud WAF](https://cloud.tencent.com/product/waf) (Web Application Firewall) supports integration with Tencent Cloud Load Balancer (CLB), but requires using Layer 7 listeners (HTTP/HTTPS), while Nginx Ingress uses Layer 4 CLB listeners by default:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F01%2F20240401120854.png)
 
-本文主要介绍将 Nginx Ingress 所使用的 CLB 监听器改为七层监听器：
+This article mainly describes how to change the CLB listener used by Nginx Ingress to a Layer 7 listener:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F01%2F20240401154831.png)
 
-## 使用 specify-protocol 注解
+## Using the specify-protocol Annotation
 
-TKE 的 Service 支持使用 `service.cloud.tencent.com/specify-protocol` 这个注解来修改 CLB 监听器协议，参考 [Service 扩展协议](https://cloud.tencent.com/document/product/457/51259)。
+TKE Service supports using the `service.cloud.tencent.com/specify-protocol` annotation to modify the CLB listener protocol. Reference: [Service Extended Protocol](https://cloud.tencent.com/document/product/457/51259).
 
-`values.yaml` 配置示例：
+`values.yaml` configuration example:
 
 ```yaml
 controller:
   service:
-    enableHttp: false # 如果只允许 HTTPS 访问，可以将 enableHttp 置为 false 来禁用 80 监听器
+    enableHttp: false # If only HTTPS access is allowed, you can set enableHttp to false to disable the port 80 listener
     targetPorts:
-      https: http # 让 CLB 443 监听器绑后端 nginx ingress 的 80 （CLB 到后端默认通过 HTTP 转发）
+      https: http # Make CLB 443 listener bind to nginx ingress's port 80 (CLB to backend forwards through HTTP by default)
     annotations:
       service.cloud.tencent.com/specify-protocol: |
         {
@@ -50,37 +50,37 @@ controller:
         }
 ```
 
-* 实际 Ingress 规则里用到了哪些域名，也需要在注解里的 `hosts` 配一下。
-* HTTPS 监听器需要证书，先在 [我的证书](https://console.cloud.tencent.com/ssl) 里创建好证书，然后在 TKE 集群中创建 Secret (需在 Nginx Ingress 所在命名空间)，Secret 的 Key 为 `qcloud_cert_id`，Value 为对应的证书 ID，然后在注解里引用 secret 名称。
-* `targetPorts` 需要将 https 端口指向 nginx ingress 的 80 (http)，避免 CLB 的 443 流量转到 nginx ingress 的 443 端口（会导致双重证书，转发失败）。
-* 不需要 HTTP 流量可以将 `enableHttp` 置为 false。
+* Whatever domains are used in actual Ingress rules also need to be configured in the annotation's `hosts`.
+* HTTPS listeners require certificates. First create certificates in [My Certificates](https://console.cloud.tencent.com/ssl), then create a Secret in the TKE cluster (must be in the same namespace as Nginx Ingress). The Secret's Key is `qcloud_cert_id`, and the Value is the corresponding certificate ID. Then reference the secret name in the annotation.
+* `targetPorts` needs to point the https port to nginx ingress's port 80 (http), to avoid CLB's 443 traffic being forwarded to nginx ingress's 443 port (which would cause double certificates and forwarding failure).
+* If HTTP traffic is not needed, set `enableHttp` to false.
 
 :::tip
 
-如果需要将 HTTP 的流量重定向到 HTTPS，可以在 CLB 控制台找到 nginx ingress 使用的 CLB 实例（实例 ID 可从 nginx ingress controller 的 service 的 yaml 中获取），在实例页面手动配置下重定向规则：
+If you need to redirect HTTP traffic to HTTPS, you can find the CLB instance used by nginx ingress in the CLB console (the instance ID can be obtained from the nginx ingress controller's service yaml), and manually configure the redirect rule on the instance page:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F13%2F20240413111751.png)
 
 :::
 
-## 操作步骤
+## Operation Steps
 
-1. 在 [我的证书](https://console.cloud.tencent.com/ssl) 里上传证书并复制证书 ID。
-2. 在 nginx ingress 所在 namespace 创建对应的证书 secret（引用证书 ID）:
+1. Upload certificates in [My Certificates](https://console.cloud.tencent.com/ssl) and copy the certificate ID.
+2. Create the corresponding certificate secret (referencing the certificate ID) in the nginx ingress namespace:
     ```yaml showLineNumbers
     apiVersion: v1
     kind: Secret
     metadata:
       name: cert-secret-test
       namespace: ingress-nginx
-    stringData: # 用 stringData 就不需要手动 base64 转码
+    stringData: # Using stringData eliminates the need for manual base64 encoding
       # highlight-next-line
-      qcloud_cert_id: E2pcp0Fy # 替换证书 ID
+      qcloud_cert_id: E2pcp0Fy # Replace with certificate ID
     type: Opaque
     ```
-3. 配置 `values.yaml`:
+3. Configure `values.yaml`:
     ```yaml showLineNumbers
-    controller: # 以下配置将依赖镜像替换为了 docker hub 上的 mirror 镜像以保证在国内环境能正常拉取
+    controller: # The following configuration replaces dependent images with mirror images on docker hub to ensure normal pulling in domestic environments
       image:
         registry: docker.io
         image: k8smirror/ingress-nginx-controller
@@ -124,9 +124,9 @@ controller:
               }
             }
     ```
-4. 如果需要，将 HTTP 自动重定向到 HTTPS，去 CLB 控制台配置下重定向规则：
+4. If needed, automatically redirect HTTP to HTTPS by configuring redirect rules in the CLB console:
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F13%2F20240413112551.png)
-5. 部署测试应用和 Ingress 规则：
+5. Deploy test application and Ingress rules:
     ```yaml
     apiVersion: v1
     kind: Service
@@ -179,10 +179,10 @@ controller:
                 path: /
                 pathType: Prefix
     ```
-6. 配置 hosts 或域名解析后，测试功能是否正常：
+6. After configuring hosts or DNS resolution, test if functionality is normal:
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F13%2F20240413115358.png)
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F13%2F20240413115447.png)
 
-## 配置 WAF
+## Configuring WAF
 
-Nginx Ingress 配置好后，如果确认对应的 CLB 监听器已经改为了 HTTP/HTTPS，至此 Nginx Ingress 接入 WAF 的前提条件就算是满足了，接下来就可以根据 [WAF 官方文档](https://cloud.tencent.com/document/product/627/40765) 的指引来进行配置，最终完成 Nginx Ingress 的 WAF 接入。
+After Nginx Ingress is configured, if you confirm that the corresponding CLB listener has been changed to HTTP/HTTPS, the prerequisites for Nginx Ingress integration with WAF are met. You can then follow the guidance in [WAF Official Documentation](https://cloud.tencent.com/document/product/627/40765) to configure and complete Nginx Ingress WAF integration.

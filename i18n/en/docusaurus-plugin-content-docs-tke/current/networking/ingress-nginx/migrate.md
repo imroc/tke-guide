@@ -1,56 +1,56 @@
-# 从 TKE Nginx Ingress 插件迁移到自建 Nginx Ingress
+# Migrating from TKE Nginx Ingress Plugin to Self-built Nginx Ingress
 
-## 迁移的好处
+## Benefits of Migration
 
-迁移到自建 Nginx Ingress 有什么好处？Nginx Ingress 提供的功能和配置都是非常多和灵活，可以满足各种使用场景，自建可以解锁 Nginx Ingress 的全部功能，可以根据自己需求，对配置进行自定义，还能够及时更新版本。
+What are the benefits of migrating to self-built Nginx Ingress? Nginx Ingress provides many features and configurations that are very flexible and can meet various use scenarios. Self-building can unlock all features of Nginx Ingress, allowing you to customize configurations according to your needs and update versions in a timely manner.
 
-## 迁移思路
+## Migration Strategy
 
-使用本文中自建的方法创建一套新的 Nginx Ingress 实例以及 Ingress 规则，两套流量入口共存，最后修改 DNS 指向新的入口地址，完成平滑迁移。
+Create a new Nginx Ingress instance and Ingress rules using the self-building method described in this article, allowing both traffic entry points to coexist. Finally, modify DNS to point to the new entry address, completing a smooth migration.
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F01%2F20240401143927.png)
 
-## 确认已安装的 Nginx Ingress 相关信息
+## Confirming Installed Nginx Ingress Information
 
-1. 先确认已安装的 Nginx Ingress 实例的 IngressClass 名称，比如：
+1. First confirm the IngressClass name of the installed Nginx Ingress instance, for example:
 
 ```bash
 $ kubectl get deploy -A | grep nginx
 kube-system            extranet-ingress-nginx-controller           1/1     1            1           216d
 ```
 
-本例子中只有一个实例，Deployment 名称是 `extranet-ingress-nginx-controller`，IngressClass 是 `-ingress-nginx-controller` 之前的部分，这里是 `extranet`。
+In this example, there is only one instance. The Deployment name is `extranet-ingress-nginx-controller`, and the IngressClass is the part before `-ingress-nginx-controller`, which is `extranet` here.
 
-2. 然后确认下当前使用的 nginx ingress 的镜像版本：
+2. Then confirm the current nginx ingress image version:
 
 ```yaml
 $ kubectl -n kube-system get deploy extranet-ingress-nginx-controller -o yaml | grep image:
         image: ccr.ccs.tencentyun.com/tkeimages/nginx-ingress-controller:v1.9.5
 ```
 
-本例中版本是 `v1.9.5`，看下对应哪个 chart 版本：
+In this example, the version is `v1.9.5`. Check which chart version corresponds to it:
 
 ```bash
 $ helm search repo ingress-nginx/ingress-nginx --versions  | grep 1.9.5
 ingress-nginx/ingress-nginx     4.9.0           1.9.5           Ingress controller for Kubernetes using NGINX a...
 ```
 
-这里看到是 `4.9.0`，记住这个版本，后面用 helm 安装新版渲染时需要指定这个 chart 版本。
+Here we see it's `4.9.0`. Remember this version as it will be needed when installing the new version with helm.
 
-## 准备 values.yaml
+## Preparing values.yaml
 
-下面配置 `values.yaml`，确保 helm 新创建的 Nginx Ingress 实例和 TKE 插件创建 Nginx Ingress 实例不要共用同一个 IngressClass：
+Configure `values.yaml` below to ensure that the new Nginx Ingress instance created by helm does not share the same IngressClass as the Nginx Ingress instance created by the TKE plugin:
 
 ```yaml
 controller:
-  ingressClass: extranet-new # 新 IngressClass 名称，避免冲突
+  ingressClass: extranet-new # New IngressClass name to avoid conflicts
   ingressClassResource:
     name: extranet-new
     enabled: true
     controllerValue: k8s.io/extranet-new
 ```
 
-## 安装新的 Nginx Ingress Controller
+## Installing New Nginx Ingress Controller
 
 ```bash
 helm upgrade --install new-extranet-ingress-nginx ingress-nginx/ingress-nginx \
@@ -59,10 +59,10 @@ helm upgrade --install new-extranet-ingress-nginx ingress-nginx/ingress-nginx \
   -f values.yaml
 ```
 
-* 避免 release 名称加上 `-controller`  后缀后与已有的 Nginx Ingress Deployment 名称相同，主要是会有同名的 ClusterRole 存在导致 helm 安装失败。
-* version 指定前面步骤得到的 chart 版本（当前 nginx ingress 实例版本对应的 chart 版本）。
+* Avoid having the release name with `-controller` suffix match the existing Nginx Ingress Deployment name, mainly because the same named ClusterRole would exist causing helm installation failure.
+* Specify the chart version obtained in the previous step (the chart version corresponding to the current nginx ingress instance version) with version.
 
-拿到新的 Nginx Ingress 的流量入口：
+Get the traffic entry point of the new Nginx Ingress:
 
 ```bash
 $ kubectl -n ingress-nginx get svc
@@ -70,24 +70,24 @@ NAME                                              TYPE           CLUSTER-IP     
 new-extranet-ingress-nginx-controller             LoadBalancer   172.16.165.100   43.136.214.239   80:31507/TCP,443:31116/TCP   9m37s
 ```
 
-`EXTERNAL-IP` 是新的流量入口，验证确认下能够正常转发。
+`EXTERNAL-IP` is the new traffic entry point. Verify and confirm that it can forward normally.
 
-## 复制 Ingress 资源
+## Copying Ingress Resources
 
-将使用旧 IngressClass 的 Ingress 资源的 YAML 文件保存下来，并修改其名称（例如添加后缀 `-new`）。然后，将修改后的 YAML 文件应用到集群中。这样，新旧 Nginx Ingress 实例的转发规则将保持一致，确保流量进入任意入口时效果相同。
+Save the YAML files of Ingress resources using the old IngressClass and modify their names (for example, add the suffix `-new`). Then apply the modified YAML files to the cluster. This way, the forwarding rules of the new and old Nginx Ingress instances will remain consistent, ensuring that the traffic effect is the same when entering through either entry point.
 
-## 切换 DNS
+## Switching DNS
 
-至此，新旧 Nginx Ingress 共存，无论通过哪个流量入口都能正常转发。
+At this point, the new and old Nginx Ingress coexist, and traffic can be forwarded normally through either traffic entry point.
 
-接下来修改域名的 DNS 解析，指向新 Nginx Ingress 流量入口，在 DNS 解析完全生效前，两边流量入口均能正常转发，无论通过哪个流量入口都能正常转发，这个过程会非常平滑，生产环境的流量不受影响。
+Next, modify the domain's DNS resolution to point to the new Nginx Ingress traffic entry point. Before DNS resolution is fully effective, both traffic entry points can forward normally. Regardless of which traffic entry point is used, forwarding works properly. This process will be very smooth, and production environment traffic will not be affected.
 
-## 删除旧 NginxIngress 实例和插件
+## Deleting Old Nginx Ingress Instance and Plugin
 
-最后等到所有旧的 Nginx Ingress 实例完全没有流量的时候，前往 TKE 控制台删除 Nginx Ingress 实例：
+Finally, when the old Nginx Ingress instance has completely no traffic, go to the TKE console to delete the Nginx Ingress instance:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F28%2F20240328105512.png)
 
-再去【组件管理】里删除 `ingressnginx` 彻底完成迁移:
+Then go to **Component Management** to delete `ingressnginx` to completely finish the migration:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F03%2F28%2F20240328104308.png)
