@@ -1,4 +1,4 @@
-# Using TCR to Host Cilium Images
+# Host Cilium Images Using TCR
 
 ## Overview
 

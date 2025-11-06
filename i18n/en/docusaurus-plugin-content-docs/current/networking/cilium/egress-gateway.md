@@ -1,4 +1,4 @@
-# Egress Gateway Practical Guide
+# Egress Gateway Guide
 
 ## Overview
 

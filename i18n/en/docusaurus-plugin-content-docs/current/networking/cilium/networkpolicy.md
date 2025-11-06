@@ -1,4 +1,4 @@
-# NetworkPolicy Practical Guide
+# NetworkPolicy Guide
 
 ## NetworkPolicy vs CiliumNetworkPolicy
 

@@ -8,7 +8,7 @@
     "description": "The label for category 网络指南 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.在 TKE 自建 Cilium": {
-    "message": "Self-hosted Cilium on TKE",
+    "message": "Cilium on TKE",
     "description": "The label for category 在 TKE 自建 Cilium in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.Cilium 与第三方组件共存方案": {
@@ -16,7 +16,7 @@
     "description": "The label for category Cilium 与第三方组件共存方案 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.在 TKE 自建 Nginx Ingress Controller": {
-    "message": "Self-hosted Nginx Ingress Controller on TKE",
+    "message": "Nginx Ingress on TKE",
     "description": "The label for category 在 TKE 自建 Nginx Ingress Controller in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.存储指南": {
