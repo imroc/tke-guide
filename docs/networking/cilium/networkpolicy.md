@@ -46,7 +46,7 @@ Kubernetes 原生的 NetworkPolicy 和 Cilium 的 CiliumNetworkPolicy 都用于�
 - Cilium 完全兼容 Kubernetes 原生 NetworkPolicy。
 - 可以在同一集群中混用两种策略类型。
 
-## CiliumNetworkPolicy vs CiliumClusterwideNetworkPolicy
+## CiliumClusterwideNetworkPolicy
 
 CiliumNetworkPolicy 和 CiliumClusterwideNetworkPolicy 的核心区别在于作用域和管理方式，它们的策略语法完全相同。
 

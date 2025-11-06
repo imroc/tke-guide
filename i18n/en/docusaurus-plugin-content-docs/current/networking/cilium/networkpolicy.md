@@ -46,7 +46,7 @@ Kubernetes native NetworkPolicy and Cilium's CiliumNetworkPolicy are both used t
 - Cilium is fully compatible with Kubernetes native NetworkPolicy.
 - Both policy types can be mixed in the same cluster.
 
-## CiliumNetworkPolicy vs CiliumClusterwideNetworkPolicy
+## CiliumClusterwideNetworkPolicy
 
 CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy differ primarily in scope and management approach, while their policy syntax is identical.
 
