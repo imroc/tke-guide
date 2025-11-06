@@ -25,7 +25,7 @@ After the cluster is created successfully, enable cluster access to expose the c
 
 Depending on your situation, choose to enable private network access or public network access, mainly depending on whether the network environment where the helm command is located can communicate with the VPC where the TKE cluster is located:
 1. If it can communicate, enable private network access.
-2. If it cannot communicate, enable public network access. Currently, enabling public network access requires deploying the `kubernetes-proxy` component to the cluster as a relay, which depends on the existence of nodes in the cluster (this dependency may be removed in the future, but currently it is required). If you want to use public network access, it is recommended to add a serverless node to the cluster first so that the `kubernetes-proxy` pod can be scheduled normally, and then delete the serverless node after Cilium installation is complete.
+2. If it cannot communicate, enable public network access. Currently, enabling public network access requires deploying the `kubernetes-proxy` component to the cluster as a relay, which depends on the existence of nodes in the cluster (this dependency may be removed in the future, but currently it is required). If you want to use public network access, it is recommended to add a super node to the cluster first so that the `kubernetes-proxy` pod can be scheduled normally, and then delete the super node after Cilium installation is complete.
 
 If you use Terraform to create the cluster, refer to the following code snippet:
 
@@ -674,11 +674,11 @@ TencentOS 4 system image is currently in internal testing and requires [submitti
 
 Without application, general nodes cannot select TencentOS 4 system image, and native nodes will fail to initialize successfully if annotation specifies TencentOS 4.
 
-### cilium-operator cannot be ready on serverless nodes?
+### cilium-operator cannot be ready on super nodes?
 
-cilium-operator uses hostNetwork and has readiness probes configured. When using hostNetwork on serverless nodes, probe requests fail, so cilium-operator cannot be ready.
+cilium-operator uses hostNetwork and has readiness probes configured. When using hostNetwork on super nodes, probe requests fail, so cilium-operator cannot be ready.
 
-It is not recommended to use serverless nodes in clusters installing Cilium. They can be removed. If you must use them, you can add taints to serverless nodes and add corresponding tolerations to Pods that need to be scheduled to serverless nodes.
+It is not recommended to use super nodes in clusters installing Cilium. They can be removed. If you must use them, you can add taints to super nodes and add corresponding tolerations to Pods that need to be scheduled to super nodes.
 
 ## References
 
