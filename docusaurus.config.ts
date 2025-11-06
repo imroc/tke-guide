@@ -1,5 +1,6 @@
 import PrismDark from './src/utils/prismDark';
 import type { Config } from '@docusaurus/types';
+import type * as Preset from '@docusaurus/preset-classic';
 // import { themes as prismThemes } from 'prism-react-renderer';
 
 const DefaultLocale = "zh"
@@ -9,6 +10,11 @@ const config: Config = {
   title: 'TKE 实践指南', // 网站标题
   tagline: 'TKE 老司机带你飞', // slogan
   favicon: 'img/logo.svg', // 电子书 favicon 文件，注意替换
+
+  // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
+  future: {
+    v4: true, // Improve compatibility with the upcoming Docusaurus v4
+  },
 
   url: 'https://imroc.cc', // 在线电子书的 url
   baseUrl: '/tke/', // 在线电子书所在 url 的路径，如果没有子路径，可改为 "/"
@@ -56,41 +62,33 @@ const config: Config = {
         ],
       },
     ],
-    [
-      /** @type {import('@docusaurus/plugin-content-docs').PluginOptions} */
-      '@docusaurus/plugin-content-docs',
-      ({
-        id: 'tke',
-        showLastUpdateTime: true,
-        path: 'content',
-        // 文档的路由前缀
-        routeBasePath: '/',
-        // 左侧导航栏的配置
-        sidebarPath: require.resolve('./content/sidebars.ts'),
-        // 每个文档左下角 "编辑此页" 的链接
-        editUrl: ({ locale, versionDocsDirPath, docPath }) => {
-          // Link to Crowdin for French docs
-          if (locale !== DefaultLocale) {
-            return `https://github.com/imroc/tke-guide/edit/main/${locale}`;
-          }
-          // Link to GitHub for English docs
-          return `https://github.com/imroc/tke-guide/edit/main/content/${docPath}`;
-        },
-      }),
-    ]
   ],
 
   presets: [
     [
       'classic',
-      /** @type {import('@docusaurus/preset-classic').Options} */
-      ({
-        docs: false, // 禁用 preset 默认的 docs，直接用 plugin-content-docs 配置可以更灵活。
+      {
+        docs: {
+          showLastUpdateTime: true,
+          // 文档的路由前缀
+          routeBasePath: '/',
+          // 左侧导航栏的配置
+          sidebarPath: require.resolve('./sidebars.ts'),
+          // 每个文档左下角 "编辑此页" 的链接
+          editUrl: ({ locale, versionDocsDirPath, docPath }) => {
+            // Link to Crowdin for French docs
+            if (locale !== DefaultLocale) {
+              return `https://github.com/imroc/tke-guide/edit/main/${locale}`;
+            }
+            // Link to GitHub for English docs
+            return `https://github.com/imroc/tke-guide/edit/main/docs/${docPath}`;
+          },
+        },
         blog: false, // 禁用博客
         theme: {
           customCss: require.resolve('./src/css/custom.scss'), // custom.css 重命名为 custom.scss
         },
-      }),
+      } satisfies Preset.Options,
     ],
   ],
 
