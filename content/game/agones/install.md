@@ -8,15 +8,15 @@
 
 | 原始镜像地址                                              | DockerHub mirror 镜像地址                                                                                                |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| us-docker.pkg.dev/agones-images/release/agones-allocator  | [docker.io/imroc/agones-allocator](https://hub.docker.com/repository/docker/imroc/agones-allocator/tags?ordering=name)   |
-| us-docker.pkg.dev/agones-images/release/agones-controller | [docker.io/imroc/agones-controller](https://hub.docker.com/repository/docker/imroc/agones-controller/tags?ordering=name) |
-| us-docker.pkg.dev/agones-images/release/agones-extensions | [docker.io/imroc/agones-extensions](https://hub.docker.com/repository/docker/imroc/agones-extensions/tags?ordering=name) |
-| us-docker.pkg.dev/agones-images/release/agones-ping       | [docker.io/imroc/agones-ping](https://hub.docker.com/repository/docker/imroc/agones-ping/tags?ordering=name)             |
-| us-docker.pkg.dev/agones-images/release/agones-sdk        | [docker.io/imroc/agones-sdk](https://hub.docker.com/repository/docker/imroc/agones-sdk/tags?ordering=name)               |
+| us-docker.pkg.dev/agones-images/release/agones-allocator  | [docker.io/k8smirror/agones-allocator](https://hub.docker.com/repository/docker/k8smirror/agones-allocator/tags?ordering=name)   |
+| us-docker.pkg.dev/agones-images/release/agones-controller | [docker.io/k8smirror/agones-controller](https://hub.docker.com/repository/docker/k8smirror/agones-controller/tags?ordering=name) |
+| us-docker.pkg.dev/agones-images/release/agones-extensions | [docker.io/k8smirror/agones-extensions](https://hub.docker.com/repository/docker/k8smirror/agones-extensions/tags?ordering=name) |
+| us-docker.pkg.dev/agones-images/release/agones-ping       | [docker.io/k8smirror/agones-ping](https://hub.docker.com/repository/docker/k8smirror/agones-ping/tags?ordering=name)             |
+| us-docker.pkg.dev/agones-images/release/agones-sdk        | [docker.io/k8smirror/agones-sdk](https://hub.docker.com/repository/docker/k8smirror/agones-sdk/tags?ordering=name)               |
 
 :::tip[说明]
 
-Agones 的 mirror 镜像均使用 [image-porter](https://github.com/imroc/image-porter) 长期自动同步，可放心安装和升级。
+Agones 的 mirror 镜像均使用 [image-porter](https://github.com/k8smirror/image-porter) 长期自动同步，可放心安装和升级。
 
 :::
 
@@ -28,34 +28,10 @@ Agones 的 mirror 镜像均使用 [image-porter](https://github.com/imroc/image-
 helm repo add agones https://agones.dev/chart/stable --force-update
 ```
 
-2. 准备 `values.yaml` 配置：
-
-
-```yaml
-agones:
-  image:
-    registry: docker.io/imroc
-```
-
-3. 安装：
+2. 安装：
 
 ```bash
-helm upgrade --install \
-  agones agones/agones \
+helm upgrade --install agones agones/agones \
   --namespace agones-system --create-namespace \
-  -f values.yaml
+  --set agones.image.registry=docker.io/k8smirror
 ```
-> 后续如果需要修改 `values.yaml` 配置，或者升级版本，都可以通过执行这个命令来更新 agones。
-
-## 验证
-
-查看 pod 状态：
-
-```bash
-$ kubectl -n cert-manager get pod
-NAME                                           READY   STATUS    RESTARTS   AGE
-cert-manager-774c68d885-db59h                  1/1     Running   0          23s
-cert-manager-cainjector-56c45955bc-zdzmd       1/1     Running   0          23s
-cert-manager-webhook-79958f7fd5-vjlt9          1/1     Running   0          23s
-```
-
