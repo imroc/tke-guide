@@ -1,4 +1,4 @@
-# Cilium Installation
+# Install Cilium
 
 This document describes how to install Cilium on TKE clusters.
 
