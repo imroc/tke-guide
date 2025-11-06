@@ -1,26 +1,26 @@
-# Egress Gateway 应用实践
+# Egress Gateway Practical Guide
 
-## 概述
+## Overview
 
-本文介绍如何使用 Cilium 的 Egress Gateway 和 CiliumEgressGatewayPolicy 来灵活控制哪些集群外访流量用哪个出口 IP 出去。
+This article explains how to use Cilium's Egress Gateway and CiliumEgressGatewayPolicy to flexibly control which egress IP is used for outbound traffic from the cluster.
 
-## 已知问题
+## Known Issues
 
-使用 Cilium 的 Egress Gateway 功能存在以下已知问题：
-1. 对新 Pod 执行 Egress 策略有延迟。新 Pod 启动后，如果该 Pod 命中 Egress 策略，期望 Pod 的外访流量走指定出口网关出去，但实际上在 Pod 刚启动的一段时间内，该策略可能并未生效，不过这个时间通常会很短，大部分场景不受影响。
-2. 与 Cilium 的 Cluster Mesh 和 CiliumEndpointSlice 功能不兼容。
+Using Cilium's Egress Gateway feature has the following known issues:
+1. **Egress policy delay for new Pods**: After a new Pod starts, if it matches an Egress policy, the expectation is that the Pod's outbound traffic should go through the specified egress gateway. However, during the initial period after Pod startup, this policy may not take effect immediately, though this delay is typically very short and doesn't affect most scenarios.
+2. **Incompatibility with Cilium's Cluster Mesh and CiliumEndpointSlice features**.
 
-## 启用 Egress Gateway
+## Enabling Egress Gateway
 
-如果要启用 Egress Gateway，需满足以下条件：
-1. 启用 cilium 替代 kube-proxy。
-2. 启用 ip masquerade，且使用 bpf 的实现进行 masquerade 而非默认的 iptables 实现。
+To enable Egress Gateway, the following conditions must be met:
+1. Enable cilium to replace kube-proxy.
+2. Enable IP masquerade using BPF implementation instead of the default iptables implementation.
 
-启用 Egress Gateway 的 cilium 安装方法：
+Method to enable Egress Gateway during cilium installation:
 
-:::info[注意]
+:::info[Note]
 
-`VPC_CIDR` 需替换为 TKE 集群所在 VPC 的实际 ipv4 网段。
+`VPC_CIDR` should be replaced with the actual IPv4 network segment of the VPC where the TKE cluster is located.
 
 :::
 
@@ -57,16 +57,16 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   # highlight-add-end
 ```
 
-然后重启 cilium 组件生效：
+Then restart cilium components to take effect:
 
 ```bash
 kubectl rollout restart ds cilium -n kube-system
 kubectl rollout restart deploy cilium-operator -n kube-system
 ```
 
-:::tip[备注]
+:::tip[Note]
 
-如果你是使用 [安装cilium](install.md) 中 **使用 helm 安装 cilium** 给的安装方法进行了安装，启用 Egress Gateway 的命令可以简化成这样：
+If you installed cilium using the **Install cilium using helm** method provided in [Installing Cilium](install.md), the command to enable Egress Gateway can be simplified to:
 
 ```bash
 helm upgrade cilium cilium/cilium --version 1.18.3 \
@@ -80,28 +80,28 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
 
 :::
 
-## 创建 Egress 节点
+## Creating Egress Nodes
 
-可以创建一个节点池作为 Egress 节点池，后续可以配置让某些 Pod 出集群的流量经过这些节点出去，创建方法参考 [安装cilium](install.md) 中 **新建节点池** 部分。
+You can create a node pool as an Egress node pool, which can later be configured to route certain Pods' outbound traffic through these nodes. Refer to the **Creating New Node Pool** section in [Installing Cilium](install.md) for creation methods.
 
-需要注意的是：
-1. 要通过节点池为扩出来的节点打上 label（如 `egress-node=true`）用以标识的用于 Egress Gateway。
-2. 如果需要出公网，要为节点分配公网 IP。
-3. 如果不希望普通 Pod 调度过去，可以加下污点。
-4. Egress 节点池通常不启用自动伸缩，设置固定数量的节点。
+Things to note:
+1. Use the node pool to label the scaled-out nodes (e.g., `egress-node=true`) to identify them as Egress Gateway nodes.
+2. If internet access is needed, assign public IPs to the nodes.
+3. To prevent regular Pods from being scheduled there, add taints.
+4. Egress node pools typically don't enable auto-scaling and set a fixed number of nodes.
 
-以下是操作创建节点池的具体注意事项参考。
+Below are specific operational considerations for creating node pools:
 
 <Tabs>
-  <TabItem value="1" label="原生节点池">
+  <TabItem value="1" label="Native Node Pool">
 
-  如果通过控制台创建，注意勾选**创建弹性公网IP**:
+  If creating through the console, make sure to check **Create Elastic Public IP**:
   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F29%2F20251029142955.png)
 
-  新增一下 Labels 和 Taints (可选):
+  Add Labels and Taints (optional):
   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F30%2F20251030140442.png)
 
-  如果通过 terraform 创建，参考以下代码片段：
+  If creating via terraform, refer to the following code snippet:
   ```hcl showLineNumbers
   resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
     name       = "cilium"
@@ -112,12 +112,12 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
       value = "ts4-public"
     }
     # highlight-add-start
-    # 给扩出来的 Node 打上这个 label
+    # Label the scaled-out nodes with this label
     labels {
       name = "egress-node"
       value = "true"
     }
-    # （可选）给节点加污点，避免普通 Pod 调度到 Egress 节点
+    # (Optional) Add taints to nodes to prevent regular Pods from scheduling to Egress nodes
     taints {
       key    = "egress-node"
       effect = "NoSchedule"
@@ -126,57 +126,57 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
     # highlight-add-end
     native {
       # highlight-add-start
-      # 设置 egress 节点副本数量
+      # Set egress node replica count
       replicas = 1
       internet_accessible {
-        # 按流量计费
+        # Pay by traffic
         charge_type       = "TRAFFIC_POSTPAID_BY_HOUR"
-        # 最大出带宽 100Mbps
+        # Maximum outbound bandwidth 100Mbps
         max_bandwidth_out = 100
       }
       # highlight-add-end
-      # 省略其它必要但不相关配置
+      # Omit other necessary but unrelated configurations
     }
 ```
   </TabItem>
-  <TabItem value="2" label="普通节点池">
+  <TabItem value="2" label="Regular Node Pool">
 
-  如果通过控制台创建，注意勾选**分配免费公网IP**:
+  If creating through the console, make sure to check **Assign Free Public IP**:
   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F29%2F20251029142148.png)
 
-  新增一下 Labels 和 Taints (可选):
+  Add Labels and Taints (optional):
   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F30%2F20251030140442.png)
 
-  如果通过 terraform 创建，参考以下代码片段：
+  If creating via terraform, refer to the following code snippet:
 
   ```hcl showLineNumbers
   resource "tencentcloud_kubernetes_node_pool" "cilium" {
     name              = "cilium"
     cluster_id        = tencentcloud_kubernetes_cluster.tke_cluster.id
-    node_os           = "img-gqmik24x" # TencentOS 4，普通节点池使用该镜像目前还需开白
-    enable_auto_scale = false # 禁用自动伸缩
-    desired_capacity  = 3 # 设置 egress 节点数量
+    node_os           = "img-gqmik24x" # TencentOS 4, currently requires whitelisting for regular node pools
+    enable_auto_scale = false # Disable auto-scaling
+    desired_capacity  = 3 # Set egress node count
 
     auto_scaling_config {
       # highlight-add-start
-      # 按流量计费
+      # Pay by traffic
       internet_charge_type       = "TRAFFIC_POSTPAID_BY_HOUR"
-      # 分配免费公网IP
+      # Assign free public IP
       internet_max_bandwidth_out = 100
-      # 分配免费公网IP
+      # Assign free public IP
       public_ip_assigned         = true 
       # highlight-add-end
-      # 省略其它必要但不相关配置
+      # Omit other necessary but unrelated configurations
     }
 
     # highlight-add-start
     labels = {
-      # 给扩出来的 Node 打上这个 label
+      # Label the scaled-out nodes with this label
       "egress-node" = "true"
     }
     # highlight-add-end
 
-    # （可选）给节点加污点，避免普通 Pod 调度到 Egress 节点
+    # (Optional) Add taints to nodes to prevent regular Pods from scheduling to Egress nodes
     taints {
       key    = "egress-node"
       effect = "NoSchedule"
@@ -185,9 +185,9 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
   ```
 
   </TabItem>
-  <TabItem value="3" label="Karpenter 节点池">
+  <TabItem value="3" label="Karpenter Node Pool">
   
-  在 `TKEMachineNodeClass` 配置节点公网，在 `NodePool` 配置节点 Label：
+  Configure node public network in `TKEMachineNodeClass`, configure node Label in `NodePool`:
 
   ```yaml showLineNumbers
   apiVersion: karpenter.sh/v1
@@ -205,10 +205,10 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
         annotations:
           beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public 
         # highlight-add-start
-        # 给扩出来的 Node 打上这个 label
+        # Label the scaled-out nodes with this label
         labels:
           egress-node: "true"
-        # （可选）给节点加污点，避免普通 Pod 调度到 Egress 节点
+        # (Optional) Add taints to nodes to prevent regular Pods from scheduling to Egress nodes
         taints:
         - key: egress-node
           effect: NoSchedule
@@ -245,8 +245,8 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
   spec:
     # highlight-add-start
     internetAccessible:
-      chargeType: TrafficPostpaidByHour # 按流量计费
-      maxBandwidthOut: 100 # 最大出带宽 100Mbps
+      chargeType: TrafficPostpaidByHour # Pay by traffic
+      maxBandwidthOut: 100 # Maximum outbound bandwidth 100Mbps
     # highlight-add-end
     subnetSelectorTerms:
     - id: subnet-12sxk3z4
@@ -260,7 +260,7 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
   </TabItem>
 </Tabs>
 
-节点池创建并初始化节点后，通过如下方式查看哪些节点是 egress 节点，以及分配的公网 IP 是什么：
+After the node pool is created and nodes are initialized, check which nodes are egress nodes and what public IPs are assigned using:
 
 ```bash
 $ kubectl get nodes -o wide -l egress-node=true
@@ -270,16 +270,16 @@ NAME            STATUS   ROLES    AGE     VERSION         INTERNAL-IP     EXTERN
 172.22.48.64    Ready    <none>   3h17m   v1.32.2-tke.6   172.22.48.64    43.134.178.226   TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
 ```
 
-## 配置 CiliumEgressGatewayPolicy
+## Configuring CiliumEgressGatewayPolicy
 
-通过配置 `CiliumEgressGatewayPolicy` 可以灵活的定义哪些 Pod 的流量走哪些网关的出口 IP 出集群，配置方法参考官方文档 [Writing egress gateway policies](https://docs.cilium.io/en/stable/network/egress-gateway/egress-gateway/#writing-egress-gateway-policies)。
+By configuring `CiliumEgressGatewayPolicy`, you can flexibly define which egress IPs are used for which Pods' traffic leaving the cluster. Refer to the official documentation [Writing egress gateway policies](https://docs.cilium.io/en/stable/network/egress-gateway/egress-gateway/#writing-egress-gateway-policies) for configuration methods.
 
-## 使用案例
-### 外访流量走固定的 Egress 节点出去
+## Usage Examples
+### Outbound Traffic Through Fixed Egress Nodes
 
-如果希望让外访流量通过固定的 Egress 节点出去（出公网时，出口源 IP 将固定是 Egress 节点绑定的公网 IP），可参考下面的方法配置。
+If you want outbound traffic to go through fixed Egress nodes (when accessing the internet, the source IP will be fixed to the public IP bound to the Egress node), refer to the following configuration method.
 
-部署一个 `nginx` 工作负载：
+Deploy an `nginx` workload:
 
 ```yaml
 apiVersion: apps/v1
@@ -302,7 +302,7 @@ spec:
         image: nginx:latest
 ```
 
-通过配置 `CiliumEgressGatewayPolicy` 来指定该工作负载使用指定 egress 节点访问公网：
+Configure `CiliumEgressGatewayPolicy` to specify that this workload uses a specific egress node for internet access:
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -311,24 +311,24 @@ metadata:
   name: egress-test
 spec:
   selectors:
-  - podSelector: # 指定该 egress 策略针对哪些 Pod 生效
+  - podSelector: # Specify which Pods this egress policy applies to
       matchLabels:
-        app: nginx # 指定带 app=nginx 标签的 Pod
-        io.kubernetes.pod.namespace: default # 指定 default 命名空间
+        app: nginx # Specify Pods with app=nginx label
+        io.kubernetes.pod.namespace: default # Specify default namespace
   destinationCIDRs:
   - "0.0.0.0/0"
   - "::/0"
   egressGateway:
     nodeSelector:
       matchLabels:
-        kubernetes.io/hostname: 172.22.49.119 # egress 节点名称
-    # 重要：经测试在 TKE 环境这里必须指定使用 egress 节点的内网 IP，
-    # 用于决定 egress 节点转发外访流量时使用什么源 IP，不管是转发内网
-    # 还是公网流量，出 egress 节点时使用的源 IP 都是使用节点的内网 IP。
+        kubernetes.io/hostname: 172.22.49.119 # egress node name
+    # Important: Testing shows that in TKE environment, the internal IP of the egress node must be specified here,
+    # used to determine the source IP when the egress node forwards outbound traffic. Whether forwarding internal
+    # or public network traffic, the source IP used when leaving the egress node is the node's internal IP.
     egressIP: 172.22.49.119
 ```
 
-查看 egress 节点：
+Check the egress node:
 
 ```bash
 $ kubectl get nodes -o wide 172.22.49.119
@@ -336,20 +336,20 @@ NAME            STATUS   ROLES    AGE   VERSION         INTERNAL-IP     EXTERNAL
 172.22.49.119   Ready    <none>   69m   v1.32.2-tke.6   172.22.49.119   129.226.84.9   TencentOS Server 4.4   6.6.98-40.2.tl4.x86_64   containerd://1.6.9-tke.8
 ```
 
-可以看到该节点的公网 IP 为 `129.226.84.9`，进入 Pod 测试当前出口 IP：
+You can see the node's public IP is `129.226.84.9`. Enter the Pod to test the current egress IP:
 
 ```bash
 $ kubectl -n default exec -it deployment/nginx -- curl ifconfig.me
 129.226.84.9
 ```
 
-可以看到最终的出口 IP 就是 `129.226.84.9`，符合预期。
+The final egress IP is `129.226.84.9`, which meets expectations.
 
-### 外访流量走一组 Egress 节点出去
+### Outbound Traffic Through a Group of Egress Nodes
 
-如果希望让外访流量通过固定的一组 Egress 节点出去（出公网时，出口源 IP 将固定是 Egress 节点绑定的公网 IP），可参考下面的方法配置。
+If you want outbound traffic to go through a fixed group of Egress nodes (when accessing the internet, the source IP will be fixed to the public IP bound to the Egress node), refer to the following configuration method.
 
-部署一个 `nginx` 工作负载：
+Deploy an `nginx` workload:
 
 ```yaml
 apiVersion: apps/v1
@@ -372,7 +372,7 @@ spec:
         image: nginx:latest
 ```
 
-通过配置 `CiliumEgressGatewayPolicy` 来指定该工作负载通过一组 Egress 节点进行流量外访：
+Configure `CiliumEgressGatewayPolicy` to specify that this workload uses a group of Egress nodes for outbound traffic:
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -381,19 +381,19 @@ metadata:
   name: egress-test
 spec:
   selectors:
-  - podSelector: # 指定该 egress 针对哪些 Pod 生效
+  - podSelector: # Specify which Pods this egress policy applies to
       matchLabels:
-        app: nginx # 指定带 app=nginx 标签的 Pod
-        io.kubernetes.pod.namespace: default # 指定命名空间
+        app: nginx # Specify Pods with app=nginx label
+        io.kubernetes.pod.namespace: default # Specify namespace
   destinationCIDRs:
   - "0.0.0.0/0"
   - "::/0"
-  egressGateway: # 该字段是必填的，如果要指定多个 egress 节点，这里还是必须要指定一个，不然会报错： spec.egressGateway: Required value
+  egressGateway: # This field is required. If you want to specify multiple egress nodes, you must still specify one here, otherwise it will error: spec.egressGateway: Required value
     nodeSelector:
       matchLabels:
-        kubernetes.io/hostname: 172.22.49.20 # egress 节点名称
-    egressIP: 172.22.49.20 # egress 节点内网 IP
-  egressGateways: # 其余的 egress 节点追加到这个列表
+        kubernetes.io/hostname: 172.22.49.20 # egress node name
+    egressIP: 172.22.49.20 # egress node internal IP
+  egressGateways: # Add remaining egress nodes to this list
   - nodeSelector:
       matchLabels:
         kubernetes.io/hostname: 172.22.49.147
@@ -404,7 +404,7 @@ spec:
     egressIP: 172.22.49.119
 ```
 
-测试可以看到工作负载中各个 Pod 使用的出口公网 IP 可能不同：
+Testing shows that different Pods in the workload may use different egress public IPs:
 
 ```bash
 $ kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} sh -c 'kubectl exec -n default -it {} -- curl -s ifconfig.me 2>/dev/null || echo "Failed"; printf ":\t%s\n" "{}"'
@@ -420,7 +420,7 @@ $ kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | 
 43.156.123.70:  nginx-54c98b4f84-xt8bs
 ```
 
-但都使用的当前定义的这组 egress 节点所绑定的公网 IP：
+But all use the public IPs bound to the currently defined group of egress nodes:
 
 ```bash
 $ kubectl get nodes -o custom-columns="NAME:.metadata.name,EXTERNAL-IP:.status.addresses[?(@.type=='ExternalIP')].address" -l egress-node=true
@@ -430,9 +430,9 @@ NAME            EXTERNAL-IP
 172.22.49.20    43.163.1.23
 ```
 
-### 集群所有外访流量统一走 Egress 节点出去
+### All Cluster Outbound Traffic Through Egress Nodes
 
-如果要让集群中所有 Pod 的外访流量统一走 Egress 节点出去，可以使用 `podSelector: {}` 选中集群全部 Pod：
+If you want all Pods' outbound traffic in the cluster to go through Egress nodes, you can use `podSelector: {}` to select all cluster Pods:
 
 ```yaml showLineNumbers
 apiVersion: cilium.io/v2
@@ -442,17 +442,17 @@ metadata:
 spec:
   # highlight-add-start
   selectors:
-  - podSelector: {} # 选中集群全部 Pod
+  - podSelector: {} # Select all cluster Pods
   # highlight-add-end
   destinationCIDRs:
   - "0.0.0.0/0"
   - "::/0"
-  egressGateway: # 该字段是必填的，如果要指定多个 egress 节点，这里还是必须要指定一个，不然会报错： spec.egressGateway: Required value
+  egressGateway: # This field is required. If you want to specify multiple egress nodes, you must still specify one here, otherwise it will error: spec.egressGateway: Required value
     nodeSelector:
       matchLabels:
-        kubernetes.io/hostname: 172.22.49.20 # egress 节点名称
-    egressIP: 172.22.49.20 # egress 节点内网 IP
-  egressGateways: # 其余的 egress 节点追加到这个列表
+        kubernetes.io/hostname: 172.22.49.20 # egress node name
+    egressIP: 172.22.49.20 # egress node internal IP
+  egressGateways: # Add remaining egress nodes to this list
   - nodeSelector:
       matchLabels:
         kubernetes.io/hostname: 172.22.49.147
@@ -463,9 +463,9 @@ spec:
     egressIP: 172.22.49.119
 ```
 
-### 不同环境或不同业务 Pod 的外访流量走不同 Egress 节点出去
+### Different Environments or Business Pods Using Different Egress Nodes
 
-如果不同环境或不同业务的 Pod 通过 namespace 隔离，可以指定某 namespace 下 Pod 的外访流量走指定 Egress 节点出去：
+If different environments or business Pods are isolated by namespace, you can specify that Pods in a certain namespace use specific Egress nodes for outbound traffic:
 
 ```yaml showLineNumbers
 apiVersion: cilium.io/v2
@@ -477,7 +477,7 @@ spec:
   - podSelector:
       matchLabels:
         # highlight-add-line
-        io.kubernetes.pod.namespace: prod # 指定 prod 命名空间下所有 Pod
+        io.kubernetes.pod.namespace: prod # Specify all Pods in prod namespace
   destinationCIDRs:
   - "0.0.0.0/0"
   - "::/0"
@@ -488,7 +488,7 @@ spec:
     egressIP: 172.22.49.119
 ```
 
-如果通过 label 来区分不同业务，可以指定所有 namespace 下指定 label 的 Pod 的外访流量走指定 Egress 节点出去：
+If different businesses are distinguished by labels, you can specify that Pods with specific labels across all namespaces use specific Egress nodes for outbound traffic:
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -500,7 +500,7 @@ spec:
   - podSelector:
       matchLabels:
         # highlight-add-line
-        business: mall # 指定所有含 business=mall 的 Pod
+        business: mall # Specify all Pods with business=mall label
   destinationCIDRs:
   - "0.0.0.0/0"
   - "::/0"
@@ -511,14 +511,13 @@ spec:
     egressIP: 172.22.49.119
 ```
 
+## Common Issues
 
-## 常见问题
+### Network Connectivity Issues After Policy Configuration
 
-### 配置策略后网络不通
+First confirm if the CiliumEgressGatewayPolicy configuration method is correct. In TKE environment, ensure that egressGateway's nodeSelector only selects one node, and egressIP must be configured as that node's internal IP, otherwise connectivity issues may occur.
 
-首先确认 CiliumEgressGatewayPolicy 配置方法是否正确，在 TKE 环境下，确保 egressGateway 的 nodeSelector 只选中一个 node，egressIP 必须配置该 node 的内网 IP，否则可能就会出现不通的问题。
-
-另外还可以登录 egress 节点所在的 cilium pod，执行 `cilium-dbg bpf egress list` 查看当前节点上的 egress bpf 规则：
+You can also log into the cilium pod on the egress node and execute `cilium-dbg bpf egress list` to view current egress bpf rules on the node:
 
 ```bash
 $ kubectl -n kube-systme exec -it cilium-nz5hd -- bash
@@ -539,12 +538,12 @@ Source IP      Destination CIDR   Egress IP       Gateway IP
 172.22.48.47   0.0.0.0/0          0.0.0.0         172.22.49.147
 ```
 
-`Source IP` 是 Pod IP，`Egress IP` 是走当前节点出去使用的源 IP， `0.0.0.0` 表示当前节点没有转发对应 Pod IP 的流量，如果全都为 `0.0.0.0` 表示没有 egress 规则选中当前节点。
+`Source IP` is the Pod IP, `Egress IP` is the source IP used when traffic goes through the current node, `0.0.0.0` means the current node is not forwarding traffic for the corresponding Pod IP. If all are `0.0.0.0`, it means no egress rules are selecting the current node.
 
-### 出口 IP 不符预期
+### Unexpected Egress IP
 
-通常是跟 NAT 网关冲突，如果 VPC 路由表配置了公网走 NAT 网关，最终就可能走 NAT 网关出公网而不是用 egress 节点绑定的公网 IP  出去，所以可以检查下 VPC 路由表，是否有配置发往 NAT 网关的路由规则。
+Usually conflicts with NAT gateway. If the VPC routing table is configured to route public traffic through a NAT gateway, traffic may eventually go through the NAT gateway instead of using the public IP bound to the egress node. Check if the VPC routing table has routing rules configured to send traffic to the NAT gateway.
 
-## 参考资料
+## Reference Materials
 
 - [Cilium Egress Gateway](https://docs.cilium.io/en/stable/network/egress-gateway/egress-gateway/)

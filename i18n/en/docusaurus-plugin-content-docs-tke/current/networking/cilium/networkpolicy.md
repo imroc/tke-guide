@@ -1,133 +1,133 @@
-# NetworkPolicy 应用实践
+# NetworkPolicy Practical Guide
 
 ## NetworkPolicy vs CiliumNetworkPolicy
 
-Kubernetes 原生的 NetworkPolicy 和 Cilium 的 CiliumNetworkPolicy 都用于定义 Pod 间的网络访问控制策略，但 CiliumNetworkPolicy 在功能上更加强大和灵活。虽然 Cilium 也兼容 NetworkPolicy，但既然安装了 Cilium 就建议使用功能更强大的 CiliumNetworkPolicy。
+Kubernetes native NetworkPolicy and Cilium's CiliumNetworkPolicy are both used to define network access control policies between Pods, but CiliumNetworkPolicy is more powerful and flexible in functionality. Although Cilium is also compatible with NetworkPolicy, it's recommended to use the more powerful CiliumNetworkPolicy since Cilium is installed.
 
-### 核心功能对比
+### Core Feature Comparison
 
-| 特性             | NetworkPolicy          | CiliumNetworkPolicy                 |
-| ---------------- | ---------------------- | ----------------------------------- |
-| **作用域**       | 命名空间级别           | 命名空间级别                        |
-| **基本流量控制** | ✅ 支持 ingress/egress | ✅ 支持 ingress/egress              |
-| **Pod 选择器**   | ✅ 基于 label 选择     | ✅ 支持更复杂的表达式               |
-| **L3/L4 规则**   | ✅ IP/端口控制         | ✅ IP/端口控制                      |
-| **L7 协议感知**  | ❌ 不支持              | ✅ 支持 HTTP/gRPC/Kafka 等          |
-| **FQDN 支持**    | ❌ 不支持              | ✅ 支持域名匹配                     |
-| **显式拒绝规则** | ❌ 只能隐式拒绝        | ✅ 支持 `egressDeny`/`ingressDeny`  |
-| **实体选择器**   | ❌ 不支持              | ✅ 支持 `toEntities`/`fromEntities` |
-| **DNS 感知**     | ❌ 不支持              | ✅ 支持 DNS 规则                    |
-| **服务选择器**   | ❌ 不支持              | ✅ 支持 `toServices`                |
+| Feature                   | NetworkPolicy              | CiliumNetworkPolicy                     |
+| ------------------------- | -------------------------- | --------------------------------------- |
+| **Scope**                 | Namespace level            | Namespace level                         |
+| **Basic Traffic Control** | ✅ Supports ingress/egress | ✅ Supports ingress/egress              |
+| **Pod Selector**          | ✅ Label-based selection   | ✅ Supports more complex expressions    |
+| **L3/L4 Rules**           | ✅ IP/port control         | ✅ IP/port control                      |
+| **L7 Protocol Awareness** | ❌ Not supported           | ✅ Supports HTTP/gRPC/Kafka etc.        |
+| **FQDN Support**          | ❌ Not supported           | ✅ Supports domain name matching        |
+| **Explicit Deny Rules**   | ❌ Only implicit deny      | ✅ Supports `egressDeny`/`ingressDeny`  |
+| **Entity Selector**       | ❌ Not supported           | ✅ Supports `toEntities`/`fromEntities` |
+| **DNS Awareness**         | ❌ Not supported           | ✅ Supports DNS rules                   |
+| **Service Selector**      | ❌ Not supported           | ✅ Supports `toServices`                |
 
-### 主要差异说明
+### Key Differences Explanation
 
-**1. L7 协议感知**
-- NetworkPolicy 只能控制到 L3/L4 层（IP 地址和端口）。
-- CiliumNetworkPolicy 可以深入到 L7 层，控制 HTTP 方法、路径、header，gRPC 方法等。
+**1. L7 Protocol Awareness**
+- NetworkPolicy can only control up to L3/L4 layers (IP addresses and ports).
+- CiliumNetworkPolicy can reach deep into L7 layer, controlling HTTP methods, paths, headers, gRPC methods, etc.
 
-**2. FQDN 域名支持**
-- NetworkPolicy 只能使用 IP 或 CIDR，无法直接控制域名访问。
-- CiliumNetworkPolicy 支持 `toFQDNs`，可以直接使用域名和通配符模式。
+**2. FQDN Domain Name Support**
+- NetworkPolicy can only use IPs or CIDRs, unable to directly control domain name access.
+- CiliumNetworkPolicy supports `toFQDNs`, allowing direct use of domain names and wildcard patterns.
 
-**3. 显式拒绝规则**
-- NetworkPolicy 采用白名单模式，未匹配的流量默认拒绝，但无法显式拒绝特定流量。
-- CiliumNetworkPolicy 支持 `egressDeny`/`ingressDeny`，可以在允许大部分流量的同时显式拒绝特定目标。
+**3. Explicit Deny Rules**
+- NetworkPolicy uses a whitelist model, implicitly denying unmatched traffic but unable to explicitly deny specific traffic.
+- CiliumNetworkPolicy supports `egressDeny`/`ingressDeny`, allowing explicit denial of specific targets while permitting most traffic.
 
-**4. 实体选择器**
-- NetworkPolicy 需要通过 CIDR 或选择器间接指定目标。
-- CiliumNetworkPolicy 提供 `toEntities`/`fromEntities`，可以直接选择 `kube-apiserver`、`host`、`remote-node`、`world` 等预定义实体。
+**4. Entity Selector**
+- NetworkPolicy needs to indirectly specify targets through CIDRs or selectors.
+- CiliumNetworkPolicy provides `toEntities`/`fromEntities`, allowing direct selection of predefined entities like `kube-apiserver`, `host`, `remote-node`, `world`.
 
-**5. 选择器灵活性**
-- NetworkPolicy 使用标准的 `podSelector` 和 `namespaceSelector`。
-- CiliumNetworkPolicy 的 `endpointSelector` 支持更复杂的表达式。
+**5. Selector Flexibility**
+- NetworkPolicy uses standard `podSelector` and `namespaceSelector`.
+- CiliumNetworkPolicy's `endpointSelector` supports more complex expressions.
 
-### 兼容性
+### Compatibility
 
-- Cilium 完全兼容 Kubernetes 原生 NetworkPolicy。
-- 可以在同一集群中混用两种策略类型。
+- Cilium is fully compatible with Kubernetes native NetworkPolicy.
+- Both policy types can be mixed in the same cluster.
 
 ## CiliumNetworkPolicy vs CiliumClusterwideNetworkPolicy
 
-CiliumNetworkPolicy 和 CiliumClusterwideNetworkPolicy 的核心区别在于作用域和管理方式，它们的策略语法完全相同。
+CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy differ primarily in scope and management approach, while their policy syntax is identical.
 
-### 核心差异
+### Core Differences
 
-| 特性               | CiliumNetworkPolicy | CiliumClusterwideNetworkPolicy        |
-| ------------------ | ------------------- | ------------------------------------- |
-| **作用域**         | 命名空间级别        | 集群级别                              |
-| **资源类型**       | 命名空间资源        | 集群资源（无命名空间）                |
-| **管理权限**       | 命名空间管理员      | 集群管理员                            |
-| **选择器默认范围** | 同命名空间 Pod      | 集群所有 Pod                          |
-| **跨命名空间选择** | 需要显式指定        | 天然支持                              |
-| **策略优先级**     | 普通优先级          | 较高优先级                            |
-| **节点防火墙**     | ❌ 不支持           | ✅ 支持（通过 nodeSelector 选中节点） |
-| **使用场景**       | 应用级策略          | 集群基线策略                          |
+| Feature                       | CiliumNetworkPolicy             | CiliumClusterwideNetworkPolicy                  |
+| ----------------------------- | ------------------------------- | ----------------------------------------------- |
+| **Scope**                     | Namespace level                 | Cluster level                                   |
+| **Resource Type**             | Namespaced resource             | Cluster resource (no namespace)                 |
+| **Management Permissions**    | Namespace admin                 | Cluster admin                                   |
+| **Selector Default Scope**    | Same namespace Pods             | All cluster Pods                                |
+| **Cross-Namespace Selection** | Requires explicit specification | Naturally supported                             |
+| **Policy Priority**           | Normal priority                 | Higher priority                                 |
+| **Node Firewall**             | ❌ Not supported                | ✅ Supported (via nodeSelector targeting nodes) |
+| **Use Cases**                 | Application-level policies      | Cluster baseline policies                       |
 
-### 主要差异说明
+### Key Differences Explanation
 
-**1. 作用域和资源位置**
-- CiliumNetworkPolicy 必须创建在特定命名空间中，通过 `metadata.namespace` 指定。
-- CiliumClusterwideNetworkPolicy 是集群级资源，没有命名空间概念。
+**1. Scope and Resource Location**
+- CiliumNetworkPolicy must be created in specific namespaces, specified via `metadata.namespace`.
+- CiliumClusterwideNetworkPolicy is a cluster-level resource with no namespace concept.
 
-**2. 选择器行为**
-- CiliumNetworkPolicy 的 `endpointSelector` 默认只选择同命名空间的 Pod。
-- CiliumClusterwideNetworkPolicy 的 `endpointSelector` 可以选择集群中任意命名空间的 Pod。
+**2. Selector Behavior**
+- CiliumNetworkPolicy's `endpointSelector` by default only selects Pods in the same namespace.
+- CiliumClusterwideNetworkPolicy's `endpointSelector` can select Pods from any namespace in the cluster.
 
-**3. 跨命名空间访问控制**
-- CiliumNetworkPolicy 控制跨命名空间访问时，需要在 `toEndpoints`/`fromEndpoints` 中显式指定命名空间标签。
-- CiliumClusterwideNetworkPolicy 可以直接通过命名空间标签统一管理多个命名空间的策略。
+**3. Cross-Namespace Access Control**
+- When controlling cross-namespace access, CiliumNetworkPolicy needs to explicitly specify namespace labels in `toEndpoints`/`fromEndpoints`.
+- CiliumClusterwideNetworkPolicy can directly manage policies across multiple namespaces through namespace labels.
 
-**4. 管理权限和职责分离**
-- CiliumNetworkPolicy 可以由命名空间管理员（有该命名空间权限的用户）管理。
-- CiliumClusterwideNetworkPolicy 需要集群管理员权限，适合平台团队管理。
+**4. Management Permissions and Responsibility Separation**
+- CiliumNetworkPolicy can be managed by namespace administrators (users with namespace permissions).
+- CiliumClusterwideNetworkPolicy requires cluster administrator permissions, suitable for platform teams.
 
-**5. 策略合并和优先级**
-- 当同一个 Pod 同时被两种策略选中时，规则会合并生效。
-- 拒绝规则（`egressDeny`/`ingressDeny`）优先于允许规则。
-- 通常使用 CiliumClusterwideNetworkPolicy 设置安全基线，用 CiliumNetworkPolicy 添加应用特定规则。
+**5. Policy Merging and Priority**
+- When the same Pod is selected by both policy types, rules are merged and take effect.
+- Deny rules (`egressDeny`/`ingressDeny`) take precedence over allow rules.
+- Typically, use CiliumClusterwideNetworkPolicy to set security baselines and CiliumNetworkPolicy to add application-specific rules.
 
-**6. 配置节点防火墙**
-- CiliumClusterwideNetworkPolicy 支持将网络策略应用到节点上，用于设置节点维度防火墙。
-- 这种策略只能由 CiliumClusterwideNetworkPolicy 来配置，CiliumNetworkPolicy 不支持。
+**6. Configuring Node Firewall**
+- CiliumClusterwideNetworkPolicy supports applying network policies to nodes for node-level firewall configuration.
+- This type of policy can only be configured by CiliumClusterwideNetworkPolicy; CiliumNetworkPolicy does not support it.
 
-### 典型使用场景
+### Typical Use Cases
 
-**CiliumNetworkPolicy 适用于：**
-- 微服务之间的访问控制。
-- 应用特定的网络隔离需求。
-- 开发团队自主管理的网络策略。
-- 命名空间内的细粒度控制。
+**CiliumNetworkPolicy is suitable for:**
+- Access control between microservices.
+- Application-specific network isolation requirements.
+- Network policies managed autonomously by development teams.
+- Fine-grained control within namespaces.
 
-**CiliumClusterwideNetworkPolicy 适用于：**
-- 集群默认拒绝策略（default deny）。
-- 统一管理多个基础设施命名空间的网络策略。
-- 全局安全基线和合规要求。
-- 跨命名空间的统一访问控制。
-- 限制对敏感资源（如 kube-apiserver）的访问。
-- 配置节点防火墙。
+**CiliumClusterwideNetworkPolicy is suitable for:**
+- Cluster default deny policies.
+- Unified management of network policies across multiple infrastructure namespaces.
+- Global security baselines and compliance requirements.
+- Unified access control across namespaces.
+- Restricting access to sensitive resources (like kube-apiserver).
+- Configuring node firewalls.
 
-### 最佳实践
+### Best Practices
 
-**分层管理策略：**
-1. 使用 CiliumClusterwideNetworkPolicy 设置集群安全基线（如默认拒绝、DNS 访问、基础设施互通）。
-2. 使用 CiliumNetworkPolicy 实现应用特定的网络策略（如服务间调用、外部 API 访问）。
+**Layered Policy Management:**
+1. Use CiliumClusterwideNetworkPolicy to set cluster security baselines (e.g., default deny, DNS access, infrastructure communication).
+2. Use CiliumNetworkPolicy to implement application-specific network policies (e.g., service-to-service calls, external API access).
 
-**权限分离：**
-- 平台团队管理 CiliumClusterwideNetworkPolicy，确保集群整体安全。
-- 应用团队管理 CiliumNetworkPolicy，满足业务需求。
+**Permission Separation:**
+- Platform teams manage CiliumClusterwideNetworkPolicy to ensure overall cluster security.
+- Application teams manage CiliumNetworkPolicy to meet business requirements.
 
-**命名规范：**
-- 集群策略使用描述性前缀，如 `default-deny-all`、`global-infrastructure`。
-- 命名空间策略使用应用相关名称，如 `frontend-to-backend`、`allow-external-api`。
+**Naming Conventions:**
+- Use descriptive prefixes for cluster policies, like `default-deny-all`, `global-infrastructure`.
+- Use application-related names for namespace policies, like `frontend-to-backend`, `allow-external-api`.
 
-## 用法实践
-### 安全基线：默认拒绝
+## Usage Practices
+### Security Baseline: Default Deny
 
-集群默认拒绝 egress 流量（dns 解析除外，kube-system 命名空间中的 pod 除外），严格控制集群 Pod 的网络访问权限：
+Cluster default denies egress traffic (except DNS resolution, and Pods in kube-system namespace), strictly controlling network access permissions for cluster Pods:
 
-:::tip[备注]
+:::tip[Note]
 
-通常 ingress 流量不设置全局的默认拒绝，可针对敏感业务单独设置 ingress 策略（如 A 只允许被 B 访问）。
+Typically, ingress traffic is not set with global default deny; specific ingress policies can be set for sensitive services separately (e.g., A can only be accessed by B).
 
 :::
 
@@ -139,7 +139,7 @@ metadata:
 spec:
   description: "Block all the traffic (except DNS) by default"
   egress:
-  - toEndpoints: # 允许集群所有 Pod 通过 coredns 解析域名
+  - toEndpoints: # Allow all cluster Pods to resolve domain names via coredns
     - matchLabels:
         io.kubernetes.pod.namespace: kube-system
         k8s-app: kube-dns
@@ -151,16 +151,16 @@ spec:
         dns:
         - matchPattern: "*"
   endpointSelector:
-    matchExpressions: # 不限制 kube-system 命名空间中 Pod 的 egress 流量
+    matchExpressions: # Do not restrict egress traffic for Pods in kube-system namespace
     - key: io.kubernetes.pod.namespace
       operator: NotIn
       values:
       - kube-system
  ```
 
-### 统一管控基础设施的网络策略
+### Unified Management of Infrastructure Network Policies
 
-集群中可能会部署许多基础设施相关应用，分散在多个命名空间，我们可以用 CiliumClusterwideNetworkPolicy 和命名空间标签来统一设置这些命名空间的网络策略（假设这些命名空间都打上了 `role=infrastructure` 这个 label）：
+A cluster may deploy many infrastructure-related applications scattered across multiple namespaces. We can use CiliumClusterwideNetworkPolicy and namespace labels to uniformly set network policies for these namespaces (assuming these namespaces have the `role=infrastructure` label):
 
  ```yaml
 apiVersion: cilium.io/v2
@@ -168,14 +168,14 @@ kind: CiliumClusterwideNetworkPolicy
 metadata:
   name: default-infrastructure
 spec:
-  endpointSelector: # 选中所有基础设施命名空间中的 Pod
+  endpointSelector: # Select all Pods in infrastructure namespaces
     matchLabels:
       io.cilium.k8s.namespace.labels.role: infrastructure
-  egress: # 配置 egress 策略
-  - toEndpoints: # 允许访问所有基础设施命名空间中的 Pod
+  egress: # Configure egress policies
+  - toEndpoints: # Allow access to all Pods in infrastructure namespaces
     - matchLabels:
         io.cilium.k8s.namespace.labels.role: infrastructure
-  - toEndpoints: # 允许 访问 coredns 解析域名
+  - toEndpoints: # Allow access to coredns for domain resolution
     - matchLabels:
         io.kubernetes.pod.namespace: kube-system
         k8s-app: kube-dns
@@ -186,7 +186,7 @@ spec:
       rules:
         dns:
         - matchPattern: "*"
-  - toFQDNs: # 允许调用腾讯云相关 API
+  - toFQDNs: # Allow calling Tencent Cloud related APIs
     - matchPattern: '*.tencent.com'
     - matchPattern: '*.*.tencent.com'
     - matchPattern: '*.*.*.tencent.com'
@@ -202,11 +202,11 @@ spec:
     - matchPattern: '*.*.*.tencentyun.com'
     - matchPattern: '*.*.*.*.tencentyun.com'
     - matchPattern: '*.*.*.*.*.tencentyun.com'
-  - toCIDR: # 允许访问腾讯云上的平台服务
-    - 169.254.0.0/16 # 169.254.0.0/16 是腾讯云上的保留网段，一些平台服务会使用这个 IP，如 TKE 集群 apiserver 的 VIP、COS 存储、镜像仓库等。
-  - toEntities: # 允许访问 apiserver
+  - toCIDR: # Allow access to platform services on Tencent Cloud
+    - 169.254.0.0/16 # 169.254.0.0/16 is a reserved network segment on Tencent Cloud, used by some platform services like TKE cluster apiserver VIP, COS storage, image repositories, etc.
+  - toEntities: # Allow access to apiserver
     - kube-apiserver
-  - toEntities: # 允许访问集群中所有节点的 10250 端口，可用于监控指标采集
+  - toEntities: # Allow access to port 10250 on all nodes in the cluster, useful for monitoring metrics collection
     - host
     - remote-node
     toPorts:
@@ -215,7 +215,7 @@ spec:
         protocol: TCP
  ```
 
-### 配置节点防火墙
+### Configuring Node Firewall
 
 ```yaml
 apiVersion: "cilium.io/v2"
@@ -223,23 +223,23 @@ kind: CiliumClusterwideNetworkPolicy
 metadata:
   name: default-host-firewall
 spec:
-  nodeSelector: {} # 选中所有节点
+  nodeSelector: {} # Select all nodes
   ingress:
   - fromEntities:
-    - cluster # 不限制集群内的流量
+    - cluster # Do not restrict traffic within the cluster
   - toPorts:
-    - ports: # 允许 ssh 访问
+    - ports: # Allow SSH access
       - port: "22"
         protocol: TCP
-  - icmps: # 允许 ping 请求
+  - icmps: # Allow ping requests
     - fields:
       - type: EchoRequest
         family: IPv4
 ```
 
-### 多租户隔离
+### Multi-tenant Isolation
 
-很多时候集群是多租户共享，如果每个租户使用一个命名空间，平台可以使用 CiliumNetworkPolicy 限制租户的业务 Pod 只能在同名空间下互访：
+If a cluster is shared by multiple tenants where each tenant uses a separate namespace, the platform can use CiliumNetworkPolicy to restrict tenant business Pods to communicate only within the same namespace:
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -257,7 +257,7 @@ spec:
     - {}
 ```
 
-如果是每个租户的业务 Pod 分布有多个命名空间，但有相同的命名空间标签来标识租户，这可以使用 CiliumClusterwideNetworkPolicy 来实现：
+If each tenant's business Pods are distributed across multiple namespaces but have the same namespace label to identify the tenant, this can be implemented using CiliumClusterwideNetworkPolicy:
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -265,24 +265,24 @@ kind: CiliumClusterwideNetworkPolicy
 metadata:
  name: tenant-001
 spec:
- endpointSelector: # 选中租户 001 所有命名空间下的 Pod
+ endpointSelector: # Select all Pods in all namespaces for tenant 001
    matchLabels:
      io.cilium.k8s.namespace.labels.tenant-id: "001"
- egress: # 只允许租户 001 的 Pod 访问自己的业务 Pod
+ egress: # Only allow tenant 001 Pods to access their own business Pods
  - toEndpoints:
    - matchLabels:
        io.cilium.k8s.namespace.labels.tenant-id: "001"
- ingress: # 只允许租户 001 的 Pod 被自己的业务 Pod 访问
+ ingress: # Only allow tenant 001 Pods to be accessed by their own business Pods
  - fromEndpoints:
    - matchLabels:
        io.cilium.k8s.namespace.labels.tenant-id: "001"
 ```
 
-### 限制 apiserver 的访问
+### Restricting apiserver Access
 
-如需严格限制 apiserver 的访问，避免集群被攻击或减少不必要的控制面压力，可先配置一个全局的默认拒绝规则（参考前面的 `安全基线：默认拒绝` 示例），然后在按需配置允许哪些 Pod 访问。
+To strictly restrict apiserver access and avoid cluster attacks or reduce unnecessary control plane pressure, first configure a global default deny rule (refer to the previous "Security Baseline: Default Deny" example), then configure as needed which Pods are allowed to access it.
 
-允许 `test` 命名空间下所有 pod 访问 apiserver:
+Allow all Pods in the `test` namespace to access apiserver:
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -297,7 +297,7 @@ spec:
     - kube-apiserver
 ```
 
-允许 `test` 命名空间下的 A 服务访问 apiserver:
+Allow service A in the `test` namespace to access apiserver:
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -314,9 +314,8 @@ spec:
     - kube-apiserver
 ```
 
-
-### 限制业务的入流量：保护敏感服务
-#### 限制 A 只能被 B 访问，且只能访问 80/TCP 端口
+### Restricting Business Ingress Traffic: Protecting Sensitive Services
+#### Restricting A to only be accessed by B, and only on port 80/TCP
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -337,7 +336,7 @@ spec:
         protocol: TCP
 ```
 
-#### 限制 A 只能被 B 访问，且只能访问部分接口
+#### Restricting A to only be accessed by B, and only specific endpoints
 
  ```yaml
 apiVersion: cilium.io/v2
@@ -359,17 +358,17 @@ spec:
         protocol: TCP
       rules:
         http:
-        - method: "GET" # 允许 GET /public
+        - method: "GET" # Allow GET /public
           path: "/public"
-        - method: "PUT" # 允许 PUT /avatar，但需要携带 X-My-Header: true 的 header
+        - method: "PUT" # Allow PUT /avatar, but requires X-My-Header: true header
           path: "/avatar$" 
           headers:
           - 'X-My-Header: true'
  ```
 
-#### 限制 A 只能被集群外部访问
+#### Restricting A to only be accessed from outside the cluster
 
-如果 A 对外提供服务， CLB 直连  Pod，处理来自公网的请求，不允许其它流量（如来自集群内 Pod 或节点），可配置如下策略：
+If A provides external services with CLB directly connecting to Pods, handling requests from the public internet, and other traffic (like from cluster Pods or nodes) should not be allowed, configure the following policy:
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -385,8 +384,8 @@ spec:
     - world
 ```
 
-### 限制业务的出流量
-#### A 只能访问 B
+### Restricting Business Egress Traffic
+#### A can only access B
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -403,7 +402,7 @@ spec:
         app: b
 ```
 
-#### A 只能访问同名空间下的 Pod 
+#### A can only access Pods in the same namespace
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -419,7 +418,7 @@ spec:
     - {}
 ```
 
-#### A 只能访问指定网段下的服务
+#### A can only access services in specified network segments
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -439,7 +438,7 @@ spec:
         protocol: TCP
 ```
 
-#### A 只能访问指定端口范围的服务
+#### A can only access services on specified port ranges
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -452,13 +451,13 @@ spec:
       app: a
   egress:
     - toPorts:
-      - ports: # 只能发送目标端口在 80-444 的 TCP 流量
+      - ports: # Can only send TCP traffic with destination ports 80-444
         - port: "80"
           endPort: 444
           protocol: TCP
 ```
 
-####  A 只能访问指定域名的服务
+#### A can only access services with specified domain names
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -502,7 +501,7 @@ spec:
     - matchPattern: '*.*.*.*.*.tencentyun.com'
 ```
 
-#### 显式禁止：A 不能访问 B
+#### Explicit Denial: A cannot access B
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -514,15 +513,14 @@ spec:
     matchLabels:
       app: a
   egressDeny:
-  - toEndpoints: # 显式禁止 A 访问 B
+  - toEndpoints: # Explicitly deny A from accessing B
     - matchLabels:
         app: b
   egress:
-  - toEntities: # 允许 A 的其它流量
+  - toEntities: # Allow other traffic from A
     - all
 ```
 
-## 参考资料
+## Reference Materials
 
 - [Cilium NetworkPolicy Examples](https://docs.cilium.io/en/stable/security/policy/language/)
-
