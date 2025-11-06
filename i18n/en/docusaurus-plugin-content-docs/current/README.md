@@ -14,7 +14,7 @@ This book is not official TKE documentation. As I have worked in the TKE team fo
 
 ## Online Reading
 
-URL: https://imroc.cc/tke
+URL: https://imroc.cc/tke/en
 
 ## Comments and Interaction
 
