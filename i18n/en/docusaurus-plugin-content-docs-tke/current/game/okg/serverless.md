@@ -1,27 +1,27 @@
-# 在 TKE Serverless 中使用 OpenKruiseGame
+# Using OpenKruiseGame in TKE Serverless
 
-## 背景
+## Background
 
-如果 TKE Serverless 中使用 OpenKruiseGame，且用到了 [自定义服务质量](https://openkruise.io/zh/kruisegame/user-manuals/service-qualities) 的功能，有以下问题和需要做的调整：
+If you use OpenKruiseGame in TKE Serverless and use the [Custom Service Quality](https://openkruise.io/kruisegame/user-manuals/service-qualities) feature, there are the following issues and required adjustments:
 
-1. [自定义服务质量](https://openkruise.io/zh/kruisegame/user-manuals/service-qualities) 这个功能依赖了 OpenKruise 中的 `kruise-daemon` 组件，是以 `DaemonSet` 形式部署的，而 TKE Serverless（超级节点）并不是传统的 node 模型，`kruise-daemon` 组件默认不会运行在 Serverless Pod 所在虚拟机中，但可以通过注解声明让 `kruise-daemon` 容器自动注入到 Serverless 的 Pod 中。
-2. 当前 TKE Serverless Pod 中的 containerd 版本是 1.4.3，与 `kruise-damon` 不兼容，会导致 `kruise-daemon` 启动时 panic 退出，可通过指定注解实现使用 containerd 1.6.9 版本，该版本兼容 `kruise-daemon`。预计年后（农历）TKE Serverless 的默认 containerd 版本将变为 1.6.9，届时无需通过注解声明 containerd 版本。
+1. The [Custom Service Quality](https://openkruise.io/kruisegame/user-manuals/service-qualities) feature depends on the `kruise-daemon` component in OpenKruise, which is deployed as a `DaemonSet`. TKE Serverless (super nodes) does not follow the traditional node model, and the `kruise-daemon` component will not run by default in the virtual machines where Serverless Pods are located. However, you can declare through annotations to automatically inject the `kruise-daemon` container into Serverless Pods.
+2. The current containerd version in TKE Serverless Pods is 1.4.3, which is incompatible with `kruise-daemon` and will cause `kruise-daemon` to panic and exit on startup. You can specify an annotation to use containerd version 1.6.9, which is compatible with `kruise-daemon`. It is expected that after the Lunar New Year, the default containerd version for TKE Serverless will change to 1.6.9, and then there will be no need to declare the containerd version through annotations.
 
-## 在应用市场安装 OpenKruise 和 OpenKruiseGame
+## Installing OpenKruise and OpenKruiseGame from Application Marketplace
 
-首先在 [TKE 应用市场](https://console.cloud.tencent.com/tke2/helm) 中搜索 `kruise`, 可以看到 `kruise` 和 `kruise-game`, 将它们安装到集群中即可。
+First, search for `kruise` in the [TKE Application Marketplace](https://console.cloud.tencent.com/tke2/helm), and you will see `kruise` and `kruise-game`. Install them to the cluster.
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F12%2F26%2F20241226161254.png)
 
-## 为 kruise-daemon 增加注解
+## Adding Annotations to kruise-daemon
 
-编辑 `kruise-daemon` 的 YAML：
+Edit the YAML of `kruise-daemon`:
 
 ```bash
 kubectl edit ds kruise-daemon -n kruise-system
 ```
 
-增加以下注解：
+Add the following annotations:
 
 ```yaml showLineNumbers
 apiVersion: apps/v1
@@ -39,18 +39,18 @@ spec:
         # highlight-add-end
 ```
 
-- `eks.tke.cloud.tencent.com/ds-injection`: 声明该 DaemonSet 需要被注入到 Serverless Pod 中。
-- `eks.tke.cloud.tencent.com/ds-inject-by-label`: 声明注入范围限制到带有 `okg:true` 标签的 Pod（避免全部注入，尽量减少影响范围）。
+- `eks.tke.cloud.tencent.com/ds-injection`: Declares that this DaemonSet needs to be injected into Serverless Pods.
+- `eks.tke.cloud.tencent.com/ds-inject-by-label`: Declares that injection scope is limited to Pods with the `okg:true` label (avoiding injecting into all Pods to minimize impact scope).
 
-如果不方便用 kubectl，你也可以通过 TKE 控制台编辑 YAML：
+If it's inconvenient to use kubectl, you can also edit the YAML through the TKE console:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F12%2F26%2F20241226184316.png)
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F12%2F26%2F20241226184348.png)
 
-## 游戏服 Pod 增加标签和注解
+## Adding Labels and Annotations to Game Server Pods
 
-`GameServerSet` 示例：
+`GameServerSet` example:
 
 ```yaml showLineNumbers
 apiVersion: game.kruise.io/v1alpha1
@@ -65,11 +65,11 @@ spec:
   gameServerTemplate:
     metadata:
       labels:
-        # 用于 kruise-daemon 注入到 serverless 时匹配的 label
+        # Label for matching when kruise-daemon is injected into serverless
         # highlight-add-line
         okg: "true"
       annotations:
-        # 以下两个注解用于声明使用 containerd 1.6.9
+        # The following two annotations are used to declare using containerd 1.6.9
         # highlight-add-start
         eks.tke.cloud.tencent.com/eklet-version: latest-tkex-ts4
         eks.tke.cloud.tencent.com/not-reuse-cbs: "true"
@@ -108,5 +108,5 @@ spec:
           opsState: None
 ```
 
-1. `eks.tke.cloud.tencent.com/eklet-version: latest-tkex-ts4` 和 `eks.tke.cloud.tencent.com/not-reuse-cbs: "true"` 这两个注解用于声明使用 containerd 1.6.9 版本，该版本兼容 `kruise-daemon`。
-2. 为游戏服 Pod 增加标签 `okg:true`，以便 `kruise-daemon` 能自动注入到 Pod 中。
+1. The two annotations `eks.tke.cloud.tencent.com/eklet-version: latest-tkex-ts4` and `eks.tke.cloud.tencent.com/not-reuse-cbs: "true"` are used to declare using containerd version 1.6.9, which is compatible with `kruise-daemon`.
+2. Add the label `okg:true` to game server Pods so that `kruise-daemon` can be automatically injected into the Pods.

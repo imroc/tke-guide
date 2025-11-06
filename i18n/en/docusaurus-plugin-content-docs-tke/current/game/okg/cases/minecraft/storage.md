@@ -1,12 +1,12 @@
-# 游戏数据持久化
+# Game Data Persistence
 
-## 概述
+## Overview
 
-minecraft-server 的数据存储在 `/data` 路径，我们可以通过为该路径挂盘来实现将游戏数据持久化存储。
+minecraft-server data is stored in the `/data` path. We can mount a disk to this path to achieve persistent storage of game data.
 
-## 创建 StorageClass
+## Creating StorageClass
 
-在 TKE 上持久化游戏数据可以 CBS（云硬盘），先创建一个 StorageClass：
+To persist game data on TKE, you can use CBS (Cloud Block Storage). First create a StorageClass:
 
 ```yaml
 apiVersion: storage.k8s.io/v1
@@ -15,16 +15,16 @@ metadata:
   name: minecraft
 parameters:
   diskChargeType: POSTPAID_BY_HOUR
-  diskType: CLOUD_HSSD # 高性能SSD
+  diskType: CLOUD_HSSD # High-Performance SSD
 allowVolumeExpansion: true
 provisioner: com.tencent.cloud.csi.cbs
 reclaimPolicy: Delete
-volumeBindingMode: WaitForFirstConsumer # 等 Pod 第一次调度后再创建 CBS，避免 Pod 与 CBS 不在同一可用区导致无法绑定
+volumeBindingMode: WaitForFirstConsumer # Create CBS after the first Pod scheduling to avoid Pod and CBS being in different availability zones and unable to bind
 ```
 
-## 在 GameServerSet 中声明 volume 并挂载
+## Declaring and Mounting Volume in GameServerSet
 
-重点关注高亮部分：
+Focus on the highlighted sections:
 
 ```yaml showLineNumbers
 apiVersion: game.kruise.io/v1alpha1
@@ -63,4 +63,3 @@ spec:
             - name: ONLINE_MODE
               value: "FALSE"
 ```
-

@@ -1,17 +1,17 @@
-# 快速部署
+# Quick Deployment
 
-## 安装 OpenKruiseGame
+## Installing OpenKruiseGame
 
-在 TKE 上安装 OpenKruiseGame 并无特殊之处，可直接参考 [OpenKruiseGame 官方安装文档](https://openkruise.io/zh/kruisegame/installation) 进行安装。
+Installing OpenKruiseGame on TKE has no special requirements. You can directly refer to the [OpenKruiseGame Official Installation Documentation](https://openkruise.io/kruisegame/installation) for installation.
 
-本人使用默认配置安装 OpenKruiseGame 的时候（v0.8.0），`kruise-game-controller-manager` 的 Pod 起不来：
+When I installed OpenKruiseGame with default configuration (v0.8.0), the `kruise-game-controller-manager` Pod failed to start:
 
 ```log
 I0708 03:28:11.315405       1 request.go:601] Waited for 1.176544858s due to client-side throttling, not priority and fairness, request: GET:https://172.16.128.1:443/apis/operators.coreos.com/v1alpha2?timeout=32s
 I0708 03:28:21.315900       1 request.go:601] Waited for 11.176584459s due to client-side throttling, not priority and fairness, request: GET:https://172.16.128.1:443/apis/install.istio.io/v1alpha1?timeout=32s
 ```
 
-是因为 OpenKruiseGame 的 helm chart 包中，默认的本地 APIServer 限速太低 (`values.yaml`):
+This is because the default local APIServer rate limiting in OpenKruiseGame's helm chart package is too low (`values.yaml`):
 
 ```yaml
 kruiseGame:
@@ -19,7 +19,7 @@ kruiseGame:
   apiServerQpsBurst: 10
 ```
 
-可以改高点：
+You can increase it:
 
 ```yaml
 kruiseGame:
@@ -27,11 +27,11 @@ kruiseGame:
   apiServerQpsBurst: 100
 ```
 
-## minecrafter-server 容器镜像
+## minecraft-server Container Image
 
-[docker-minecraft-server](https://github.com/itzg/docker-minecraft-server) 是我的世界这款游戏的服务端容器镜像的开源项目，可以部署在 Kubernetes 上。该镜像托管在 DockerHub 上，在 TKE 环境可以直接拉取，下面将会使用这个镜像进行部署。
+[docker-minecraft-server](https://github.com/itzg/docker-minecraft-server) is an open-source project for the server-side container image of the Minecraft game, which can be deployed on Kubernetes. This image is hosted on DockerHub and can be pulled directly in TKE environments. This image will be used for deployment below.
 
-## 使用 GameServerSet 部署 minecraft
+## Deploying Minecraft with GameServerSet
 
 ```yaml
 apiVersion: game.kruise.io/v1alpha1
@@ -60,9 +60,9 @@ spec:
               value: "FALSE"
 ```
 
-* `EULA` 需要显式置为 `TRUE`，表示同意微软的条款。
-* 如果不买正版 minecraft 来连游戏服，可将 `ONLINE_MODE` 需要置为 `FALSE`，可跳过微软的玩家认证。
+* `EULA` needs to be explicitly set to `TRUE`, indicating agreement with Microsoft's terms.
+* If not purchasing the official Minecraft version to connect to the game server, `ONLINE_MODE` needs to be set to `FALSE` to skip Microsoft's player authentication.
 
-## 参考资料
+## References
 
-* [KruiseGame用户手册：部署游戏服](https://openkruise.io/zh/kruisegame/user-manuals/deploy-gameservers)
+* [KruiseGame User Manual: Deploying Game Servers](https://openkruise.io/kruisegame/user-manuals/deploy-gameservers)

@@ -2,6 +2,7 @@ import PrismDark from './src/utils/prismDark';
 import type { Config } from '@docusaurus/types';
 // import { themes as prismThemes } from 'prism-react-renderer';
 
+const DefaultLocale = "zh"
 const beian = '蜀ICP备2021009081号-1'
 
 const config: Config = {
@@ -60,15 +61,21 @@ const config: Config = {
       '@docusaurus/plugin-content-docs',
       ({
         id: 'tke',
-        path: 'content',
         showLastUpdateTime: true,
+        path: 'content',
         // 文档的路由前缀
         routeBasePath: '/',
         // 左侧导航栏的配置
         sidebarPath: require.resolve('./content/sidebars.ts'),
         // 每个文档左下角 "编辑此页" 的链接
-        editUrl: ({ docPath }) =>
-          `https://github.com/imroc/tke-guide/edit/main/content/${docPath}`,
+        editUrl: ({ locale, versionDocsDirPath, docPath }) => {
+          // Link to Crowdin for French docs
+          if (locale !== DefaultLocale) {
+            return `https://github.com/imroc/tke-guide/edit/main/${locale}`;
+          }
+          // Link to GitHub for English docs
+          return `https://github.com/imroc/tke-guide/edit/main/content/${docPath}`;
+        },
       }),
     ]
   ],

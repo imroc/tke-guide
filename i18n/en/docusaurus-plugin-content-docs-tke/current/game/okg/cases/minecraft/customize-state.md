@@ -1,19 +1,19 @@
-# 自定义游戏服状态
+# Customizing Game Server State
 
-## 概述
+## Overview
 
-游戏是有状态服务，OpenKruiseGame 允许定义游戏服的状态，开发者可以根据不同游戏服状态去设置对应的处理动作。比如在缩容时，只缩容空闲的游戏服Pod（没有玩家在该房间内）。
+Games are stateful services. OpenKruiseGame allows defining game server states, and developers can set corresponding handling actions based on different game server states. For example, when scaling down, only scale down idle game server Pods (no players in that room).
 
-## 探测脚本
+## Detection Script
 
-[docker-minecraft-server](https://github.com/itzg/docker-minecraft-server) 的容器镜像中提供了 `mc-health` 这个脚本，执行它可以探测 minecraft-server 的状态，其中包含在线玩家数量的统计：
+The container image of [docker-minecraft-server](https://github.com/itzg/docker-minecraft-server) provides the `mc-health` script. Executing it can detect the status of minecraft-server, including statistics on the number of online players:
 
 ```bash
 $ mc-health
 localhost:25565 : version=1.21 online=1 max=20 motd='A Minecraft Server'
 ```
 
-我们可以再写个脚本包一层用来探测游戏服是否空闲，检测到 `online=0` 时，返回 0 退出码，表示游戏服空闲:
+We can write another script as a wrapper to detect whether the game server is idle. When `online=0` is detected, return an exit code of 0, indicating the game server is idle:
 
 ```bash title="idle.sh"
 #!/bin/bash
@@ -27,7 +27,7 @@ fi
 exit 1
 ```
 
-最终需要将这个脚本放到 `ConfigMap` 中去，如果你使用 `kustomize` 部署，可以在 `kustomization.yaml` 中用 `configMapGenerator` 来引用该脚本文件生成对应的 `ConfigMap`:
+Eventually, this script needs to be placed in a `ConfigMap`. If you deploy using `kustomize`, you can use `configMapGenerator` in `kustomization.yaml` to reference this script file and generate the corresponding `ConfigMap`:
 
 ```yaml title="kustomization.yaml"
 configMapGenerator:
@@ -38,9 +38,9 @@ configMapGenerator:
       - idle.sh
 ```
 
-## 在 GameServerSet 自定义服务质量
+## Customizing Service Quality in GameServerSet
 
-重点关注高亮部分：
+Focus on the highlighted sections:
 
 ```yaml showLineNumbers
 apiVersion: game.kruise.io/v1alpha1
@@ -64,7 +64,7 @@ spec:
               storage: 20Gi
     spec:
       # highlight-start
-      volumes: # 引用 idle.sh 脚本文件的 ConfigMap
+      volumes: # Reference ConfigMap for idle.sh script file
         - name: script
           configMap:
             name: minecraft-script
@@ -75,7 +75,7 @@ spec:
           name: minecraft
           volumeMounts:
             # highlight-start
-            - name: script # 挂载 idle.sh 脚本文件
+            - name: script # Mount idle.sh script file
               mountPath: /idle.sh
               subPath: idle.sh
             # highlight-end
@@ -92,18 +92,18 @@ spec:
       containerName: minecraft
       permanent: false
       exec:
-        command: ["bash", "/idle.sh"] # 用 idle.sh 探测来决定 opsState
+        command: ["bash", "/idle.sh"] # Use idle.sh detection to determine opsState
       serviceQualityAction:
         - state: true
-          opsState: WaitToBeDeleted # 当 idle.sh 返回 0 时，将 opsState 设置为 WaitToBeDeleted，滚动更新时检测到此状态才删除 Pod，实现“空闲时升级游戏服”
+          opsState: WaitToBeDeleted # When idle.sh returns 0, set opsState to WaitToBeDeleted. During rolling updates, delete Pod only when this state is detected, achieving "upgrade game server when idle"
         - state: false
           opsState: None
   # highlight-end
 ```
 
-## 测试并观察 opsState
+## Testing and Observing opsState
 
-我们用客户端连接游戏服后，执行以下命令可查看各个游戏服务的 `opsState`:
+After connecting to the game server with the client, execute the following command to view the `opsState` of each game server:
 
 ```bash
 $ kubectl get gameserver
@@ -113,8 +113,8 @@ minecraft-1   Ready   None              0     0     69m
 minecraft-2   Ready   WaitToBeDeleted   0     0     70m
 ```
 
-> 其中为 `None` 的表示有玩家正在该服游戏，`WaitToBeDeleted` 表示该服没有玩家，可以被缩容。
+> Among them, `None` indicates that players are playing on that server, and `WaitToBeDeleted` indicates that the server has no players and can be scaled down.
 
-## 参考资料
+## References
 
-* [KruiseGame用户手册：自定义服务质量](https://openkruise.io/zh/kruisegame/user-manuals/service-qualities)
+* [KruiseGame User Manual: Custom Service Quality](https://openkruise.io/kruisegame/user-manuals/service-qualities)
