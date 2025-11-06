@@ -17,7 +17,7 @@ Create a TKE cluster in the [TKE Console](https://console.cloud.tencent.com/tke2
 - Kubernetes Version: Not lower than 1.30.0, latest version recommended (refer to [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)).
 - Operating System: TencentOS 4 or Ubuntu >= 22.04.
 - Container Network Plugin: VPC-CNI with shared ENI multiple IPs.
-- Nodes: Do not add any regular nodes or native nodes to the cluster before installation to avoid residual rules and configurations. Add them after installation is complete.
+- Nodes: Do not add any general nodes or native nodes to the cluster before installation to avoid residual rules and configurations. Add them after installation is complete.
 - Basic Components: Uncheck ip-masq-agent to avoid conflicts.
 - Enhanced Components: If you want to use Karpenter node pools, check to install the Karpenter component; otherwise, leave it unchecked (refer to the node pool selection below).
 
@@ -306,7 +306,7 @@ kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"s
 
 1. By adding nodeSelector, the daemonset will not be deployed to any nodes, which is equivalent to uninstalling while leaving a fallback; currently kube-proxy can only be uninstalled this way, if kube-proxy is deleted directly, subsequent cluster upgrades will be blocked.
 3. If Pods use VPC-CNI network, tke-cni-agent is not needed, uninstall to avoid CNI configuration file conflicts.
-4. As mentioned earlier, it is not recommended to add nodes before installing Cilium. If for some reason regular nodes or native nodes are added before installing Cilium, and you don't want to restart existing nodes after installing Cilium, you can add preStop to tke-cni-agent before executing uninstall to clean up CNI configuration on existing nodes:
+4. As mentioned earlier, it is not recommended to add nodes before installing Cilium. If for some reason general nodes or native nodes are added before installing Cilium, and you don't want to restart existing nodes after installing Cilium, you can add preStop to tke-cni-agent before executing uninstall to clean up CNI configuration on existing nodes:
 
 ```bash
 kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
@@ -338,8 +338,8 @@ kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"s
 ### Node Pool Selection
 
 The following three types of node pools can adapt to Cilium:
-- Native Node Pool: Based on native nodes, native nodes have rich features and are the node type recommended by TKE (refer to [Native Node VS Regular Node](https://cloud.tencent.com/document/product/457/78197#.E5.8E.9F.E7.94.9F.E8.8A.82.E7.82.B9-vs-.E6.99.AE.E9.80.9A.E8.8A.82.E7.82.B9)), OS is fixed to use TencentOS.
-- Regular Node Pool: Based on regular nodes (CVM), OS image is flexible.
+- Native Node Pool: Based on native nodes, native nodes have rich features and are the node type recommended by TKE (refer to [Native Node VS Normal Node](https://cloud.tencent.com/document/product/457/78197#.E5.8E.9F.E7.94.9F.E8.8A.82.E7.82.B9-vs-.E6.99.AE.E9.80.9A.E8.8A.82.E7.82.B9)), OS is fixed to use TencentOS.
+- General Node Pool: Based on general nodes (CVM), OS image is flexible.
 - Karpenter Node Pool: Similar to native node pool, based on native nodes, OS is fixed to use TencentOS, but node management uses the more powerful [Karpenter](https://karpenter.sh/) instead of [cluster-autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) (CA) used by regular and native node pools.
 
 Below is a comparison of these node pools, choose the appropriate node pool type based on your situation:
@@ -347,7 +347,7 @@ Below is a comparison of these node pools, choose the appropriate node pool type
 | Node Pool Type   | Node Type       | Available OS Images         | Node Scaling Component |
 | ---------------- | --------------- | --------------------------- | ---------------------- |
 | Native Node Pool | Native Node     | TencentOS                   | cluster-autoscaler     |
-| Regular Node Pool| Regular Node (CVM) | Ubuntu/TencentOS/Custom Image | cluster-autoscaler |
+| General Node Pool| General Node (CVM) | Ubuntu/TencentOS/Custom Image | cluster-autoscaler |
 | Karpenter Node Pool | Native Node  | TencentOS                   | Karpenter              |
 
 
@@ -447,18 +447,18 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
   }
 }
 ```
-### Create Regular Node Pool
+### Create General Node Pool
 
-Below are the steps to create a regular node pool through the [TKE Console](https://console.cloud.tencent.com/tke2):
+Below are the steps to create a general node pool through the [TKE Console](https://console.cloud.tencent.com/tke2):
 1. In the cluster list, click cluster ID to enter cluster details page.
 2. Select **Node Management** from the left menu, click **Node Pool** to enter the node pool list page.
 3. Click **Create**.
-4. Select **Regular Node**.
+4. Select **General Node**.
 5. For **Operating System**, select **TencentOS 4**, **Ubuntu 22.04** or **Ubuntu 24.04**.
 6. Select other options according to your needs.
 7. Click **Create Node Pool**.
 
-If you want to create a regular node pool via Terraform, refer to the following code snippet:
+If you want to create a general node pool via Terraform, refer to the following code snippet:
 
 ```hcl
 resource "tencentcloud_kubernetes_node_pool" "cilium" {
@@ -672,7 +672,7 @@ If you want higher availability for image pulling, you can [Use TCR to Host Cili
 
 TencentOS 4 system image is currently in internal testing and requires [submitting a ticket](https://console.cloud.tencent.com/workorder/category) to apply.
 
-Without application, regular nodes cannot select TencentOS 4 system image, and native nodes will fail to initialize successfully if annotation specifies TencentOS 4.
+Without application, general nodes cannot select TencentOS 4 system image, and native nodes will fail to initialize successfully if annotation specifies TencentOS 4.
 
 ### cilium-operator cannot be ready on serverless nodes?
 
