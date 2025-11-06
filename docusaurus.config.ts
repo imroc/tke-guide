@@ -78,7 +78,7 @@ const config: Config = {
           editUrl: ({ locale, versionDocsDirPath, docPath }) => {
             // Link to Crowdin for French docs
             if (locale !== DefaultLocale) {
-              return `https://github.com/imroc/tke-guide/edit/main/${locale}/i18n/en/docusaurus-plugin-content-docs/current/${docPath}`;
+              return `https://github.com/imroc/tke-guide/edit/main/i18n/${locale}/docusaurus-plugin-content-docs/current/${docPath}`;
             }
             // Link to GitHub for English docs
             return `https://github.com/imroc/tke-guide/edit/main/docs/${docPath}`;
