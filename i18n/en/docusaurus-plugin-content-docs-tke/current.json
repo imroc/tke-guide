@@ -4,51 +4,51 @@
     "description": "The label for version current"
   },
   "sidebar.tkeSidebar.category.网络指南": {
-    "message": "网络指南",
+    "message": "Networking Guide",
     "description": "The label for category 网络指南 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.在 TKE 自建 Cilium": {
-    "message": "在 TKE 自建 Cilium",
+    "message": "Self-hosted Cilium on TKE",
     "description": "The label for category 在 TKE 自建 Cilium in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.Cilium 与第三方组件共存方案": {
-    "message": "Cilium 与第三方组件共存方案",
+    "message": "Cilium Coexistence with Third-party Components",
     "description": "The label for category Cilium 与第三方组件共存方案 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.在 TKE 自建 Nginx Ingress Controller": {
-    "message": "在 TKE 自建 Nginx Ingress Controller",
+    "message": "Self-hosted Nginx Ingress Controller on TKE",
     "description": "The label for category 在 TKE 自建 Nginx Ingress Controller in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.存储指南": {
-    "message": "存储指南",
+    "message": "Storage Guide",
     "description": "The label for category 存储指南 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.弹性伸缩": {
-    "message": "弹性伸缩",
+    "message": "Autoscaling",
     "description": "The label for category 弹性伸缩 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.事件驱动弹性伸缩最佳实践(KEDA)": {
-    "message": "事件驱动弹性伸缩最佳实践(KEDA)",
+    "message": "Event-driven Autoscaling Best Practices (KEDA)",
     "description": "The label for category 事件驱动弹性伸缩最佳实践(KEDA) in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.OPA 策略管理": {
-    "message": "OPA 策略管理",
+    "message": "OPA Policy Management",
     "description": "The label for category OPA 策略管理 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.监控指南": {
-    "message": "监控指南",
+    "message": "Monitoring Guide",
     "description": "The label for category 监控指南 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.镜像与仓库": {
-    "message": "镜像与仓库",
+    "message": "Images and Registry",
     "description": "The label for category 镜像与仓库 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.故障排查": {
-    "message": "故障排查",
+    "message": "Troubleshooting",
     "description": "The label for category 故障排查 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.应用管理": {
-    "message": "应用管理",
+    "message": "Application Management",
     "description": "The label for category 应用管理 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.AI": {
@@ -56,7 +56,7 @@
     "description": "The label for category AI in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.游戏方案": {
-    "message": "游戏方案",
+    "message": "Gaming Solutions",
     "description": "The label for category 游戏方案 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.OpenKruiseGame": {
@@ -64,11 +64,11 @@
     "description": "The label for category OpenKruiseGame in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.实践案例": {
-    "message": "实践案例",
+    "message": "Practice Cases",
     "description": "The label for category 实践案例 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.使用 OpenKruiseGame 部署我的世界": {
-    "message": "使用 OpenKruiseGame 部署我的世界",
+    "message": "Deploy Minecraft with OpenKruiseGame",
     "description": "The label for category 使用 OpenKruiseGame 部署我的世界 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.Agones": {
@@ -76,23 +76,23 @@
     "description": "The label for category Agones in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.常见应用部署": {
-    "message": "常见应用部署",
+    "message": "Common Application Deployment",
     "description": "The label for category 常见应用部署 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.常见问题": {
-    "message": "常见问题",
+    "message": "FAQ",
     "description": "The label for category 常见问题 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.附录": {
-    "message": "附录",
+    "message": "Appendix",
     "description": "The label for category 附录 in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.实用 YAML": {
-    "message": "实用 YAML",
+    "message": "Useful YAML",
     "description": "The label for category 实用 YAML in sidebar tkeSidebar"
   },
   "sidebar.tkeSidebar.category.实用 kubectl 脚本": {
-    "message": "实用 kubectl 脚本",
+    "message": "Useful kubectl Scripts",
     "description": "The label for category 实用 kubectl 脚本 in sidebar tkeSidebar"
   }
 }
