@@ -92,111 +92,109 @@ const config: Config = {
     ],
   ],
 
-  themeConfig:
-    /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
-    ({
-      // algolia 搜索功能
-      algolia: {
-        appId: 'PMI694UTDL',
-        apiKey: '70252d611402a606b9b6827a1303d486',
-        indexName: 'imroc_cc',
-        contextualSearch: false,
+  themeConfig: {
+    // algolia 搜索功能
+    algolia: {
+      appId: 'PMI694UTDL',
+      apiKey: '70252d611402a606b9b6827a1303d486',
+      indexName: 'imroc_cc',
+      contextualSearch: false,
+    },
+    // giscus 评论功能
+    giscus: {
+      repo: 'imroc/tke-guide',
+      repoId: 'R_kgDOLJf_vQ',
+      category: 'General',
+      categoryId: 'DIC_kwDOLJf_vc4Ccryl',
+    },
+    navbar: {
+      title: 'TKE 实践指南', // 左上角的电子书名称
+      logo: {
+        alt: 'TKE',
+        src: 'img/logo.svg', // 电子书 logo 文件，注意替换
       },
-      // giscus 评论功能
-      giscus: {
-        repo: 'imroc/tke-guide',
-        repoId: 'R_kgDOLJf_vQ',
-        category: 'General',
-        categoryId: 'DIC_kwDOLJf_vc4Ccryl',
-      },
-      navbar: {
-        title: 'TKE 实践指南', // 左上角的电子书名称
-        logo: {
-          alt: 'TKE',
-          src: 'img/logo.svg', // 电子书 logo 文件，注意替换
+      items: [
+        {
+          href: 'https://github.com/imroc/tke-guide', // 改成自己的仓库地址
+          label: 'GitHub',
+          position: 'right',
         },
-        items: [
-          {
-            href: 'https://github.com/imroc/tke-guide', // 改成自己的仓库地址
-            label: 'GitHub',
-            position: 'right',
-          },
-          {
-            type: 'localeDropdown',
-            position: 'right',
-          },
-        ],
-      },
-      // 自定义页脚
-      footer: {
-        style: 'dark',
-        links: [
-          {
-            title: '相关电子书',
-            items: [
-              {
-                label: 'kubernetes 实践指南',
-                href: 'https://imroc.cc/kubernetes',
-              },
-              {
-                label: 'istio 实践指南',
-                href: 'https://imroc.cc/istio',
-              },
-            ],
-          },
-          {
-            title: '更多',
-            items: [
-              {
-                label: 'roc 云原生',
-                href: 'https://imroc.cc',
-              },
-              {
-                label: 'GitHub',
-                href: 'https://github.com/imroc/tke-guide',
-              },
-            ],
-          },
-        ],
-        copyright: `Copyright ${new Date().getFullYear()} roc | All Right Reserved | <a href="http://beian.miit.gov.cn/">${beian}</a>`,
-      },
-      // 自定义代码高亮
-      prism: {
-        theme: PrismDark,
-        magicComments: [
-          {
-            className: 'code-block-highlighted-line',
-            line: 'highlight-next-line',
-            block: { start: 'highlight-start', end: 'highlight-end' }
-          },
-          {
-            className: 'code-block-add-line',
-            line: 'highlight-add-line',
-            block: { start: 'highlight-add-start', end: 'highlight-add-end' }
-          },
-          {
-            className: 'code-block-update-line',
-            line: 'highlight-update-line',
-            block: { start: 'highlight-update-start', end: 'highlight-update-end' }
-          },
-          {
-            className: 'code-block-error-line',
-            line: 'highlight-error-line',
-            block: { start: 'highlight-error-start', end: 'highlight-error-end' }
-          },
-        ],
-        // languages enabled by default: https://github.com/FormidableLabs/prism-react-renderer/blob/master/packages/generate-prism-languages/index.ts#L9-L23
-        // prism supported languages: https://prismjs.com/#supported-languages
-        additionalLanguages: [
-          'java',
-          'json',
-          'hcl',
-          'bash',
-          'diff',
-          'docker',
-        ],
-      },
-    }),
+        {
+          type: 'localeDropdown',
+          position: 'right',
+        },
+      ],
+    },
+    // 自定义页脚
+    footer: {
+      style: 'dark',
+      links: [
+        {
+          title: '相关电子书',
+          items: [
+            {
+              label: 'kubernetes 实践指南',
+              href: 'https://imroc.cc/kubernetes',
+            },
+            {
+              label: 'istio 实践指南',
+              href: 'https://imroc.cc/istio',
+            },
+          ],
+        },
+        {
+          title: '更多',
+          items: [
+            {
+              label: 'roc 云原生',
+              href: 'https://imroc.cc',
+            },
+            {
+              label: 'GitHub',
+              href: 'https://github.com/imroc/tke-guide',
+            },
+          ],
+        },
+      ],
+      copyright: `Copyright ${new Date().getFullYear()} roc | All Right Reserved | <a href="http://beian.miit.gov.cn/">${beian}</a>`,
+    },
+    // 自定义代码高亮
+    prism: {
+      theme: PrismDark,
+      magicComments: [
+        {
+          className: 'code-block-highlighted-line',
+          line: 'highlight-next-line',
+          block: { start: 'highlight-start', end: 'highlight-end' }
+        },
+        {
+          className: 'code-block-add-line',
+          line: 'highlight-add-line',
+          block: { start: 'highlight-add-start', end: 'highlight-add-end' }
+        },
+        {
+          className: 'code-block-update-line',
+          line: 'highlight-update-line',
+          block: { start: 'highlight-update-start', end: 'highlight-update-end' }
+        },
+        {
+          className: 'code-block-error-line',
+          line: 'highlight-error-line',
+          block: { start: 'highlight-error-start', end: 'highlight-error-end' }
+        },
+      ],
+      // languages enabled by default: https://github.com/FormidableLabs/prism-react-renderer/blob/master/packages/generate-prism-languages/index.ts#L9-L23
+      // prism supported languages: https://prismjs.com/#supported-languages
+      additionalLanguages: [
+        'java',
+        'json',
+        'hcl',
+        'bash',
+        'diff',
+        'docker',
+      ],
+    },
+  } satisfies Preset.ThemeConfig,
 };
 
 export default config;
