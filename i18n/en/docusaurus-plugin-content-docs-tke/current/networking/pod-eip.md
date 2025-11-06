@@ -1,43 +1,43 @@
-# Pod 绑 EIP
+# Binding EIP to Pods
 
-腾讯云容器服务 TKE 支持为 Pod 绑定 EIP，参考官方文档 [Pod 直接绑定弹性公网 IP 使用说明](https://cloud.tencent.com/document/product/457/64886)。
+Tencent Cloud Container Service (TKE) supports binding EIP to Pods. Refer to the official documentation [Instructions for Directly Binding Elastic Public IP to Pods](https://cloud.tencent.com/document/product/457/64886).
 
-本文用更通俗的语言描述下在 TKE 环境如何为 Pod 绑定 EIP。
+This article describes how to bind EIP to Pods in the TKE environment in more accessible language.
 
-## EIP 授权
+## EIP Authorization
 
-集群中的 ipamd 组件通过调用相关云 API 为 Pod 分配 EIP，需要 ipamd 有相关的权限，具体授权方法：
-1. 在 [角色列表](https://console.cloud.tencent.com/cam/role) 页面找到 `IPAMDofTKE_QCSRole` 这个角色，点进去。
-2. 点击关联策略：
+The ipamd component in the cluster allocates EIP to Pods by calling related cloud APIs and requires relevant permissions. Specific authorization method:
+1. Find the `IPAMDofTKE_QCSRole` role on the [Role List](https://console.cloud.tencent.com/cam/role) page and click into it.
+2. Click to associate policy:
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F07%2F11%2F20240711100010.png)
-3. 选择 `QcloudAccessForIPAMDRoleInQcloudAllocateEIP` 进行关联：
+3. Select `QcloudAccessForIPAMDRoleInQcloudAllocateEIP` for association:
     ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F07%2F11%2F20240711100056.png)
 
-## 标准集群与 Serverless 集群
+## Standard Clusters and Serverless Clusters
 
-TKE 的集群有标准集群与 Serverless 集群之分，两种类型集群为 Pod  配置 EIP 方式是不一样的。
+TKE clusters are divided into standard clusters and Serverless clusters. The methods for configuring EIP for Pods differ between these two cluster types.
 
-> Serverless 集群的能力现已与融入到标准集群中，未来将不存在 Serverless 集群类型。
+> Serverless cluster capabilities have now been integrated into standard clusters. In the future, there will be no Serverless cluster type.
 
-:::tip[注意]
+:::tip[Note]
 
-1. 如果您使用标准集群，不管 Pod 在超级节点与否，统一都使用标准集群写法即可。
-2. 如果您的存量 Serverless 集群需使用 EIP，查看 YAML 示例时注意选择 Serverless 集群版本的写法。
+1. If you are using a standard cluster, regardless of whether the Pod is on a super node, use the standard cluster syntax uniformly.
+2. If your existing Serverless cluster needs to use EIP, pay attention to select the Serverless cluster version syntax when viewing YAML examples.
 
-::::
+:::
 
-## 如何为 Pod 绑 EIP ?
+## How to Bind EIP to Pods?
 
-为 Pod 加 `eip-attributes` 注解以声明需要绑定 EIP，值为 JSON 格式，填写创建 EIP 接口的相关的参数，详细参数列表可参考 [这里](https://cloud.tencent.com/document/api/215/16699#2.-.E8.BE.93.E5.85.A5.E5.8F.82.E6.95.B0) 。
+Add the `eip-attributes` annotation to the Pod to declare that it needs to bind an EIP. The value is in JSON format, filling in parameters related to the create EIP interface. For a detailed parameter list, refer to [here](https://cloud.tencent.com/document/api/215/16699#2.-.E8.BE.93.E5.85.A5.E5.8F.82.E6.95.B0).
 
-YAML 写法示例：
+YAML example:
 
 <Tabs>
-  <TabItem value="eip" label="标准集群写法">
+  <TabItem value="eip" label="Standard Cluster Syntax">
 
-  :::info[注意]
+  :::info[Note]
 
-  使用 TKE 标准集群，要求 Pod 使用 `VPC-CNI` 网络模式（参考这里的[前提条件和限制](https://cloud.tencent.com/document/product/457/64886)）。
+  When using TKE standard clusters, Pods must use the `VPC-CNI` network mode (refer to [Prerequisites and Limitations](https://cloud.tencent.com/document/product/457/64886) here).
 
   :::
 
@@ -45,71 +45,71 @@ YAML 写法示例：
 
   </TabItem>
 
-  <TabItem value="eip-serverless" label="Serverless 集群写法">
+  <TabItem value="eip-serverless" label="Serverless Cluster Syntax">
     <FileBlock file="eip/nginx-eip-serverless.yaml" showLineNumbers />
   </TabItem>
 </Tabs>
 
 
-## 如何保留 EIP ?
+## How to Retain EIP?
 
-如果希望 Pod 重建后能复用重建之前的 EIP，需要在创建集群的时候启用 `固定 Pod IP` 并设置 `IP 回收策略`:
+If you want the Pod to reuse the EIP from before reconstruction after being rebuilt, you need to enable `Fixed Pod IP` and set `IP Reclaim Policy` when creating the cluster:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F07%2F11%2F20240711102603.png)
 
-Pod 被删除后 EIP 会被释放，EIP 在未绑定状态下会产生费用（在和Pod绑定时EIP不计费），这个 `IP 回收策略` 配置的是 EIP 回收的时间阈值，EIP 在未绑定状态超过该时间阈值就会被销毁，避免因某些问题导致 EIP 长时间处于未绑定状态而产生更多额外费用。
+After the Pod is deleted, the EIP will be released. EIP generates charges when unbound (EIP is not charged when bound to Pods). This `IP Reclaim Policy` configures the time threshold for EIP reclamation. If the EIP remains unbound beyond this time threshold, it will be destroyed to avoid generating more additional costs due to certain issues causing the EIP to remain unbound for an extended period.
 
-那如何声明让 Pod 保留 EIP 呢？
+So how do you declare that a Pod should retain its EIP?
 
-首先需要使用 `StatefulSet` 部署或其它第三方有状态工作负载（如 `OpenKruise` 的 `Advanced StatefulSet`、`OpenKruiseGame` 的 `GameServerSet`）。
+First, you need to use `StatefulSet` deployment or other third-party stateful workloads (such as `OpenKruise`'s `Advanced StatefulSet`, `OpenKruiseGame`'s `GameServerSet`).
 
-:::tip[说明]
+:::tip[Note]
 
-为什么要用有状态工作负载才可以？因为有状态工作负载的 Pod 名称有序号，可通过 Pod 名称与 EIP 的关联关系实现固定 EIP，无状态的 Pod 就无法实现了。
+Why must stateful workloads be used? Because stateful workload Pod names have sequence numbers, fixed EIP can be achieved through the association between Pod names and EIPs. This cannot be achieved with stateless Pods.
 
 :::
 
-下面是保留 EIP 的 YAML 示例:
+Below is a YAML example for retaining EIP:
 
 <Tabs>
-  <TabItem value="retain-eip" label="标准集群写法">
+  <TabItem value="retain-eip" label="Standard Cluster Syntax">
     <FileBlock file="eip/nginx-retain-eip.yaml" showLineNumbers />
   </TabItem>
 
-  <TabItem value="retain-eip-serverless" label="Serverless 集群写法">
+  <TabItem value="retain-eip-serverless" label="Serverless Cluster Syntax">
     <FileBlock file="eip/nginx-retain-eip-serverless.yaml" showLineNumbers />
   </TabItem>
 </Tabs>
 
-## 如何在容器内获取自身公网 IP ？
+## How to Obtain the Public IP within a Container?
 
-可以利用 K8S 的 [Downward API](https://kubernetes.io/zh/docs/tasks/inject-data-application/environment-variable-expose-pod-information/) ，将 Pod 上的一些字段注入到环境变量或挂载到文件，Pod 的 EIP 信息最终会写到 Pod 的 `tke.cloud.tencent.com/eip-public-ip` 这个 annotation 上，但不会 Pod 创建时就写上，是在启动过程写上去的，所以如果注入到环境变量最终会为空，挂载到文件就没问题，以下是使用方法:
+You can use Kubernetes' [Downward API](https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/) to inject certain Pod fields into environment variables or mount them to files. The Pod's EIP information will eventually be written to the Pod's `tke.cloud.tencent.com/eip-public-ip` annotation, but not immediately upon Pod creation - it's written during the startup process. Therefore, if injected as an environment variable, it will ultimately be empty. Mounting to a file works fine. Here's how to use it:
 
 <Tabs>
-  <TabItem value="mount-eip" label="标准集群写法">
+  <TabItem value="mount-eip" label="Standard Cluster Syntax">
     <FileBlock file="eip/nginx-eip-mount-podinfo.yaml" showLineNumbers />
   </TabItem>
 
-  <TabItem value="mount-eip-serverless" label="Serverless 集群写法">
+  <TabItem value="mount-eip-serverless" label="Serverless Cluster Syntax">
     <FileBlock file="eip/nginx-eip-mount-podinfo-serverless.yaml" showLineNumbers />
   </TabItem>
 </Tabs>
 
-容器内进程启动时可以读取 `/etc/podinfo/eip` 中的内容来获取 EIP。
+When the container process starts, it can read the contents of `/etc/podinfo/eip` to obtain the EIP.
 
-## 常见问题：EIP 分配失败
+## FAQ: EIP Allocation Failure
 
-Pod EIP 分配失败，`tke.cloud.tencent.com/eip-public-ip` 注解没有被自动打上，Pod 内无法通过 Downward API 获取自身 EIP。
+Pod EIP allocation fails, the `tke.cloud.tencent.com/eip-public-ip` annotation is not automatically applied, and the Pod cannot obtain its own EIP through the Downward API.
 
-Pod 事件报错：
+Pod event error:
 
 ```txt
   Warning  FailedAllocateEIP  4m58s  tke-eni-ipamd      Failed to create eip: failed to allocate eip: [TencentCloudSDKError] Code=UnauthorizedOperation, Message="[request id:********-****-****-****-************]you are not authorized to perform operation (cvm:AllocateAddresses)\nresource (qcs::cvm:ap-guangzhou:uin\/1000******04:eip\/*) has no permission\n"., RequestId=********-****-****-****-************
 ```
 
-原因是没正确为 `ipamd` 组件授权，需按照 [EIP 授权](#eip-授权) 步骤进行操作。
+The reason is that the `ipamd` component was not properly authorized. Follow the steps in [EIP Authorization](#eip-authorization) to operate.
 
-## 参考资料
+## References
 
-* [Pod 直接绑定弹性公网 IP 使用说明](https://cloud.tencent.com/document/product/457/64886)
-* [超级节点下 Pod 绑 EIP 相关注解](https://cloud.tencent.com/document/product/457/44173#.E7.BB.91.E5.AE.9A-eip)
+* [Instructions for Directly Binding Elastic Public IP to Pods](https://cloud.tencent.com/document/product/457/64886)
+* [Annotations Related to Binding EIP to Pods on Super Nodes](https://cloud.tencent.com/document/product/457/44173#.E7.BB.91.E5.AE.9A-eip)
