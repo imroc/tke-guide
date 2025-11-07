@@ -26,7 +26,7 @@ Uploading Cilium images requires that the client uploading the images can access
 
 Additionally, TKE cluster nodes pulling Cilium dependency images also need to be able to access the TCR image repository. Refer to [Configuring Private Network Access Control](https://cloud.tencent.com/document/product/1141/41838) to enable private network access between the image repository and the VPC where the TKE cluster is located, ensure that the VPC where the Cilium upload client is located establishes a private network access link with the TCR image repository, and make sure to check **Auto Resolution**:
 
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F31%2F20251031140032.png)
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F11%2F07%2F20251107105604.png)
 
 ## Install TCR Plugin
 
