@@ -13,10 +13,10 @@
 ## 新建命名空间
 
 TCR 镜像仓库创建完成后，新建一个命名空间：
-1. **名称**: cilium。
+1. **名称**: quay.io。
 1. **访问级别**：公开。
 
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F31%2F20251031125444.png)
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F11%2F07%2F20251107105339.png)
 
 ## 配置访问控制
 
