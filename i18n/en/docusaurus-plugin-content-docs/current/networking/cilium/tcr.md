@@ -13,10 +13,10 @@ To achieve fast image pulls, you must create a TCR image repository in the same 
 ## Create Namespace
 
 After the TCR image repository is created, create a new namespace:
-1. **Name**: cilium
+1. **Name**: quay.io
 1. **Access Level**: Public
 
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F31%2F20251031125444.png)
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F11%2F07%2F20251107105451.png)
 
 ## Configure Access Control
 
