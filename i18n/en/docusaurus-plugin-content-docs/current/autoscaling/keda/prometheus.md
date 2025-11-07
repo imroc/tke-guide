@@ -1,14 +1,14 @@
-# 基于 Prometheus 自定义指标的弹性伸缩
+# Elastic Scaling Based on Prometheus Custom Metrics
 
-## Prometheus 触发器
+## Prometheus Trigger
 
-KEDA 支持 `prometheus` 类型的触发器，即根据自定义的 PromQL 查询到的 Prometheus 指标数据进行伸缩，完整配置参数参考 [KEDA Scalers: Prometheus](https://keda.sh/docs/latest/scalers/prometheus/)，本文将给出使用案例。
+KEDA supports `prometheus` type triggers, i.e., scaling based on Prometheus metric data queried through custom PromQL. For complete configuration parameters, refer to [KEDA Scalers: Prometheus](https://keda.sh/docs/latest/scalers/prometheus/). This article will provide use cases.
 
-## 案例：基于 istio 的 QPS 指标伸缩
+## Use Case: Scaling Based on Istio QPS Metrics
 
-如果你使用 isito，业务 Pod 注入了 sidecar，会自动暴露一些七层的监控指标，最常见的是 `istio_requests_total`，可以通过这个指标计算 QPS。
+If you use Istio and business Pods have sidecars injected, they automatically expose some Layer 7 monitoring metrics. The most common is `istio_requests_total`, which can be used to calculate QPS.
 
-假设这种场景：A 服务需要根据 B 服务处理的 QPS 进行伸缩。
+Assume this scenario: Service A needs to scale based on the QPS handled by Service B.
 
 ```yaml showLineNumbers
 apiVersion: keda.sh/v1alpha1
@@ -20,7 +20,7 @@ spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: a # 对 A 服务进行伸缩
+    name: a # Scale Service A
   pollingInterval: 15
   minReplicaCount: 1
   maxReplicaCount: 100
@@ -28,18 +28,17 @@ spec:
     # highlight-start
     - type: prometheus
       metadata:
-        serverAddress: http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090 # 替换 Prometheus 的地址
-        query: | # 计算 B 服务 QPS 的 PromQL
+        serverAddress: http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090 # Replace with Prometheus address
+        query: | # PromQL to calculate Service B QPS
           sum(irate(istio_requests_total{reporter=~"destination",destination_workload_namespace=~"prod",destination_workload=~"b"}[1m]))
-        threshold: "100" # A服务副本数=ceil(B服务QPS/100)
+        threshold: "100" # Service A replica count = ceil(Service B QPS/100)
     # highlight-end
 ```
 
-## 相比 prometheus-adapter 的优势
+## Advantages Over prometheus-adapter
 
-[prometheus-adapter](https://github.com/kubernetes-sigs/prometheus-adapter) 也支持相同的能力，即根据 Prometheus 中的监控指标数据进行伸缩，但相比 KEDA 的方案有以下不足：
+[prometheus-adapter](https://github.com/kubernetes-sigs/prometheus-adapter) also supports the same capability, i.e., scaling based on monitoring metric data in Prometheus, but compared to the KEDA solution, it has the following shortcomings:
 
-* 每次新增自定义指标，都要改动 `prometheus-adapter`  的配置，且改配置是集中式管理的，不支持通过 CRD 管理，配置维护起来比较麻烦，而 KEDA 方案则只需要配置 `ScaledObject` 或 `ScaledJob` 这种 CRD，不同业务使用不同的 YAML 文件维护，利于配置维护。
-* `prometheus-adapter` 的配置语法晦涩难懂，不能直接写 `PromQL`，需要学习一下 `prometheus-adapter` 的配置语法，有一定的学习成本，而 KEDA 的 prometheus 配置则非常简单，指标可以直接写 `PromQL` 查询语句，简单明了。
-* `prometheus-adapter` 只支持根据 Prometheus 监控数据进行伸缩，而对于 KEDA 来说，Prometheus 只是众多触发器中的一种。
-
+* Every time a custom metric is added, the `prometheus-adapter` configuration must be modified, and the configuration is centrally managed and does not support management through CRDs. Configuration maintenance is cumbersome, while the KEDA solution only requires configuring `ScaledObject` or `ScaledJob` CRDs. Different businesses use different YAML files for maintenance, which is conducive to configuration maintenance.
+* The `prometheus-adapter` configuration syntax is obscure and difficult to understand. You cannot write `PromQL` directly; you need to learn the `prometheus-adapter` configuration syntax, which has a certain learning cost. KEDA's prometheus configuration is very simple; metrics can be written directly using `PromQL` query statements, which is simple and clear.
+* `prometheus-adapter` only supports scaling based on Prometheus monitoring data, while for KEDA, Prometheus is just one of many triggers.

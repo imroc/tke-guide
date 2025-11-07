@@ -1,21 +1,21 @@
-# 在 TKE 上部署 KEDA
+# Deploying KEDA on TKE
 
-## 添加 helm repo
+## Add helm repo
 
 ```bash
 helm repo add kedacore https://kedacore.github.io/charts
 helm repo update
 ```
 
-## 准备 values.yaml
+## Prepare values.yaml
 
-先查看默认的 values.yaml (看看有哪些可以自定义的配置项)
+First check the default values.yaml (to see what configuration options can be customized)
 
 ```bash
 helm show values kedacore/keda
 ```
 
-默认的依赖镜像在国内环境拉取不了，可以替换为使用 docker hub 上的 mirror 镜像，配置 `values.yaml`：
+The default dependency images cannot be pulled in domestic environments. You can replace them with mirror images from Docker Hub by configuring `values.yaml`:
 
 ```yaml
 image:
@@ -30,13 +30,13 @@ image:
     repository: imroc/keda-admission-webhooks
 ```
 
-:::tip[说明]
+:::tip[Note]
 
-以上 mirror 镜像长期自动同步，可放心使用和更新版本。
+The above mirror images are automatically synced long-term and can be used and updated with confidence.
 
 :::
 
-## 安装
+## Install
 
 ```bash
 helm upgrade --install keda kedacore/keda \
@@ -44,11 +44,11 @@ helm upgrade --install keda kedacore/keda \
   -f values.yaml
 ```
 
-## 版本与升级
+## Versioning and Upgrades
 
-每个 KEDA 的版本都有对应适配的 K8S 版本区间，如果你的 TKE 集群版本不是特别新，安装最新版的 KEDA 可能无法兼容，可查看 [KEDA Kubernetes Compatibility](https://keda.sh/docs/latest/operate/cluster/#kubernetes-compatibility) 来确认当前集群版本能兼容的 KEDA 版本。
+Each KEDA version has a corresponding supported K8S version range. If your TKE cluster version is not particularly new, installing the latest KEDA version may not be compatible. You can check [KEDA Kubernetes Compatibility](https://keda.sh/docs/latest/operate/cluster/#kubernetes-compatibility) to confirm which KEDA version is compatible with your current cluster version.
 
-比如 TKE 集群版本是 1.26，对应能兼容的 KEDA 最新版本是 v2.12，再查询到 KEDA v2.12 (APP VERSION) 对应的 Chart 版本 (CHART VERSION) 最高版本是 2.12.1：
+For example, if the TKE cluster version is 1.26, the latest compatible KEDA version is v2.12. Then query to find that KEDA v2.12 (APP VERSION) corresponds to the highest Chart version (CHART VERSION) of 2.12.1:
 
 ```bash
 $ helm search repo keda --versions
@@ -63,7 +63,7 @@ kedacore/keda                                   2.11.2          2.11.2          
 kedacore/keda                                   2.11.1          2.11.1          Event-based autoscaler for workloads on Kubernetes
 ```
 
-安装 KEDA 时指定版本：
+Specify the version when installing KEDA:
 
 ```bash
 helm upgrade --install keda kedacore/keda \
@@ -73,14 +73,14 @@ helm upgrade --install keda kedacore/keda \
   -f values.yaml
 ```
 
-后续升级版本时可复用上面的安装命令，只需修改下版本号即可。
+For subsequent version upgrades, you can reuse the above installation command, only modifying the version number.
 
-**注意**：在升级 TKE 集群前也用这里的方法先确认下升级后的集群版本能否兼容当前版本的 KEDA，如果不能，请提前升级 KEDA 到当前集群版本所能兼容的最新 KEDA 版本。
+**Note**: Before upgrading the TKE cluster, also use this method to first confirm whether the upgraded cluster version can be compatible with the current KEDA version. If not, please upgrade KEDA in advance to the latest KEDA version compatible with the current cluster version.
 
-## 卸载
+## Uninstall
 
-参考 [官方卸载说明](https://keda.sh/docs/latest/deploy/#uninstall)。
+Refer to [official uninstall documentation](https://keda.sh/docs/latest/deploy/#uninstall).
 
-## 参考资料
+## References
 
-* [KEDA 官方文档：Deploying KEDA](https://keda.sh/docs/latest/deploy/)
+* [KEDA Official Documentation: Deploying KEDA](https://keda.sh/docs/latest/deploy/)

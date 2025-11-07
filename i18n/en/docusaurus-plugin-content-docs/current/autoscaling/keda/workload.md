@@ -1,19 +1,19 @@
-# 多级服务同步水平伸缩 (Workload 触发器)
+# Multi-tier Service Synchronized Horizontal Scaling (Workload Trigger)
 
-## Workload 触发器
+## Workload Trigger
 
-KEDA 支持 Kubernetes Workload 触发器，即可以根据的一个或多个工作负载的 Pod 数量来扩缩容，在多级服务调用的场景下很有用，具体用法参考 [KEDA Scalers: Kubernetes Workload](https://keda.sh/docs/2.13/scalers/kubernetes-workload/)。
+KEDA supports Kubernetes Workload triggers, i.e., it can scale based on the number of Pods in one or more workloads. This is very useful in multi-tier service invocation scenarios. For specific usage, refer to [KEDA Scalers: Kubernetes Workload](https://keda.sh/docs/2.13/scalers/kubernetes-workload/).
 
-## 案例：多级服务同时扩容
+## Use Case: Multi-tier Service Simultaneous Scaling
 
-比如下面这种多级微服务调用：
+For example, the following multi-tier microservice invocation:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F08%2F20240408084514.png)
 
-* A、B、C 这一组服务通常有比较固定的数量比例。
-* A 的压力突增，迫使扩容，B 和 C 也可以用 KEDA 的 Kubernetes Workload 触发器实现与 A 几乎同时扩容，而无需等待压力逐级传导才缓慢迫使扩容。
+* Services A, B, and C in this group usually have a relatively fixed quantity ratio.
+* When pressure suddenly increases on A, forcing it to scale, B and C can also use KEDA's Kubernetes Workload trigger to scale almost simultaneously with A, without waiting for pressure to be transmitted level by level, which would cause slow forced scaling.
 
-首先配置 A 的扩容，根据 CPU 和内存压力扩容：
+First, configure scaling for A based on CPU and memory pressure:
 
 ```yaml showLineNumbers
 apiVersion: keda.sh/v1alpha1
@@ -40,7 +40,7 @@ spec:
 ```
 
 
-然后配置 B 和 C 的扩容，假设固定比例 A:B:C = 3:3:2。
+Then configure scaling for B and C, assuming a fixed ratio A:B:C = 3:3:2.
 
 <Tabs>
   <TabItem value="B" label="B">
@@ -62,7 +62,7 @@ spec:
        # highlight-start
        - type: kubernetes-workload
          metadata:
-           podSelector: 'app=a' # 选中 A 服务
+           podSelector: 'app=a' # Select Service A
            value: '1' # A/B=3/3=1
        # highlight-end
    ```
@@ -88,7 +88,7 @@ spec:
        # highlight-start
        - type: kubernetes-workload
          metadata:
-           podSelector: 'app=a' # 选中 A 服务
+           podSelector: 'app=a' # Select Service A
            value: '1.5' # A/C=3/2=1.5
        # highlight-end
    ```
@@ -96,4 +96,4 @@ spec:
   </TabItem>
 </Tabs>
 
-通过以上配置，当A的压力增加时，A、B和C将几乎同时进行扩容，而无需等待压力逐级传导。这样可以更快地适应压力变化，提高系统的弹性和性能。
+With the above configuration, when pressure on A increases, A, B, and C will scale almost simultaneously without waiting for pressure to be transmitted level by level. This allows for faster adaptation to pressure changes and improves system elasticity and performance.

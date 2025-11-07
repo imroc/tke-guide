@@ -1,58 +1,58 @@
-# 认识 KEDA
+# Understanding KEDA
 
-## 什么是 KEDA ？
+## What is KEDA?
 
-KEDA (Kubernetes-based Event-Driven Autoscaler) 是在 Kubernetes 中事件驱动的弹性伸缩器，功能非常强大。不仅支持根据基础的 CPU 和内存指标进行伸缩，还支持根据各种消息队列中的长度、数据库中的数据统计、QPS、Cron 定时计划以及您可以想象的任何其他指标进行伸缩，甚至还可以将副本缩到 0。
+KEDA (Kubernetes-based Event-Driven Autoscaler) is an event-driven autoscaler in Kubernetes with very powerful capabilities. It not only supports scaling based on basic CPU and memory metrics, but also based on various message queue lengths, database statistics, QPS, Cron schedules, and any other metrics you can imagine. It can even scale replicas down to 0.
 
-该项目于 2020.3 被 CNCF 接收，2021.8 开始孵化，最后在 2023.8 宣布毕业，目前已经非常成熟，可放心在生产环境中使用。
+The project was accepted by CNCF in March 2020, started incubation in August 2021, and finally announced graduation in August 2023. It is now very mature and can be confidently used in production environments.
 
-## 为什么需要 KEDA ？
+## Why is KEDA Needed?
 
-HPA 是 Kubernetes 自带的 Pod 水平自动伸缩器，只能根据监控指标对工作负载自动扩缩容，指标主要是工作负载的 CPU 和内存的利用率（Resource Metrics），如果需要支持其它自定义指标，一般是安装 [prometheus-adapter](https://github.com/kubernetes-sigs/prometheus-adapter) 来作为 HPA  的 Custom Metrics 和 External Metrics 的实现来将 Prometheus 中的监控数据作为自定义指标提供给 HPA。理论上，用  HPA + prometheus-adapter 也能实现 KEDA 的功能，但实现上会非常麻烦，比如想要根据数据库中任务表里记录的待执行的任务数量统计进行伸缩，就需要编写并部署 Exporter 应用，将统计结果转换为 Metrics 暴露给 Prometheus 进行采集，然后 prometheus-adapter 再从 Prometheus 查询待执行的任务数量指标来决定是否伸缩。
+HPA is Kubernetes' built-in horizontal pod autoscaler, which can only automatically scale workloads based on monitoring metrics, mainly CPU and memory utilization (Resource Metrics). If other custom metrics need to be supported, typically [prometheus-adapter](https://github.com/kubernetes-sigs/prometheus-adapter) is installed to serve as the implementation of HPA's Custom Metrics and External Metrics, providing monitoring data from Prometheus as custom metrics to HPA. In theory, HPA + prometheus-adapter can also achieve KEDA's functionality, but the implementation would be very cumbersome. For example, if you want to scale based on the count of pending tasks in a database task table, you would need to write and deploy an Exporter application to convert the statistics into Metrics exposed to Prometheus for collection, then prometheus-adapter would query Prometheus for the pending task count metric to decide whether to scale.
 
-KEDA 的出现主要是为了解决 HPA 无法基于灵活的事件源进行伸缩的这个问题，内置了几十种常见的 [Scaler](https://keda.sh/docs/latest/scalers/) ，可直接跟各种第三方应用对接，比如各种开源和云托管的关系型数据库、时序数据库、文档数据库、键值存储、消息队列、事件总线等，也可以使用 Cron 表达式进行定时自动伸缩，常见的伸缩常见基本都涵盖了，如果发现有不支持的，还可以自己实现一个外部 Scaler 来配合 KEDA 使用。
+KEDA's emergence is mainly to solve the problem that HPA cannot scale based on flexible event sources. It has built-in dozens of common [Scalers](https://keda.sh/docs/latest/scalers/) that can directly interface with various third-party applications, such as various open-source and cloud-managed relational databases, time-series databases, document databases, key-value stores, message queues, event buses, etc. It can also use Cron expressions for scheduled automatic scaling. Common scaling scenarios are basically covered, and if you find any unsupported scenarios, you can implement your own external Scaler to work with KEDA.
 
-## KEDA 的原理
+## KEDA's Architecture
 
-KEDA 并不是要替代 HPA，而是作为 HPA 的补充或者增强，事实上很多时候 KEDA 是配合 HPA 一起工作的，这是 KEDA 官方的架构图：
+KEDA is not meant to replace HPA, but rather to complement or enhance it. In fact, KEDA often works together with HPA. This is KEDA's official architecture diagram:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F07%2F20240407153149.png)
 
-* 当要将工作负载的副本数缩到闲时副本数，或从闲时副本数扩容时，由 KEDA 通过修改工作负载的副本数实现（闲时副本数小于 `minReplicaCount`，包括 0，即可以缩到 0）。
-* 其它情况下的扩缩容由 HPA 实现，HPA 由 KEDA 自动管理，HPA 使用 External Metrics 作为数据源，而 External Metrics 后端的数据由 KEDA 提供。
-* KEDA 各种 Scalers 的核心其实就是为 HPA 暴露 External Metrics 格式的数据，KEDA 会将各种外部事件转换为所需的 External Metrics 数据，最终实现 HPA 通过 External Metrics 数据进行自动伸缩，直接复用了 HPA 已有的能力，所以如果还想要控制扩缩容的行为细节（比如快速扩容，缓慢缩容），可以直接通过配置 HPA 的 `behavior` 字段来实现 (要求 Kubernetes 版本 >= 1.18)。
+* When scaling the workload's replica count down to the idle replica count, or scaling up from the idle replica count, KEDA implements it by modifying the workload's replica count (idle replica count is less than `minReplicaCount`, including 0, meaning it can scale to 0).
+* In other cases, scaling is implemented by HPA, which is automatically managed by KEDA. HPA uses External Metrics as the data source, and the External Metrics backend data is provided by KEDA.
+* The core of KEDA's various Scalers is to expose data in External Metrics format for HPA. KEDA converts various external events into the required External Metrics data, ultimately enabling HPA to automatically scale through External Metrics data, directly reusing HPA's existing capabilities. So if you want to control the details of scaling behavior (such as fast scale-up, slow scale-down), you can directly configure HPA's `behavior` field to achieve this (requires Kubernetes version >= 1.18).
 
-除了工作负载的扩缩容，对于任务计算类场景，KEDA 还可以根据排队的任务数量自动创建 Job 来实现对任务的及时处理：
+In addition to workload scaling, for job computing scenarios, KEDA can also automatically create Jobs based on the number of queued tasks for timely task processing:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F08%2F20240408083135.png)
 
-## 哪些场景适合使用 KEDA ？
+## Which Scenarios are Suitable for Using KEDA?
 
-下面罗列下适合使用 KEDA 的场景。
+Below are scenarios suitable for using KEDA.
 
-### 微服务多级调用
+### Multi-tier Microservice Invocations
 
-在微服务中，基本都存在多级调用的业务场景，压力是逐级传递的，下面展示了一个常见的情况：
+In microservices, there are basically multi-tier invocation scenarios in business, where pressure is transmitted level by level. The following shows a common situation:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F08%2F20240408084514.png)
 
-如果使用传统的 HPA 根据负载扩缩容，用户流量进入集群后：
-1. `Deploy A` 负载升高，指标变化迫使 `Deploy A` 扩容。
-2. A 扩容之后，吞吐量变大，B 受到压力，再次采集到指标变化，扩容 `Deploy B`。
-3. B 吞吐变大，C 受到压力，扩容 `Deploy C`。
+If using traditional HPA to scale based on load, after user traffic enters the cluster:
+1. `Deploy A`'s load increases, metric changes force `Deploy A` to scale.
+2. After A scales, throughput increases, B receives pressure, metrics change again, `Deploy B` scales.
+3. B's throughput increases, C receives pressure, `Deploy C` scales.
 
-这个逐级传递的过程不仅缓慢，还很危险：每一级的扩容都是直接被 CPU 或内存的飙高触发的，被 “冲垮” 的可能性是普遍存在的。这种被动、滞后的方式，很明显是有问题的。
+This level-by-level transmission process is not only slow but also dangerous: each level's scaling is directly triggered by CPU or memory spikes, and the possibility of being "overwhelmed" is widespread. This passive, lagging approach obviously has problems.
 
-此时，我们可以利用 KEDA 来实现多级快速扩容：
-* `Deploy A` 可根据自身负载或网关记录的 QPS 等指标扩缩容。
-* `Deploy B` 和 `Deploy C` 可根据 `Deploy A` 副本数扩缩容（各级服务副本数保持一定比例）。
+At this point, we can use KEDA to implement multi-tier fast scaling:
+* `Deploy A` can scale based on its own load or QPS metrics recorded by the gateway.
+* `Deploy B` and `Deploy C` can scale based on `Deploy A`'s replica count (maintaining a certain ratio between service replica counts at each level).
 
-### 任务执行（生产者与消费者）
+### Task Execution (Producer and Consumer)
 
-如果有需要长时间执行的计算任务，如数据分析、ETL、机器学习等场景，从消息队列或数据库中取任务进行执行，需要根据任务数量来伸缩，使用 HPA 不太合适，用 KEDA 就非常方便，可以让 KEDA 根据排队中的任务数量对工作负载进行伸缩，也可以自动创建 Job 来消费任务。
+For long-running computational tasks such as data analysis, ETL, machine learning, etc., retrieving tasks from message queues or databases for execution, scaling based on task count, using HPA is not quite suitable. Using KEDA is very convenient - it can scale workloads based on the number of queued tasks, or automatically create Jobs to consume tasks.
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2024%2F04%2F09%2F20240409172007.png)
 
-### 周期性规律
+### Periodic Patterns
 
-如果业务有周期性的波峰波谷特征，可以使用 KEDA 配置定时伸缩，在波峰来临之前先提前扩容，结束之后再缓慢缩容。
+If business has periodic peak and valley characteristics, you can use KEDA to configure scheduled scaling, scaling in advance before peaks arrive, and slowly scaling down after they end.

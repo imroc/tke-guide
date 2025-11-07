@@ -1,18 +1,18 @@
-# 基于 CLB 监控指标的水平伸缩
+# Horizontal Scaling Based on CLB Monitoring Metrics
 
-## 业务场景
+## Business Scenario
 
-TKE 上的业务流量往往是通过 CLB（腾讯云负载均衡器）接入的，有时候希望工作负载能够直接根据 CLB 的监控指标进行伸缩，比如：
-1. 游戏房间、在线会议等长连接场景，一条连接对应一个用户，工作负载里的每个 Pod 处理的连接数上限比较固定，这时可以根据 CLB 连接数指标进行伸缩。
-2. HTTP 协议的在线业务，工作负载里的单个 Pod 所能支撑的 QPS 比较固定，这时可以根据 CLB 的 QPS（每秒请求数） 指标进行伸缩。
+Business traffic on TKE is often accessed through CLB (Tencent Cloud Load Balancer). Sometimes, it's desirable for workloads to scale directly based on CLB monitoring metrics, for example:
+1. For long connection scenarios like game rooms and online meetings, one connection corresponds to one user. Each Pod in the workload handles a relatively fixed upper limit of connections, so scaling can be based on CLB connection count metrics.
+2. For online services using the HTTP protocol, where a single Pod in the workload can support a relatively fixed QPS, scaling can be based on CLB's QPS (requests per second) metric.
 
-## keda-tencentcloud-clb-scaler 介绍
+## Introduction to keda-tencentcloud-clb-scaler
 
-KEDA 有很多内置的触发器，但没有腾讯云 CLB 的，不过 KEDA 支持 external 类型的触发器来对触发器进行扩展，[keda-tencentcloud-clb-scaler](https://github.com/imroc/keda-tencentcloud-clb-scaler) 是基于腾讯云 CLB 监控指标的 KEDA External Scaler，可实现基于 CLB 连接数、QPS 和带宽等指标的弹性伸缩。
+KEDA has many built-in triggers, but not for Tencent Cloud CLB. However, KEDA supports external-type triggers to extend triggers. [keda-tencentcloud-clb-scaler](https://github.com/imroc/keda-tencentcloud-clb-scaler) is a KEDA External Scaler based on Tencent Cloud CLB monitoring metrics, enabling elastic scaling based on CLB metrics such as connections, QPS, and bandwidth.
 
-## 准备访问密钥
+## Prepare Access Keys
 
-需要准备一个腾讯云账号的访问密钥(SecretID、SecretKey)，参考[子账号访问密钥管理](https://cloud.tencent.com/document/product/598/37140)，要求账号至少具有以下权限：
+You need to prepare access keys (SecretID, SecretKey) for a Tencent Cloud account. Refer to [Sub-account Access Key Management](https://cloud.tencent.com/document/product/598/37140). The account must have at least the following permissions:
 
 ```json
 {
@@ -34,7 +34,7 @@ KEDA 有很多内置的触发器，但没有腾讯云 CLB 的，不过 KEDA 支�
 }
 ```
 
-## 安装 keda-tencentcloud-clb-scaler
+## Install keda-tencentcloud-clb-scaler
 
 ```bash
 helm repo add clb-scaler https://imroc.github.io/keda-tencentcloud-clb-scaler
@@ -44,12 +44,12 @@ helm upgrade --install clb-scaler clb-scaler/clb-scaler -n keda \
   --set credentials.secretKey="xxx"
 ```
 
-* `region` 修改为CLB 所在地域（一般就是集群所在地域），地域列表: https://cloud.tencent.com/document/product/213/6091
-* `credentials.secretId` 和 `credentials.secretKey`  是腾讯云账户的访问密钥，用于调相关云 API 来查询 CLB 监控数据。
+* Modify `region` to the region where the CLB is located (usually the cluster's region). Region list: https://cloud.tencent.com/document/product/213/6091
+* `credentials.secretId` and `credentials.secretKey` are the Tencent Cloud account access keys, used to call related cloud APIs to query CLB monitoring data.
 
-## 部署工作负载
+## Deploy Workload
 
-下面给出一个用于测试的工作负载 YAML 实例：
+Below is a workload YAML example for testing:
 
 ```yaml showLineNumbers
 apiVersion: v1
@@ -87,26 +87,26 @@ spec:
           name: httpbin
 ```
 
-部署好后，会自动创建响应的公网 CLB 接入流量，通过以下命令获取对应的 CLB ID：
+After deployment, a corresponding public network CLB will be automatically created to receive traffic. Get the corresponding CLB ID with the following command:
 ```bash
 $ kubectl get svc httpbin -o jsonpath='{.metadata.annotations.service\.kubernetes\.io/loadbalance-id}'
 lb-********
 ```
 
-记录下获取到的 CLB ID，后续 KEDA 的扩缩容配置需要用到。
+Record the obtained CLB ID, as it will be needed for the subsequent KEDA scaling configuration.
 
-## 使用 ScaledObject 配置基于 CLB 监控指标的弹性伸缩
+## Configure Elastic Scaling Based on CLB Monitoring Metrics Using ScaledObject
 
-### 配置方法
+### Configuration Method
 
-基于 CLB 的监控指标通常用于在线业务，通常使用 KEDA 的 `ScaledObject` 配置弹性伸缩，配置 `external` 类型的 trigger，并传入所需的 metadata，主要包含以下字段：
-* `scalerAddress` 是 `keda-operator` 调用 `keda-tencentcloud-clb-scaler` 时使用的地址。
-* `loadBalancerId` 是 CLB 的实例 ID。
-* `metricName` 是 CLB 的监控指标名称，公网和内网的大部分指标相同，具体指标列表参考官方文档 [公网负载均衡监控指标](https://cloud.tencent.com/document/product/248/51898) 和 [内网负载均衡监控指标](https://cloud.tencent.com/document/product/248/51899)。
-* `threshold` 是扩缩容的指标阈值，即会通过比较 `metricValue / Pod 数量` 与 `threshold` 的值来决定是否扩缩容。
-* `listener` 是唯一可选的配置，指定监控指标的 CLB 监听器，格式：`协议/端口`。
+Scaling based on CLB monitoring metrics is typically used for online services and usually configured with KEDA's `ScaledObject` for elastic scaling, configuring an `external` type trigger and passing in the required metadata, which mainly includes the following fields:
+* `scalerAddress` is the address used by `keda-operator` when calling `keda-tencentcloud-clb-scaler`.
+* `loadBalancerId` is the CLB instance ID.
+* `metricName` is the CLB monitoring metric name. Most metrics for public and private networks are the same. Refer to the official documentation for specific metric lists: [Public Network Load Balancer Monitoring Metrics](https://cloud.tencent.com/document/product/248/51898) and [Private Network Load Balancer Monitoring Metrics](https://cloud.tencent.com/document/product/248/51899).
+* `threshold` is the metric threshold for scaling, i.e., it decides whether to scale by comparing `metricValue / Pod count` with the `threshold` value.
+* `listener` is the only optional configuration, specifying the CLB listener for monitoring metrics, format: `protocol/port`.
 
-### 配置示例一：基于 CLB 连接数指标的弹性伸缩
+### Configuration Example 1: Elastic Scaling Based on CLB Connection Count Metric
 
 ```yaml showLineNumbers
 apiVersion: keda.sh/v1alpha1
@@ -127,13 +127,13 @@ spec:
         # highlight-start
         scalerAddress: clb-scaler.keda.svc.cluster.local:9000
         loadBalancerId: lb-xxxxxxxx
-        metricName: ClientConnum # 连接数指标
-        threshold: "100" # 每个 Pod 处理 100 条连接
-        listener: "TCP/8080" # 可选，指定监听器，格式：协议/端口
+        metricName: ClientConnum # Connection count metric
+        threshold: "100" # Each Pod handles 100 connections
+        listener: "TCP/8080" # Optional, specify listener, format: protocol/port
         # highlight-end
 ```
 
-### 配置示例二：基于 CLB QPS 指标的弹性伸缩
+### Configuration Example 2: Elastic Scaling Based on CLB QPS Metric
 
 ```yaml showLineNumbers
 apiVersion: keda.sh/v1alpha1
@@ -154,8 +154,8 @@ spec:
         # highlight-start
         scalerAddress: clb-scaler.keda.svc.cluster.local:9000
         loadBalancerId: lb-xxxxxxxx
-        metricName: TotalReq # 每秒连接数指标
-        threshold: "500" # 平均每个 Pod 支撑 500 QPS
-        listener: "TCP/8080" # 可选，指定监听器，格式：协议/端口
+        metricName: TotalReq # Requests per second metric
+        threshold: "500" # Average of 500 QPS per Pod
+        listener: "TCP/8080" # Optional, specify listener, format: protocol/port
         # highlight-end
 ```
