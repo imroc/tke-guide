@@ -27,19 +27,8 @@ const sidebars: SidebarsConfig = {
             'networking/cilium/egress-gateway',
             'networking/cilium/networkpolicy',
             'networking/cilium/observability',
+            'networking/cilium/with-node-local-dns',
             'networking/cilium/roadmap',
-            {
-              type: 'category',
-              label: 'Cilium 与第三方组件共存方案',
-              collapsed: true,
-              link: {
-                type: 'generated-index',
-                slug: '/networking/cilium/with'
-              },
-              items: [
-                'networking/cilium/with/node-local-dns',
-              ]
-            },
             'networking/cilium/debug',
           ],
         },

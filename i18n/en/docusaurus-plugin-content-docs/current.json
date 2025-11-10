@@ -11,10 +11,6 @@
     "message": "Cilium on TKE",
     "description": "The label for category 在 TKE 自建 Cilium in sidebar tkeSidebar"
   },
-  "sidebar.tkeSidebar.category.Cilium 与第三方组件共存方案": {
-    "message": "Cilium Coexistence with Third-party Components",
-    "description": "The label for category Cilium 与第三方组件共存方案 in sidebar tkeSidebar"
-  },
   "sidebar.tkeSidebar.category.在 TKE 自建 Nginx Ingress Controller": {
     "message": "Nginx Ingress on TKE",
     "description": "The label for category 在 TKE 自建 Nginx Ingress Controller in sidebar tkeSidebar"
