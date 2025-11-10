@@ -127,7 +127,7 @@ spec:
       containers:
       - name: node-cache
         # highlight-next-line
-        image: docker.io/k8smirror/k8s-dns-node-cache:1.26.4 # 官方镜像在 registry.k8s.io，这里替换为 dockerhub 上的 mirror 镜像（TKE 环境默认有 dockerhub 加速，可直接内网拉取）
+        image: docker.io/k8smirror/k8s-dns-node-cache:1.26.4
         resources:
           requests:
             cpu: 25m
