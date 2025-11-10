@@ -28,6 +28,7 @@ const sidebars: SidebarsConfig = {
             'networking/cilium/networkpolicy',
             'networking/cilium/observability',
             'networking/cilium/with-node-local-dns',
+            'networking/cilium/clustermesh',
             'networking/cilium/roadmap',
             'networking/cilium/debug',
           ],

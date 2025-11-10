@@ -1,4 +1,4 @@
-# 安装 cilium
+# 安装 Cilium
 
 本文介绍如何在 TKE 集群中安装 cilium。
 
@@ -171,6 +171,16 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
   --set operator.image.repository=quay.tencentcloudcr.com/cilium/operator \
+  --set certgen.image.repository=quay.tencentcloudcr.com/cilium/certgen \
+  --set hubble.relay.image.repository=quay.tencentcloudcr.com/cilium/hubble-relay \
+  --set hubble.ui.backend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui-backend \
+  --set hubble.ui.frontend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui \
+  --set nodeinit.image.repository=quay.tencentcloudcr.com/cilium/startup-script \
+  --set preflight.image.repository=quay.tencentcloudcr.com/cilium/cilium \
+  --set preflight.envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
+  --set clustermesh.apiserver.image.repository=quay.tencentcloudcr.com/cilium/clustermesh-apiserver \
+  --set authentication.mutual.spire.install.agent.image.repository=docker.io/k8smirror/spire-agent \
+  --set authentication.mutual.spire.install.server.image.repository=docker.io/k8smirror/spire-server \
   --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
   --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
   --set operator.tolerations[2].key="node.kubernetes.io/not-ready",operator.tolerations[2].operator="Exists" \
@@ -197,80 +207,131 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
 
 以下是是包含各参数解释的 `values.yaml`:
 
-```yaml showLineNumbers title="values.yaml"
-# 替换 cilium, cilium-envoy 和 cilium-operator 的镜像为 TKE 上可以直接拉取到的 mirror 仓库地址
-image:
-  repository: quay.tencentcloudcr.com/cilium/cilium
-envoy:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-operator:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/operator
-# 使用 native routing，Pod 直接使用 VPC IP 路由，无需 overlay，参考 native routing: https://docs.cilium.io/en/stable/network/concepts/routing/#native-routing
-routingMode: "native" 
-endpointRoutes:
-  # 使用 native routing，此选项必须置为 true。表示转发 Pod 流量时，直接路由到 veth 设备而不需要经过 cilium_host 网卡
-  enabled: true 
-ipam:
-  # TKE Pod IP 分配由 tke-eni-ipamd 组件负责，cilium 无需负责 Pod IP 分配
-  mode: "delegated-plugin"
-# 使用 VPC-CNI 无需 IP 伪装
-enableIPv4Masquerade: false
-# TKE 节点中 eth 开头的网卡都可能出入流量（Pod 流量走辅助网卡，eth1, eth2 ...），用这个参数让所有 eth 开头的网卡都挂载 cilium ebpf 程序，
-# 以便让报文能够根据 conntrack 被正常反向 nat， 否则可能导致部分场景下网络不通（如跨节点访问 HostPort）
-devices: eth+
-cni:
-  # 使用 generic-veth 与 VPC-CNI 做 CNI Chaining，参考：https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/
-  chainingMode: generic-veth
-  # CNI 配置完全自定义
-  customConf: true
-  # 存放 CNI 配置的 ConfigMap 名称
-  configMap: cni-configuration
-  # VPC-CNI 会自动配置 Pod 路由，cilium 不需要配置
-  externalRouting: true
-operator:
-  tolerations:
-  - key: "node-role.kubernetes.io/control-plane"
-    operator: Exists
-  - key: "node-role.kubernetes.io/master"
-    operator: Exists
-  - key: "node.kubernetes.io/not-ready"
-    operator: Exists
-  - key: "node.cloudprovider.kubernetes.io/uninitialized"
-    operator: Exists
-  # 容忍 TKE 的污点，避免首次安装时循环依赖
-  - key: "tke.cloud.tencent.com/uninitialized" 
-    operator: Exists
-  - key: "tke.cloud.tencent.com/eni-ip-unavailable" 
-    operator: Exists
-extraConfig:
-  # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
-  local-router-ipv4: 169.254.32.16
-# 启用 CiliumLocalRedirectPolicy 的能力，参考 https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
-localRedirectPolicies:
-  enabled: true
-# 替代 kube-proxy，包括 ClusterIP 转发、NodePort 转发，另外还附带了 HostPort 转发的能力
-kubeProxyReplacement: "true"
-# 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
-k8sServiceHost: 169.254.128.112 
-k8sServicePort: 60002
-```
+<Tabs>
+  <TabItem value="1" label="适配 TKE 相关">
 
-生产环境部署建议将参数保存到 `values.yaml`，然后在安装或更新时，都可以执行下面的命令（如果要升级版本，替换 `--version` 即可）：
+  ```yaml showLineNumbers title="tke-values.yaml"
+  # 使用 native routing，Pod 直接使用 VPC IP 路由，无需 overlay，参考 native routing: https://docs.cilium.io/en/stable/network/concepts/routing/#native-routing
+  routingMode: "native" 
+  endpointRoutes:
+    # 使用 native routing，此选项必须置为 true。表示转发 Pod 流量时，直接路由到 veth 设备而不需要经过 cilium_host 网卡
+    enabled: true 
+  ipam:
+    # TKE Pod IP 分配由 tke-eni-ipamd 组件负责，cilium 无需负责 Pod IP 分配
+    mode: "delegated-plugin"
+  # 使用 VPC-CNI 无需 IP 伪装
+  enableIPv4Masquerade: false
+  # TKE 节点中 eth 开头的网卡都可能出入流量（Pod 流量走辅助网卡，eth1, eth2 ...），用这个参数让所有 eth 开头的网卡都挂载 cilium ebpf 程序，
+  # 以便让报文能够根据 conntrack 被正常反向 nat， 否则可能导致部分场景下网络不通（如跨节点访问 HostPort）
+  devices: eth+
+  cni:
+    # 使用 generic-veth 与 VPC-CNI 做 CNI Chaining，参考：https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/
+    chainingMode: generic-veth
+    # CNI 配置完全自定义
+    customConf: true
+    # 存放 CNI 配置的 ConfigMap 名称
+    configMap: cni-configuration
+    # VPC-CNI 会自动配置 Pod 路由，cilium 不需要配置
+    externalRouting: true
+  operator:
+    tolerations:
+    - key: "node-role.kubernetes.io/control-plane"
+      operator: Exists
+    - key: "node-role.kubernetes.io/master"
+      operator: Exists
+    - key: "node.kubernetes.io/not-ready"
+      operator: Exists
+    - key: "node.cloudprovider.kubernetes.io/uninitialized"
+      operator: Exists
+    # 容忍 TKE 的污点，避免首次安装时循环依赖
+    - key: "tke.cloud.tencent.com/uninitialized" 
+      operator: Exists
+    - key: "tke.cloud.tencent.com/eni-ip-unavailable" 
+      operator: Exists
+  extraConfig:
+    # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
+    local-router-ipv4: 169.254.32.16
+  # 启用 CiliumLocalRedirectPolicy 的能力，参考 https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
+  localRedirectPolicies:
+    enabled: true
+  # 替代 kube-proxy，包括 ClusterIP 转发、NodePort 转发，另外还附带了 HostPort 转发的能力
+  kubeProxyReplacement: "true"
+  # 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
+  k8sServiceHost: 169.254.128.112 
+  k8sServicePort: 60002
+  ```
+
+  </TabItem>
+  <TabItem value="2" label="镜像相关">
+
+  将所有 cilium 依赖镜像替换为在 TKE 环境中能直接内网拉取 mirror 镜像，避免因网络问题导致镜像拉取失败：
+
+  ```yaml title="image-values.yaml"
+  image:
+    repository: quay.tencentcloudcr.com/cilium/cilium
+  envoy:
+    image:
+      repository: quay.tencentcloudcr.com/cilium/cilium-envoy
+  operator:
+    image:
+      repository: quay.tencentcloudcr.com/cilium/operator
+  certgen:
+    image:
+      repository: quay.tencentcloudcr.com/cilium/certgen
+  hubble:
+    relay:
+      image:
+        repository: quay.tencentcloudcr.com/cilium/hubble-relay
+    ui:
+      backend:
+        image:
+          repository: quay.tencentcloudcr.com/cilium/hubble-ui-backend
+      frontend:
+        image:
+          repository: quay.tencentcloudcr.com/cilium/hubble-ui
+  nodeinit:
+    image:
+      repository: quay.tencentcloudcr.com/cilium/startup-script
+  preflight:
+    image:
+      repository: quay.tencentcloudcr.com/cilium/cilium
+    envoy:
+      image:
+        repository: quay.tencentcloudcr.com/cilium/cilium-envoy
+  clustermesh:
+    apiserver:
+      image:
+        repository: quay.tencentcloudcr.com/cilium/clustermesh-apiserver
+  authentication:
+    mutual:
+      spire:
+        install:
+          agent:
+            image:
+              repository: docker.io/k8smirror/spire-agent
+          server:
+            image:
+              repository: docker.io/k8smirror/spire-server
+  ```
+
+  </TabItem>
+</Tabs>
+
+生产环境部署建议将参数保存到 YAML 文件，然后在安装或更新时，都可以类似执行下面的命令（如果要升级版本，替换 `--version` 即可）：
 
 ```bash
 helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace=kube-system \
-  -f values.yaml
+  -f tke-values.yaml \
+  -f image-values.yaml
 ```
 
-如果自定义的配置较多，建议拆成多个 yaml 文件维护，比如替换镜像地址的配置放到 `image-values.yaml`，用于启用 Egress Gateway 的配置放到 `egress-values.yaml`，配置容器 request 与 limit 的放到 `resources-values.yaml`，更新配置时通过加多个 `-f` 参数来合并多个 yaml 文件：
+如果自定义的配置较多，建议拆成多个 yaml 文件维护，比如用于启用 Egress Gateway 的配置放到 `egress-values.yaml`，配置容器 request 与 limit 的放到 `resources-values.yaml`，更新配置时通过加多个 `-f` 参数来合并多个 yaml 文件：
 
 ```bash
 helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace=kube-system \
-  -f values.yaml \
+  -f tke-values.yaml \
   -f image-values.yaml \
   -f egress-values.yaml \
   -f resources-values.yaml
