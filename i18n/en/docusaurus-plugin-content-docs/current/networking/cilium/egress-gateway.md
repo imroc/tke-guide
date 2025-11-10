@@ -18,18 +18,22 @@ To enable Egress Gateway, the following conditions must be met:
 
 Method to enable Egress Gateway during cilium installation:
 
-:::info[Note]
-
-`VPC_CIDR` should be replaced with the actual IPv4 network segment of the VPC where the TKE cluster is located.
-
-:::
-
 ```bash showLineNumbers
 helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
   --set operator.image.repository=quay.tencentcloudcr.com/cilium/operator \
+  --set certgen.image.repository=quay.tencentcloudcr.com/cilium/certgen \
+  --set hubble.relay.image.repository=quay.tencentcloudcr.com/cilium/hubble-relay \
+  --set hubble.ui.backend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui-backend \
+  --set hubble.ui.frontend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui \
+  --set nodeinit.image.repository=quay.tencentcloudcr.com/cilium/startup-script \
+  --set preflight.image.repository=quay.tencentcloudcr.com/cilium/cilium \
+  --set preflight.envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
+  --set clustermesh.apiserver.image.repository=quay.tencentcloudcr.com/cilium/clustermesh-apiserver \
+  --set authentication.mutual.spire.install.agent.image.repository=docker.io/k8smirror/spire-agent \
+  --set authentication.mutual.spire.install.server.image.repository=docker.io/k8smirror/spire-server \
   --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
   --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
   --set operator.tolerations[2].key="node.kubernetes.io/not-ready",operator.tolerations[2].operator="Exists" \
@@ -52,8 +56,9 @@ helm upgrade --install cilium cilium/cilium --version 1.18.3 \
   --set k8sServicePort=60002 \
   --set egressGateway.enabled=true \
   --set enableIPv4Masquerade=true \
-  --set ipv4NativeRoutingCIDR="VPC_CIDR" \
-  --set bpf.masquerade=true
+  --set bpf.masquerade=true \
+  --set ipMasqAgent.enabled=true \
+  --set ipMasqAgent.config.masqLinkLocal=true
   # highlight-add-end
 ```
 
@@ -74,8 +79,9 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
   --reuse-values \
   --set egressGateway.enabled=true \
   --set enableIPv4Masquerade=true \
-  --set ipv4NativeRoutingCIDR="VPC_CIDR" \
-  --set bpf.masquerade=true
+  --set bpf.masquerade=true \
+  --set ipMasqAgent.enabled=true \
+  --set ipMasqAgent.config.masqLinkLocal=true
 ```
 
 :::
