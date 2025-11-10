@@ -60,7 +60,7 @@ cilium clustermesh connect --context $CLUSTER1 --destination-context $CLUSTER2
 
 ### Ensuring No SNAT for Cross-Cluster Pod Communication
 
-If IP masquerading is enabled, you should ensure that all network segments used by Pods across all clusters do not have SNAT. For specific configuration methods, refer to [Configuring IP Masquerading](./masquerading.md).
+If IP masquerading is enabled, you should ensure that all CIDR used by Pods across all clusters do not have SNAT. For specific configuration methods, refer to [Configuring IP Masquerading](./masquerading.md).
 
 ## References
 
