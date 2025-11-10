@@ -6,7 +6,7 @@
 
 ## VPC-CNI 大部分场景不需要 IP 伪装
 
-TKE VPC-CNI 网络模式，Pod IP 使用的 VPC IP，与节点 IP 一样，可直接在 VPC 内路由，与其他 VPC 或其它云（如 AWS）通过云联网打通后，Pod IP 也可以直接路由，也还支持 NAT 网关。
+TKE VPC-CNI 网络模式，Pod IP 使用的 VPC IP，与节点 IP 一样，可直接在 VPC 内路由，与其他 VPC 或其它云（如 AWS）通过云联网打通后，Pod IP 也可以直接路由。另外，它还支持 NAT 网关，Pod 通过 NAT 网关访问公网也是可以的。
 
 所以，大部分场景，我们不需要开启 IP 伪装，[安装 Cilium](./install.md) 中给出的默认安装方式也是禁用了 Cilium 的 IP 伪装功能（`--set enableIPv4Masquerade=false`）。
 
