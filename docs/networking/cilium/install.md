@@ -539,8 +539,9 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
   --reuse-values \
   # highlight-add-start
   --set enableIPv4Masquerade=true \
-  --set ipv4NativeRoutingCIDR="VPC_CIDR" \
-  --set bpf.masquerade=true
+  --set bpf.masquerade=true \
+  --set ipMasqAgent.enabled=true \
+  --set ipMasqAgent.config.masqLinkLocal=true
   # highlight-add-end
 ```
 
@@ -561,12 +562,20 @@ kubectl -n kube-system rollout restart daemonset cilium
 ```yaml title="values.yaml"
 # 启用 cilium 的 IP MASQUERADE 功能
 enableIPv4Masquerade: true
-# 指定集群所在 VPC 的 CIDR（注意替换为集群所在 VPC 的实际 CIDR），表示 VPC 内的流量不做 SNAT，其余的流量要做 SNAT。
-# 这样 Pod 访问公网时就会 SNAT 成节点 IP，就可以利用节点的公网能力访问公网。
-ipv4NativeRoutingCIDR: 172.22.0.0/16
 bpf:
   # cilium 的 IP MASQUERADE 功能有 bpf 和 iptables 两个版本，在 TKE 环境需使用 bpf 版本。参考 https://docs.cilium.io/en/stable/network/concepts/masquerading/
   masquerade: true
+ipMasqAgent:
+  # 使用 cilium 基于 ebpf 实现的 ipMasqAgent 来控制 IP MASQUERADE，这样可以支持配置多个 CIDR 网段不做 SNAT。
+  # 说明：ipv4NativeRoutingCIDR 方式仅支持单个 CIDR，而腾讯云 VPC 支持添加辅助 CIDR 来扩展 VPC 的 CIDR，所以
+  # 相同集群中的 Pod IP 可能属于不同的大内网网段（比如 Pod A 的 IP 是 172.x.x.x，而 Pod B 的 IP 是 10.x.x.x）。
+  enabled: true
+  config:
+    # masqLinkLocal 用于控制 link local 网段（169.254.0.0/16）是否做 SNAT，该网段在腾讯云上用于公共服务使用，
+    # 比如 cvm 的 metadata 服务（查询当前 cvm 的元信息），或者其它一些需要使用节点 IP 鉴权的接口，在  Pod 中
+    # 调用这些接口都需要确保 SNAT 节点 IP，所以将 masqLinkLocal 置为 true，确保发送给 169.254.0.0/16 网段的流
+    # 量都 SNAT 成节点 IP，避免这类接口调用失败。
+    masqLinkLocal: true
 ```
 
 :::
