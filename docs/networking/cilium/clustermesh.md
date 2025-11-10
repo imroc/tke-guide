@@ -58,9 +58,9 @@ cilium clustermesh connect --context $CLUSTER1 --destination-context $CLUSTER2
 
 ## 注意事项
 
-### 跨集群 Pod 通信不能有 SNAT
+### 确保跨集群 Pod 通信没有 SNAT
 
-如果启用了 IP Masquerade 功能，应确保所有集群的 Pod 使用的网段都不能有 SNAT，具体配置方法参考 [安装 Cilium](./install.md) 中的常见问题 **如何配置 IP Masquerade ？**。
+如果启用了 IP 伪装功能，应确保所有集群的 Pod 使用的网段都不能有 SNAT，具体配置方法参考 [配置 IP 伪装](./masquerading.md)。
 
 ## 参考资料
 
