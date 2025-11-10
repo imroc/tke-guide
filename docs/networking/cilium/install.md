@@ -531,7 +531,15 @@ helm upgrade --install cilium ./cilium-1.18.3.tgz \
 
 可以创建公网 NAT 网关，然后在集群所在 VPC 的路由表中新建路由规则，让访问外网的流量转发到公网 NAT 网关，并确保路由表关联到了集群使用的子网，参考 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)。
 
-如果是节点本身有公网带宽，希望 Pod 能直接利用节点的公网能力出公网，需要在部署 cilium 时做一些配置调整：
+如果是节点本身有公网带宽，希望 Pod 能直接利用节点的公网能力出公网，需要开启 Cilium 的 IP Masquerade 能力，具体方法参考下面的 **如何配置 IP Masquerade ？** 部分。
+
+如果有更高级的流量外访需求（比如指定某些 Pod 用某个公网 IP 访问公网），可以参考 [Egress Gateway 应用实践](egress-gateway.md)。
+
+### 如何配置 IP Masquerade ？
+
+有时候需要将 Pod 的流量 SNAT 成节点 IP，比如 Pod 利用节点的公网带宽访问公网，或者调用某些基于节点 IP 鉴权的腾讯云接口，都需要将 Pod 出流量 SNAT 成节点 IP。
+
+Cilium 开启 IP Masquerade 的方法如下：
 
 ```bash showLineNumbers
 helm upgrade cilium cilium/cilium --version 1.18.3 \
@@ -547,7 +555,7 @@ helm upgrade cilium cilium/cilium --version 1.18.3 \
 
 :::info[注意]
 
-如果是调整已安装的 cilium 配置，存量节点需重启 cilium daemonset 才能生效：
+如果是调整已安装的 cilium 配置，存量节点需重启 cilium-agent 才能生效：
 
 ```bash
 kubectl -n kube-system rollout restart daemonset cilium
@@ -580,7 +588,55 @@ ipMasqAgent:
 
 :::
 
-如果有更高级的流量外访需求（比如指定某些 Pod 用某个公网 IP 访问公网），可以参考 [Egress Gateway 应用实践](egress-gateway.md)。
+以上配置会针对所有内网网段（169.255.0.0/16 除外）不做 SNAT，如需更精细化的控制，可显式配置具体哪些 CIDR 不做 SNAT，具体方法如下。
+
+1. 准备 ip-masq-agent ConfigMap 到文件 `ip-masq-agent-config.yaml`：
+
+:::tip[说明]
+
+将不需要 SNAT 的 CIDR 都 nonMasqueradeCIDRs 中，通常是 TKE 集群中的 Pod 使用到的 VPC CIDR（包括 VPC 辅助 CIDR）。
+
+:::
+
+```yaml title="ip-masq-agent-config.yaml"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ip-masq-agent
+  namespace: kube-system
+data:
+  config: |
+    nonMasqueradeCIDRs:
+    - 10.0.0.0/16
+    - 172.18.0.0/16
+    - 192.168.0.0/17
+    masqLinkLocal: true
+```
+
+2. 创建 ConfigMap：
+
+```bash
+kubectl apply -f ip-masq-agent-config.yaml
+```
+
+3. 更新 cilium 配置：
+
+```bash showLineNumbers
+helm upgrade cilium cilium/cilium --version 1.18.3 \
+  --namespace kube-system \
+  --reuse-values \
+  # highlight-add-start
+  --set enableIPv4Masquerade=true \
+  --set bpf.masquerade=true \
+  --set ipMasqAgent.enabled=true
+  # highlight-add-end
+```
+
+4. 重启 cilium-agent:
+
+```bash
+kubectl -n kube-system rollout restart daemonset cilium
+```
 
 ### 镜像拉取失败？
 
