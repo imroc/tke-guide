@@ -6,7 +6,7 @@ Simply put, IP masquerading is the process of disguising the source IP of Pod tr
 
 ## VPC-CNI Mostly Does Not Require IP Masquerading
 
-In TKE VPC-CNI network mode, Pod IPs use VPC IPs, which are the same as node IPs and can be directly routed within the VPC. After connecting with other VPCs or other clouds (such as AWS) through cloud networking, Pod IPs can also be directly routed, and NAT gateways are also supported.
+In TKE VPC-CNI network mode, Pod IPs use VPC IPs, which are the same as node IPs and can be directly routed within the VPC. After connecting with other VPCs or other clouds (such as AWS) through cloud networking, Pod IPs can also be directly routed. Additionally, it also supports NAT gateways, allowing Pods to access the public internet through NAT gateways.
 
 Therefore, in most scenarios, we don't need to enable IP masquerading. The default installation method provided in [Installing Cilium](./install.md) also disables Cilium's IP masquerading function (`--set enableIPv4Masquerade=false`).
 
