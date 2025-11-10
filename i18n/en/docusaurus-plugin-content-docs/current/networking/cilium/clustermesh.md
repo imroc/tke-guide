@@ -1,16 +1,16 @@
-# 使用 Cilium 构建多集群网络
+# Building Multi-Cluster Networks with Cilium
 
-## 概述
+## Overview
 
-如果希望统一管理多个集群的网络，如多集群 Service 负载均衡，集群间通信的安全策略管控，可将多个集群组成网格（Cluster Mesh），本文介绍如何操作。
+If you want to uniformly manage networks across multiple clusters, such as multi-cluster Service load balancing and security policy control for inter-cluster communication, you can form a mesh of multiple clusters (Cluster Mesh). This article explains how to do this.
 
-## 准备 kubeconfig
+## Preparing kubeconfig
 
-需将所有需要组 Cluster Mesh 的集群的 kubeconfig 合并到一个文件，通过 context 区分集群，context 名称为 TKE 集群 ID（cls-xxx），且确保当前使用的 kubeconfig 指向该文件。
+You need to merge the kubeconfig files of all clusters that need to form a Cluster Mesh into one file, distinguishing clusters by context. The context name should be the TKE cluster ID (cls-xxx), and ensure that the currently used kubeconfig points to this file.
 
-## 指定集群名称、ID 和 clustermesh-apiserver 内网 CLB
+## Specifying Cluster Name, ID, and clustermesh-apiserver Internal CLB
 
-安装 cilium 指定下集群名称（可与 TKE 集群 ID 相同，格式 cls-xxx）、集群数字 ID（1-255）和 clustermesh-apiserver 组件内网 CLB 所在子网 ID（该组件用于暴露当前集群 cilium 控制面给其它 cilium 集群，使用 LoadBalancer 类型 Service 方式创建 CLB，内网 CLB 需指定子网 ID）：
+When installing Cilium, specify the cluster name (which can be the same as the TKE cluster ID, format cls-xxx), cluster numeric ID (1-255), and the subnet ID where the clustermesh-apiserver component's internal CLB is located (this component is used to expose the current cluster's Cilium control plane to other Cilium clusters, created using LoadBalancer type Service, and the internal CLB needs to specify a subnet ID):
 
 ```bash
 helm --kube-context=$CLUSTER1 upgrade --install cilium cilium/cilium --version 1.18.3 \
@@ -29,11 +29,11 @@ helm --kube-context=$CLUSTER2 upgrade --install cilium cilium/cilium --version 1
   --set clustermesh.apiserver.service.annotations."service\.kubernetes\.io\/qcloud\-loadbalancer\-internal\-subnetid"="$CLUSTER2_SUBNET_ID"
 ```
 
-## 共享 CA
+## Sharing CA
 
-如果您计划跨集群允许 Hubble Relay，需确保每个集群中的 CA 证书相同，以便让跨集群的 mTLS 能够正常工作。
+If you plan to enable Hubble Relay across clusters, you need to ensure that the CA certificates in each cluster are the same, so that cross-cluster mTLS can work properly.
 
-可以将一个集群的 CA 证书复制到另一个集群：
+You can copy the CA certificate from one cluster to another:
 
 ```bash
 kubectl --context=$CLUSTER1 -n kube-system get secret cilium-ca -o yaml > cilium-ca.yaml
@@ -41,28 +41,28 @@ kubectl --context=$CLUSTER2 -n kube-system delete secret cilium-ca
 kubectl --context=$CLUSTER2 apply -f cilium-ca.yaml
 ```
 
-## 启用 Cluster Mesh
+## Enabling Cluster Mesh
 
-通过 cilium 命令启用 Cluster Mesh：
+Enable Cluster Mesh using the cilium command:
 
 ```bash
 cilium clustermesh enable --context $CLUSTER1 --service-type=LoadBalancer
 cilium clustermesh enable --context $CLUSTER2 --service-type=LoadBalancer
 ```
 
-## 连接集群
+## Connecting Clusters
 
 ```bash
 cilium clustermesh connect --context $CLUSTER1 --destination-context $CLUSTER2
 ```
 
-## 注意事项
+## Considerations
 
-### 确保跨集群 Pod 通信没有 SNAT
+### Ensuring No SNAT for Cross-Cluster Pod Communication
 
-如果启用了 IP 伪装功能，应确保所有集群的 Pod 使用的网段都不能有 SNAT，具体配置方法参考 [配置 IP 伪装](./masquerading.md)。
+If IP masquerading is enabled, you should ensure that all network segments used by Pods across all clusters do not have SNAT. For specific configuration methods, refer to [Configuring IP Masquerading](./masquerading.md).
 
-## 参考资料
+## References
 
 - [Multi-cluster Networking](https://docs.cilium.io/en/stable/network/clustermesh/)
 - [Setting up Cluster Mesh](https://docs.cilium.io/en/stable/network/clustermesh/clustermesh/)
