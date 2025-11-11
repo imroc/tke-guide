@@ -12,7 +12,10 @@ Therefore, in most scenarios, we don't need to enable IP masquerading. The defau
 
 ## When is IP Masquerading Needed?
 
-If you want Pods to utilize the node's public network bandwidth to access the internet, or call certain Tencent Cloud APIs that authenticate based on node IPs, you need to SNAT the Pod's outgoing traffic to the node IP. In such cases, you can enable Cilium's IP masquerading function.
+You can enable Cilium's IP masquerading function in the following scenarios:
+1. Want Pods to utilize the node's public bandwidth to access the public internet.
+2. Pods need to call certain Tencent Cloud interfaces that authenticate based on node IP, such as [CVM metadata interface](https://cloud.tencent.com/document/product/213/4934).
+3. When interconnecting across VPCs or across clouds, the network segments overlap, but Node IPs can communicate with each other.
 
 ## Cilium's IP Masquerading Function Introduction
 

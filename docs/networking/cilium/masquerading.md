@@ -14,7 +14,7 @@ TKE VPC-CNI 网络模式，Pod IP 使用的 VPC IP，与节点 IP 一样，可�
 
 如果有以下需求场景，可启用 Cilium 的 IP 伪装功能：
 1. 希望 Pod 利用节点的公网带宽访问公网。
-2. Pod 需要调用某些基于节点 IP 鉴权的腾讯云接口，如 [metadata 接口](https://cloud.tencent.com/document/product/213/4934)。
+2. Pod 需要调用某些基于节点 IP 鉴权的腾讯云接口，如 [CVM metadata 接口](https://cloud.tencent.com/document/product/213/4934)。
 3. 跨 VPC 或跨云互通时，网段有重叠，但 Node IP 可以互通。
 
 ## Cilium 的 IP 伪装功能介绍
