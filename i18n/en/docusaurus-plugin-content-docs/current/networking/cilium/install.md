@@ -703,6 +703,12 @@ cilium-operator uses hostNetwork and configures readiness probes. When using hos
 
 It's not recommended to use super nodes in clusters where Cilium is installed. They can be removed. If you must use them, you can add taints to super nodes, and then add corresponding tolerations to Pods that need to be scheduled to super nodes.
 
+### cilium-agent connecting to apiserver reports `operation not permitted` error?
+
+If when installing Cilium, `k8sServiceHost` points to a CLB address (the CLB used when enabling cluster internal network access), which is either a CLB VIP or a domain name that ultimately resolves to a CLB VIP, then the connection path from cilium-agent to apiserver will be intercepted and forwarded by Cilium itself, not actually going through CLB forwarding. Cilium's forwarding of this address is ultimately implemented by eBPF programs, and the eBPF program forwarding of this address is based on eBPF data (endpoint list) stored in the kernel. Under certain triggering conditions, the eBPF data may be refreshed, and the refresh may cause the endpoint list to be temporarily cleared. Once cleared, cilium-agent can no longer connect to apiserver (reporting `operation not permitted` error), and thus cannot perceive the current real endpoint list to update the eBPF data, forming a circular dependency. Normal operation is only restored after restarting the node.
+
+Therefore, the recommendation is not to configure `k8sServiceHost` with the apiserver's CLB address, but to use the cluster's `169.254.x.x` apiserver address (`kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'`). This address is also a VIP, but it will not be intercepted and forwarded by Cilium, and it will never change after the cluster is created, so it can be safely used as the `k8sServiceHost` configuration. If you want to use a more recognizable domain name configuration, you can also resolve the domain name to this address and then configure it to `k8sServiceHost`.
+
 ## References
 
 - [Installation using Helm](https://docs.cilium.io/en/stable/installation/k8s-install-helm/)
