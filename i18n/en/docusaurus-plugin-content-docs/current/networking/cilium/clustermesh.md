@@ -15,18 +15,18 @@ When installing Cilium, specify the cluster name (which can be the same as the T
 ```bash
 helm --kube-context=$CLUSTER1 upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
-  --reuse-values \
   --set cluster.name=$CLUSTER1 \
   --set cluster.id=1 \
-  --set clustermesh.apiserver.service.annotations."service\.kubernetes\.io\/qcloud\-loadbalancer\-internal\-subnetid"="$CLUSTER1_SUBNET_ID"
+  --set clustermesh.apiserver.service.annotations."service\.kubernetes\.io\/qcloud\-loadbalancer\-internal\-subnetid"="$CLUSTER1_SUBNET_ID" \
+  # omit other parameters
 
 
 helm --kube-context=$CLUSTER2 upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
-  --reuse-values \
   --set cluster.name=$CLUSTER2 \
   --set cluster.id=2 \
-  --set clustermesh.apiserver.service.annotations."service\.kubernetes\.io\/qcloud\-loadbalancer\-internal\-subnetid"="$CLUSTER2_SUBNET_ID"
+  --set clustermesh.apiserver.service.annotations."service\.kubernetes\.io\/qcloud\-loadbalancer\-internal\-subnetid"="$CLUSTER2_SUBNET_ID" \
+  # omit other parameters
 ```
 
 ## Sharing CA
