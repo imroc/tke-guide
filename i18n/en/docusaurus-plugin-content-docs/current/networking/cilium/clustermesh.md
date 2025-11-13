@@ -20,7 +20,6 @@ helm --kube-context=$CLUSTER1 upgrade --install cilium cilium/cilium --version 1
   --set clustermesh.apiserver.service.annotations."service\.kubernetes\.io\/qcloud\-loadbalancer\-internal\-subnetid"="$CLUSTER1_SUBNET_ID" \
   # omit other parameters
 
-
 helm --kube-context=$CLUSTER2 upgrade --install cilium cilium/cilium --version 1.18.3 \
   --namespace kube-system \
   --set cluster.name=$CLUSTER2 \
