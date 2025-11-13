@@ -1,5 +1,13 @@
 # 快速开始
 
+:::warning[警告]
+
+Nginx Ingress 将会退役，Kubernetes 社区不再维护: https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/
+
+建议迁移到 Ingresss 到 Gateway API，比如使用 EnvoyGateway 作为 GatewayAPI 的实现（参考 [在 TKE 使用 EnvoyGateway 流量网关](../envoygateway.md)）。
+
+:::
+
 ## 概述
 
 [Nginx Ingress Controller](https://github.com/kubernetes/ingress-nginx) 是基于高性能 NGINX 反向代理实现的 Kubernetes Ingress 控制器，也是最常用的开源 Ingress 实现。本文介绍如何在 TKE 环境中自建 Nginx Ingress Controller，主要使用 helm 进行安装，提供一些 `values.yaml` 配置指引。
