@@ -1,5 +1,13 @@
 # Quick Start
 
+:::warning[warning]
+
+Nginx Ingress will be deprecated and will no longer be maintained by the Kubernetes community: https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/
+
+It is recommended to migrate to Ingresss for the Gateway API, such as using EnvoyGateway as the Gateway API implementation (see [Using EnvoyGateway Traffic Gateway on TKE](../envoygateway.md)).
+
+:::
+
 ## Overview
 
 [Nginx Ingress Controller](https://github.com/kubernetes/ingress-nginx) is a Kubernetes Ingress controller implemented based on the high-performance NGINX reverse proxy, and is the most commonly used open-source Ingress implementation. This article describes how to self-build Nginx Ingress Controller in a TKE environment, primarily using helm for installation, and provides some `values.yaml` configuration guidance.
