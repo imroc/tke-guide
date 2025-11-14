@@ -21,29 +21,16 @@ Kubernetes 提供了 `Ingress API` 来接入七层南北向流量，但功能很
 
 ## 安装 EnvoyGateway
 
-可以通过 TKE 应用市场安装，也可以使用 helm 直接安装，推荐有动手能力的直接使用 helm 安装，可使用社区最新版（TKE 应用市场的版本通常会及时更新，也不保证最新）。
-
-### 方法一：使用 helm 安装
+建议通过 helm 直接安装，可使用社区最新版（TKE 应用市场的版本通常会及时更新，也不保证最新）。
 
 ```bash
 helm install eg oci://docker.io/envoyproxy/gateway-helm \
-  --version v1.5.4 \
+  --version v1.6.0 \
   -n envoy-gateway-system \
   --create-namespace
 ```
 
 > 参考 EnvoyGateway 官方文档 [Install with Helm](https://gateway.envoyproxy.io/docs/install/)。
-
-### 方法二：通过应用市场安装
-
-在 [TKE 应用市场](https://console.cloud.tencent.com/tke2/helm/market) 搜索或在 `网络` 分类中找到 `envoygateway`，点击【创建应用】，命名空间选 `envoy-gateway-system`，若没有则先新建一个，完成其余配置后点击【创建】即可将 envoygateway 安装到集群中。
-
-1. 在目标 TKE 集群中新建一个名为 `envoy-gateway-system` 的命名空间。
-2. 在 [TKE 应用市场](https://console.cloud.tencent.com/tke2/helm/market) 搜索并选择 envoygateway。
-3. 单击**创建应用**，选择好目标 TKE 集群，名称建议写 `eg`，命名空间选 `envoy-gateway-system`。
-  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F27%2F20250227140332.png)
-4. 根据需求配置完参数后，单击**创建**即可将 Envoy Gateway 安装到集群中。
-
 
 ## 基础用法
 ### 创建 GatewayClass
