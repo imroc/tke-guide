@@ -25,28 +25,16 @@ Using EnvoyGateway on TKE has a clear advantage over the built-in CLB Ingress: m
 
 ## Installing EnvoyGateway
 
-You can install via TKE Application Market or directly using helm. For users with hands-on experience, we recommend installing directly with helm to use the latest community version (TKE Application Market versions are usually updated promptly but not guaranteed to be the latest).
-
-### Method 1: Install using helm
+It is recommended to install directly via Helm, and you can use the latest version from the community (the version from the TKE application market is usually updated in a timely manner, but it is not guaranteed to be the latest).
 
 ```bash
 helm install eg oci://docker.io/envoyproxy/gateway-helm \
-  --version v1.5.4 \
+  --version v1.6.0 \
   -n envoy-gateway-system \
   --create-namespace
 ```
 
-> Refer to EnvoyGateway official documentation [Install with Helm](https://gateway.envoyproxy.io/docs/install/).
-
-### Method 2: Install via Application Market
-
-Search for `envoygateway` in the [TKE Application Market](https://console.cloud.tencent.com/tke2/helm/market) or find it in the `Network` category. Click 【Create Application】, select namespace `envoy-gateway-system`, create it if it doesn't exist, complete other configurations, then click 【Create】 to install envoygateway into the cluster.
-
-1. Create a namespace named `envoy-gateway-system` in the target TKE cluster.
-2. Search for and select envoygateway in the [TKE Application Market](https://console.cloud.tencent.com/tke2/helm/market).
-3. Click **Create Application**, select the target TKE cluster, suggested name `eg`, namespace select `envoy-gateway-system`.
-  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F02%2F27%2F20250227140332.png)
-4. Configure parameters according to requirements, then click **Create** to install Envoy Gateway into the cluster.
+> Refer to the EnvoyGateway official documentation [Install with Helm](https://gateway.envoyproxy.io/docs/install/)。
 
 ## Basic Usage
 ### Create GatewayClass
