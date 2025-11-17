@@ -30,7 +30,7 @@ helm install eg oci://docker.io/envoyproxy/gateway-helm \
   --create-namespace
 ```
 
-> 参考 EnvoyGateway 官方文档 [Install with Helm](https://gateway.envoyproxy.io/docs/install/)。
+> 参考 EnvoyGateway 官方文档 [Install with Helm](https://gateway.envoyproxy.io/docs/install/install-helm/)。
 
 ## 基础用法
 ### 创建 GatewayClass
