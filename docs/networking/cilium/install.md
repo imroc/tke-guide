@@ -394,6 +394,28 @@ kubectl -n kube-system rollout status daemonset/tke-cni-agent --watch # 等待�
 kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 ```
 
+
+### 配置 APF 限速
+
+每台节点上都有 cilium-agent 运行，当集群规模较大时，可能会对 APIServer 造成较大压力，极端场景可能造成雪崩，导致整个集群不可用，所以需要配置 APF 来对 cilium 的组件进行限速。
+
+
+保存以下内容到文件 `cilium-apf.yaml`：
+
+:::tip[说明]
+
+根据集群规格修改 `nominalConcurrencyShares` 的值，参考注释。
+
+:::
+
+<FileBlock file="cilium/apf.yaml" showLineNumbers  showFileName />
+
+创建 APF 限速规则：
+
+```bash
+kubectl apply -f cilium-apf.yaml
+```
+
 ## 新建节点池
 
 ### 节点池选型

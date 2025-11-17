@@ -1,0 +1,55 @@
+apiVersion: flowcontrol.apiserver.k8s.io/v1
+kind: FlowSchema
+metadata:
+  name: cilium
+spec:
+  distinguisherMethod:
+    type: ByUser
+  matchingPrecedence: 2
+  priorityLevelConfiguration:
+    name: cilium
+  rules:
+  - resourceRules:
+    - apiGroups:
+      - 'cilium.io'
+      clusterScope: true
+      namespaces:
+      - '*'
+      resources:
+      - '*'
+      verbs:
+      - list
+    - apiGroups:
+      - ''
+      clusterScope: true
+      namespaces:
+      - '*'
+      resources:
+      - pods
+      verbs:
+      - list
+    subjects:
+    - kind: ServiceAccount
+      serviceAccount:
+        name: cilium
+        namespace: kube-system
+---
+apiVersion: flowcontrol.apiserver.k8s.io/v1
+kind: PriorityLevelConfiguration
+metadata:
+  name: cilium
+spec:
+  limited:
+    # highlight-start
+    # L500=10, L1000=6, L3000=3, L5000=2
+    nominalConcurrencyShares: 2
+    # highlight-end
+    borrowingLimitPercent: 0
+    lendablePercent: 0
+    limitResponse:
+      queuing:
+        handSize: 6
+        queueLengthLimit: 50
+        queues: 64
+      type: Queue
+  type: Limited
