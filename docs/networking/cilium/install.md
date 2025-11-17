@@ -408,7 +408,7 @@ kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"s
 
 :::
 
-<FileBlock file="cilium/apf.yaml" showLineNumbers  showFileName />
+<FileBlock file="cilium/cilium-apf.yaml" showLineNumbers  showFileName />
 
 创建 APF 限速规则：
 
