@@ -382,33 +382,15 @@ kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"s
 :::tip[Explanation]
 
 1. By adding nodeSelector to make daemonset not deploy to any nodes, equivalent to uninstalling, while also providing a fallback option; currently kube-proxy can only be uninstalled this way, if directly deleting kube-proxy, subsequent cluster upgrades will be blocked.
-3. If Pods use VPC-CNI network, tke-cni-agent may not be needed, uninstall to avoid CNI configuration file conflicts.
-4. As mentioned earlier, it's not recommended to add nodes before installing cilium. If regular nodes or native nodes were added before cilium installation for some reason, and you don't want to restart existing nodes during cilium installation, you can add preStop to tke-cni-agent before performing uninstall operation to clean up CNI configurations on existing nodes:
-
-```bash
-kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
-  {
-    "op": "add",
-    "path": "/spec/template/spec/containers/0/lifecycle",
-    "value": {
-      "preStop": {
-        "exec": {
-          "command": ["rm", "/host/etc/cni/net.d/00-multus.conf"]
-        }
-      }
-    }
-  }
-]'
-kubectl -n kube-system rollout status daemonset/tke-cni-agent --watch # Wait for tke-cni-agent pods on existing nodes to update completely, ensure preStop is successfully added
-```
-
-:::
-
-If ip-masq-agent was not unchecked during cluster creation, you can uninstall it:
+2. If Pods use VPC-CNI network, tke-cni-agent may not be needed, uninstall to avoid CNI configuration file conflicts.
+3. As mentioned earlier, it's not recommended to add nodes before installing cilium. If regular nodes or native nodes were added before cilium installation for some reason, the existing node needs to be restarted to avoid leaving any related rules and configurations. 
+4. If you forgot to uncheck ip-masq-agent when creating the cluster, you can uninstall it manually:
 
 ```bash
 kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 ```
+
+:::
 
 ### Configuring APF Rate Limiting
 

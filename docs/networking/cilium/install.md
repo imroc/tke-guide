@@ -379,37 +379,19 @@ kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec
 kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 ```
 
+
 :::tip[说明]
 
 1. 通过加 nodeSelector 方式让 daemonset 不部署到任何节点，等同于卸载，同时也留个退路；当前 kube-proxy 也只能通过这种方式卸载，如果直接删除 kube-proxy，后续集群升级会被阻塞。
-3. 如果 Pod 使用 VPC-CNI 网络，可以不需要 tke-cni-agent，卸载以避免 CNI 配置文件冲突。
-4. 前面提到过安装 cilium 之前不建议添加节点，如果因某些原因导致在安装 cilium 前添加了普通节点或原生节点，又不希望在安装 cilium 重启存量节点，那可以在执行卸载操作前为 tke-cni-agent 增加 preStop，用于清理存量节点的 CNI 配置:
-
-```bash
-kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
-  {
-    "op": "add",
-    "path": "/spec/template/spec/containers/0/lifecycle",
-    "value": {
-      "preStop": {
-        "exec": {
-          "command": ["rm", "/host/etc/cni/net.d/00-multus.conf"]
-        }
-      }
-    }
-  }
-]'
-kubectl -n kube-system rollout status daemonset/tke-cni-agent --watch # 等待存量节点的 tke-cni-agent pod 更新完成，确保 preStop 全部成功加上
-```
-
-:::
-
-如果创建集群时没有取消勾选 ip-masq-agent，可以卸载下：
+2. 如果 Pod 使用 VPC-CNI 网络，可以不需要 tke-cni-agent，卸载以避免 CNI 配置文件冲突。
+3. 前面提到过安装 cilium 之前不建议添加节点，如果因某些原因导致在安装 cilium 前添加了普通节点或原生节点，需重启下存量节点，避免残留相关规则和配置。
+4. 如果创建集群时忘记了取消勾选 ip-masq-agent，可以手动卸载下：
 
 ```bash
 kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 ```
 
+:::
 
 ### 配置 APF 限速
 
