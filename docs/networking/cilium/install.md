@@ -47,6 +47,14 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   disable_addons = ["ip-masq-agent"]
   # 省略其它必要但不相关配置
 }
+
+# 如需使用 Karpenter 节点池，需安装 Karpenter 组件。（cluster-autoscaler 与 karpenter 互斥，
+# 启用此组件将不会安装 cluster-autoscaler，也就会禁用原生节点池和普通节点池的扩缩容功能，
+# 如不使用 Karpenter 节点池，可省略以下代码，具体节点池选型参考下文“新建节点池”一节）。
+resource "tencentcloud_kubernetes_addon" "karpenter" {
+  cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
+  addon_name = "karpenter"
+}
 ```
 
 ### 准备 helm 环境

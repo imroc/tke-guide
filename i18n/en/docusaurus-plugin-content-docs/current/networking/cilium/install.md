@@ -47,6 +47,15 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   disable_addons = ["ip-masq-agent"]
   # Omit other necessary but unrelated configurations
 }
+
+# To use the Karpenter node pool, the Karpenter component must be installed. (cluster-autoscaler and karpenter are mutually exclusive,
+# enabling this component will prevent cluster-autoscaler from being installed, thus disabling the scaling functionality of the native
+# node pool and the regular node pool, if you are not using a Karpenter node pool, you can omit the following code. For specific node
+# pool selection, please refer to the section on "Create New Node Pools" below).
+resource "tencentcloud_kubernetes_addon" "karpenter" {
+  cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
+  addon_name = "karpenter"
+}
 ```
 
 ### Prepare Helm Environment
