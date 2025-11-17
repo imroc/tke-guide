@@ -382,7 +382,7 @@ kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"s
 :::tip[Explanation]
 
 1. By adding nodeSelector to make daemonset not deploy to any nodes, equivalent to uninstalling, while also providing a fallback option; currently kube-proxy can only be uninstalled this way, if directly deleting kube-proxy, subsequent cluster upgrades will be blocked.
-2. If Pods use VPC-CNI network, tke-cni-agent may not be needed, uninstall to avoid CNI configuration file conflicts.
+2. Using a VPC-CNI network with a fully customized CNI configuration, tke-cni-agent can be dispensed with and uninstalled to avoid CNI profile conflicts.
 3. As mentioned earlier, it's not recommended to add nodes before installing cilium. If regular nodes or native nodes were added before cilium installation for some reason, the existing node needs to be restarted to avoid leaving any related rules and configurations. 
 4. If you forgot to uncheck ip-masq-agent when creating the cluster, you can uninstall it manually:
 
