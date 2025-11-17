@@ -40,10 +40,8 @@ metadata:
   name: cilium
 spec:
   limited:
-    # highlight-start
     # L500=10, L1000=6, L3000=3, L5000=2
     nominalConcurrencyShares: 2
-    # highlight-end
     borrowingLimitPercent: 0
     lendablePercent: 0
     limitResponse:
