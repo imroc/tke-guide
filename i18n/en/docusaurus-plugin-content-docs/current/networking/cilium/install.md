@@ -30,6 +30,8 @@ Depending on your situation, choose to enable internal network access or public 
 If using Terraform to create a cluster, refer to the following code snippet:
 
 ```hcl
+# fetch latest addon(chart) versions
+data "tencentcloud_kubernetes_charts" "charts" {}
 locals {
   chartNames    = data.tencentcloud_kubernetes_charts.charts.chart_list.*.name
   chartVersions = data.tencentcloud_kubernetes_charts.charts.chart_list.*.latest_version

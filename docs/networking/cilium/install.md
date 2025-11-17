@@ -30,6 +30,8 @@
 如果使用 terraform 创建集群，参考以下代码片段：
 
 ```hcl
+# 获取最新的扩展组件（chart）的版本
+data "tencentcloud_kubernetes_charts" "charts" {}
 locals {
   chartNames    = data.tencentcloud_kubernetes_charts.charts.chart_list.*.name
   chartVersions = data.tencentcloud_kubernetes_charts.charts.chart_list.*.latest_version
