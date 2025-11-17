@@ -30,6 +30,11 @@ Depending on your situation, choose to enable internal network access or public 
 If using Terraform to create a cluster, refer to the following code snippet:
 
 ```hcl
+locals {
+  chartNames    = data.tencentcloud_kubernetes_charts.charts.chart_list.*.name
+  chartVersions = data.tencentcloud_kubernetes_charts.charts.chart_list.*.latest_version
+  chartMap      = zipmap(local.chartNames, local.chartVersions)
+}
 resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   # Standard Cluster
   cluster_deploy_type = "MANAGED_CLUSTER"
@@ -45,16 +50,17 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   cluster_intranet_subnet_id = "subnet-xxx" 
   # Do not install ip-masq-agent (disable_addons requires tencentcloud provider version 1.82.33+)
   disable_addons = ["ip-masq-agent"]
+  # To use the Karpenter node pool, the Karpenter component must be installed. (cluster-autoscaler and karpenter are mutually exclusive,
+  # enabling this component will prevent cluster-autoscaler from being installed, thus disabling the scaling functionality of the native
+  # node pool and the regular node pool, if you are not using a Karpenter node pool, you can omit the following code. For specific node
+  # pool selection, please refer to the section on "Create New Node Pools" below).
+  extension_addon {
+    name = "karpenter"
+    param = jsonencode({
+      "kind" : "App", "spec" : { "chart" : { "chartName" : "karpenter", "chartVersion" : local.chartMap["karpenter"] } }
+    })
+  }
   # Omit other necessary but unrelated configurations
-}
-
-# To use the Karpenter node pool, the Karpenter component must be installed. (cluster-autoscaler and karpenter are mutually exclusive,
-# enabling this component will prevent cluster-autoscaler from being installed, thus disabling the scaling functionality of the native
-# node pool and the regular node pool, if you are not using a Karpenter node pool, you can omit the following code. For specific node
-# pool selection, please refer to the section on "Create New Node Pools" below).
-resource "tencentcloud_kubernetes_addon" "karpenter" {
-  cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
-  addon_name = "karpenter"
 }
 ```
 
