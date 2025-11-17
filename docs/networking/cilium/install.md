@@ -402,9 +402,9 @@ kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"s
 
 保存以下内容到文件 `cilium-apf.yaml`：
 
-:::tip[说明]
+:::tip[备注]
 
-根据集群规格修改 `nominalConcurrencyShares` 的值，参考注释。
+可根据集群规格修改 `nominalConcurrencyShares` 的值，参考注释。
 
 :::
 

@@ -399,9 +399,9 @@ Cilium-agent runs on each node. When the cluster scale is large, it may put sign
 
 Save the following content to the file `cilium-apf.yaml`:
 
-:::tip[Explanation]
+:::tip[Note]
 
-Modify the value of `nominalConcurrencyShares` according to the cluster specifications, refer to the comments.
+You can modify the value of `nominalConcurrencyShares` according to the cluster specifications, refer to the comments.
 
 :::
 
