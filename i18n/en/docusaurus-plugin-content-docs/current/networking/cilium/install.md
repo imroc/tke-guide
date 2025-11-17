@@ -114,7 +114,6 @@ After the eniipamd component is officially released with v3.8.0, you can upgrade
   </TabItem>
 </Tabs>
 
-
 ### Configure CNI
 
 Prepare the CNI configuration ConfigMap `cni-config.yaml` for Cilium:
@@ -392,6 +391,26 @@ If ip-masq-agent was not unchecked during cluster creation, you can uninstall it
 
 ```bash
 kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+```
+
+### Configuring APF Rate Limiting
+
+Cilium-agent runs on each node. When the cluster scale is large, it may put significant pressure on the APIServer. In extreme scenarios, this could cause a cascade failure, making the entire cluster unavailable. Therefore, it's necessary to configure APF to rate limit Cilium's components.
+
+Save the following content to the file `cilium-apf.yaml`:
+
+:::tip[Explanation]
+
+Modify the value of `nominalConcurrencyShares` according to the cluster specifications, refer to the comments.
+
+:::
+
+<FileBlock file="cilium/cilium-apf.yaml" showLineNumbers  showFileName />
+
+Create APF rate limiting rules:
+
+```bash
+kubectl apply -f cilium-apf.yaml
 ```
 
 ## Create New Node Pools
