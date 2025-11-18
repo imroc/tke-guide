@@ -2,7 +2,7 @@
 
 ## Introduction to IP Masquerading
 
-Simply put, IP masquerading is the process of disguising the source IP of Pod traffic leaving the cluster as the node IP (SNAT). This is typically used in scenarios where Pod IPs cannot be directly routed outside the cluster.
+Simply put, IP masquerading is the process of disguising the source IP of Pod traffic leaving the cluster as the node IP (SNAT). This is typically used in scenarios where the Pod IP cannot be directly routed outside the cluster, but traffic still needs to be accessible externally.
 
 ## VPC-CNI Mostly Does Not Require IP Masquerading
 
