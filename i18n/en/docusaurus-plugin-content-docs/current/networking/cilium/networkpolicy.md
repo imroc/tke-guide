@@ -374,7 +374,7 @@ If A provides external services with CLB directly connecting to Pods, handling r
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: from-world-to-a
+  name: from-outside-to-a
 spec:
   endpointSelector:
     matchLabels:
@@ -382,6 +382,23 @@ spec:
   ingress:
   - fromEntities:
     - world
+```
+
+If the CLB is not a directly connected Pod, but is forwarded via NodePort, SNAT will be performed across nodes. In this case, it can be written like this:
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: from-outside-to-a
+spec:
+  endpointSelector:
+    matchLabels:
+      app: a
+  ingress:
+  - fromEntities:
+    - world
+    - remote-node # Allow traffic from NodePort to be forwarded across nodes
 ```
 
 ### Restricting Business Egress Traffic

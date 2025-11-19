@@ -375,7 +375,7 @@ spec:
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: from-world-to-a
+  name: from-outside-to-a
 spec:
   endpointSelector:
     matchLabels:
@@ -383,6 +383,23 @@ spec:
   ingress:
   - fromEntities:
     - world
+```
+
+如果 CLB 不是直连的 Pod，而是经过了 NodePort 转发，跨节点会做 SNAT，这时可以写成这样：
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: from-outside-to-a
+spec:
+  endpointSelector:
+    matchLabels:
+      app: a
+  ingress:
+  - fromEntities:
+    - world
+    - remote-node # 允许来自 NodePort 跨节点转发的流量
 ```
 
 ### 限制业务的出流量
