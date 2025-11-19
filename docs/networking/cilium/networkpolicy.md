@@ -203,7 +203,7 @@ spec:
     - matchPattern: '*.*.*.*.tencentyun.com'
     - matchPattern: '*.*.*.*.*.tencentyun.com'
   - toCIDR: # 允许访问腾讯云上的平台服务
-    - 169.254.0.0/16 # 169.254.0.0/16 是腾讯云上的保留网段，一些平台服务会使用这个 IP，如 TKE 集群 apiserver 的 VIP、COS 存储、镜像仓库等。
+    - 169.254.0.0/16 # 169.254.0.0/16 是腾讯云上的保留网段，一些平台服务会使用这个 IP，如 TKE 集群 apiserver 的 VIP、COS 存储、镜像仓库等，一些 TKE 自带的组件也会调用该网段提供的接口（如 ipamd），且配置了 hostAlias，不会经过 dns 解析，通过 toFQDNs 去放通 egress 流量将不会生效（toFQDNs 依赖请求要经过 dns 解析）。
   - toEntities: # 允许访问 apiserver
     - kube-apiserver
   - toEntities: # 允许访问集群中所有节点的 10250 端口，可用于监控指标采集
@@ -369,7 +369,7 @@ spec:
 
 #### 限制 A 只能被集群外部访问
 
-如果 A 对外提供服务， CLB 直连  Pod，处理来自公网的请求，不允许其它流量（如来自集群内 Pod 或节点），可配置如下策略：
+如果 A 对外提供服务， CLB 直连  Pod（参考 [使用 LoadBalancer 直连 Pod 模式 Service](https://cloud.tencent.com/document/product/457/41897)），处理来自公网的请求，不允许其它流量（如来自集群内 Pod 或节点），可配置如下策略：
 
 ```yaml
 apiVersion: cilium.io/v2
