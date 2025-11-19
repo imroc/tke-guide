@@ -9,14 +9,17 @@
 由于 `kube-prometheus-stack` 这个 chart 非常庞大，还包含了很多其它依赖的 chart，配置也就非常多，如果我们要自定义的配置也很多，写到一个 `values.yaml` 中维护起来比较麻烦，我们可以拆成多个，在安装的时候指定多个配置文件就可以了：
 * 如果你直接用 helm 进行安装，可以指定多次 `-f` 参数:
   ```bash
-  helm upgrade --install eg prom/kube-prometheus-stack -f image-values.yaml -f grafana-values.yaml
+  helm upgrade --install kube-prometheus-stack prom/kube-prometheus-stack \
+    --namespace monitoring --create-namespace \
+    -f image-values.yaml \
+    -f grafana-values.yaml
   ```
 * 如果你用 kustomize 引用该 chart 安装，可以用 `additionalValuesFiles` 指定多个 `values` 配置文件:
   ```yaml showLineNumbers title="kustomization.yaml"
   helmCharts:
     - repo: https://prometheus-community.github.io/helm-charts
       name: kube-prometheus-stack
-      releaseName: monitoring
+      releaseName: kube-prometheus-stack
       namespace: monitoring
       includeCRDs: true
       # highlight-start
@@ -57,38 +60,31 @@
 grafana:
   sidecar:
     image:
-      registry: docker.io/kiwigrid
-      repository: k8s-sidecar
+      registry: quay.tencentcloudcr.com
 alertmanager:
   alertmanagerSpec:
     image:
-      registry: docker.io
-      repository: imroc/prometheus-alertmanager
+      registry: quay.tencentcloudcr.com
 prometheus:
   prometheusSpec:
     image:
-      registry: docker.io
-      repository: imroc/prometheus
+      registry: quay.tencentcloudcr.com
 prometheusOperator:
   image:
-    registry: docker.io
-    repository: imroc/prometheus-operator
+    registry: quay.tencentcloudcr.com
   admissionWebhooks:
     deployment:
       image:
-        registry: docker.io
-        repository: imroc/prometheus-operator-admission-webhook
+        registry: quay.tencentcloudcr.com
     patch:
       image:
         registry: docker.io
         repository: k8smirror/ingress-nginx-kube-webhook-certgen
   prometheusConfigReloader:
     image:
-      registry: docker.io
-      repository: imroc/prometheus-config-reloader
+      registry: quay.tencentcloudcr.com
   thanosImage:
-    registry: docker.io
-    repository: imroc/thanos
+    registry: quay.tencentcloudcr.com
 thanosRuler:
   thanosRulerSpec:
     image:
@@ -98,14 +94,15 @@ kube-state-metrics:
   image:
     registry: docker.io
     repository: k8smirror/kube-state-metrics
-prometheus-node-exporter:
-  image:
-    registry: docker.io
-    repository: imroc/prometheus-node-exporter
   kubeRBACProxy:
     image:
-      registry: quay.io
-      repository: brancz/kube-rbac-proxy
+      registry: quay.tencentcloudcr.com
+prometheus-node-exporter:
+  image:
+    registry: quay.tencentcloudcr.com
+  kubeRBACProxy:
+    image:
+      registry: quay.tencentcloudcr.com
 ```
 
 ## 配置 Grafana 
@@ -116,6 +113,14 @@ grafana 是 `kube-prometheus-stack` 中的一个 subchart，它所有的配置�
 grafana:
   adminUser: "admin"
   adminPassword: "123456"
+defaultDashboardsTimezone: "Asia/Shanghai"
+sidecar:
+  dashboards:
+    folderAnnotation: "grafana_folder"
+    provider:
+      foldersFromFilesStructure: true
+testFramework:
+  enabled: false
 ```
 
 具体配置建议参考 [在 TKE 上自建 Grafana](grafana)。
