@@ -32,19 +32,10 @@
 
 ## 国内环境替换镜像地址
 
-`kube-prometheus-stack` 很多依赖镜像在 `quay.io` 和 `registry.k8s.io` 这些国外的镜像仓库，国内环境拉取会失败，如果你的集群在国内，可以将国外的依赖镜像替换为 DockerHub 中相应的自动同步的 mirror 镜像：
+`kube-prometheus-stack` 很多依赖镜像在 `quay.io` 和 `registry.k8s.io` 这些国外的镜像仓库，国内环境拉取会失败，如果你的集群在国内，可以将 `quay.io` 上的镜像替换为 TKE 上的 mirror 加速地址 `quay.tencentcloudcr.com`，`registry.k8s.io` 上的镜像替换为 DockerHub 中相应的自动同步的 mirror 镜像：
 
 | 国外的依赖镜像                                         | DockerHub 中自动同步的 mirror 镜像                     |
 | :----------------------------------------------------- | :----------------------------------------------------- |
-| quay.io/prometheus-operator/admission-webhook          | docker.io/imroc/prometheus-operator-admission-webhook  |
-| quay.io/prometheus-operator/prometheus-operator        | docker.io/imroc/prometheus-operator                    |
-| quay.io/prometheus/node-exporter                       | docker.io/imroc/prometheus-node-exporter               |
-| quay.io/prometheus/alertmanager                        | docker.io/imroc/prometheus-alertmanager                |
-| quay.io/prometheus/prometheus                          | docker.io/imroc/prometheus                             |
-| quay.io/prometheus-operator/prometheus-config-reloader | docker.io/imroc/prometheus-config-reloader             |
-| quay.io/thanos/thanos                                  | docker.io/imroc/thanos                                 |
-| quay.io/brancz/kube-rbac-proxy                         | docker.io/imroc/kube-rbac-proxy                        |
-| quay.io/kiwigrid/k8s-sidecar                           | docker.io/kiwigrid/k8s-sidecar                         |
 | registry.k8s.io/kube-state-metrics/kube-state-metrics  | docker.io/k8smirror/kube-state-metrics                 |
 | registry.k8s.io/ingress-nginx/kube-webhook-certgen     | docker.io/k8smirror/ingress-nginx-kube-webhook-certgen |
 

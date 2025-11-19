@@ -14,7 +14,10 @@ Since the `kube-prometheus-stack` chart is very large and contains many other de
 
 * If installing directly with helm, you can specify multiple `-f` parameters:
   ```bash
-  helm upgrade --install eg prom/kube-prometheus-stack -f image-values.yaml -f grafana-values.yaml
+  helm upgrade --install kube-prometheus-stack prom/kube-prometheus-stack \
+    --namespace monitoring --create-namespace \
+    -f image-values.yaml \
+    -f grafana-values.yaml
   ```
 * If using kustomize to reference this chart for installation, you can use `additionalValuesFiles` to specify multiple `values` configuration files:
   ```yaml showLineNumbers title="kustomization.yaml"
