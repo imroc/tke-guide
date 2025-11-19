@@ -203,7 +203,7 @@ spec:
     - matchPattern: '*.*.*.*.tencentyun.com'
     - matchPattern: '*.*.*.*.*.tencentyun.com'
   - toCIDR: # Allow access to platform services on Tencent Cloud
-    - 169.254.0.0/16 # 169.254.0.0/16 is a reserved network segment on Tencent Cloud, used by some platform services like TKE cluster apiserver VIP, COS storage, image repositories, etc.
+    - 169.254.0.0/16 # 169.254.0.0/16 is a reserved network segment on Tencent Cloud, used by some platform services like TKE cluster apiserver VIP, COS storage, image repositories, etc. Some TKE built-in components also call the API provided by this network cidr (such as ipamd) and are configured with hostAlias, so they will not go through DNS resolution. Therefore, allowing egress traffic through toFQDNs will not work (toFQDNs depends on the request going through DNS resolution).
   - toEntities: # Allow access to apiserver
     - kube-apiserver
   - toEntities: # Allow access to port 10250 on all nodes in the cluster, useful for monitoring metrics collection
