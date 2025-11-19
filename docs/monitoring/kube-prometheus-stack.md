@@ -34,10 +34,10 @@
 
 `kube-prometheus-stack` 很多依赖镜像在 `quay.io` 和 `registry.k8s.io` 这些国外的镜像仓库，国内环境拉取会失败，如果你的集群在国内，可以将 `quay.io` 上的镜像替换为 TKE 上的 mirror 加速地址 `quay.tencentcloudcr.com`，`registry.k8s.io` 上的镜像替换为 DockerHub 中相应的自动同步的 mirror 镜像：
 
-| 国外的依赖镜像                                         | DockerHub 中自动同步的 mirror 镜像                     |
-| :----------------------------------------------------- | :----------------------------------------------------- |
-| registry.k8s.io/kube-state-metrics/kube-state-metrics  | docker.io/k8smirror/kube-state-metrics                 |
-| registry.k8s.io/ingress-nginx/kube-webhook-certgen     | docker.io/k8smirror/ingress-nginx-kube-webhook-certgen |
+| 国外的依赖镜像                                        | DockerHub 中自动同步的 mirror 镜像                     |
+| :---------------------------------------------------- | :----------------------------------------------------- |
+| registry.k8s.io/kube-state-metrics/kube-state-metrics | docker.io/k8smirror/kube-state-metrics                 |
+| registry.k8s.io/ingress-nginx/kube-webhook-certgen    | docker.io/k8smirror/ingress-nginx-kube-webhook-certgen |
 
 :::tip
 

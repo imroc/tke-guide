@@ -37,21 +37,13 @@ Since the `kube-prometheus-stack` chart is very large and contains many other de
 
 ## Replacing Image Addresses for Domestic Environments
 
-Many dependency images in `kube-prometheus-stack` are in foreign image registries like `quay.io` and `registry.k8s.io`, which may fail to pull in domestic environments. If your cluster is in China, you can replace foreign dependency images with corresponding automatically synchronized mirror images in DockerHub:
+Many of the dependent images for `kube-prometheus-stack` are located in foreign image repositories such as `quay.io` and `registry.k8s.io`. Pulling these images may fail in a domestic environment. If your cluster is located in China, you can replace the images on `quay.io` with the TKE-accelerated mirror address `quay.tencentcloudcr.com`, and replace the images on `registry.k8s.io` with the corresponding automatically synchronized mirror images from Docker Hub:
 
-| Foreign Dependency Images | DockerHub Automatically Synchronized Mirror Images |
-| :----------------------------------------------------- | :----------------------------------------------------- |
-| quay.io/prometheus-operator/admission-webhook | docker.io/imroc/prometheus-operator-admission-webhook |
-| quay.io/prometheus-operator/prometheus-operator | docker.io/imroc/prometheus-operator |
-| quay.io/prometheus/node-exporter | docker.io/imroc/prometheus-node-exporter |
-| quay.io/prometheus/alertmanager | docker.io/imroc/prometheus-alertmanager |
-| quay.io/prometheus/prometheus | docker.io/imroc/prometheus |
-| quay.io/prometheus-operator/prometheus-config-reloader | docker.io/imroc/prometheus-config-reloader |
-| quay.io/thanos/thanos | docker.io/imroc/thanos |
-| quay.io/brancz/kube-rbac-proxy | docker.io/imroc/kube-rbac-proxy |
-| quay.io/kiwigrid/k8s-sidecar | docker.io/kiwigrid/k8s-sidecar |
-| registry.k8s.io/kube-state-metrics/kube-state-metrics | docker.io/k8smirror/kube-state-metrics |
-| registry.k8s.io/ingress-nginx/kube-webhook-certgen | docker.io/k8smirror/ingress-nginx-kube-webhook-certgen |
+
+| Foreign Dependency Images                             | DockerHub Automatically Synchronized Mirror Images     |
+| :---------------------------------------------------- | :----------------------------------------------------- |
+| registry.k8s.io/kube-state-metrics/kube-state-metrics | docker.io/k8smirror/kube-state-metrics                 |
+| registry.k8s.io/ingress-nginx/kube-webhook-certgen    | docker.io/k8smirror/ingress-nginx-kube-webhook-certgen |
 
 :::tip
 
@@ -65,38 +57,31 @@ Create corresponding `values` configuration:
 grafana:
   sidecar:
     image:
-      registry: docker.io/kiwigrid
-      repository: k8s-sidecar
+      registry: quay.tencentcloudcr.com
 alertmanager:
   alertmanagerSpec:
     image:
-      registry: docker.io
-      repository: imroc/prometheus-alertmanager
+      registry: quay.tencentcloudcr.com
 prometheus:
   prometheusSpec:
     image:
-      registry: docker.io
-      repository: imroc/prometheus
+      registry: quay.tencentcloudcr.com
 prometheusOperator:
   image:
-    registry: docker.io
-    repository: imroc/prometheus-operator
+    registry: quay.tencentcloudcr.com
   admissionWebhooks:
     deployment:
       image:
-        registry: docker.io
-        repository: imroc/prometheus-operator-admission-webhook
+        registry: quay.tencentcloudcr.com
     patch:
       image:
         registry: docker.io
         repository: k8smirror/ingress-nginx-kube-webhook-certgen
   prometheusConfigReloader:
     image:
-      registry: docker.io
-      repository: imroc/prometheus-config-reloader
+      registry: quay.tencentcloudcr.com
   thanosImage:
-    registry: docker.io
-    repository: imroc/thanos
+    registry: quay.tencentcloudcr.com
 thanosRuler:
   thanosRulerSpec:
     image:
@@ -106,14 +91,15 @@ kube-state-metrics:
   image:
     registry: docker.io
     repository: k8smirror/kube-state-metrics
-prometheus-node-exporter:
-  image:
-    registry: docker.io
-    repository: imroc/prometheus-node-exporter
   kubeRBACProxy:
     image:
-      registry: quay.io
-      repository: brancz/kube-rbac-proxy
+      registry: quay.tencentcloudcr.com
+prometheus-node-exporter:
+  image:
+    registry: quay.tencentcloudcr.com
+  kubeRBACProxy:
+    image:
+      registry: quay.tencentcloudcr.com
 ```
 
 ## Configuring Grafana
@@ -124,6 +110,14 @@ Grafana is a subchart in `kube-prometheus-stack`. All its configurations are pla
 grafana:
   adminUser: "admin"
   adminPassword: "123456"
+defaultDashboardsTimezone: "Asia/Shanghai"
+sidecar:
+  dashboards:
+    folderAnnotation: "grafana_folder"
+    provider:
+      foldersFromFilesStructure: true
+testFramework:
+  enabled: false
 ```
 
 For specific configuration recommendations, refer to [Self-hosting Grafana on TKE](grafana).
