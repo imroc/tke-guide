@@ -214,6 +214,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.4 \
   --set cni.externalRouting=true \
   --set extraConfig.local-router-ipv4=169.254.32.16 \
   --set localRedirectPolicies.enabled=true \
+  --set sysctlfix.enabled=false \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002
@@ -270,6 +271,9 @@ The following is the `values.yaml` containing explanations for each parameter:
   # Enable CiliumLocalRedirectPolicy capability, refer to https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
   localRedirectPolicies:
     enabled: true
+  # Disable sysctlfix to prevent restarting systemd-sysctl from resetting eth0's rp_filter to 1, which could cause network unavailable in some scenarios.
+  sysctlfix:
+    enabled: false
   # Replace kube-proxy, including ClusterIP forwarding, NodePort forwarding, plus HostPort forwarding capability
   kubeProxyReplacement: "true"
   # Note: Replace with actual apiserver address, obtain method: kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'

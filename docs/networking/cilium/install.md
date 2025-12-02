@@ -214,6 +214,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.4 \
   --set cni.externalRouting=true \
   --set extraConfig.local-router-ipv4=169.254.32.16 \
   --set localRedirectPolicies.enabled=true \
+  --set sysctlfix.enabled=false \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002
@@ -270,6 +271,9 @@ helm upgrade --install cilium cilium/cilium --version 1.18.4 \
   # 启用 CiliumLocalRedirectPolicy 的能力，参考 https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
   localRedirectPolicies:
     enabled: true
+  # 禁用 sysctlfix，避免重启 systemd-sysctl 导致 eth0 的 rp_filter 被重置为 1，使得部分场景网络不通
+  sysctlfix:
+    enabled: false
   # 替代 kube-proxy，包括 ClusterIP 转发、NodePort 转发，另外还附带了 HostPort 转发的能力
   kubeProxyReplacement: "true"
   # 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'

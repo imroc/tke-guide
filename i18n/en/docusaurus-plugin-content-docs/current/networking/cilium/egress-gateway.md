@@ -50,6 +50,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.4 \
   --set cni.externalRouting=true \
   --set extraConfig.local-router-ipv4=169.254.32.16 \
   --set localRedirectPolicies.enabled=true \
+  --set sysctlfix.enabled=false \
   # highlight-add-start
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
