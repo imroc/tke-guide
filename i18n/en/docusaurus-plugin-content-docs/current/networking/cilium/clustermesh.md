@@ -13,14 +13,14 @@ You need to merge the kubeconfig files of all clusters that need to form a Clust
 When installing Cilium, specify the cluster name (which can be the same as the TKE cluster ID, format cls-xxx), cluster numeric ID (1-255), and the subnet ID where the clustermesh-apiserver component's internal CLB is located (this component is used to expose the current cluster's Cilium control plane to other Cilium clusters, created using LoadBalancer type Service, and the internal CLB needs to specify a subnet ID):
 
 ```bash
-helm --kube-context=$CLUSTER1 upgrade --install cilium cilium/cilium --version 1.18.3 \
+helm --kube-context=$CLUSTER1 upgrade --install cilium cilium/cilium --version 1.18.4 \
   --namespace kube-system \
   --set cluster.name=$CLUSTER1 \
   --set cluster.id=1 \
   --set clustermesh.apiserver.service.annotations."service\.kubernetes\.io\/qcloud\-loadbalancer\-internal\-subnetid"="$CLUSTER1_SUBNET_ID" \
   # omit other parameters
 
-helm --kube-context=$CLUSTER2 upgrade --install cilium cilium/cilium --version 1.18.3 \
+helm --kube-context=$CLUSTER2 upgrade --install cilium cilium/cilium --version 1.18.4 \
   --namespace kube-system \
   --set cluster.name=$CLUSTER2 \
   --set cluster.id=2 \

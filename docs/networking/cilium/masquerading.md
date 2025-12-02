@@ -39,7 +39,7 @@ ebpf 的实现也有两种使用方式：
 可通过以下命令启用：
 
 ```bash showLineNumbers
-helm upgrade cilium cilium/cilium --version 1.18.3 \
+helm upgrade cilium cilium/cilium --version 1.18.4 \
   --namespace kube-system \
   --reuse-values \
   # highlight-add-start
@@ -121,7 +121,7 @@ kubectl apply -f ip-masq-agent-config.yaml
 3. 更新 cilium 配置：
 
 ```bash showLineNumbers
-helm upgrade cilium cilium/cilium --version 1.18.3 \
+helm upgrade cilium cilium/cilium --version 1.18.4 \
   --namespace kube-system \
   --reuse-values \
   # highlight-add-start
