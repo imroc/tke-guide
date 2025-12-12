@@ -559,7 +559,7 @@ Usually conflicts with NAT gateway. If the VPC routing table is configured to ro
 
 ### How to route outbound traffic through machines outside the VPC?
 
-In certain specific scenarios, you may want some Pod outbound traffic to go through designated machines outside the VPC (For example, use machines in other VPCs, other clouds, or IDC data centers to bypass the network). However, when Cilium uses CiliumEgressGatewayPolicy to configure policies, it requires the Egress machine to be a node in the current cluster. Normally, nodes added to a TKE cluster are machines within the VPC. So how can you route outbound traffic through machines outside the VPC?
+In certain specific scenarios, you may want some Pod outbound traffic to go through designated machines outside the VPC (for example, when the business egress IP is in another VPC, another cloud, or an IDC data center, and a third party has whitelisted that IP, making it inconvenient to change, so you need the outbound traffic to exit through the machine where this IP is located). However, when Cilium uses CiliumEgressGatewayPolicy to configure policies, it requires the Egress machine to be a node in the current cluster. Normally, nodes added to a TKE cluster are machines within the VPC. So how can you route outbound traffic through machines outside the VPC?
 
 You can add machines outside the VPC to the TKE cluster as registered nodes, and then configure the egress gateway in CiliumEgressGatewayPolicy to be that node.
 
