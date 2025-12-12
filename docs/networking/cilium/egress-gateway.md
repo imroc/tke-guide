@@ -565,7 +565,7 @@ Source IP      Destination CIDR   Egress IP       Gateway IP
 
 具体操作方法是：
 
-1. 在安装 cilium 之前，在 TKE 集群的基本信息页面中启用注册节点，专线连接勾选开启支持（启用后，集群的 apiserver 地址将发生变化，cilium 替代了 kube-proxy，需感知 apiserver 地址，这也是为什么要在安装 cilium 之前启用）。
+1. 在安装 cilium 之前，先在 TKE 集群的基本信息页面中启用注册节点，专线连接勾选开启支持（启用后，集群的 apiserver 地址将发生变化，cilium 替代了 kube-proxy，需感知 apiserver 地址，这也是为什么要在安装 cilium 之前启用）。
    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F12%2F12%2F20251212095535.png)
    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F12%2F12%2F20251212100137.png)
 2. 安装 cilium 并启用 Egress Gateway。

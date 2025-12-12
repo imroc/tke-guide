@@ -565,7 +565,7 @@ You can add machines outside the VPC to the TKE cluster as registered nodes, and
 
 The specific steps are:
 
-1. Before installing Cilium, enable registered nodes in the TKE cluster's basic information page, and check to enable dedicated line connection support (after enabling, the cluster's apiserver address will change, and since Cilium replaces kube-proxy, it needs to be aware of the apiserver address - this is why it should be enabled before installing Cilium).
+1. Before installing Cilium, enable registered nodes first in the TKE cluster's basic information page, and check to enable dedicated line connection support (after enabling, the cluster's apiserver address will change, and since Cilium replaces kube-proxy, it needs to be aware of the apiserver address - this is why it should be enabled before installing Cilium).
    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F12%2F12%2F20251212095535.png)
    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F12%2F12%2F20251212100137.png)
 2. Install Cilium and enable Egress Gateway.
