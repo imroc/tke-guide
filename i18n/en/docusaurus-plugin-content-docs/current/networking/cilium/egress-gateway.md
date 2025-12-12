@@ -557,22 +557,22 @@ Source IP      Destination CIDR   Egress IP       Gateway IP
 
 Usually conflicts with NAT gateway. If the VPC routing table is configured to route public traffic through a NAT gateway, traffic may eventually go through the NAT gateway instead of using the public IP bound to the egress node. Check if the VPC routing table has routing rules configured to send traffic to the NAT gateway.
 
-### 如何让外访流量走 VPC 之外的机器出去？
+### How to route outbound traffic through machines outside the VPC?
 
-在某些特定场景下，可能希望某些 Pod 外访流量通过 VPC 之外的指定机器出去，而 cilium 使用 CiliumEgressGatewayPolicy 配置策略时必须要求 Egress 机器是当前集群的节点，正常情况下，TKE 集群添加的节点都是 VPC 内的机器，如何实现让外访流量走 VPC 之外的机器出去？
+In certain specific scenarios, you may want some Pod outbound traffic to go through designated machines outside the VPC. However, when Cilium uses CiliumEgressGatewayPolicy to configure policies, it requires the Egress machine to be a node in the current cluster. Normally, nodes added to a TKE cluster are machines within the VPC. So how can you route outbound traffic through machines outside the VPC?
 
-可以将 VPC 之外的机器已注册节点的形式加入到 TKE 集群中，然后在 CiliumEgressGatewayPolicy 中配置 egress gateway 为该节点即可。
+You can add machines outside the VPC to the TKE cluster as registered nodes, and then configure the egress gateway in CiliumEgressGatewayPolicy to be that node.
 
-具体操作方法是：
+The specific steps are:
 
-1. 在安装 cilium 之前，在 TKE 集群的基本信息页面中启用注册节点，专线连接勾选开启支持（启用后，集群的 apiserver 地址将发生变化，cilium 替代了 kube-proxy，需感知 apiserver 地址，这也是为什么要在安装 cilium 之前启用）。
+1. Before installing Cilium, enable registered nodes in the TKE cluster's basic information page, and check to enable dedicated line connection support (after enabling, the cluster's apiserver address will change, and since Cilium replaces kube-proxy, it needs to be aware of the apiserver address - this is why it should be enabled before installing Cilium).
    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F12%2F12%2F20251212095535.png)
    ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F12%2F12%2F20251212100137.png)
-2. 安装 cilium 并启用 Egress Gateway。
-3. 准备 VPC 之外的 Egress 机器，主要要求网络与 TKE 集群所在 VPC 打通，并且 Linux 内核版本 >= 5.10。
-4. 新建一个注册节点池，建议 Labels 和 Taints 都打上（Taints 示例 `egress-node=true:NoSchedule`，可避免普通 Pod 被调度到该节点上，因为注册节点无法使用 VPC-CNI 网络插件，无法分配到 Pod IP，只能使用 HostNetwork）。
-5. 进入新建的注册节点池，点击新建节点，按照提示复制注册脚本并在 VPC 之外的 Egress 机器上执行，让该机器作为节点加入到 TKE 集群中。
-6. 按需配置 CiliumEgressGatewayPolicy，让指定的外访流量走该 VPC 之外的机器出去，示例：
+2. Install Cilium and enable Egress Gateway.
+3. Prepare the Egress machine outside the VPC. The main requirements are that the network is connected to the VPC where the TKE cluster is located, and the Linux kernel version is >= 5.10.
+4. Create a new registered node pool. It's recommended to add both Labels and Taints (Taints example: `egress-node=true:NoSchedule`, which prevents regular Pods from being scheduled to this node, because registered nodes cannot use the VPC-CNI network plugin, cannot be assigned Pod IPs, and can only use HostNetwork).
+5. Enter the newly created registered node pool, click to create a new node, copy the registration script as prompted and execute it on the Egress machine outside the VPC to add that machine as a node to the TKE cluster.
+6. Configure CiliumEgressGatewayPolicy as needed to route specified outbound traffic through the machine outside the VPC. Example (Note that you need to replace the hostname and the egressIP):
    ```yaml
    apiVersion: cilium.io/v2
    kind: CiliumEgressGatewayPolicy
@@ -580,20 +580,21 @@ Usually conflicts with NAT gateway. If the VPC routing table is configured to ro
      name: egress-test
    spec:
      selectors:
-     - podSelector: # 指定该 egress 策略针对哪些 Pod 生效
+     - podSelector: # Specify which Pods this egress policy applies to
          matchLabels:
-           app: nginx # 指定带 app=nginx 标签的 Pod
-           io.kubernetes.pod.namespace: test # 指定 default 命名空间
+           app: nginx # Specify Pods with the app=nginx label
+           io.kubernetes.pod.namespace: test # Specify the test namespace
      destinationCIDRs:
      - "0.0.0.0/0"
      - "::/0"
      egressGateway:
        nodeSelector:
          matchLabels:
-           kubernetes.io/hostname: node-10.111.128.148 # egress 注册节点名称
-       # 重要：经测试在 TKE 环境这里必须指定使用 egress 节点的内网 IP，
-       # 用于决定 egress 节点转发外访流量时使用什么源 IP，不管是转发内网
-       # 还是公网流量，出 egress 节点时使用的源 IP 都是使用节点的内网 IP。
+           kubernetes.io/hostname: node-10.111.128.148 # Egress registered node name
+       # Important: Testing shows that in TKE environments, you must specify the egress node's
+       # internal IP here. This determines what source IP the egress node uses when forwarding
+       # outbound traffic. Whether forwarding internal or public network traffic, the source IP
+       # when leaving the egress node is the node's internal IP.
        egressIP: 10.111.128.148
    ```
 

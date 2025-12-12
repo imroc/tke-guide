@@ -572,7 +572,7 @@ Source IP      Destination CIDR   Egress IP       Gateway IP
 3. 准备 VPC 之外的 Egress 机器，主要要求网络与 TKE 集群所在 VPC 打通，并且 Linux 内核版本 >= 5.10。
 4. 新建一个注册节点池，建议 Labels 和 Taints 都打上（Taints 示例 `egress-node=true:NoSchedule`，可避免普通 Pod 被调度到该节点上，因为注册节点无法使用 VPC-CNI 网络插件，无法分配到 Pod IP，只能使用 HostNetwork）。
 5. 进入新建的注册节点池，点击新建节点，按照提示复制注册脚本并在 VPC 之外的 Egress 机器上执行，让该机器作为节点加入到 TKE 集群中。
-6. 按需配置 CiliumEgressGatewayPolicy，让指定的外访流量走该 VPC 之外的机器出去，示例：
+6. 按需配置 CiliumEgressGatewayPolicy，让指定的外访流量走该 VPC 之外的机器出去，示例（注意替换节点名称和 egressIP 的值）：
    ```yaml
    apiVersion: cilium.io/v2
    kind: CiliumEgressGatewayPolicy
