@@ -561,7 +561,7 @@ Source IP      Destination CIDR   Egress IP       Gateway IP
 
 在某些特定场景下，可能希望某些 Pod 外访流量通过 VPC 之外的指定机器出去（比如走其它 VPC、其它云或者 IDC 机房的机器绕一下），而 cilium 使用 CiliumEgressGatewayPolicy 配置策略时必须要求 Egress 机器是当前集群的节点，正常情况下，TKE 集群添加的节点都是 VPC 内的机器，如何实现让外访流量走 VPC 之外的机器出去？
 
-可以将 VPC 之外的机器已注册节点的形式加入到 TKE 集群中，然后在 CiliumEgressGatewayPolicy 中配置 egress gateway 为该节点即可。
+可以将 VPC 之外的机器以注册节点的形式加入到 TKE 集群中，然后在 CiliumEgressGatewayPolicy 中配置 egress gateway 为该节点即可。
 
 具体操作方法是：
 
