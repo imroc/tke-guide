@@ -7,12 +7,14 @@
 ## 已知问题
 
 使用 Cilium 的 Egress Gateway 功能存在以下已知问题：
+
 1. 对新 Pod 执行 Egress 策略有延迟。新 Pod 启动后，如果该 Pod 命中 Egress 策略，期望 Pod 的外访流量走指定出口网关出去，但实际上在 Pod 刚启动的一段时间内，该策略可能并未生效，不过这个时间通常会很短，大部分场景不受影响。
 2. 与 Cilium 的 Cluster Mesh 和 CiliumEndpointSlice 功能不兼容。
 
 ## 启用 Egress Gateway
 
 如果要启用 Egress Gateway，需满足以下条件：
+
 1. 启用 cilium 替代 kube-proxy。
 2. 启用 ip masquerade，且使用 bpf 的实现进行 masquerade 而非默认的 iptables 实现。
 
@@ -72,7 +74,7 @@ kubectl rollout restart deploy cilium-operator -n kube-system
 
 :::tip[备注]
 
-如果你是使用 [安装cilium](install.md) 中 **使用 helm 安装 cilium** 给的安装方法进行了安装，启用 Egress Gateway 的命令可以简化成这样：
+如果你已经使用了 [安装cilium](install.md) 中 **使用 helm 安装 cilium** 给的安装方法进行了安装，启用 Egress Gateway 的命令可以简化成这样：
 
 ```bash
 helm upgrade cilium cilium/cilium --version 1.18.4 \
@@ -92,6 +94,7 @@ helm upgrade cilium cilium/cilium --version 1.18.4 \
 可以创建一个节点池作为 Egress 节点池，后续可以配置让某些 Pod 出集群的流量经过这些节点出去，创建方法参考 [安装cilium](install.md) 中 **新建节点池** 部分。
 
 需要注意的是：
+
 1. 要通过节点池为扩出来的节点打上 label（如 `egress-node=true`）用以标识的用于 Egress Gateway。
 2. 如果需要出公网，要为节点分配公网 IP。
 3. 如果不希望普通 Pod 调度过去，可以加下污点。
@@ -102,167 +105,169 @@ helm upgrade cilium cilium/cilium --version 1.18.4 \
 <Tabs>
   <TabItem value="1" label="原生节点池">
 
-  如果通过控制台创建，注意勾选**创建弹性公网IP**:
-  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F29%2F20251029142955.png)
+如果通过控制台创建，注意勾选**创建弹性公网IP**:
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F29%2F20251029142955.png)
 
-  新增一下 Labels 和 Taints (可选):
-  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F30%2F20251030140442.png)
+新增一下 Labels 和 Taints (可选):
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F30%2F20251030140442.png)
 
-  如果通过 terraform 创建，参考以下代码片段：
-  ```hcl showLineNumbers
-  resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
-    name       = "cilium"
-    cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
-    type       = "Native"
-    annotations {
-      name  = "node.tke.cloud.tencent.com/beta-image"
-      value = "ts4-public"
-    }
+如果通过 terraform 创建，参考以下代码片段：
+
+```hcl showLineNumbers
+resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
+  name       = "cilium"
+  cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
+  type       = "Native"
+  annotations {
+    name  = "node.tke.cloud.tencent.com/beta-image"
+    value = "ts4-public"
+  }
+  # highlight-add-start
+  # 给扩出来的 Node 打上这个 label
+  labels {
+    name = "egress-node"
+    value = "true"
+  }
+  # （可选）给节点加污点，避免普通 Pod 调度到 Egress 节点
+  taints {
+    key    = "egress-node"
+    effect = "NoSchedule"
+    value  = "true"
+  }
+  # highlight-add-end
+  native {
     # highlight-add-start
-    # 给扩出来的 Node 打上这个 label
-    labels {
-      name = "egress-node"
-      value = "true"
-    }
-    # （可选）给节点加污点，避免普通 Pod 调度到 Egress 节点
-    taints {
-      key    = "egress-node"
-      effect = "NoSchedule"
-      value  = "true"
+    # 设置 egress 节点副本数量
+    replicas = 1
+    internet_accessible {
+      # 按流量计费
+      charge_type       = "TRAFFIC_POSTPAID_BY_HOUR"
+      # 最大出带宽 100Mbps
+      max_bandwidth_out = 100
     }
     # highlight-add-end
-    native {
-      # highlight-add-start
-      # 设置 egress 节点副本数量
-      replicas = 1
-      internet_accessible {
-        # 按流量计费
-        charge_type       = "TRAFFIC_POSTPAID_BY_HOUR"
-        # 最大出带宽 100Mbps
-        max_bandwidth_out = 100
-      }
-      # highlight-add-end
-      # 省略其它必要但不相关配置
-    }
+    # 省略其它必要但不相关配置
+  }
 ```
+
   </TabItem>
   <TabItem value="2" label="普通节点池">
 
-  如果通过控制台创建，注意勾选**分配免费公网IP**:
-  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F29%2F20251029142148.png)
+如果通过控制台创建，注意勾选**分配免费公网IP**:
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F29%2F20251029142148.png)
 
-  新增一下 Labels 和 Taints (可选):
-  ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F30%2F20251030140442.png)
+新增一下 Labels 和 Taints (可选):
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F30%2F20251030140442.png)
 
-  如果通过 terraform 创建，参考以下代码片段：
+如果通过 terraform 创建，参考以下代码片段：
 
-  ```hcl showLineNumbers
-  resource "tencentcloud_kubernetes_node_pool" "cilium" {
-    name              = "cilium"
-    cluster_id        = tencentcloud_kubernetes_cluster.tke_cluster.id
-    node_os           = "img-gqmik24x" # TencentOS 4，普通节点池使用该镜像目前还需开白
-    enable_auto_scale = false # 禁用自动伸缩
-    desired_capacity  = 3 # 设置 egress 节点数量
+```hcl showLineNumbers
+resource "tencentcloud_kubernetes_node_pool" "cilium" {
+  name              = "cilium"
+  cluster_id        = tencentcloud_kubernetes_cluster.tke_cluster.id
+  node_os           = "img-gqmik24x" # TencentOS 4，普通节点池使用该镜像目前还需开白
+  enable_auto_scale = false # 禁用自动伸缩
+  desired_capacity  = 3 # 设置 egress 节点数量
 
-    auto_scaling_config {
-      # highlight-add-start
-      # 按流量计费
-      internet_charge_type       = "TRAFFIC_POSTPAID_BY_HOUR"
-      # 分配免费公网IP
-      internet_max_bandwidth_out = 100
-      # 分配免费公网IP
-      public_ip_assigned         = true 
-      # highlight-add-end
-      # 省略其它必要但不相关配置
-    }
-
+  auto_scaling_config {
     # highlight-add-start
-    labels = {
-      # 给扩出来的 Node 打上这个 label
-      "egress-node" = "true"
-    }
+    # 按流量计费
+    internet_charge_type       = "TRAFFIC_POSTPAID_BY_HOUR"
+    # 分配免费公网IP
+    internet_max_bandwidth_out = 100
+    # 分配免费公网IP
+    public_ip_assigned         = true
     # highlight-add-end
+    # 省略其它必要但不相关配置
+  }
 
-    # （可选）给节点加污点，避免普通 Pod 调度到 Egress 节点
-    taints {
-      key    = "egress-node"
-      effect = "NoSchedule"
-      value  = "true"
-    }
-  ```
+  # highlight-add-start
+  labels = {
+    # 给扩出来的 Node 打上这个 label
+    "egress-node" = "true"
+  }
+  # highlight-add-end
+
+  # （可选）给节点加污点，避免普通 Pod 调度到 Egress 节点
+  taints {
+    key    = "egress-node"
+    effect = "NoSchedule"
+    value  = "true"
+  }
+```
 
   </TabItem>
   <TabItem value="3" label="Karpenter 节点池">
   
   在 `TKEMachineNodeClass` 配置节点公网，在 `NodePool` 配置节点 Label：
 
-  ```yaml showLineNumbers
-  apiVersion: karpenter.sh/v1
-  kind: NodePool
-  metadata:
-    name: default
-  spec:
-    disruption:
-      consolidationPolicy: WhenEmptyOrUnderutilized
-      consolidateAfter: 5m
-      budgets:
-      - nodes: 10%
-    template:
-      metadata:
-        annotations:
-          beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public 
-        # highlight-add-start
-        # 给扩出来的 Node 打上这个 label
-        labels:
-          egress-node: "true"
-        # （可选）给节点加污点，避免普通 Pod 调度到 Egress 节点
-        taints:
-        - key: egress-node
-          effect: NoSchedule
-          value: "true"
-        # highlight-add-end
-      spec:
-        requirements:
-        - key: kubernetes.io/arch
-          operator: In
-          values: ["amd64"]
-        - key: kubernetes.io/os
-          operator: In
-          values: ["linux"]
-        - key: karpenter.k8s.tke/instance-family
-          operator: In
-          values: ["S5", "SA2", "SA5"]
-        - key: karpenter.sh/capacity-type
-          operator: In
-          values: ["on-demand"]
-        - key: "karpenter.k8s.tke/instance-cpu"
-          operator: Gt
-          values: ["1"]
-        nodeClassRef:
-          group: karpenter.k8s.tke
-          kind: TKEMachineNodeClass
-          name: default
-    limits:
-      cpu: 100
-  ---
-  apiVersion: karpenter.k8s.tke/v1beta1
-  kind: TKEMachineNodeClass
-  metadata:
-    name: default
-  spec:
-    # highlight-add-start
-    internetAccessible:
-      chargeType: TrafficPostpaidByHour # 按流量计费
-      maxBandwidthOut: 100 # 最大出带宽 100Mbps
-    # highlight-add-end
-    subnetSelectorTerms:
-    - id: subnet-12sxk3z4
-    - id: subnet-b8qyi2dk
-    securityGroupSelectorTerms:
-    - id: sg-nok01xpa
-    sshKeySelectorTerms:
-    - id: skey-3t01mlvf
-  ```
+```yaml showLineNumbers
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: default
+spec:
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 5m
+    budgets:
+    - nodes: 10%
+  template:
+    metadata:
+      annotations:
+        beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public
+      # highlight-add-start
+      # 给扩出来的 Node 打上这个 label
+      labels:
+        egress-node: "true"
+      # （可选）给节点加污点，避免普通 Pod 调度到 Egress 节点
+      taints:
+      - key: egress-node
+        effect: NoSchedule
+        value: "true"
+      # highlight-add-end
+    spec:
+      requirements:
+      - key: kubernetes.io/arch
+        operator: In
+        values: ["amd64"]
+      - key: kubernetes.io/os
+        operator: In
+        values: ["linux"]
+      - key: karpenter.k8s.tke/instance-family
+        operator: In
+        values: ["S5", "SA2", "SA5"]
+      - key: karpenter.sh/capacity-type
+        operator: In
+        values: ["on-demand"]
+      - key: "karpenter.k8s.tke/instance-cpu"
+        operator: Gt
+        values: ["1"]
+      nodeClassRef:
+        group: karpenter.k8s.tke
+        kind: TKEMachineNodeClass
+        name: default
+  limits:
+    cpu: 100
+---
+apiVersion: karpenter.k8s.tke/v1beta1
+kind: TKEMachineNodeClass
+metadata:
+  name: default
+spec:
+  # highlight-add-start
+  internetAccessible:
+    chargeType: TrafficPostpaidByHour # 按流量计费
+    maxBandwidthOut: 100 # 最大出带宽 100Mbps
+  # highlight-add-end
+  subnetSelectorTerms:
+  - id: subnet-12sxk3z4
+  - id: subnet-b8qyi2dk
+  securityGroupSelectorTerms:
+  - id: sg-nok01xpa
+  sshKeySelectorTerms:
+  - id: skey-3t01mlvf
+```
 
   </TabItem>
 </Tabs>
@@ -282,6 +287,7 @@ NAME            STATUS   ROLES    AGE     VERSION         INTERNAL-IP     EXTERN
 通过配置 `CiliumEgressGatewayPolicy` 可以灵活的定义哪些 Pod 的流量走哪些网关的出口 IP 出集群，配置方法参考官方文档 [Writing egress gateway policies](https://docs.cilium.io/en/stable/network/egress-gateway/egress-gateway/#writing-egress-gateway-policies)。
 
 ## 使用案例
+
 ### 外访流量走固定的 Egress 节点出去
 
 如果希望让外访流量通过固定的 Egress 节点出去（出公网时，出口源 IP 将固定是 Egress 节点绑定的公网 IP），可参考下面的方法配置。
@@ -518,7 +524,6 @@ spec:
     egressIP: 172.22.49.119
 ```
 
-
 ## 常见问题
 
 ### 配置策略后网络不通
@@ -550,7 +555,47 @@ Source IP      Destination CIDR   Egress IP       Gateway IP
 
 ### 出口 IP 不符预期
 
-通常是跟 NAT 网关冲突，如果 VPC 路由表配置了公网走 NAT 网关，最终就可能走 NAT 网关出公网而不是用 egress 节点绑定的公网 IP  出去，所以可以检查下 VPC 路由表，是否有配置发往 NAT 网关的路由规则。
+通常是跟 NAT 网关冲突，如果 VPC 路由表配置了公网走 NAT 网关，最终就可能走 NAT 网关出公网而不是用 egress 节点绑定的公网 IP 出去，所以可以检查下 VPC 路由表，是否有配置发往 NAT 网关的路由规则。
+
+### 如何让外访流量走 VPC 之外的机器出去？
+
+在某些特定场景下，可能希望某些 Pod 外访流量通过 VPC 之外的指定机器出去，而 cilium 使用 CiliumEgressGatewayPolicy 配置策略时必须要求 Egress 机器是当前集群的节点，正常情况下，TKE 集群添加的节点都是 VPC 内的机器，如何实现让外访流量走 VPC 之外的机器出去？
+
+可以将 VPC 之外的机器已注册节点的形式加入到 TKE 集群中，然后在 CiliumEgressGatewayPolicy 中配置 egress gateway 为该节点即可。
+
+具体操作方法是：
+
+1. 在安装 cilium 之前，在 TKE 集群的基本信息页面中启用注册节点，专线连接勾选开启支持（启用后，集群的 apiserver 地址将发生变化，cilium 替代了 kube-proxy，需感知 apiserver 地址，这也是为什么要在安装 cilium 之前启用）。
+   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F12%2F12%2F20251212095535.png)
+   ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F12%2F12%2F20251212100137.png)
+2. 安装 cilium 并启用 Egress Gateway。
+3. 准备 VPC 之外的 Egress 机器，主要要求网络与 TKE 集群所在 VPC 打通，并且 Linux 内核版本 >= 5.10。
+4. 新建一个注册节点池，建议 Labels 和 Taints 都打上（Taints 示例 `egress-node=true:NoSchedule`，可避免普通 Pod 被调度到该节点上，因为注册节点无法使用 VPC-CNI 网络插件，无法分配到 Pod IP，只能使用 HostNetwork）。
+5. 进入新建的注册节点池，点击新建节点，按照提示复制注册脚本并在 VPC 之外的 Egress 机器上执行，让该机器作为节点加入到 TKE 集群中。
+6. 按需配置 CiliumEgressGatewayPolicy，让指定的外访流量走该 VPC 之外的机器出去，示例：
+   ```yaml
+   apiVersion: cilium.io/v2
+   kind: CiliumEgressGatewayPolicy
+   metadata:
+     name: egress-test
+   spec:
+     selectors:
+     - podSelector: # 指定该 egress 策略针对哪些 Pod 生效
+         matchLabels:
+           app: nginx # 指定带 app=nginx 标签的 Pod
+           io.kubernetes.pod.namespace: test # 指定 default 命名空间
+     destinationCIDRs:
+     - "0.0.0.0/0"
+     - "::/0"
+     egressGateway:
+       nodeSelector:
+         matchLabels:
+           kubernetes.io/hostname: node-10.111.128.148 # egress 注册节点名称
+       # 重要：经测试在 TKE 环境这里必须指定使用 egress 节点的内网 IP，
+       # 用于决定 egress 节点转发外访流量时使用什么源 IP，不管是转发内网
+       # 还是公网流量，出 egress 节点时使用的源 IP 都是使用节点的内网 IP。
+       egressIP: 10.111.128.148
+   ```
 
 ## 参考资料
 
