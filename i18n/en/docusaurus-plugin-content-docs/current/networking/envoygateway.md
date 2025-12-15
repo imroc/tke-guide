@@ -29,7 +29,7 @@ It is recommended to install directly via Helm, and you can use the latest versi
 
 ```bash
 helm install eg oci://docker.io/envoyproxy/gateway-helm \
-  --version v1.6.0 \
+  --version v1.6.1 \
   -n envoy-gateway-system \
   --create-namespace
 ```
@@ -37,6 +37,7 @@ helm install eg oci://docker.io/envoyproxy/gateway-helm \
 > Refer to the EnvoyGateway official documentation [Install with Helm](https://gateway.envoyproxy.io/docs/install/install-helm/)。
 
 ## Basic Usage
+
 ### Create GatewayClass
 
 Similar to how `Ingress` needs to specify `IngressClass`, each `Gateway` in Gateway API needs to reference a `GatewayClass`. `GatewayClass` essentially represents the gateway instance configuration excluding listeners (such as deployment method, gateway Pod template, replica count, associated Service, etc.). So first create a `GatewayClass`:
@@ -177,40 +178,40 @@ Then `TCPRoute` and `UDPRoute` can reference this Gateway:
 <Tabs>
   <TabItem value="1" label="TCPRoute">
 
-  ```yaml
-  apiVersion: gateway.networking.k8s.io/v1alpha2
-  kind: TCPRoute
-  metadata:
-    name: foo
-  spec:
-    parentRefs:
-    - namespace: test
-      name: test-gw
-      sectionName: foo
-    rules:
-    - backendRefs:
-      - name: foo
-        port: 6000
-  ```
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: foo
+spec:
+  parentRefs:
+  - namespace: test
+    name: test-gw
+    sectionName: foo
+  rules:
+  - backendRefs:
+    - name: foo
+      port: 6000
+```
 
   </TabItem>
   <TabItem value="2" label="UDPRoute">
 
-  ```yaml
-  apiVersion: gateway.networking.k8s.io/v1alpha2
-  kind: UDPRoute
-  metadata:
-    name: bar
-  spec:
-    parentRefs:
-    - namespace: test
-      name: test-gw
-      sectionName: bar
-    rules:
-    - backendRefs:
-      - name: bar
-        port: 6000
-  ```
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: bar
+spec:
+  parentRefs:
+  - namespace: test
+    name: test-gw
+    sectionName: bar
+  rules:
+  - backendRefs:
+    - name: bar
+      port: 6000
+```
 
   </TabItem>
 </Tabs>
@@ -262,8 +263,8 @@ spec:
 
 In the above example:
 
-* Explicitly declare using VPC-CNI network mode and enable CLB direct-to-pod.
-* Use existing CLB, specifying CLB ID.
+- Explicitly declare using VPC-CNI network mode and enable CLB direct-to-pod.
+- Use existing CLB, specifying CLB ID.
 
 Correspondingly, `Gateway` needs to reference this `EnvoyProxy` configuration:
 
@@ -305,6 +306,7 @@ spec:
 For more CLB-related customization, refer to [Service Annotation Description](https://cloud.tencent.com/document/product/457/51258).
 
 Some common customization examples:
+
 1. Use `service.cloud.tencent.com/specify-protocol` annotation to modify listener protocol to HTTPS and correctly reference SSL certificates to enable CLB integration with [Tencent Cloud WAF](https://cloud.tencent.com/product/waf).
 2. Use `service.kubernetes.io/qcloud-loadbalancer-internal-subnetid` annotation to specify CLB private IP, enabling automatic creation of private CLB for traffic access.
 3. Use `service.kubernetes.io/service.extensiveParameters` annotation to customize more properties of automatically created CLBs, such as specifying carriers, bandwidth limits, instance specifications, network billing modes, etc.

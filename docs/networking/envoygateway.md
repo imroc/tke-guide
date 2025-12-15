@@ -25,7 +25,7 @@ Kubernetes 提供了 `Ingress API` 来接入七层南北向流量，但功能很
 
 ```bash
 helm install eg oci://docker.io/envoyproxy/gateway-helm \
-  --version v1.6.0 \
+  --version v1.6.1 \
   -n envoy-gateway-system \
   --create-namespace
 ```
@@ -33,6 +33,7 @@ helm install eg oci://docker.io/envoyproxy/gateway-helm \
 > 参考 EnvoyGateway 官方文档 [Install with Helm](https://gateway.envoyproxy.io/docs/install/install-helm/)。
 
 ## 基础用法
+
 ### 创建 GatewayClass
 
 类似 `Ingress` 需要指定 `IngressClass`，Gateway API 中每个 `Gateway` 都需要引用一个 `GatewayClass`，`GatewayClass` 相当于是网关实例除监听器外的配置（如部署方式、网关 Pod 的 template、副本数量、关联的 Service 等），所以先创建一个 `GatewayClass`：
@@ -173,43 +174,44 @@ spec:
 <Tabs>
   <TabItem value="1" label="TCPRoute">
 
-  ```yaml
-  apiVersion: gateway.networking.k8s.io/v1alpha2
-  kind: TCPRoute
-  metadata:
-    name: foo
-  spec:
-    parentRefs:
-    - namespace: test
-      name: test-gw
-      sectionName: foo
-    rules:
-    - backendRefs:
-      - name: foo
-        port: 6000
-  ```
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: foo
+spec:
+  parentRefs:
+  - namespace: test
+    name: test-gw
+    sectionName: foo
+  rules:
+  - backendRefs:
+    - name: foo
+      port: 6000
+```
 
   </TabItem>
   <TabItem value="2" label="UDPRoute">
 
-  ```yaml
-  apiVersion: gateway.networking.k8s.io/v1alpha2
-  kind: UDPRoute
-  metadata:
-    name: bar
-  spec:
-    parentRefs:
-    - namespace: test
-      name: test-gw
-      sectionName: bar
-    rules:
-    - backendRefs:
-      - name: bar
-        port: 6000
-  ```
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: bar
+spec:
+  parentRefs:
+  - namespace: test
+    name: test-gw
+    sectionName: bar
+  rules:
+  - backendRefs:
+    - name: bar
+      port: 6000
+```
 
-  ```yaml
-  ```
+```yaml
+
+```
 
   </TabItem>
 </Tabs>
@@ -220,7 +222,6 @@ spec:
 2. `backendRefs` 定义该条转发规则对应的后端 Service。
 
 :::
-
 
 ## 使用案例
 
@@ -262,8 +263,8 @@ spec:
 
 以上示例中：
 
-* 显式声明使用 VPC-CNI 网络模式且启用 CLB 直连 Pod。
-* 使用已有 CLB，指定了 CLB 的 ID。
+- 显式声明使用 VPC-CNI 网络模式且启用 CLB 直连 Pod。
+- 使用已有 CLB，指定了 CLB 的 ID。
 
 相应的，`Gateway` 中需引用该 `EnvoyProxy` 配置:
 
@@ -305,6 +306,7 @@ spec:
 更多 CLB 相关的自定义可参考 [Service Annotation 说明](https://cloud.tencent.com/document/product/457/51258)。
 
 举几个常见的自定义例子：
+
 1. 通过 `service.cloud.tencent.com/specify-protocol` 注解来修改监听器协议为 HTTPS 并正确引用 SSL 证书，以便让 CLB 能够接入 [腾讯云 WAF](https://cloud.tencent.com/product/waf)。
 2. 通过 `service.kubernetes.io/qcloud-loadbalancer-internal-subnetid` 注解指定 CLB 内网 IP，实现自动创建内网 CLB 来接入流量。
 3. 通过 `service.kubernetes.io/service.extensiveParameters` 注解自定义自动创建的 CLB 更多属性，如指定运营商、带宽上限、实例规格、网络计费模式等。
