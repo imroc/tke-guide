@@ -182,7 +182,7 @@ kubectl apply -f cni-config.yaml
 :::
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.18.4 \
+helm upgrade --install cilium cilium/cilium --version 1.18.5 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -340,7 +340,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.4 \
 生产环境部署建议将参数保存到 YAML 文件，然后在安装或更新时，都可以类似执行下面的命令（如果要升级版本，替换 `--version` 即可）：
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.18.4 \
+helm upgrade --install cilium cilium/cilium --version 1.18.5 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml
@@ -349,7 +349,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.4 \
 如果自定义的配置较多，建议拆成多个 yaml 文件维护，比如用于启用 Egress Gateway 的配置放到 `egress-values.yaml`，配置容器 request 与 limit 的放到 `resources-values.yaml`，更新配置时通过加多个 `-f` 参数来合并多个 yaml 文件：
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.18.4 \
+helm upgrade --install cilium cilium/cilium --version 1.18.5 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml \
@@ -560,7 +560,7 @@ Cilium 的 helm 安装包提供了大量的自定义配置项，上面安装步�
 执行下面的命令可查看所有的安装配置项：
 
 ```bash
-helm show values cilium/cilium --version 1.18.4
+helm show values cilium/cilium --version 1.18.5
 ```
 
 ### 为什么要加 local-router-ipv4 配置？
@@ -574,21 +574,21 @@ cilium 会在每台节点上创建 `cilium_host` 虚拟网卡，并需要配置�
 解决办法是在可以连上的环境下载 chart 压缩包：
 
 ```bash
-$ helm pull cilium/cilium --version 1.18.4
+$ helm pull cilium/cilium --version 1.18.5
 $ ls cilium-*.tgz
-cilium-1.18.4.tgz
+cilium-1.18.5.tgz
 ```
 
 然后将 chart 压缩包复制到执行 helm 安装的机器上，安装时指定下 chart 压缩包的路径：
 ```bash
-helm upgrade --install cilium ./cilium-1.18.4.tgz \
+helm upgrade --install cilium ./cilium-1.18.5.tgz \
   --namespace kube-system \
   -f values.yaml
 ```
 
 ### 大规模场景如何优化？
 
-如果集群规模较大，建议开启 [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) 特性，该特性于  1.11 开始引入，当前（1.18.4）仍在 Beta 阶段（详见 [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)），在大规模场景下，该特性可以显著提升 cilium 性能并降低 apiserver 的压力。
+如果集群规模较大，建议开启 [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) 特性，该特性于  1.11 开始引入，当前（1.18.5）仍在 Beta 阶段（详见 [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)），在大规模场景下，该特性可以显著提升 cilium 性能并降低 apiserver 的压力。
 
 默认没有启用，启用方法是在使用 helm 安装 cilium 时，通过加 `--set ciliumEndpointSlice.enabled=true` 参数来开启。
 
@@ -627,7 +627,7 @@ cilium 依赖的大部分镜像在 `quay.io`，如果安装时没使用本文给
 如果你配置了更多安装的参数，可能会涉及更多的镜像依赖，没有配置镜像地址替换的话可能导致镜像拉取失败，用以下命令可将所有 cilium 依赖镜像一键替换为 TKE 环境中可直接内网拉取的 mirror 仓库地址：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.18.4 \
+helm upgrade cilium cilium/cilium --version 1.18.5 \
   --namespace kube-system \
   --reuse-values \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
@@ -698,7 +698,7 @@ authentication:
 更新 cilium 时追加一个 `-f image-values.yaml` 将镜像替换的配置加上：
 
 ```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.18.4 \
+helm upgrade --install cilium cilium/cilium --version 1.18.5 \
   --namespace=kube-system \
   -f values.yaml \
   # highlight-add-line
