@@ -13,6 +13,7 @@ Installing Cilium is a significant change to the cluster. It is not recommended 
 :::
 
 Create a TKE cluster in the [Container Service Console](https://console.cloud.tencent.com/tke2/cluster), paying attention to the following key options:
+
 - Cluster Type: Standard Cluster
 - Kubernetes Version: No lower than 1.30.0, recommended to choose the latest version (refer to [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)).
 - Operating System: TencentOS 4 or Ubuntu >= 22.04.
@@ -24,6 +25,7 @@ Create a TKE cluster in the [Container Service Console](https://console.cloud.te
 After the cluster is successfully created, you need to enable cluster access to expose the cluster's apiserver so that the helm command can operate the TKE cluster normally when installing Cilium later. Refer to [How to Enable Cluster Access](https://cloud.tencent.com/document/product/457/32191#.E6.93.8D.E4.BD.9C.E6.AD.A5.E9.AA.A4).
 
 Depending on your situation, choose to enable internal network access or public network access, mainly depending on whether the network where the helm command is located can communicate with the VPC where the TKE cluster is located:
+
 1. If it can communicate, enable internal network access.
 2. If it cannot communicate, enable public network access. Currently, enabling public network access requires deploying the `kubernetes-proxy` component to the cluster as a relay, which depends on the existence of nodes in the cluster (this dependency may be removed in the future, but currently it is required). If you want to use public network access, it is recommended to add a super node to the cluster first so that the `kubernetes-proxy` pod can be scheduled normally, and then delete this super node after Cilium installation is complete.
 
@@ -43,13 +45,13 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   # Kubernetes Version >= 1.30.0
   cluster_version = "1.32.2"
   # Operating System, TencentOS 4 image ID, currently requires submitting a ticket to apply for using this image
-  cluster_os = "img-gqmik24x" 
+  cluster_os = "img-gqmik24x"
   # Container Network Plugin: VPC-CNI
   network_type = "VPC-CNI"
   # Enable Cluster APIServer Access
   cluster_internet = true
   # Expose APIServer through internal CLB, need to specify the subnet ID where CLB is located
-  cluster_intranet_subnet_id = "subnet-xxx" 
+  cluster_intranet_subnet_id = "subnet-xxx"
   # Do not install ip-masq-agent (disable_addons requires tencentcloud provider version 1.82.33+)
   disable_addons = ["ip-masq-agent"]
   # To use the Karpenter node pool, the Karpenter component must be installed. (cluster-autoscaler and karpenter are mutually exclusive,
@@ -70,9 +72,9 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
 
 1. Ensure [helm](https://helm.sh/docs/intro/install/) and [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/) are installed and configured with a kubeconfig that can connect to the cluster (refer to [Connecting to Cluster](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)).
 2. Add Cilium's helm repo:
-    ```bash
-    helm repo add cilium https://helm.cilium.io/
-    ```
+   ```bash
+   helm repo add cilium https://helm.cilium.io/
+   ```
 
 ## Install Cilium
 
@@ -93,40 +95,40 @@ After the eniipamd component is officially released with v3.8.0, you can upgrade
 <Tabs>
   <TabItem value="1" label="bash">
 
-   ```bash
-   # Get current image
-   CURRENT_IMAGE=$(kubectl get daemonset tke-eni-agent -n kube-system \
-     -o jsonpath='{.spec.template.spec.containers[0].image}')
+```bash
+# Get current image
+CURRENT_IMAGE=$(kubectl get daemonset tke-eni-agent -n kube-system \
+  -o jsonpath='{.spec.template.spec.containers[0].image}')
 
-   # Construct new image name (keep repository path, replace tag)
-   REPOSITORY=${CURRENT_IMAGE%%:*}
-   NEW_IMAGE="${REPOSITORY}:v3.8.0-rc.0"
+# Construct new image name (keep repository path, replace tag)
+REPOSITORY=${CURRENT_IMAGE%%:*}
+NEW_IMAGE="${REPOSITORY}:v3.8.0-rc.0"
 
-   # Upgrade tke-eni-agent image
-   kubectl patch daemonset tke-eni-agent -n kube-system \
-     --type='json' \
-     -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "'"${NEW_IMAGE}"'"}]'
-   ```
+# Upgrade tke-eni-agent image
+kubectl patch daemonset tke-eni-agent -n kube-system \
+  --type='json' \
+  -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "'"${NEW_IMAGE}"'"}]'
+```
 
   </TabItem>
   <TabItem value="2" label="fish">
 
-   ```bash
-   # Get current image
-   set -l current_image (kubectl get daemonset tke-eni-agent -n kube-system \
-     -o jsonpath="{.spec.template.spec.containers[0].image}")
-   
-   # Extract repository path (remove tag part)
-   set -l repository (echo $current_image | awk -F: '{print $1}')
-   
-   # Construct new image name
-   set -l new_image "$repository:v3.8.0-rc.0"
-   
-   # Upgrade tke-eni-agent image
-   kubectl patch daemonset tke-eni-agent -n kube-system \
-     --type='json' \
-     -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "'$new_image'"}]'   
-   ```
+```bash
+# Get current image
+set -l current_image (kubectl get daemonset tke-eni-agent -n kube-system \
+  -o jsonpath="{.spec.template.spec.containers[0].image}")
+
+# Extract repository path (remove tag part)
+set -l repository (echo $current_image | awk -F: '{print $1}')
+
+# Construct new image name
+set -l new_image "$repository:v3.8.0-rc.0"
+
+# Upgrade tke-eni-agent image
+kubectl patch daemonset tke-eni-agent -n kube-system \
+  --type='json' \
+  -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "'$new_image'"}]'
+```
 
   </TabItem>
 </Tabs>
@@ -182,7 +184,7 @@ Execute the installation using Helm:
 :::
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.18.4 \
+helm upgrade --install cilium cilium/cilium --version 1.18.5 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -227,112 +229,112 @@ The following is the `values.yaml` containing explanations for each parameter:
 <Tabs>
   <TabItem value="1" label="TKE Adaptation Related">
 
-  ```yaml showLineNumbers title="tke-values.yaml"
-  # Use native routing, Pods directly use VPC IP routing without overlay, refer to native routing: https://docs.cilium.io/en/stable/network/concepts/routing/#native-routing
-  routingMode: "native" 
-  endpointRoutes:
-    # When using native routing, this option must be set to true. Indicates that when forwarding Pod traffic, it routes directly to veth devices without going through cilium_host network card
-    enabled: true 
-  ipam:
-    # TKE Pod IP allocation is handled by tke-eni-ipamd component, cilium does not need to handle Pod IP allocation
-    mode: "delegated-plugin"
-  # No IP masquerade needed when using VPC-CNI
-  enableIPv4Masquerade: false
-  # In TKE nodes, eth-prefixed network cards may have incoming/outgoing traffic (Pod traffic goes through auxiliary network cards, eth1, eth2 ...), use this parameter to mount cilium ebpf programs on all eth-prefixed network cards,
-  # so that packets can be properly reverse NAT based on conntrack, otherwise it may cause network connectivity issues in some scenarios (such as cross-node HostPort access)
-  devices: eth+
-  cni:
-    # Use generic-veth for CNI Chaining with VPC-CNI, refer to: https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/
-    chainingMode: generic-veth
-    # CNI configuration is fully customized
-    customConf: true
-    # Name of the ConfigMap storing CNI configuration
-    configMap: cni-configuration
-    # VPC-CNI will automatically configure Pod routing, cilium doesn't need to configure it
-    externalRouting: true
-  operator:
-    tolerations:
-    - key: "node-role.kubernetes.io/control-plane"
-      operator: Exists
-    - key: "node-role.kubernetes.io/master"
-      operator: Exists
-    - key: "node.kubernetes.io/not-ready"
-      operator: Exists
-    - key: "node.cloudprovider.kubernetes.io/uninitialized"
-      operator: Exists
-    # Tolerate TKE's taints to avoid circular dependencies during first installation
-    - key: "tke.cloud.tencent.com/uninitialized" 
-      operator: Exists
-    - key: "tke.cloud.tencent.com/eni-ip-unavailable" 
-      operator: Exists
-  extraConfig:
-    # cilium doesn't handle Pod IP allocation, need to manually specify an IP address that won't conflict, as the IP address for cilium_host virtual network card on each node
-    local-router-ipv4: 169.254.32.16
-  # Enable CiliumLocalRedirectPolicy capability, refer to https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
-  localRedirectPolicies:
-    enabled: true
-  # Disable sysctlfix to prevent restarting systemd-sysctl from resetting eth0's rp_filter to 1, which could cause network unavailable in some scenarios.
-  sysctlfix:
-    enabled: false
-  # Replace kube-proxy, including ClusterIP forwarding, NodePort forwarding, plus HostPort forwarding capability
-  kubeProxyReplacement: "true"
-  # Note: Replace with actual apiserver address, obtain method: kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
-  k8sServiceHost: 169.254.128.112 
-  k8sServicePort: 60002
-  ```
+```yaml showLineNumbers title="tke-values.yaml"
+# Use native routing, Pods directly use VPC IP routing without overlay, refer to native routing: https://docs.cilium.io/en/stable/network/concepts/routing/#native-routing
+routingMode: "native"
+endpointRoutes:
+  # When using native routing, this option must be set to true. Indicates that when forwarding Pod traffic, it routes directly to veth devices without going through cilium_host network card
+  enabled: true
+ipam:
+  # TKE Pod IP allocation is handled by tke-eni-ipamd component, cilium does not need to handle Pod IP allocation
+  mode: "delegated-plugin"
+# No IP masquerade needed when using VPC-CNI
+enableIPv4Masquerade: false
+# In TKE nodes, eth-prefixed network cards may have incoming/outgoing traffic (Pod traffic goes through auxiliary network cards, eth1, eth2 ...), use this parameter to mount cilium ebpf programs on all eth-prefixed network cards,
+# so that packets can be properly reverse NAT based on conntrack, otherwise it may cause network connectivity issues in some scenarios (such as cross-node HostPort access)
+devices: eth+
+cni:
+  # Use generic-veth for CNI Chaining with VPC-CNI, refer to: https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/
+  chainingMode: generic-veth
+  # CNI configuration is fully customized
+  customConf: true
+  # Name of the ConfigMap storing CNI configuration
+  configMap: cni-configuration
+  # VPC-CNI will automatically configure Pod routing, cilium doesn't need to configure it
+  externalRouting: true
+operator:
+  tolerations:
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: Exists
+  - key: "node-role.kubernetes.io/master"
+    operator: Exists
+  - key: "node.kubernetes.io/not-ready"
+    operator: Exists
+  - key: "node.cloudprovider.kubernetes.io/uninitialized"
+    operator: Exists
+  # Tolerate TKE's taints to avoid circular dependencies during first installation
+  - key: "tke.cloud.tencent.com/uninitialized"
+    operator: Exists
+  - key: "tke.cloud.tencent.com/eni-ip-unavailable"
+    operator: Exists
+extraConfig:
+  # cilium doesn't handle Pod IP allocation, need to manually specify an IP address that won't conflict, as the IP address for cilium_host virtual network card on each node
+  local-router-ipv4: 169.254.32.16
+# Enable CiliumLocalRedirectPolicy capability, refer to https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
+localRedirectPolicies:
+  enabled: true
+# Disable sysctlfix to prevent restarting systemd-sysctl from resetting eth0's rp_filter to 1, which could cause network unavailable in some scenarios.
+sysctlfix:
+  enabled: false
+# Replace kube-proxy, including ClusterIP forwarding, NodePort forwarding, plus HostPort forwarding capability
+kubeProxyReplacement: "true"
+# Note: Replace with actual apiserver address, obtain method: kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
+k8sServiceHost: 169.254.128.112
+k8sServicePort: 60002
+```
 
   </TabItem>
   <TabItem value="2" label="Image Related">
 
-  Replace all cilium dependent images with mirror images that can be directly pulled from internal network in TKE environment, avoiding image pull failures due to network issues:
+Replace all cilium dependent images with mirror images that can be directly pulled from internal network in TKE environment, avoiding image pull failures due to network issues:
 
-  ```yaml title="image-values.yaml"
+```yaml title="image-values.yaml"
+image:
+  repository: quay.tencentcloudcr.com/cilium/cilium
+envoy:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/cilium-envoy
+operator:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/operator
+certgen:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/certgen
+hubble:
+  relay:
+    image:
+      repository: quay.tencentcloudcr.com/cilium/hubble-relay
+  ui:
+    backend:
+      image:
+        repository: quay.tencentcloudcr.com/cilium/hubble-ui-backend
+    frontend:
+      image:
+        repository: quay.tencentcloudcr.com/cilium/hubble-ui
+nodeinit:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/startup-script
+preflight:
   image:
     repository: quay.tencentcloudcr.com/cilium/cilium
   envoy:
     image:
       repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-  operator:
+clustermesh:
+  apiserver:
     image:
-      repository: quay.tencentcloudcr.com/cilium/operator
-  certgen:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/certgen
-  hubble:
-    relay:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/hubble-relay
-    ui:
-      backend:
-        image:
-          repository: quay.tencentcloudcr.com/cilium/hubble-ui-backend
-      frontend:
-        image:
-          repository: quay.tencentcloudcr.com/cilium/hubble-ui
-  nodeinit:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/startup-script
-  preflight:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/cilium
-    envoy:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-  clustermesh:
-    apiserver:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/clustermesh-apiserver
-  authentication:
-    mutual:
-      spire:
-        install:
-          agent:
-            image:
-              repository: docker.io/k8smirror/spire-agent
-          server:
-            image:
-              repository: docker.io/k8smirror/spire-server
-  ```
+      repository: quay.tencentcloudcr.com/cilium/clustermesh-apiserver
+authentication:
+  mutual:
+    spire:
+      install:
+        agent:
+          image:
+            repository: docker.io/k8smirror/spire-agent
+        server:
+          image:
+            repository: docker.io/k8smirror/spire-server
+```
 
   </TabItem>
 </Tabs>
@@ -340,7 +342,7 @@ The following is the `values.yaml` containing explanations for each parameter:
 For production environment deployment, it's recommended to save parameters to YAML files, then execute commands similar to the following during installation or update (if upgrading version, just replace `--version`):
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.18.4 \
+helm upgrade --install cilium cilium/cilium --version 1.18.5 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml
@@ -349,7 +351,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.4 \
 If you have many custom configurations, it's recommended to split them into multiple yaml files for maintenance, for example, put configurations for enabling Egress Gateway in `egress-values.yaml`, put container request and limit configurations in `resources-values.yaml`, and merge multiple yaml files by adding multiple `-f` parameters when updating configurations:
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.18.4 \
+helm upgrade --install cilium cilium/cilium --version 1.18.5 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml \
@@ -387,11 +389,11 @@ kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"s
 
 1. By adding nodeSelector to make daemonset not deploy to any nodes, equivalent to uninstalling, while also providing a fallback option; currently kube-proxy can only be uninstalled this way, if directly deleting kube-proxy, subsequent cluster upgrades will be blocked.
 2. Using a VPC-CNI network with a fully customized CNI configuration, tke-cni-agent can be dispensed with and uninstalled to avoid CNI profile conflicts.
-3. As mentioned earlier, it's not recommended to add nodes before installing cilium. If regular nodes or native nodes were added before cilium installation for some reason, the existing node needs to be restarted to avoid leaving any related rules and configurations. 
+3. As mentioned earlier, it's not recommended to add nodes before installing cilium. If regular nodes or native nodes were added before cilium installation for some reason, the existing node needs to be restarted to avoid leaving any related rules and configurations.
 4. If you forgot to uncheck ip-masq-agent when creating the cluster, you can uninstall it manually:
-    ```bash
-    kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-    ```
+   ```bash
+   kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+   ```
 
 :::
 
@@ -420,18 +422,18 @@ kubectl apply -f cilium-apf.yaml
 ### Node Pool Selection
 
 The following three types of node pools can adapt to cilium:
+
 - Native Node Pool: Based on native nodes, native nodes have rich features and are also the recommended node type for TKE (refer to [Native Nodes vs Regular Nodes](https://cloud.tencent.com/document/product/457/78197#.E5.8E.9F.E7.94.9F.E8.8A.82.E7.82.B9-vs-.E6.99.AE.E9.80.9A.E8.8A.82.E7.82.B9)), OS fixed to use TencentOS.
 - Regular Node Pool: Based on regular nodes (CVM), OS images are more flexible.
 - Karpenter Node Pool: Similar to native node pool, based on native nodes, OS fixed to use TencentOS, but uses the more powerful [Karpenter](https://karpenter.sh/) for node management instead of [cluster-autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) (CA) used by regular node pools and native node pools.
 
 The following is a comparison of these node pool types, choose the appropriate node pool type based on your situation:
 
-| Node Pool Type | Node Type | Available OS Images | Node Scaling Component |
-| ---------------- | --------------- | --------------------------- | ------------------ |
-| Native Node Pool | Native Nodes | TencentOS | cluster-autoscaler |
-| Regular Node Pool | Regular Nodes (CVM) | Ubuntu/TencentOS/Custom Images | cluster-autoscaler |
-| Karpenter Node Pool | Native Nodes | TencentOS | Karpenter |
-
+| Node Pool Type      | Node Type           | Available OS Images            | Node Scaling Component |
+| ------------------- | ------------------- | ------------------------------ | ---------------------- |
+| Native Node Pool    | Native Nodes        | TencentOS                      | cluster-autoscaler     |
+| Regular Node Pool   | Regular Nodes (CVM) | Ubuntu/TencentOS/Custom Images | cluster-autoscaler     |
+| Karpenter Node Pool | Native Nodes        | TencentOS                      | Karpenter              |
 
 Below are the steps to create various node pools.
 
@@ -457,7 +459,7 @@ spec:
       annotations:
         # Native nodes default to installing TencentOS 3, which is incompatible with the latest cilium version, specify this annotation to install TencentOS 4
         # Note: Currently using this system image still requires submitting a ticket to apply
-        beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public 
+        beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public
     spec:
       requirements:
       - key: kubernetes.io/arch
@@ -508,6 +510,7 @@ kubectl apply -f nodepool.yaml
 ### Create Native Node Pool
 
 The following are the steps to create a native node pool through the [Container Service Console](https://console.cloud.tencent.com/tke2):
+
 1. In the cluster list, click the cluster ID to enter the cluster details page.
 2. Select **Node Management** from the left menu bar, click **Node Pools** to enter the node pool list page.
 3. Click **Create New**.
@@ -529,9 +532,11 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
   }
 }
 ```
+
 ### Create Regular Node Pool
 
 The following are the steps to create a regular node pool through the [Container Service Console](https://console.cloud.tencent.com/tke2):
+
 1. In the cluster list, click the cluster ID to enter the cluster details page.
 2. Select **Node Management** from the left menu bar, click **Node Pools** to enter the node pool list page.
 3. Click **Create New**.
@@ -559,7 +564,7 @@ Cilium's helm installation package provides a large number of custom configurati
 Execute the following command to view all installation configuration items:
 
 ```bash
-helm show values cilium/cilium --version 1.18.4
+helm show values cilium/cilium --version 1.18.5
 ```
 
 ### Why add local-router-ipv4 configuration?
@@ -573,21 +578,22 @@ When using helm to install Cilium, helm will get chart related information from 
 The solution is to download the chart compressed package in an environment that can connect:
 
 ```bash
-$ helm pull cilium/cilium --version 1.18.4
+$ helm pull cilium/cilium --version 1.18.5
 $ ls cilium-*.tgz
-cilium-1.18.4.tgz
+cilium-1.18.5.tgz
 ```
 
 Then copy the chart compressed package to the machine where helm installation is executed, and specify the path of the chart compressed package during installation:
+
 ```bash
-helm upgrade --install cilium ./cilium-1.18.4.tgz \
+helm upgrade --install cilium ./cilium-1.18.5.tgz \
   --namespace kube-system \
   -f values.yaml
 ```
 
 ### How to optimize for large-scale scenarios?
 
-If the cluster scale is large, it's recommended to enable the [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) feature. This feature was introduced in version 1.11 and is still in Beta stage in the current version (1.18.4) (see [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)). In large-scale scenarios, this feature can significantly improve Cilium performance and reduce apiserver pressure.
+If the cluster scale is large, it's recommended to enable the [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) feature. This feature was introduced in version 1.11 and is still in Beta stage in the current version (1.18.5) (see [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)). In large-scale scenarios, this feature can significantly improve Cilium performance and reduce apiserver pressure.
 
 It's not enabled by default. The enablement method is to add the `--set ciliumEndpointSlice.enabled=true` parameter when using helm to install Cilium.
 
@@ -596,6 +602,7 @@ It's not enabled by default. The enablement method is to add the `--set ciliumEn
 Test conclusion: No.
 
 It should be that Cilium doesn't support bridge CNI plugin (Global Router network plugin is based on bridge CNI plugin), related issues:
+
 - [CFP: eBPF with bridge mode](https://github.com/cilium/cilium/issues/35011)
 - [CFP: cilium CNI chaining can support cni-bridge](https://github.com/cilium/cilium/issues/20336)
 
@@ -626,7 +633,7 @@ In TKE environment, the mirror repository address `quay.tencentcloudcr.com` is p
 If you configure more installation parameters, it may involve more image dependencies. If you don't configure image address replacement, it may cause image pull failures. Use the following command to replace all Cilium dependent images with mirror repository addresses that can be directly pulled from internal network in TKE environment:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.18.4 \
+helm upgrade cilium cilium/cilium --version 1.18.5 \
   --namespace kube-system \
   --reuse-values \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
@@ -697,7 +704,7 @@ authentication:
 When updating Cilium, add a `-f image-values.yaml` to include the image replacement configuration:
 
 ```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.18.4 \
+helm upgrade --install cilium cilium/cilium --version 1.18.5 \
   --namespace=kube-system \
   -f values.yaml \
   # highlight-add-line
