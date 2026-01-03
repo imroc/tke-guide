@@ -32,6 +32,18 @@ const sidebars: SidebarsConfig = {
             'networking/cilium/clustermesh',
             'networking/cilium/roadmap',
             'networking/cilium/debug',
+            {
+              type: 'category',
+              label: '附录',
+              collapsed: true,
+              link: {
+                type: 'generated-index',
+                slug: '/networking/cilium/appendix'
+              },
+              items: [
+                'networking/cilium/appendix/connect-apiserver-operation-not-permitted'
+              ]
+            }
           ],
         },
         {
