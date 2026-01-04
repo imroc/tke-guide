@@ -101,3 +101,9 @@ kubernetes-intranet-qxgk4   IPv4          60002   169.254.128.7   11d
 查到这里，还没找到根因，但可以得出规避方案：安装 cilium 时配置的 apiserver 地址不使用 CLB 地址，直接使用 `kubernetes` 这个 svc 的 endpoint 地址（169.254 开头的地址，集群创建后就不会再变），该地址不会被 cilium 拦截转发，不存在这个问题。
 
 没有查到根因，无法确定其它场景是否也会有问题，存在重大隐患，所以还需进一步排查。
+
+## 深入 cilium 源码分析
+
+根据之前的排查，明显可以看出是 cilium 内部的状态 (cilium service list 看到的 backend) 与实际的 EndpointSlice 不匹配，前者是空的，后者是一直存在且没有变动的。
+
+所以，猜测是 cilium 同步 Service/EndpointSlice 时的逻辑问题。
