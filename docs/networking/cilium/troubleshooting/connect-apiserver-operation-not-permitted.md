@@ -88,7 +88,7 @@ ID   Frontend                  Service Type   Backend
 
 通过手动删除重建 `kubernetes-intranet` 对应的 EndpointSlice，确实也能复现改问题。
 
-但实际上，这个 svc 对应的 EndpointSlice 一直是存在的，没有任何变化：
+但实际上，这个 svc 对应的 EndpointSlice 一直是存在的，没有被删除重建：
 
 ```txt
 $ kubectl get endpointslices kubernetes-intranet-qxgk4
@@ -96,6 +96,8 @@ NAME                        ADDRESSTYPE   PORTS   ENDPOINTS       AGE
 kubernetes-intranet-qxgk4   IPv4          60002   169.254.128.7   11d
 ```
 
-所以至此，还没查到根因，但可以得出规避方案：安装 cilium 时配置的 apiserver 地址不使用 CLB 地址，直接使用 `kubernetes` 这个 svc 的 endpoint 地址（169.254 开头的地址，集群创建后就不会再变），该地址不会被 cilium 拦截转发，不存在这个问题。
+并且查看集群审计，这个 EndpointSlice 对象也没有任何 patch/update 操作，所以，不可能是这个原因导致的。
 
-没有查到根因，无法确定其它场景是否也会有问题，所以还需进一步排查。
+查到这里，还没找到根因，但可以得出规避方案：安装 cilium 时配置的 apiserver 地址不使用 CLB 地址，直接使用 `kubernetes` 这个 svc 的 endpoint 地址（169.254 开头的地址，集群创建后就不会再变），该地址不会被 cilium 拦截转发，不存在这个问题。
+
+没有查到根因，无法确定其它场景是否也会有问题，存在重大隐患，所以还需进一步排查。
