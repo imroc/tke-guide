@@ -102,8 +102,85 @@ kubernetes-intranet-qxgk4   IPv4          60002   169.254.128.7   11d
 
 没有查到根因，无法确定其它场景是否也会有问题，存在重大隐患，所以还需进一步排查。
 
-## 深入 cilium 源码分析
+## 寻找复现条件
+
+要进一步排查，得先找到复现条件，然后才好继续调试分析。
+
+经过各种尝试，**终于发现了复现条件：调整 TKE 集群规格**。
+
+TKE 集群规格可自动或手动调整，尝试手动调整集群规格后，问题复现了。
+
+这个复现条件的特征是 apiserver 会重建，所有 ListWatch 操作都会断连。
+
+## 给 cilium 增加调试代码
 
 根据之前的排查，明显可以看出是 cilium 内部的状态 (cilium service list 看到的 backend) 与实际的 EndpointSlice 不匹配，前者是空的，后者是一直存在且没有变动的。
 
-所以，猜测是 cilium 同步 Service/EndpointSlice 时的逻辑问题。
+所以，猜测是 cilium 同步 Service/EndpointSlice 时的逻辑问题，定位到关键处理函数是 `runServiceEndpointsReflector`(`pkg/loadbalancer/reflectors/k8s.go`)，先加两行调试日志，看复现时代码路径会走 processServiceEvent 还是 processEndpointsEvent，或者都会走：
+
+```go
+	processBuffer := func(buf buffer) {
+		for key, val := range buf.All() {
+			if key.isSvc {
+        // highlight-next-line
+				p.Log.Info("DEBUG: Processing service event", "key", key)
+				processServiceEvent(txn, val.kind, val.svc)
+			} else {
+        // highlight-next-line
+				p.Log.Info("DEBUG: Processing endpointslice event", "key", key)
+				processEndpointsEvent(txn, key, val.kind, val.allEndpoints)
+			}
+		}
+	}
+```
+
+编译镜像，重新 tag 并推送到自己的镜像仓库：
+
+```bash
+make dev-docker-image-debug
+docker tag quay.io/cilium/cilium-dev:latest docker.io/imroc/cilium:dev
+docker push docker.io/imroc/cilium:dev
+```
+
+然后替换集群中的 cilium 镜像：
+
+```bash
+kubectl -n kube-system patch ds cilium --patch '{"spec": {"template": {"spec": {"containers": [{"name": "cilium-agent","image": "docker.io/imroc/cilium:dev" }]}}}}'
+```
+
+然后调整集群规格来复现问题，查看 cilium-agent 的日志：
+
+```txt
+$ kubectl -n kube-system logs cilium-dn47b --tail 15
+time=2026-01-04T04:37:14.723083417Z level=info msg="DEBUG: Processing service event" module=agent.controlplane.loadbalancer-reflectors.k8s-reflector key="{key:{Name:kubernetes-intranet Namespace:default} isSvc:true}"
+time=2026-01-04T04:37:16.722637542Z level=info msg="DEBUG: Processing service event" module=agent.controlplane.loadbalancer-reflectors.k8s-reflector key="{key:{Name:kubernetes-intranet Namespace:default} isSvc:true}"
+time=2026-01-04T04:37:28.223095883Z level=info msg="DEBUG: Processing service event" module=agent.controlplane.loadbalancer-reflectors.k8s-reflector key="{key:{Name:kubernetes-intranet Namespace:default} isSvc:true}"
+time=2026-01-04T04:37:28.72302971Z level=info msg="DEBUG: Processing service event" module=agent.controlplane.loadbalancer-reflectors.k8s-reflector key="{key:{Name:kubernetes-intranet Namespace:default} isSvc:true}"
+time=2026-01-04T04:38:13.222620275Z level=info msg="DEBUG: Processing service event" module=agent.controlplane.loadbalancer-reflectors.k8s-reflector key="{key:{Name:kubernetes-intranet Namespace:default} isSvc:true}"
+time=2026-01-04T04:38:14.222853386Z level=info msg="DEBUG: Processing service event" module=agent.controlplane.loadbalancer-reflectors.k8s-reflector key="{key:{Name:kubernetes-intranet Namespace:default} isSvc:true}"
+time=2026-01-04T04:38:18.722798226Z level=info msg="DEBUG: Processing service event" module=agent.controlplane.loadbalancer-reflectors.k8s-reflector key="{key:{Name:kubernetes-intranet Namespace:default} isSvc:true}"
+time=2026-01-04T04:38:23.723207324Z level=info msg="DEBUG: Processing service event" module=agent.controlplane.loadbalancer-reflectors.k8s-reflector key="{key:{Name:kubernetes-intranet Namespace:default} isSvc:true}"
+time=2026-01-04T04:38:24.222522501Z level=info msg="DEBUG: Processing service event" module=agent.controlplane.loadbalancer-reflectors.k8s-reflector key="{key:{Name:kubernetes-intranet Namespace:default} isSvc:true}"
+time=2026-01-04T04:38:43.22250763Z level=info msg="DEBUG: Processing service event" module=agent.controlplane.loadbalancer-reflectors.k8s-reflector key="{key:{Name:kubernetes-intranet Namespace:default} isSvc:true}"
+time=2026-01-04T04:39:27.558444466Z level=error msg=k8sError error="Get \"https://10.15.1.8:443/api/v1/namespaces?allowWatchBookmarks=true&resourceVersion=2595060490&timeout=9m6s&timeoutSeconds=546&watch=true\": dial tcp 10.15.1.8:443: connect: operation not permitted"
+time=2026-01-04T04:39:27.558512846Z level=error msg=k8sError error="Get \"https://10.15.1.8:443/apis/cilium.io/v2/ciliumnodes?allowWatchBookmarks=true&resourceVersion=2595021218&timeout=7m44s&timeoutSeconds=464&watch=true\": dial tcp 10.15.1.8:443: connect: operation not permitted"
+time=2026-01-04T04:39:27.558573601Z level=error msg=k8sError error="Get \"https://10.15.1.8:443/apis/discovery.k8s.io/v1/endpointslices?allowWatchBookmarks=true&labelSelector=endpointslice.kubernetes.io%2Fmanaged-by%21%3Dendpointslice-mesh-controller.cilium.io%2C%21service.kubernetes.io%2Fheadless&resourceVersion=2595174540&timeout=7m2s&timeoutSeconds=422&watch=true\": dial tcp 10.15.1.8:443: connect: operation not permitted"
+time=2026-01-04T04:39:27.558611351Z level=error msg=k8sError error="Get \"https://10.15.1.8:443/apis/cilium.io/v2/ciliumnetworkpolicies?allowWatchBookmarks=true&resourceVersion=2595069082&timeout=8m49s&timeoutSeconds=529&watch=true\": dial tcp 10.15.1.8:443: connect: operation not permitted"
+time=2026-01-04T04:39:27.559328906Z level=error msg=k8sError error="Get \"https://10.15.1.8:443/api/v1/namespaces/kube-system/configmaps?allowWatchBookmarks=true&fieldSelector=metadata.name%3Dcilium-config&resourceVersion=2595172652&timeout=5m20s&timeoutSeconds=320&watch=true\": dial tcp 10.15.1.8:443: connect: operation not permitted"
+```
+
+可以看出：当调整 TKE 集群规格后，cilium-agent 会处理 `kubernetes-intranet` 这个 Service 事件，没有对应的 EndpointSlice 事件。
+
+## 分析 APIServer 审计
+
+在集群的 **监控告警-日志-审计日志-全局搜索** 中使用下面的 CQL 查询 `kubernetes-intranet` 这个 Service 及其关联的 EndpointSlice 相关审计日志。
+
+```txt
+objectRef.namespace:"default" AND ((objectRef.name:"kubernetes-intranet" AND objectRef.resource:"services") OR (objectRef.name:"kubernetes-intranet-qxgk4" AND objectRef.resource:"endpointslices")) NOT verb:get
+```
+
+从集群审计日志看，调整集群规格时，`kubernetes-intranet` 这个 Service 会有一些 patch 操作，对应的 EndpointSlice 对象没有任何操作：
+
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2026%2F01%2F04%2F20260104155041.png)
+
+这个 patch 操作来自 TKE 的 service-controller，因为这个 Service 是 LoadBalancer 类型的，会被 service-controller 处理，当调整集群规格时，apiserver 重建，导致 service-controller 存量 ListWatch 连接断开，然后自动重连并重新对账，对账完成后发起 patch 操作记录最新的对账时间戳到 Service 注解。
