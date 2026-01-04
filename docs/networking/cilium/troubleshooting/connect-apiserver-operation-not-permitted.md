@@ -119,19 +119,19 @@ TKE 集群规格可自动或手动调整，尝试手动调整集群规格后，�
 所以，猜测是 cilium 同步 Service/EndpointSlice 时的逻辑问题，定位到关键处理函数是 `runServiceEndpointsReflector`(`pkg/loadbalancer/reflectors/k8s.go`)，先加两行调试日志，看复现时代码路径会走 processServiceEvent 还是 processEndpointsEvent，或者都会走：
 
 ```go
-	processBuffer := func(buf buffer) {
-		for key, val := range buf.All() {
-			if key.isSvc {
+  processBuffer := func(buf buffer) {
+    for key, val := range buf.All() {
+      if key.isSvc {
         // highlight-next-line
-				p.Log.Info("DEBUG: Processing service event", "key", key)
-				processServiceEvent(txn, val.kind, val.svc)
-			} else {
+        p.Log.Info("DEBUG: Processing service event", "key", key)
+        processServiceEvent(txn, val.kind, val.svc)
+      } else {
         // highlight-next-line
-				p.Log.Info("DEBUG: Processing endpointslice event", "key", key)
-				processEndpointsEvent(txn, key, val.kind, val.allEndpoints)
-			}
-		}
-	}
+        p.Log.Info("DEBUG: Processing endpointslice event", "key", key)
+        processEndpointsEvent(txn, key, val.kind, val.allEndpoints)
+      }
+    }
+  }
 ```
 
 编译镜像，重新 tag 并推送到自己的镜像仓库：
@@ -192,17 +192,17 @@ objectRef.namespace:"default" AND ((objectRef.name:"kubernetes-intranet" AND obj
 从前面的调试日志可以看出，调整集群规格时，会多次走到 processServiceEvent 这个函数对 `kubernetes-intranet` 这个 Service 进行对账，移除之前的调试代码，重新为 processServiceEvent 增加一行调试代码，看调整集群规格时会走哪个 switch 代码分支：
 
 ```go
-	processServiceEvent := func(txn writer.WriteTxn, kind resource.EventKind, obj *slim_corev1.Service) {
+  processServiceEvent := func(txn writer.WriteTxn, kind resource.EventKind, obj *slim_corev1.Service) {
     // 增加调试日志，看调整集群规格时会走哪个 switch 代码分支
-		p.Log.Info("DEBUG: processServiceEvent", "kind", kind, "obj", obj)
-		switch kind {
-		case resource.Sync:
+    p.Log.Info("DEBUG: processServiceEvent", "kind", kind, "obj", obj)
+    switch kind {
+    case resource.Sync:
       // ...
-		case resource.Upsert:
+    case resource.Upsert:
       // ...
-		case resource.Delete:
+    case resource.Delete:
       // ...
-	}
+  }
 ```
 
 重新更新镜像并加入新节点，然后再复现问题，观察日志：
@@ -226,19 +226,19 @@ time=2026-01-04T08:26:40.400148264Z level=error msg=k8sError error="Get \"https:
 再次移除之前的调试代码，处理 upsert 类型事件的地方打印关键调试调试信息：
 
 ```go
-	processServiceEvent := func(txn writer.WriteTxn, kind resource.EventKind, obj *slim_corev1.Service) {
-		switch kind {
-		case resource.Sync:
+  processServiceEvent := func(txn writer.WriteTxn, kind resource.EventKind, obj *slim_corev1.Service) {
+    switch kind {
+    case resource.Sync:
+       // ...
+    case resource.Upsert:
+      svc, fes := convertService(p.Config, p.ExtConfig, p.Log, p.LocalNodeStore, obj, source.Kubernetes)
+      p.Log.Info("DEBUG: convertService", "name", obj.Name, "svc", svc, "fes", fes)
       // ...
-		case resource.Upsert:
-			svc, fes := convertService(p.Config, p.ExtConfig, p.Log, p.LocalNodeStore, obj, source.Kubernetes)
-			p.Log.Info("DEBUG: convertService", "name", obj.Name, "svc", svc, "fes", fes)
+      err := p.Writer.UpsertServiceAndFrontends(txn, svc, fes...)
       // ...
-			err := p.Writer.UpsertServiceAndFrontends(txn, svc, fes...)
+    case resource.Delete:
       // ...
-		case resource.Delete:
-      // ...
-	}
+  }
 ```
 
 替换镜像并观察日志：
