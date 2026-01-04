@@ -184,3 +184,9 @@ objectRef.namespace:"default" AND ((objectRef.name:"kubernetes-intranet" AND obj
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2026%2F01%2F04%2F20260104155041.png)
 
 这个 patch 操作来自 TKE 的 service-controller，因为这个 Service 是 LoadBalancer 类型的，会被 service-controller 处理，当调整集群规格时，apiserver 重建，导致 service-controller 存量 ListWatch 连接断开，然后自动重连并重新对账，对账完成后发起 patch 操作记录最新的对账时间戳到 Service 注解。
+
+结合这里的审计分析与前面的调试日志可以得出：在调整集群规格时，apiserver 重建，触发 service-controller 多次自动重新对账，每次对账时会将对账的时间戳 patch 到 Service 注解，然后每次 patch 操作又触发 cilium-agent 对该 Service 的对账。
+
+## 进一步调试
+
+从前面的调试日志可以看出，调整集群规格时，会多次走到 processServiceEvent 这个函数对 `kubernetes-intranet` 这个 Service 进行对账。
