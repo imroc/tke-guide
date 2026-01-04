@@ -9,13 +9,12 @@
 - [x] Egress Gateway 应用实践
 - [x] NetworkPolicy 应用实践
 - [x] Cilium 与 Nodelocal DNSCache 共存
-- [ ] 使用 Cilium 增强可观测性
-- [ ] TKE 侧适配：ipamd 默认容忍 cilium 污点
-- [ ] TKE 侧适配：tke-eni-agent 避开使用 cilium 的路由表 ID （2003/2004）
+- [x] 使用 Cilium 增强可观测性
+- [x] Cilium 多集群组网（Cluster Mesh）
+- [x] TKE 侧适配：tke-eni-agent 避开使用 cilium 的路由表 ID （2003/2004）
 - [ ] e2e 性能测试
 - [ ] 与 kube-proxy 共存方案
 - [ ] 与 istio 共存方案
 - [ ] 支持使用 ENI Trunking 网络模式自建 cilium
-- [ ] Cilium 多集群组网（Cluster Mesh）
 - [ ] Cilium [Multi-Cluster Services](https://docs.cilium.io/en/latest/network/clustermesh/mcsapi/)
 - [ ] Gateway API 启用
