@@ -40,7 +40,7 @@ const sidebars: SidebarsConfig = {
                 slug: '/networking/cilium/troubleshooting'
               },
               items: [
-                'networking/cilium/troubleshooting/debug'
+                'networking/cilium/troubleshooting/debug',
                 'networking/cilium/troubleshooting/connect-apiserver-operation-not-permitted'
               ]
             }
