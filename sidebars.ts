@@ -31,17 +31,17 @@ const sidebars: SidebarsConfig = {
             'networking/cilium/with-node-local-dns',
             'networking/cilium/clustermesh',
             'networking/cilium/roadmap',
-            'networking/cilium/debug',
             {
               type: 'category',
-              label: '附录',
+              label: 'Cilium 问题排查',
               collapsed: true,
               link: {
                 type: 'generated-index',
-                slug: '/networking/cilium/appendix'
+                slug: '/networking/cilium/troubleshooting'
               },
               items: [
-                'networking/cilium/appendix/connect-apiserver-operation-not-permitted'
+                'networking/cilium/troubleshooting/debug'
+                'networking/cilium/troubleshooting/connect-apiserver-operation-not-permitted'
               ]
             }
           ],
