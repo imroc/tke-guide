@@ -62,19 +62,26 @@ kubernetes-intranet   LoadBalancer   192.168.60.179   10.15.1.8     443:30965/TC
 
 由于安装了 cilium 且启用了 kubeProxyReplacement，访问 apiserver 的流量也会直接被 cilium 的 ebpf 程序拦截并负载均衡，并不会将数据包真正发到 CLB。
 
-查看 cilium 的 ebpf 数据，发现 `kubernetes-intranet` 这个 svc 的 backend 为空（NodePort、CLB VIP、ClusterIP 均为空）：
+查看 cilium-agent 进程内存数据和 ebpf 数据，发现 `kubernetes-intranet` 这个 svc 的 backend 都为空（NodePort、CLB VIP、ClusterIP 均为空）：
 
 ```txt
 $ kubectl -n kube-system exec cilium-kddvm -- cilium service list
 ID   Frontend                  Service Type   Backend
-1    192.168.95.86:19090/TCP   ClusterIP      1 => 169.254.128.10:19090/TCP (active)
-2    192.168.87.140:443/TCP    ClusterIP      1 => 169.254.128.10:443/TCP (active)
-3    192.168.110.83:8080/TCP   ClusterIP      1 => 10.15.0.4:61678/TCP (active)
 4    0.0.0.0:30965/TCP         NodePort
 6    10.15.1.8:443/TCP         LoadBalancer
 7    192.168.60.179:443/TCP    ClusterIP
-8    192.168.47.130:443/TCP    ClusterIP      1 => 169.254.128.10:17443/TCP (active)
-9    192.168.22.35:443/TCP     ClusterIP      1 => 10.15.0.4:4244/TCP (active)
+
+$ kubectl -n kube-system exec cilium-kddvm -- cilium shell -- db/show frontends
+Address                   Type           ServiceName                          PortName         Backends                                RedirectTo   Status   Since   Error
+0.0.0.0:30965/TCP         NodePort       default/kubernetes-intranet          https                                                                 Done     4m20s
+10.15.1.8:443/TCP         LoadBalancer   default/kubernetes-intranet          https                                                                 Done     4m20s
+192.168.60.179:443/TCP    ClusterIP      default/kubernetes-intranet          https                                                                 Done     4m20s
+
+$ kubectl -n kube-system exec cilium-kddvm -- cilium bpf lb list
+SERVICE ADDRESS               BACKEND ADDRESS (REVNAT_ID) (SLOT)
+10.15.1.8:443/TCP (0)         0.0.0.0:0 (14) (0) [LoadBalancer]
+0.0.0.0:30965/TCP (0)         0.0.0.0:0 (12) (0) [NodePort, non-routable]
+192.168.60.179:443/TCP (0)    0.0.0.0:0 (15) (0) [ClusterIP, non-routable]
 ```
 
 想到一种可能性：
