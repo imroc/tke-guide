@@ -54,7 +54,7 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   extension_addon {
     name = "karpenter"
     param = jsonencode({
-      "kind" : "App", "spec" : { "chart" : { "chartName" : "karpenter", "chartVersion" : "0.1.4" } }
+      "kind" : "App", "spec" : { "chart" : { "chartName" : "karpenter" } }
     })
   }
   # Omit other necessary but unrelated configurations
