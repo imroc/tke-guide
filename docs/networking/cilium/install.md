@@ -13,6 +13,7 @@
 :::
 
 在 [容器服务控制台](https://console.cloud.tencent.com/tke2/cluster) 创建 TKE 集群，注意以下关键选项：
+
 - 集群类型：标准集群
 - Kubernetes 版本: 不低于 1.30.0，建议选择最新版（参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)）。
 - 操作系统：TencentOS 4 或者 Ubuntu >= 22.04。
@@ -24,32 +25,26 @@
 集群创建成功后，需开启集群访问来暴露集群的 apiserver 提供后续使用 helm 安装 cilium 时，helm 命令能正常操作 TKE 集群，参考 [开启集群访问的方法](https://cloud.tencent.com/document/product/457/32191#.E6.93.8D.E4.BD.9C.E6.AD.A5.E9.AA.A4)。
 
 根据自身情况，选择开启内网访问还是公网访问，主要取决于 helm 命令所在环境的网络是否与 TKE 集群所在 VPC 互通：
+
 1. 如果可以互通就开启内网访问。
 2. 如果不能互通就开启公网访问。当前开启公网访问需要向集群下发 `kubernetes-proxy` 组件作为中转，依赖集群中需要有节点存在（未来可能会取消该依赖，但当前现状是需要依赖），如果要使用公网访问方式，建议向集群先添加个超级节点，以便 `kubernetes-proxy` 的 pod 能够正常调度，等 cilium 安装完成后，再删除该超级节点。
 
 如果使用 terraform 创建集群，参考以下代码片段：
 
 ```hcl
-# 获取最新的扩展组件（chart）的版本
-data "tencentcloud_kubernetes_charts" "charts" {}
-locals {
-  chartNames    = data.tencentcloud_kubernetes_charts.charts.chart_list.*.name
-  chartVersions = data.tencentcloud_kubernetes_charts.charts.chart_list.*.latest_version
-  chartMap      = zipmap(local.chartNames, local.chartVersions)
-}
 resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   # 标准集群
   cluster_deploy_type = "MANAGED_CLUSTER"
   # Kubernetes 版本 >= 1.30.0
   cluster_version = "1.32.2"
   # 操作系统， TencentOS 4 的镜像 ID，当前使用该镜像还需要提工单申请
-  cluster_os = "img-gqmik24x" 
+  cluster_os = "img-gqmik24x"
   # 容器网络插件: VPC-CNI
   network_type = "VPC-CNI"
   # 集群 APIServer 开启访问
   cluster_internet = true
   # 通过内网 CLB 暴露 APIServer，需指定 CLB 所在子网 ID
-  cluster_intranet_subnet_id = "subnet-xxx" 
+  cluster_intranet_subnet_id = "subnet-xxx"
   # 不安装 ip-masq-agent （disable_addons 要求 tencentcloud provider 版本 1.82.33+）
   disable_addons = ["ip-masq-agent"]
   # 如需使用 Karpenter 节点池，需安装 Karpenter 组件。（cluster-autoscaler 与 karpenter 互斥，
@@ -58,7 +53,7 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   extension_addon {
     name = "karpenter"
     param = jsonencode({
-      "kind" : "App", "spec" : { "chart" : { "chartName" : "karpenter", "chartVersion" : local.chartMap["karpenter"] } }
+      "kind" : "App", "spec" : { "chart" : { "chartName" : "karpenter", "chartVersion" : "0.1.4" } }
     })
   }
   # 省略其它必要但不相关配置
@@ -69,9 +64,9 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
 
 1. 确保 [helm](https://helm.sh/zh/docs/intro/install/) 和 [kubectl](https://kubernetes.io/zh-cn/docs/tasks/tools/install-kubectl-linux/) 已安装，并配置好可以连接集群的 kubeconfig（参考 [连接集群](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)）。
 2. 添加 cilium 的 helm repo:
-    ```bash
-    helm repo add cilium https://helm.cilium.io/
-    ```
+   ```bash
+   helm repo add cilium https://helm.cilium.io/
+   ```
 
 ## 安装 cilium
 
@@ -92,44 +87,43 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
 <Tabs>
   <TabItem value="1" label="bash">
 
-   ```bash
-   # 获取当前镜像
-   CURRENT_IMAGE=$(kubectl get daemonset tke-eni-agent -n kube-system \
-     -o jsonpath='{.spec.template.spec.containers[0].image}')
+```bash
+# 获取当前镜像
+CURRENT_IMAGE=$(kubectl get daemonset tke-eni-agent -n kube-system \
+  -o jsonpath='{.spec.template.spec.containers[0].image}')
 
-   # 构造新镜像名称（保留仓库路径，替换 tag）
-   REPOSITORY=${CURRENT_IMAGE%%:*}
-   NEW_IMAGE="${REPOSITORY}:v3.8.0-rc.0"
+# 构造新镜像名称（保留仓库路径，替换 tag）
+REPOSITORY=${CURRENT_IMAGE%%:*}
+NEW_IMAGE="${REPOSITORY}:v3.8.0-rc.0"
 
-   # 升级 tke-eni-agent 镜像
-   kubectl patch daemonset tke-eni-agent -n kube-system \
-     --type='json' \
-     -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "'"${NEW_IMAGE}"'"}]'
-   ```
+# 升级 tke-eni-agent 镜像
+kubectl patch daemonset tke-eni-agent -n kube-system \
+  --type='json' \
+  -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "'"${NEW_IMAGE}"'"}]'
+```
 
   </TabItem>
   <TabItem value="2" label="fish">
 
-   ```bash
-   # 获取当前镜像
-   set -l current_image (kubectl get daemonset tke-eni-agent -n kube-system \
-     -o jsonpath="{.spec.template.spec.containers[0].image}")
-   
-   # 提取仓库路径（去除标签部分）
-   set -l repository (echo $current_image | awk -F: '{print $1}')
-   
-   # 构造新镜像名称
-   set -l new_image "$repository:v3.8.0-rc.0"
-   
-   # 升级 tke-eni-agent 镜像
-   kubectl patch daemonset tke-eni-agent -n kube-system \
-     --type='json' \
-     -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "'$new_image'"}]'   
-   ```
+```bash
+# 获取当前镜像
+set -l current_image (kubectl get daemonset tke-eni-agent -n kube-system \
+  -o jsonpath="{.spec.template.spec.containers[0].image}")
+
+# 提取仓库路径（去除标签部分）
+set -l repository (echo $current_image | awk -F: '{print $1}')
+
+# 构造新镜像名称
+set -l new_image "$repository:v3.8.0-rc.0"
+
+# 升级 tke-eni-agent 镜像
+kubectl patch daemonset tke-eni-agent -n kube-system \
+  --type='json' \
+  -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "'$new_image'"}]'
+```
 
   </TabItem>
 </Tabs>
-
 
 ### 配置 CNI
 
@@ -227,112 +221,112 @@ helm upgrade --install cilium cilium/cilium --version 1.18.5 \
 <Tabs>
   <TabItem value="1" label="适配 TKE 相关">
 
-  ```yaml showLineNumbers title="tke-values.yaml"
-  # 使用 native routing，Pod 直接使用 VPC IP 路由，无需 overlay，参考 native routing: https://docs.cilium.io/en/stable/network/concepts/routing/#native-routing
-  routingMode: "native" 
-  endpointRoutes:
-    # 使用 native routing，此选项必须置为 true。表示转发 Pod 流量时，直接路由到 veth 设备而不需要经过 cilium_host 网卡
-    enabled: true 
-  ipam:
-    # TKE Pod IP 分配由 tke-eni-ipamd 组件负责，cilium 无需负责 Pod IP 分配
-    mode: "delegated-plugin"
-  # 使用 VPC-CNI 无需 IP 伪装
-  enableIPv4Masquerade: false
-  # TKE 节点中 eth 开头的网卡都可能出入流量（Pod 流量走辅助网卡，eth1, eth2 ...），用这个参数让所有 eth 开头的网卡都挂载 cilium ebpf 程序，
-  # 以便让报文能够根据 conntrack 被正常反向 nat， 否则可能导致部分场景下网络不通（如跨节点访问 HostPort）
-  devices: eth+
-  cni:
-    # 使用 generic-veth 与 VPC-CNI 做 CNI Chaining，参考：https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/
-    chainingMode: generic-veth
-    # CNI 配置完全自定义
-    customConf: true
-    # 存放 CNI 配置的 ConfigMap 名称
-    configMap: cni-configuration
-    # VPC-CNI 会自动配置 Pod 路由，cilium 不需要配置
-    externalRouting: true
-  operator:
-    tolerations:
-    - key: "node-role.kubernetes.io/control-plane"
-      operator: Exists
-    - key: "node-role.kubernetes.io/master"
-      operator: Exists
-    - key: "node.kubernetes.io/not-ready"
-      operator: Exists
-    - key: "node.cloudprovider.kubernetes.io/uninitialized"
-      operator: Exists
-    # 容忍 TKE 的污点，避免首次安装时循环依赖
-    - key: "tke.cloud.tencent.com/uninitialized" 
-      operator: Exists
-    - key: "tke.cloud.tencent.com/eni-ip-unavailable" 
-      operator: Exists
-  extraConfig:
-    # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
-    local-router-ipv4: 169.254.32.16
-  # 启用 CiliumLocalRedirectPolicy 的能力，参考 https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
-  localRedirectPolicies:
-    enabled: true
-  # 禁用 sysctlfix，避免重启 systemd-sysctl 导致 eth0 的 rp_filter 被重置为 1，使得部分场景网络不通
-  sysctlfix:
-    enabled: false
-  # 替代 kube-proxy，包括 ClusterIP 转发、NodePort 转发，另外还附带了 HostPort 转发的能力
-  kubeProxyReplacement: "true"
-  # 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
-  k8sServiceHost: 169.254.128.112 
-  k8sServicePort: 60002
-  ```
+```yaml showLineNumbers title="tke-values.yaml"
+# 使用 native routing，Pod 直接使用 VPC IP 路由，无需 overlay，参考 native routing: https://docs.cilium.io/en/stable/network/concepts/routing/#native-routing
+routingMode: "native"
+endpointRoutes:
+  # 使用 native routing，此选项必须置为 true。表示转发 Pod 流量时，直接路由到 veth 设备而不需要经过 cilium_host 网卡
+  enabled: true
+ipam:
+  # TKE Pod IP 分配由 tke-eni-ipamd 组件负责，cilium 无需负责 Pod IP 分配
+  mode: "delegated-plugin"
+# 使用 VPC-CNI 无需 IP 伪装
+enableIPv4Masquerade: false
+# TKE 节点中 eth 开头的网卡都可能出入流量（Pod 流量走辅助网卡，eth1, eth2 ...），用这个参数让所有 eth 开头的网卡都挂载 cilium ebpf 程序，
+# 以便让报文能够根据 conntrack 被正常反向 nat， 否则可能导致部分场景下网络不通（如跨节点访问 HostPort）
+devices: eth+
+cni:
+  # 使用 generic-veth 与 VPC-CNI 做 CNI Chaining，参考：https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/
+  chainingMode: generic-veth
+  # CNI 配置完全自定义
+  customConf: true
+  # 存放 CNI 配置的 ConfigMap 名称
+  configMap: cni-configuration
+  # VPC-CNI 会自动配置 Pod 路由，cilium 不需要配置
+  externalRouting: true
+operator:
+  tolerations:
+  - key: "node-role.kubernetes.io/control-plane"
+    operator: Exists
+  - key: "node-role.kubernetes.io/master"
+    operator: Exists
+  - key: "node.kubernetes.io/not-ready"
+    operator: Exists
+  - key: "node.cloudprovider.kubernetes.io/uninitialized"
+    operator: Exists
+  # 容忍 TKE 的污点，避免首次安装时循环依赖
+  - key: "tke.cloud.tencent.com/uninitialized"
+    operator: Exists
+  - key: "tke.cloud.tencent.com/eni-ip-unavailable"
+    operator: Exists
+extraConfig:
+  # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
+  local-router-ipv4: 169.254.32.16
+# 启用 CiliumLocalRedirectPolicy 的能力，参考 https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
+localRedirectPolicies:
+  enabled: true
+# 禁用 sysctlfix，避免重启 systemd-sysctl 导致 eth0 的 rp_filter 被重置为 1，使得部分场景网络不通
+sysctlfix:
+  enabled: false
+# 替代 kube-proxy，包括 ClusterIP 转发、NodePort 转发，另外还附带了 HostPort 转发的能力
+kubeProxyReplacement: "true"
+# 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
+k8sServiceHost: 169.254.128.112
+k8sServicePort: 60002
+```
 
   </TabItem>
   <TabItem value="2" label="镜像相关">
 
-  将所有 cilium 依赖镜像替换为在 TKE 环境中能直接内网拉取 mirror 镜像，避免因网络问题导致镜像拉取失败：
+将所有 cilium 依赖镜像替换为在 TKE 环境中能直接内网拉取 mirror 镜像，避免因网络问题导致镜像拉取失败：
 
-  ```yaml title="image-values.yaml"
+```yaml title="image-values.yaml"
+image:
+  repository: quay.tencentcloudcr.com/cilium/cilium
+envoy:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/cilium-envoy
+operator:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/operator
+certgen:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/certgen
+hubble:
+  relay:
+    image:
+      repository: quay.tencentcloudcr.com/cilium/hubble-relay
+  ui:
+    backend:
+      image:
+        repository: quay.tencentcloudcr.com/cilium/hubble-ui-backend
+    frontend:
+      image:
+        repository: quay.tencentcloudcr.com/cilium/hubble-ui
+nodeinit:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/startup-script
+preflight:
   image:
     repository: quay.tencentcloudcr.com/cilium/cilium
   envoy:
     image:
       repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-  operator:
+clustermesh:
+  apiserver:
     image:
-      repository: quay.tencentcloudcr.com/cilium/operator
-  certgen:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/certgen
-  hubble:
-    relay:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/hubble-relay
-    ui:
-      backend:
-        image:
-          repository: quay.tencentcloudcr.com/cilium/hubble-ui-backend
-      frontend:
-        image:
-          repository: quay.tencentcloudcr.com/cilium/hubble-ui
-  nodeinit:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/startup-script
-  preflight:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/cilium
-    envoy:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-  clustermesh:
-    apiserver:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/clustermesh-apiserver
-  authentication:
-    mutual:
-      spire:
-        install:
-          agent:
-            image:
-              repository: docker.io/k8smirror/spire-agent
-          server:
-            image:
-              repository: docker.io/k8smirror/spire-server
-  ```
+      repository: quay.tencentcloudcr.com/cilium/clustermesh-apiserver
+authentication:
+  mutual:
+    spire:
+      install:
+        agent:
+          image:
+            repository: docker.io/k8smirror/spire-agent
+        server:
+          image:
+            repository: docker.io/k8smirror/spire-server
+```
 
   </TabItem>
 </Tabs>
@@ -389,16 +383,15 @@ kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"s
 2. 使用 VPC-CNI 网络，且 CNI 配置完全自定义了，可以不需要 tke-cni-agent，卸载以避免 CNI 配置文件冲突。
 3. 前面提到过安装 cilium 之前不建议添加节点，如果因某些原因导致在安装 cilium 前添加了普通节点或原生节点，需重启下存量节点，避免残留相关规则和配置。
 4. 如果创建集群时忘记了取消勾选 ip-masq-agent，可以手动卸载下：
-    ```bash
-    kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-    ```
+   ```bash
+   kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+   ```
 
 :::
 
 ### 配置 APF 限速
 
 每台节点上都有 cilium-agent 运行，当集群规模较大时，可能会对 APIServer 造成较大压力，极端场景可能造成雪崩，导致整个集群不可用，所以需要配置 APF 来对 cilium 的组件进行限速。
-
 
 保存以下内容到文件 `cilium-apf.yaml`：
 
@@ -421,6 +414,7 @@ kubectl apply -f cilium-apf.yaml
 ### 节点池选型
 
 以下三种节点池类型能够适配 cilium:
+
 - 原生节点池：基于原生节点，原生节点功能很丰富，也是 TKE 推荐的节点类型（参考 [原生节点 VS 普通节点](https://cloud.tencent.com/document/product/457/78197#.E5.8E.9F.E7.94.9F.E8.8A.82.E7.82.B9-vs-.E6.99.AE.E9.80.9A.E8.8A.82.E7.82.B9)），OS 固定使用 TencentOS。
 - 普通节点池：基于普通节点（CVM），OS 镜像比较灵活。
 - Karpenter 节点池：与原生节点池类似，基于原生节点，OS 固定使用 TencentOS，只是节点管理使用的功能更强大的 [Karpenter](https://karpenter.sh/) 而非普通节点池与原生节点池所使用的 [cluster-autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) (CA)。
@@ -432,7 +426,6 @@ kubectl apply -f cilium-apf.yaml
 | 原生节点池       | 原生节点        | TencentOS                   | cluster-autoscaler |
 | 普通节点池       | 普通节点（CVM） | Ubuntu/TencentOS/自定义镜像 | cluster-autoscaler |
 | Karpenter 节点池 | 原生节点        | TencentOS                   | Karpenter          |
-
 
 以下创建各种节点池的步骤。
 
@@ -458,7 +451,7 @@ spec:
       annotations:
         # 原生节点默认安装 TencentOS 3，与最新 cilium 版本不兼容，指定该注解安装 TencentOS 4
         # 注意：当前使用该系统镜像还需要提工单申请
-        beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public 
+        beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public
     spec:
       requirements:
       - key: kubernetes.io/arch
@@ -509,6 +502,7 @@ kubectl apply -f nodepool.yaml
 ### 新建原生节点池
 
 以下是通过 [容器服务控制台](https://console.cloud.tencent.com/tke2) 新建原生节点池的步骤：
+
 1. 在集群列表中，单击集群 ID，进入集群详情页。
 2. 选择左侧菜单栏中的**节点管理**，点击**节点池**进入节点池列表页面。
 3. 点击**新建**。
@@ -530,9 +524,11 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
   }
 }
 ```
+
 ### 新建普通节点池
 
 以下是通过 [容器服务控制台](https://console.cloud.tencent.com/tke2) 新建普通节点池的步骤：
+
 1. 在集群列表中，单击集群 ID，进入集群详情页。
 2. 选择左侧菜单栏中的**节点管理**，点击**节点池**进入节点池列表页面。
 3. 点击**新建**。
@@ -580,6 +576,7 @@ cilium-1.18.5.tgz
 ```
 
 然后将 chart 压缩包复制到执行 helm 安装的机器上，安装时指定下 chart 压缩包的路径：
+
 ```bash
 helm upgrade --install cilium ./cilium-1.18.5.tgz \
   --namespace kube-system \
@@ -588,7 +585,7 @@ helm upgrade --install cilium ./cilium-1.18.5.tgz \
 
 ### 大规模场景如何优化？
 
-如果集群规模较大，建议开启 [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) 特性，该特性于  1.11 开始引入，当前（1.18.5）仍在 Beta 阶段（详见 [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)），在大规模场景下，该特性可以显著提升 cilium 性能并降低 apiserver 的压力。
+如果集群规模较大，建议开启 [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) 特性，该特性于 1.11 开始引入，当前（1.18.5）仍在 Beta 阶段（详见 [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)），在大规模场景下，该特性可以显著提升 cilium 性能并降低 apiserver 的压力。
 
 默认没有启用，启用方法是在使用 helm 安装 cilium 时，通过加 `--set ciliumEndpointSlice.enabled=true` 参数来开启。
 
@@ -597,6 +594,7 @@ helm upgrade --install cilium ./cilium-1.18.5.tgz \
 测试结论是：不能。
 
 应该是 cilium 不支持 bridge CNI 插件（Global Router 网络插件基于 bridge CNI 插件），相关 issue:
+
 - [CFP: eBPF with bridge mode](https://github.com/cilium/cilium/issues/35011)
 - [CFP: cilium CNI chaining can support cni-bridge](https://github.com/cilium/cilium/issues/20336)
 

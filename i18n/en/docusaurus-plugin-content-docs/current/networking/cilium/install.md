@@ -32,13 +32,6 @@ Depending on your situation, choose to enable internal network access or public 
 If using Terraform to create a cluster, refer to the following code snippet:
 
 ```hcl
-# fetch latest addon(chart) versions
-data "tencentcloud_kubernetes_charts" "charts" {}
-locals {
-  chartNames    = data.tencentcloud_kubernetes_charts.charts.chart_list.*.name
-  chartVersions = data.tencentcloud_kubernetes_charts.charts.chart_list.*.latest_version
-  chartMap      = zipmap(local.chartNames, local.chartVersions)
-}
 resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   # Standard Cluster
   cluster_deploy_type = "MANAGED_CLUSTER"
@@ -61,7 +54,7 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   extension_addon {
     name = "karpenter"
     param = jsonencode({
-      "kind" : "App", "spec" : { "chart" : { "chartName" : "karpenter", "chartVersion" : local.chartMap["karpenter"] } }
+      "kind" : "App", "spec" : { "chart" : { "chartName" : "karpenter", "chartVersion" : "0.1.4" } }
     })
   }
   # Omit other necessary but unrelated configurations
