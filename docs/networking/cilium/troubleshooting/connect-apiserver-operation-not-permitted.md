@@ -211,22 +211,11 @@ objectRef.namespace:"default" AND objectRef.name:"kubernetes*" AND (NOT verb:get
 
 :::tip[说明]
 
-- `Collect` 是为了方便调试新增的泛型函数，用于将迭代器转换为切片，方便打印。
-- 分别打印 `convertEndpoints` 和 `UpsertAndReleaseBackends` 函数的调用情况。
+分别打印 `convertEndpoints` 和 `UpsertAndReleaseBackends` 函数的调用情况。
 
 :::
 
 ```go showLineNumbers title="pkg/loadbalancer/reflectors/k8s.go"
-// highlight-add-start
-func Collect[T any](seq iter.Seq[T]) []T {
-	var slice []T
-	for v := range seq {
-		slice = append(slice, v)
-	}
-	return slice
-}
-// highlight-add-end
-
 func runServiceEndpointsReflector(ctx context.Context, health cell.Health, p reflectorParams, initServices, initEndpoints func(writer.WriteTxn)) error {
   // ...
 	processEndpointsEvent := func(txn writer.WriteTxn, key bufferKey, kind resource.EventKind, allEps allEndpoints) {
@@ -235,14 +224,14 @@ func runServiceEndpointsReflector(ctx context.Context, health cell.Health, p ref
 		case resource.Upsert:
 			backends := convertEndpoints(p.Log, p.ExtConfig, name, allEps.Backends())
       // highlight-next-line
-			p.Log.Info("DEBUG: convertEndpoints in processEndpointsEvent", "name", name.String(), "backends", Collect(backends))
+			p.Log.Info("DEBUG: convertEndpoints in processEndpointsEvent", "name", name.String(), "backends", slices.Collect(backends))
 
 			// Find orphaned backends. We are using iter.Seq to avoid unnecessary allocations.
 			var orphans iter.Seq[loadbalancer.L3n4Addr] = func(yield func(loadbalancer.L3n4Addr) bool) {
         // ...
 			}
       // highlight-next-line
-			p.Log.Info("DEBUG: UpsertAndReleaseBackends in processEndpointsEvent", "name", name.String(), "backends", Collect(backends), "orphans", Collect(orphans))
+			p.Log.Info("DEBUG: UpsertAndReleaseBackends in processEndpointsEvent", "name", name.String(), "backends", slices.Collect(backends), "orphans", slices.Collect(orphans))
 			err = p.Writer.UpsertAndReleaseBackends(txn, name, source.Kubernetes, backends, orphans)
 		}
 	}
