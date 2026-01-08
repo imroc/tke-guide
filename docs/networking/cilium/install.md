@@ -451,7 +451,7 @@ spec:
       annotations:
         # 原生节点默认安装 TencentOS 3，与最新 cilium 版本不兼容，指定该注解安装 TencentOS 4
         # 注意：当前使用该系统镜像还需要提工单申请
-        beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public
+        beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/image-label=ts4-public
     spec:
       requirements:
       - key: kubernetes.io/arch
@@ -507,7 +507,7 @@ kubectl apply -f nodepool.yaml
 2. 选择左侧菜单栏中的**节点管理**，点击**节点池**进入节点池列表页面。
 3. 点击**新建**。
 4. 选择 **原生节点**。
-5. 在 **高级设置** 的 Annotations 点击 **新增**：`node.tke.cloud.tencent.com/beta-image=ts4-public`（原生节点默认使用 TencentOS 3.1，与最新版的 cilium 不兼容，通过注解指定原生节点使用 TencentOS 4）。
+5. 在 **高级设置** 的 Annotations 点击 **新增**：`node.tke.cloud.tencent.com/image-label=ts4-public`（原生节点默认使用 TencentOS 3.1，与最新版的 cilium 不兼容，通过注解指定原生节点使用 TencentOS 4）。
 6. 其余选项根据自身需求自行选择。
 7. 点击 **创建节点池**。
 
@@ -519,7 +519,7 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
   cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
   type       = "Native"
   annotations { # 添加注解指定原生节点使用 TencentOS 4，以便能够与 cilium 兼容，当前使用该系统镜像还需要提工单申请
-    name  = "node.tke.cloud.tencent.com/beta-image"
+    name  = "node.tke.cloud.tencent.com/image-label"
     value = "ts4-public"
   }
 }

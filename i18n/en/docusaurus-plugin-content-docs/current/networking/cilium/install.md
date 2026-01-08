@@ -452,7 +452,7 @@ spec:
       annotations:
         # Native nodes default to installing TencentOS 3, which is incompatible with the latest cilium version, specify this annotation to install TencentOS 4
         # Note: Currently using this system image still requires submitting a ticket to apply
-        beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/beta-image=ts4-public
+        beta.karpenter.k8s.tke.machine.spec/annotations: node.tke.cloud.tencent.com/image-label=ts4-public
     spec:
       requirements:
       - key: kubernetes.io/arch
@@ -508,7 +508,7 @@ The following are the steps to create a native node pool through the [Container 
 2. Select **Node Management** from the left menu bar, click **Node Pools** to enter the node pool list page.
 3. Click **Create New**.
 4. Select **Native Nodes**.
-5. In **Advanced Settings** under Annotations, click **Add**: `node.tke.cloud.tencent.com/beta-image=ts4-public` (native nodes default to using TencentOS 3.1, which is incompatible with the latest cilium version, specify this annotation to make native nodes use TencentOS 4).
+5. In **Advanced Settings** under Annotations, click **Add**: `node.tke.cloud.tencent.com/image-label=ts4-public` (native nodes default to using TencentOS 3.1, which is incompatible with the latest cilium version, specify this annotation to make native nodes use TencentOS 4).
 6. Choose other options according to your needs.
 7. Click **Create Node Pool**.
 
@@ -520,7 +520,7 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
   cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
   type       = "Native"
   annotations { # Add annotation to specify native nodes use TencentOS 4 to be compatible with cilium, currently using this system image still requires submitting a ticket to apply
-    name  = "node.tke.cloud.tencent.com/beta-image"
+    name  = "node.tke.cloud.tencent.com/image-label"
     value = "ts4-public"
   }
 }
