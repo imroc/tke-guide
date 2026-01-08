@@ -456,13 +456,13 @@ func (k BackendInstanceKey) Key() []byte {
 
 这里 SourcePriority 固定为 0（表示数据源来自 Kubernetes 资源），所以 key 始终为 ServiceName，而前面 `GetInstancesOfService` 是通过 `[]byte` 的前缀匹配来查到后端实例，查找 `default/kubernetes` 的后端实例时，也会找到 `default/kubernetes-intranet` 的后端实例，而刚好 `default/kubernetes-intranet` 的后端实例的地址跟 `default/kubernetes` 的后端实例地址相同，在释放 `default/kubernetes` 的后端地址时，也就会将 `default/kubernetes-intranet` 的后端实例也释放掉了，在 kube-apiserver 重建期间，service-controller 的 ListWatch 连接会断线重连并重新对账，将对账时间戳记录到 `default/kubernetes-intranet` 的 Service 注解，cilium-agent watch 到了这个事件，也对这个 Service 重新对账，发现此时对应的 backend 为空，更新相应的 eBPF Map，最终导致 `default/kubernetes-intranet` 这个 Service 相关的地址均无法访问（NodePort、ClusterIP、CLB VIP)。
 
-## 简化复现步骤
+## 提炼复现步骤
 
 根据前面的代码分析可以反推出：如果 Service B 的名称前缀是 Service A，且对应的 endpoint 有相同地址，那么当 Service A 的 endpoint 移除一个地址时，Service B 中的地址也会被移除。
 
-根据这个结论可以总结出一个简化的稳定复现步骤。
+根据这个结论可以提炼出一个简化的稳定复现步骤。
 
-保存以下 yaml 到文件 `test.yaml`:
+首先保存以下 yaml 到文件 `test.yaml`:
 
 ```yaml
 apiVersion: v1
