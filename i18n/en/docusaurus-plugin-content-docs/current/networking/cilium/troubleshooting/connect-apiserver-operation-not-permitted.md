@@ -1,4 +1,4 @@
-# Troubleshooting: Connecting to the API server failed: "operation not permitted"
+# Troubleshooting: Connecting APIServer failed with "operation not permitted"
 
 ## Symptoms
 
