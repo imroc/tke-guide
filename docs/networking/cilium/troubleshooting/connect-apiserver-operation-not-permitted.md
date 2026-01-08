@@ -21,7 +21,7 @@ time=2026-01-03T23:17:26.850304873Z level=info msg="Stopped hive" subsys=cilium-
 Error: Build config failed: failed to start: Get "https://10.15.1.8:443/api/v1/namespaces/kube-system": dial tcp 10.15.1.8:443: connect: operation not permitted
 ```
 
-这些日志均表示连接 apiserver 失败，报错 `operation not permitted`，尝试在节点上手动 curl 测试连接 apiserver，发现也报这个错：
+日志显示连接 apiserver 失败，报错 `operation not permitted`，尝试在节点上手动 curl 测试连接 apiserver，发现也报这个错：
 
 ```txt
 $ curl -v -k https://10.15.1.8:443
@@ -578,6 +578,6 @@ $ kubectl --namespace=kube-system exec ds/cilium -- cilium bpf lb list | grep 19
 
 ## 后记
 
-问题定位过程极其复杂，本文所总结的步骤是在假设精通 k8s、cilium 的底层原理和代码实现以及排障方法的情况下的理想步骤，而实际过程复杂很多倍，去除了很多不相关的排查细节。
+问题定位过程极其复杂，怀疑过内核、k8s 和 TKE 的问题，最终定位是 cilium 的 bug，本文所总结的排查步骤是假设在精通 k8s、cilium 的底层原理、代码实现和熟练各自排障方法和工具的情况下的理想步骤，而实际过程复杂很多倍，去除了很多不相关的排查细节。
 
 面对 k8s 和 cilium 这种巨型复杂项目，利用 AI 辅助分析和梳理可以提升不少效率，其中测试程序也是由 AI 编写的。
