@@ -85,6 +85,12 @@ Address                   Type           ServiceName                          Po
 0.0.0.0:30965/TCP         NodePort       default/kubernetes-intranet          https                                                                 Done     4m20s
 10.15.1.8:443/TCP         LoadBalancer   default/kubernetes-intranet          https                                                                 Done     4m20s
 192.168.60.179:443/TCP    ClusterIP      default/kubernetes-intranet          https                                                                 Done     4m20s
+
+$ kubectl -n kube-system exec cilium-kddvm -- cilium service list
+ID   Frontend                  Service Type   Backend
+4    0.0.0.0:30965/TCP         NodePort
+6    10.15.1.8:443/TCP         LoadBalancer
+7    192.168.60.179:443/TCP    ClusterIP
 ```
 
 cilium 中记录的 backend 地址来源是 k8s Service 关联的 EndpointSlice，查看改 Service 对应的 EndpointSlice 是存在地址的，且确认与 Service 的关联关系也是正确的：
