@@ -575,3 +575,9 @@ $ kubectl --namespace=kube-system exec ds/cilium -- cilium bpf lb list | grep 19
 
 - issue: https://github.com/cilium/cilium/issues/43619
 - PR: https://github.com/cilium/cilium/pull/43620
+
+## 后记
+
+问题定位过程极其复杂，本文所总结的步骤是假设精通 k8s、cilium 的底层原理和代码实现以及排障方法的情况下的理想步骤，实际过程复杂很多倍，去除了很多不相关的排查细节。
+
+面对 k8s 和 cilium 这种巨型项目，利用 AI 辅助分析和梳理可以提升不少效率，其中测试程序也是由 AI 编写的。
