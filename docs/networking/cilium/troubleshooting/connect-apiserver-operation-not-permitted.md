@@ -1,4 +1,4 @@
-# 问题排查：访问 APIServer 报错 operation not permitted
+# 问题排查：连接 APIServer 报错 operation not permitted
 
 ## 问题现象
 
