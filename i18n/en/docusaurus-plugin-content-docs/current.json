@@ -90,5 +90,9 @@
   "sidebar.tkeSidebar.category.实用 kubectl 脚本": {
     "message": "Useful kubectl Scripts",
     "description": "The label for category 实用 kubectl 脚本 in sidebar tkeSidebar"
-  }
+  },
+  "sidebar.tkeSidebar.category.Cilium 问题排查": {
+    "message": "Troubleshooting Cilium",
+    "description": "The label for category Cilium 问题排查 in sidebar tkeSidebar"
+  },
 }
