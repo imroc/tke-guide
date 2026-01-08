@@ -571,7 +571,7 @@ Phenomenon summary: Removing an endpoint from Service A's EndpointSlice can actu
 
 The key is in the `BackendInstanceKey.Key` implementation. When SourcePriority is 0, we should also add a space at the end. This will solve the problem. Using the current issue as an example, `default/kubernetes ` will no longer be a prefix of `default/kubernetes-intranet ` because it has a trailing space.
 
-The issue and fix have been submitted to the community:
+The issue and PR have been submitted to the community:
 
 - Issue: https://github.com/cilium/cilium/issues/43619
 - PR: https://github.com/cilium/cilium/pull/43620
