@@ -553,7 +553,7 @@ $ kubectl -n kube-system exec ds/cilium -- cilium shell -- db/show frontends | g
 ```txt
 $ kubectl -n default patch service test-extended -p '{"metadata": {"annotations": {"test": "'$(date +%s)'"}}}'
 service/test-extended patched
-$ kubectl --namespace=kube-system exec ds/cilium -- cilium shell -- db/show frontends | grep test
+$ kubectl -n kube-system exec ds/cilium -- cilium shell -- db/show frontends | grep test
 192.168.71.144:80/TCP     ClusterIP      default/test                                                                                               Done     5m38s
 192.168.92.25:80/TCP      ClusterIP      default/test-extended                                                                                      Done     7s
 ```
@@ -561,7 +561,7 @@ $ kubectl --namespace=kube-system exec ds/cilium -- cilium shell -- db/show fron
 可以看到重新对账后，`test-extended` 这个 Service 的后端地址也被清空了，再看这个 Service 在 ebpf 层面的后端数据，也是没有后端，无法路由(non-routeable)：
 
 ```bash
-$ kubectl --namespace=kube-system exec ds/cilium -- cilium bpf lb list | grep 192.168.92.25
+$ kubectl -n kube-system exec ds/cilium -- cilium bpf lb list | grep 192.168.92.25
 192.168.92.25:80/TCP (0)      0.0.0.0:0 (21) (0) [ClusterIP, non-routable]
 ```
 

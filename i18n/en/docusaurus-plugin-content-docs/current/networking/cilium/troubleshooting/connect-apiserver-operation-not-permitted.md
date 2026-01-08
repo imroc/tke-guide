@@ -553,7 +553,7 @@ Then patch the `test-extended` Service to trigger cilium-agent to re-reconcile t
 ```txt
 $ kubectl -n default patch service test-extended -p '{"metadata": {"annotations": {"test": "'$(date +%s)'"}}}'
 service/test-extended patched
-$ kubectl --namespace=kube-system exec ds/cilium -- cilium shell -- db/show frontends | grep test
+$ kubectl -n kube-system exec ds/cilium -- cilium shell -- db/show frontends | grep test
 192.168.71.144:80/TCP     ClusterIP      default/test                                                                                               Done     5m38s
 192.168.92.25:80/TCP      ClusterIP      default/test-extended                                                                                      Done     7s
 ```
@@ -561,7 +561,7 @@ $ kubectl --namespace=kube-system exec ds/cilium -- cilium shell -- db/show fron
 We can see that after re-reconciliation, the `test-extended` Service's backend address is also cleared. Looking at this Service's backend data at the eBPF level, there's also no backend and it's non-routable:
 
 ```bash
-$ kubectl --namespace=kube-system exec ds/cilium -- cilium bpf lb list | grep 192.168.92.25
+$ kubectl -n kube-system exec ds/cilium -- cilium bpf lb list | grep 192.168.92.25
 192.168.92.25:80/TCP (0)      0.0.0.0:0 (21) (0) [ClusterIP, non-routable]
 ```
 
