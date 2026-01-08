@@ -218,23 +218,23 @@ objectRef.namespace:"default" AND objectRef.name:"kubernetes*" AND (NOT verb:get
 ```go showLineNumbers title="pkg/loadbalancer/reflectors/k8s.go"
 func runServiceEndpointsReflector(ctx context.Context, health cell.Health, p reflectorParams, initServices, initEndpoints func(writer.WriteTxn)) error {
   // ...
-	processEndpointsEvent := func(txn writer.WriteTxn, key bufferKey, kind resource.EventKind, allEps allEndpoints) {
-		switch kind {
+  processEndpointsEvent := func(txn writer.WriteTxn, key bufferKey, kind resource.EventKind, allEps allEndpoints) {
+    switch kind {
     // ...
-		case resource.Upsert:
-			backends := convertEndpoints(p.Log, p.ExtConfig, name, allEps.Backends())
+    case resource.Upsert:
+      backends := convertEndpoints(p.Log, p.ExtConfig, name, allEps.Backends())
       // highlight-next-line
-			p.Log.Info("DEBUG: convertEndpoints in processEndpointsEvent", "name", name.String(), "backends", slices.Collect(backends))
+      p.Log.Info("DEBUG: convertEndpoints in processEndpointsEvent", "name", name.String(), "backends", slices.Collect(backends))
 
-			// Find orphaned backends. We are using iter.Seq to avoid unnecessary allocations.
-			var orphans iter.Seq[loadbalancer.L3n4Addr] = func(yield func(loadbalancer.L3n4Addr) bool) {
+      // Find orphaned backends. We are using iter.Seq to avoid unnecessary allocations.
+      var orphans iter.Seq[loadbalancer.L3n4Addr] = func(yield func(loadbalancer.L3n4Addr) bool) {
         // ...
-			}
+      }
       // highlight-next-line
-			p.Log.Info("DEBUG: UpsertAndReleaseBackends in processEndpointsEvent", "name", name.String(), "backends", slices.Collect(backends), "orphans", slices.Collect(orphans))
-			err = p.Writer.UpsertAndReleaseBackends(txn, name, source.Kubernetes, backends, orphans)
-		}
-	}
+      p.Log.Info("DEBUG: UpsertAndReleaseBackends in processEndpointsEvent", "name", name.String(), "backends", slices.Collect(backends), "orphans", slices.Collect(orphans))
+      err = p.Writer.UpsertAndReleaseBackends(txn, name, source.Kubernetes, backends, orphans)
+    }
+  }
   // ...
 }
 ```
@@ -367,11 +367,11 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 再继续看传入的自己的 ip 的值的来源（`c.PublicIP`），如果 kube-apiserver 配置了 `--advertise-address` 参数，会优先使用此地址作为自己的 ip：
 
 ```go
-	fs.IPVar(&s.AdvertiseAddress, "advertise-address", s.AdvertiseAddress, ""+
-		"The IP address on which to advertise the apiserver to members of the cluster. This "+
-		"address must be reachable by the rest of the cluster. If blank, the --bind-address "+
-		"will be used. If --bind-address is unspecified, the host's default interface will "+
-		"be used.")
+  fs.IPVar(&s.AdvertiseAddress, "advertise-address", s.AdvertiseAddress, ""+
+    "The IP address on which to advertise the apiserver to members of the cluster. This "+
+    "address must be reachable by the rest of the cluster. If blank, the --bind-address "+
+    "will be used. If --bind-address is unspecified, the host's default interface will "+
+    "be used.")
 ```
 
 查看 TKE 集群的 kube-apiserver 启动参数，配置了该参数，且值为 `default/kubernetes` 这个 endpoint 的 ip 地址：
@@ -399,21 +399,21 @@ TKE 的 kube-apiserver 默认是多副本高可用部署，其对外地址由一
 
 ```go title="pkg/loadbalancer/writer/writer.go"
 func backendRelease(be *loadbalancer.Backend, name loadbalancer.ServiceName) (*loadbalancer.Backend, bool) {
-	instances := be.Instances
-	if be.Instances.Len() == 1 {
-		for k := range be.Instances.All() {
-			if k.ServiceName == name {
-				return nil, true
-			}
-		}
-	}
-	// 如果 Service 匹配，从 backend 中删除对应的实例
-	for k := range be.GetInstancesOfService(name) {
-		instances = instances.Delete(k)
-	}
-	beCopy := *be
-	beCopy.Instances = instances
-	return &beCopy, beCopy.Instances.Len() == 0
+  instances := be.Instances
+  if be.Instances.Len() == 1 {
+    for k := range be.Instances.All() {
+      if k.ServiceName == name {
+        return nil, true
+      }
+    }
+  }
+  // 如果 Service 匹配，从 backend 中删除对应的实例
+  for k := range be.GetInstancesOfService(name) {
+    instances = instances.Delete(k)
+  }
+  beCopy := *be
+  beCopy.Instances = instances
+  return &beCopy, beCopy.Instances.Len() == 0
 }
 ```
 
@@ -422,22 +422,22 @@ func backendRelease(be *loadbalancer.Backend, name loadbalancer.ServiceName) (*l
 ```go title="pkg/loadbalancer/backend.go"
 // pkg/loadbalancer/backend.go
 func (be *Backend) GetInstancesOfService(name ServiceName) iter.Seq2[BackendInstanceKey, BackendParams] {
-	return be.Instances.Prefix(BackendInstanceKey{ServiceName: name, SourcePriority: 0})
+  return be.Instances.Prefix(BackendInstanceKey{ServiceName: name, SourcePriority: 0})
 }
 
 type BackendInstanceKey struct {
-	ServiceName    ServiceName
-	SourcePriority uint8
+  ServiceName    ServiceName
+  SourcePriority uint8
 }
 
 func (k BackendInstanceKey) Key() []byte {
-	if k.SourcePriority == 0 { // 关键，当 SourcePriority 为 0 时，key 等于 ServiceName
-		return k.ServiceName.Key()
-	}
-	sk := k.ServiceName.Key()
-	buf := make([]byte, 0, 2+len(sk))
-	buf = append(buf, sk...)
-	return append(buf, ' ', k.SourcePriority)
+  if k.SourcePriority == 0 { // 关键，当 SourcePriority 为 0 时，key 等于 ServiceName
+    return k.ServiceName.Key()
+  }
+  sk := k.ServiceName.Key()
+  buf := make([]byte, 0, 2+len(sk))
+  buf = append(buf, sk...)
+  return append(buf, ' ', k.SourcePriority)
 }
 ```
 
