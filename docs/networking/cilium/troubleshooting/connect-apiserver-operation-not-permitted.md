@@ -114,7 +114,7 @@ $ kubectl get endpointslices.discovery.k8s.io kubernetes-intranet-qxgk4 -o yaml 
 
 通过手动删除重建 `kubernetes-intranet` 对应的 EndpointSlice，确实也能复现改问题。
 
-但实际上，这个 Service 对应的 EndpointSlice 一直是存在的，没有被删除重建：
+回到当前问题，实际上这个 Service 对应的 EndpointSlice 一直是存在的，并没有被删除重建：
 
 ```txt
 $ kubectl get endpointslices kubernetes-intranet-qxgk4
