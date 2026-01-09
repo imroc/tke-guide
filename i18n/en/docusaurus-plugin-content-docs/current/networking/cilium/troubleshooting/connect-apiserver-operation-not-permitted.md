@@ -114,7 +114,7 @@ This creates a circular dependency - once the EndpointSlice corresponding to `ku
 
 This issue can indeed be reproduced by manually deleting and recreating the EndpointSlice corresponding to `kubernetes-intranet`.
 
-However, in reality, the EndpointSlice for this Service has always existed and was never deleted and recreated:
+Returning to the current issue, the EndpointSlice corresponding to this Service has actually always existed and has not been deleted or recreated:
 
 ```txt
 $ kubectl get endpointslices kubernetes-intranet-qxgk4
