@@ -576,6 +576,8 @@ The issue and PR have been submitted to the community:
 - Issue: https://github.com/cilium/cilium/issues/43619
 - PR: https://github.com/cilium/cilium/pull/43620
 
+The pull request has been merged, and the issue is expected to be resolved by upgrading Cilium in the next version release.
+
 ## Afterword
 
 The debugging process was extremely complex. We suspected issues with the kernel, k8s, and TKE, but ultimately identified it as a bug in cilium. The troubleshooting steps summarized in this article assume expertise in the underlying principles and code implementation of k8s and cilium, as well as proficiency in their respective debugging methods and tools - these are the ideal steps. The actual process was many times more complex, with many unrelated debugging details removed.
