@@ -93,7 +93,7 @@ ID   Frontend                  Service Type   Backend
 7    192.168.60.179:443/TCP    ClusterIP
 ```
 
-cilium 中记录的 backend 地址来源是 k8s Service 关联的 EndpointSlice，查看改 Service 对应的 EndpointSlice 是存在地址的，且确认与 Service 的关联关系也是正确的：
+cilium 中记录的 backend 地址来源是 k8s Service 关联的 EndpointSlice，查看该 Service 对应的 EndpointSlice 是存在地址的，且确认与 Service 的关联关系也是正确的：
 
 ```txt
 $ kubectl get endpointslices.discovery.k8s.io | grep kubernetes-intranet
@@ -575,6 +575,8 @@ $ kubectl -n kube-system exec ds/cilium -- cilium bpf lb list | grep 192.168.92.
 
 - issue: https://github.com/cilium/cilium/issues/43619
 - PR: https://github.com/cilium/cilium/pull/43620
+
+PR 已经合并，预计下一次版本 release 后升级下 cilium 即可解决。
 
 ## 后记
 
