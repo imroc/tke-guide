@@ -1,10 +1,10 @@
-# 启用加密
+# 启用通信加密
 
 ## 概述
 
-本文介绍如何对 Pod 之间的通信进行加密。
+本文介绍如何使用 Cilium 给流量进行加密。
 
-## 可以使用什么加密方式？
+## 可以使用哪些加密方式？
 
 Cilium 支持以下加密方式：
 
@@ -16,16 +16,16 @@ Cilium 支持以下加密方式：
 
 ## 启用 wireguard 加密
 
-使用 wireguard 方式加密的前提条件是内核安装了 wireguard 内核模块。
+使用 wireguard 方式加密的前提条件是内核安装了 wireguard 内核模块（已知 TencentOS 4 是有的）。
 
-启用 wireguard 加密：
+启用 wireguard 加密的方法：
 
 ```bash
 helm upgrade cilium cilium/cilium --version 1.18.6 \
   --namespace kube-system \
   --reuse-values \
-  --encryption.enabled=true \
-  --encryption.type=wireguard
+  --set encryption.enabled=true \
+  --set encryption.type=wireguard
 ```
 
 ## 参考资料
