@@ -13,7 +13,7 @@ Hubble 包括 Hubble Server 和 Hubble Relay，其中 Hubble Server 已内置到
 使用下面的命令启用 Hubble Relay：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.18.5 \
+helm upgrade cilium cilium/cilium --version 1.18.6 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.relay.image.repository=quay.tencentcloudcr.com/cilium/hubble-relay \
@@ -44,11 +44,11 @@ Containers:            cilium                   Running: 3
                        # highlight-next-line
                        hubble-relay             Running: 1
 Cluster Pods:          4/4 managed by Cilium
-Helm chart version:    1.18.5
-Image versions         cilium             quay.tencentcloudcr.com/cilium/cilium:v1.18.5@sha256:5649db451c88d928ea585514746d50d91e6210801b300c897283ea319d68de15: 3
+Helm chart version:    1.18.6
+Image versions         cilium             quay.tencentcloudcr.com/cilium/cilium:v1.18.6@sha256:5649db451c88d928ea585514746d50d91e6210801b300c897283ea319d68de15: 3
                        cilium-envoy       quay.tencentcloudcr.com/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222@sha256:ca76eb4e9812d114c7f43215a742c00b8bf41200992af0d21b5561d46156fd15: 3
-                       cilium-operator    quay.tencentcloudcr.com/cilium/operator-generic:v1.18.5@sha256:b5a0138e1a38e4437c5215257ff4e35373619501f4877dbaf92c89ecfad81797: 2
-                       hubble-relay       quay.tencentcloudcr.com/cilium/hubble-relay:v1.18.5@sha256:e53e00c47fe4ffb9c086bad0c1c77f23cb968be4385881160683d9e15aa34dc3: 1
+                       cilium-operator    quay.tencentcloudcr.com/cilium/operator-generic:v1.18.6@sha256:b5a0138e1a38e4437c5215257ff4e35373619501f4877dbaf92c89ecfad81797: 2
+                       hubble-relay       quay.tencentcloudcr.com/cilium/hubble-relay:v1.18.6@sha256:e53e00c47fe4ffb9c086bad0c1c77f23cb968be4385881160683d9e15aa34dc3: 1
 ```
 
 ## 安装 Hubble 客户端
@@ -72,7 +72,7 @@ Hubble UI 可用于可视化查看集群中的服务拓扑。
 使用下面的命令启用 Hubble UI：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.18.5 \
+helm upgrade cilium cilium/cilium --version 1.18.6 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.relay.enabled=true \
