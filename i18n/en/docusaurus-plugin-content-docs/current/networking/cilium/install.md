@@ -71,61 +71,6 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
 
 ## Install Cilium
 
-### Upgrade tke-eni-agent
-
-Since Cilium uses routing table IDs 2004 and 2005 fixedly, which may conflict with the routing table IDs used by TKE's VPC-CNI network mode, the new version of VPC-CNI network mode will adjust the routing table ID generation algorithm to avoid conflicts with Cilium's routing table IDs. However, it has not been officially released yet (v3.8.0 version), so you can manually upgrade the image version to v3.8.0 rc version here.
-
-Upgrade the tke-eni-agent image version using the following script:
-
-:::info[Note]
-
-After the eniipamd component is officially released with v3.8.0, you can upgrade eniipamd in the component management.
-
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F31%2F20251031120006.png)
-
-:::
-
-<Tabs>
-  <TabItem value="1" label="bash">
-
-```bash
-# Get current image
-CURRENT_IMAGE=$(kubectl get daemonset tke-eni-agent -n kube-system \
-  -o jsonpath='{.spec.template.spec.containers[0].image}')
-
-# Construct new image name (keep repository path, replace tag)
-REPOSITORY=${CURRENT_IMAGE%%:*}
-NEW_IMAGE="${REPOSITORY}:v3.8.0-rc.0"
-
-# Upgrade tke-eni-agent image
-kubectl patch daemonset tke-eni-agent -n kube-system \
-  --type='json' \
-  -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "'"${NEW_IMAGE}"'"}]'
-```
-
-  </TabItem>
-  <TabItem value="2" label="fish">
-
-```bash
-# Get current image
-set -l current_image (kubectl get daemonset tke-eni-agent -n kube-system \
-  -o jsonpath="{.spec.template.spec.containers[0].image}")
-
-# Extract repository path (remove tag part)
-set -l repository (echo $current_image | awk -F: '{print $1}')
-
-# Construct new image name
-set -l new_image "$repository:v3.8.0-rc.0"
-
-# Upgrade tke-eni-agent image
-kubectl patch daemonset tke-eni-agent -n kube-system \
-  --type='json' \
-  -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "'$new_image'"}]'
-```
-
-  </TabItem>
-</Tabs>
-
 ### Configure CNI
 
 Prepare the CNI configuration ConfigMap `cni-config.yaml` for Cilium:

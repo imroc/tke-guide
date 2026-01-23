@@ -70,61 +70,6 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
 
 ## 安装 cilium
 
-### 升级 tke-eni-agent
-
-由于 cilium 固定使用了 2004 和 2005 两个路由表 ID，可能会与 TKE 的 VPC-CNI 网络模式所使用的路由表 ID 冲突，新版 VPC-CNI 网络模式将会调整路由表 ID 生成的算法，避免与 cilium 的路由表 ID 冲突，但目前还没正式发版（v3.8.0 版本），所以这里可以先手动升级镜像版本到 v3.8.0 的 rc 版。
-
-通过以下脚本升级 tke-eni-agent 镜像版本：
-
-:::info[注意]
-
-等 eniipamd 组件正式发布 v3.8.0 后，可以在组件管理中操作升级 eniipamd。
-
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F31%2F20251031120006.png)
-
-:::
-
-<Tabs>
-  <TabItem value="1" label="bash">
-
-```bash
-# 获取当前镜像
-CURRENT_IMAGE=$(kubectl get daemonset tke-eni-agent -n kube-system \
-  -o jsonpath='{.spec.template.spec.containers[0].image}')
-
-# 构造新镜像名称（保留仓库路径，替换 tag）
-REPOSITORY=${CURRENT_IMAGE%%:*}
-NEW_IMAGE="${REPOSITORY}:v3.8.0-rc.0"
-
-# 升级 tke-eni-agent 镜像
-kubectl patch daemonset tke-eni-agent -n kube-system \
-  --type='json' \
-  -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "'"${NEW_IMAGE}"'"}]'
-```
-
-  </TabItem>
-  <TabItem value="2" label="fish">
-
-```bash
-# 获取当前镜像
-set -l current_image (kubectl get daemonset tke-eni-agent -n kube-system \
-  -o jsonpath="{.spec.template.spec.containers[0].image}")
-
-# 提取仓库路径（去除标签部分）
-set -l repository (echo $current_image | awk -F: '{print $1}')
-
-# 构造新镜像名称
-set -l new_image "$repository:v3.8.0-rc.0"
-
-# 升级 tke-eni-agent 镜像
-kubectl patch daemonset tke-eni-agent -n kube-system \
-  --type='json' \
-  -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "'$new_image'"}]'
-```
-
-  </TabItem>
-</Tabs>
-
 ### 配置 CNI
 
 为 cilium 准备 CNI 配置的 ConfigMap `cni-config.yaml`：
