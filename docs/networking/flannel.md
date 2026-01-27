@@ -13,7 +13,7 @@
 
 在 [容器服务控制台](https://console.cloud.tencent.com/tke2/cluster) 创建 TKE 集群，注意以下关键选项：
 
-- 网络模式选择 VPC-CNI。
+- 网络模式：选择 VPC-CNI。
 - 节点：安装前不要向集群添加任何普通节点或原生节点，避免残留相关规则和配置，等安装完成后再添加。
 - 基础组件：取消勾选安装 ip-masq-agent（VPC-CNI 网络模式下此组件是可选的，由于我们需要安装 flannel，pod ip 固定只能在集群内访问，出集群流量必须 SNAT，而这个功能是 flannel 自带的，所以不需要安装 ip-masq-agent）。
 
@@ -32,15 +32,37 @@
    helm repo add flannel https://flannel-io.github.io/flannel/
    ```
 
-## 卸载 TKE CNI 插件
+## 调整 TKE CNI 插件
 
-由于我们要自建 Flannel CNI，为避免冲突，我们需要卸载 TKE 自带的 CNI 插件：
+由于我们要自建 Flannel CNI，为避免冲突，我们需要避免 TKE 的 CNI 组件调度到注册节点（让 `tke-cni-agent` 这个 DaemonSet 不调度到注册节点）：
 
 ```bash
-kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-kubectl -n kube-system patch daemonset tke-eni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-kubectl -n kube-system patch deployment tke-eni-ipamd -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
+  {
+    "op": "add",
+    "path": "/spec/template/spec/affinity",
+    "value": {
+      "nodeAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+          "nodeSelectorTerms": [
+            {
+              "matchExpressions": [
+                {
+                  "key": "node.kubernetes.io/instance-type",
+                  "operator": "NotIn",
+                  "values": ["external"]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+]'
 ```
+
+> 注册节点的 `node.kubernetes.io/instance-type` 标签值为 `external`，通过上述 nodeAffinity 配置，可以让 `tke-cni-agent` 不调度到注册节点上。
 
 ## 使用 helm 安装 flannel
 
