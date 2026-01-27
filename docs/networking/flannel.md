@@ -29,6 +29,12 @@
    helm repo add flannel https://flannel-io.github.io/flannel/
    ```
 
+## 开启注册节点能力
+
+1. 进入 TKE 集群基本信息页面。
+2. 点击 **基础信息** 选项卡。
+3. 开启 **注册节点能力**：勾选 **专线连接**，选择代理弹性网卡所在子网（用于代理注册节点访问云上资源），最后点击 **确认开启**。
+
 ## 调整 TKE CNI 插件
 
 由于我们要自建 Flannel CNI，为避免冲突，我们需要避免 TKE 的 CNI 组件调度到注册节点（让 `tke-cni-agent` 这个 DaemonSet 不调度到注册节点）：
