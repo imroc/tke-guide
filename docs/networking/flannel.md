@@ -148,8 +148,17 @@ flannel 依赖 br_netfilter 内核模块，如果未加载，会导致 flannel �
 E0127 04:42:47.627500       1 main.go:278] Failed to check br_netfilter: stat /proc/sys/net/bridge/bridge-nf-call-iptables: no such file or directory
 ```
 
-解决方法：确保 br_netfilter 内核模块已加载(modprobe br_netfilter)。
+解决方法：
+
+```bash
+# 加载内核模块
+modprobe br_netfilter
+
+# 设置开机自动加载
+echo "br_netfilter" > /etc/modules-load.d/br_netfilter.conf
+```
 
 ## 相关链接
 
 - [flannel 项目地址](https://github.com/flannel-io/flannel)
+- [podcidr-controller 项目地址](https://github.com/imroc/podcidr-controller)
