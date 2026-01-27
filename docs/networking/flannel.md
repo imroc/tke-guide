@@ -67,6 +67,37 @@ kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
 
 > 注册节点的 `node.kubernetes.io/instance-type` 标签值为 `external`，通过上述 nodeAffinity 配置，可以让 `tke-cni-agent` 不调度到注册节点上。
 
+## 规划集群网段
+
+在安装 flannel 之前，需要先确定好集群网段（Pod CIDR），这个网段将用于为所有 Pod 分配 IP 地址。规划时需注意：
+
+- 网段不能与 VPC 网段冲突，否则 Pod 可能无法访问集群外的资源（比如数据库）。
+- 网段大小决定了集群可分配的 Pod IP 数量（如 /16 可分配约 65534 个 IP）。
+- 确定后不建议更改，请根据业务规模预留足够空间。
+
+## 安装 podcidr-controller
+
+由于 TKE VPC-CNI 模式下没有集群网段概念，kube-controller-manager 不会自动为节点分配 podCIDR，也无法通过自定义参数来实现。而 flannel 依赖节点的 podCIDR 来为 Pod 分配 IP，默认情况下 flannel 依赖 kube-controller-manager 先为节点分配 podCIDR，然后 flannel 再根据当前节点的分配到的 podCIDR 为 Pod 分配 IP。flannel 另外也支持使用 etcd 来存储网段配置和 IP 分配信息，但会引入额外的 etcd，维护成本较高。
+
+为了解决这个问题，可以使用轻量级的 [podcidr-controller](https://github.com/imroc/podcidr-controller) 来自动为节点分配 podCIDR。
+
+使用以下命令安装：
+
+```bash
+helm repo add podcidr-controller https://imroc.github.io/podcidr-controller
+helm repo update podcidr-controller
+
+helm upgrade --install podcidr-controller podcidr-controller/podcidr-controller \
+  -n kube-system \
+  --set clusterCIDR="10.244.0.0/16" \
+  --set nodeCIDRMaskSize=24
+```
+
+参数说明：
+
+- `clusterCIDR`：集群网段，需与后续安装 flannel 时的 `podCidr` 保持一致。
+- `nodeCIDRMaskSize`：每个节点分配的子网掩码大小，如设为 24 表示每个节点可分配 254 个 Pod IP。
+
 ## 使用 helm 安装 flannel
 
 flannel 默认使用基于 vxlan 的 overlay 网络，需要指定一个集群网段（podCidr 参数），集群中所有的 Pod IP 都是从该网段分配，根据自己需求配置 podCidr 参数。
