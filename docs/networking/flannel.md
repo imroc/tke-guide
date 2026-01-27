@@ -81,12 +81,43 @@ helm repo add flannel https://flannel-io.github.io/flannel/
 helm upgrade --install flannel --namespace kube-flannel flannel/flannel \
   --set flannel.image.repository="docker.io/flannel/flannel" \
   --set flannel.image_cni.repository="docker.io/flannel/flannel-cni-plugin" \
+  --set flannel.nodeSelector."node\.kubernetes\.io/instance-type"=external \
   --set podCidr="10.244.0.0/16"
 ```
 
-## 添加注册节点
+## 通过注册节点纳管第三方机器
 
-flannel 安装好后，如果想要纳管第三方节点，可先开启注册节点：
+使用以下方式将第三方机器通过注册节点纳管到 TKE 集群中：
+
+1. 进入 TKE 集群**节点管理**页面。
+2. 点击 **点击节点池** 选项卡。
+3. 点击 **新建**。
+4. 选择 **注册节点** 并点击 **创建**。
+5. 根据自身情况配置并点击 **创建节点池**。
+6. 进入节点池详情页。
+7. 点击 **新建节点**。
+8. 节点初始化方式选择 **内网**。
+9. 根据提示使用注册脚本将第三方机器纳管到 TKE 集群中。
+
+:::tip[备注]
+
+注册脚本会对当前机器进行校验，如果不符合要求，会有告警信息，执行注册时也不会成功。
+
+由于使用 flannel 作为 CNI 插件，对 OS 和内核要求很低，如果不希望严格的校验，可修改注册脚本，将 `check` 函数中的 `check_os` 和 `check_kernel` 函数注释掉。
+
+:::
+
+## 常见问题
+
+### br_netfilter 内核模块未加载
+
+flannel 依赖 br_netfilter 内核模块，如果未加载，会导致 flannel 无法正常工作:
+
+```txt
+E0127 04:42:47.627500       1 main.go:278] Failed to check br_netfilter: stat /proc/sys/net/bridge/bridge-nf-call-iptables: no such file or directory
+```
+
+解决方法：确保 br_netfilter 内核模块已加载(modprobe br_netfilter)。
 
 ## 相关链接
 
