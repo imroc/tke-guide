@@ -2,12 +2,9 @@
 
 ## 概述
 
+如果需要使用 TKE 注册节点纳管第三方节点且需要使用容器网络（Pod 分配 IP），但不希望使用 CiliumOverlay 网络插件（Cilium 有很多限制，且引入了额外的复杂度，大规模场景也可能对 apiserver 有压力），可以在 TKE 自建 Flannel CNI，为注册节点的 Pod 分配 Pod IP。
+
 本文介绍如何在 TKE 自建 Flannel CNI。
-
-## 什么场景需要自建 Flannel CNI？
-
-1. Pod 数量极大，需要消耗大量 IP 资源，希望 Pod IP 不占用 VPC 的 IP 网段（包括 VPC 主网段和辅助网段）。
-2. 使用注册节点纳管第三方节点且需要使用容器网络（Pod 分配 IP），但不希望使用 CiliumOverlay 网络插件（Cilium 有很多限制，且引入了额外的复杂度，大规模场景也可能对 apiserver 有压力）。
 
 ## 准备 TKE 集群
 
