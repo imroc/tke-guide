@@ -316,7 +316,7 @@ cilium-zrxwn                      1/1     Running   0          1m
 
 ### Uninstall TKE Components
 
-Use kubectl patch to clean up all tke-cni-agent and kube-proxy pods:
+Use kubectl patch to uninstall tke-cni-agent and kube-proxy:
 
 ```bash
 kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'

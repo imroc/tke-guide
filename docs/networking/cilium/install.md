@@ -315,7 +315,7 @@ cilium-zrxwn                      1/1     Running   0          1m
 
 ### 卸载 TKE 组件
 
-通过 kubectl patch 来清理 tke-cni-agent 和 kube-proxy 所有 pod：
+通过 kubectl patch 来卸载 tke-cni-agent 和 kube-proxy：
 
 ```bash
 kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'

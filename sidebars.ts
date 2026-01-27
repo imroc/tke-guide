@@ -12,6 +12,7 @@ const sidebars: SidebarsConfig = {
         slug: '/networking'
       },
       items: [
+        'networking/flannel',
         {
           type: 'category',
           label: '在 TKE 自建 Cilium',
