@@ -77,7 +77,7 @@ kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
 
 ## 安装 podcidr-controller
 
-由于 TKE VPC-CNI 模式下没有集群网段概念，kube-controller-manager 不会自动为节点分配 podCIDR，也无法通过自定义参数来实现。而 flannel 依赖节点的 podCIDR 来为 Pod 分配 IP，默认情况下 flannel 依赖 kube-controller-manager 先为节点分配 podCIDR，然后 flannel 再根据当前节点的分配到的 podCIDR 为 Pod 分配 IP。flannel 另外也支持使用 etcd 来存储网段配置和 IP 分配信息，但会引入额外的 etcd，维护成本较高。
+由于 TKE VPC-CNI 模式下没有集群网段概念，kube-controller-manager 不会自动为节点分配 podCIDR，也无法通过自定义参数来实现。而默认情况下 flannel 依赖 kube-controller-manager 先为节点分配 podCIDR，然后 flannel 再根据当前节点的分配到的 podCIDR 为 Pod 分配 IP。flannel 另外也支持使用 etcd 来存储网段配置和 IP 分配信息，但会引入额外的 etcd，维护成本较高。
 
 为了解决这个问题，可以使用轻量级的 [podcidr-controller](https://github.com/imroc/podcidr-controller) 来自动为节点分配 podCIDR。
 
