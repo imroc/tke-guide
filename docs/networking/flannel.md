@@ -49,7 +49,7 @@
 
 由于安装依赖的 helm chart 包在 github，确保当前工具所在环境能够访问 github。
 
-## 使用 kubectl 卸载 TKE 原生网络组件
+## 卸载 TKE 网络组件
 
 为了能让 Flannel CNI 在 TKE 集群上安装和运行，我们需要对 TKE 自带的一些网络组件进行卸载，避免冲突：
 
@@ -69,7 +69,7 @@ kubectl -n kube-system delete replicasets.apps --all
 kubectl patch configmap tke-cni-agent-conf -n kube-system --type='json' -p='[{"op": "remove", "path": "/data"}]'
 ```
 
-## 使用 helm 安装 podcidr-controller
+## 安装 podcidr-controller
 
 由于 TKE VPC-CNI 模式下没有集群网段概念，kube-controller-manager 不会自动为节点分配 podCIDR，也无法通过自定义参数来实现。而默认情况下 flannel 依赖 kube-controller-manager 先为节点分配 podCIDR，然后 flannel 再根据当前节点的分配到的 podCIDR 为 Pod 分配 IP。flannel 另外也支持使用 etcd 来存储网段配置和 IP 分配信息，但会引入额外的 etcd，维护成本较高。
 
@@ -103,7 +103,7 @@ helm upgrade --install podcidr-controller podcidr-controller/podcidr-controller 
 - `removeTaints`: 自动移除节点污点。如果向 TKE 集群加入普通节点或原生节点（非注册节点），默认会给节点添加 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点，等待节点上 VPC-CNI 相关组件就绪后，会自动移除该污点，但由于我们需要使用 flannel 来完全替代 TKE 自带的网络插件，就不会自动移除该污点了，所以利用当前组件来自动移除该污点，避免 Pod 无法调度。
 - `tolerations`: 配置 podcidr-controller 的污点容忍，因为 Flannel CNI 依赖此组件为节点分配 podCIDR，而节点初始化完成也依赖 CNI 就绪，所以这个组件优先级很高，需要容忍一些污点。
 
-## 使用 helm 安装 flannel
+## 安装 flannel
 
 flannel 默认使用基于 vxlan 的 overlay 网络，需要指定一个集群网段（podCidr 参数），集群中所有的 Pod IP 都是从该网段分配，根据自己需求配置 podCidr 参数。
 
@@ -125,7 +125,7 @@ helm upgrade --install flannel --namespace kube-flannel flannel/flannel \
 - `podCidr`: 集群网段，需与 podcidr-controller 中的 `clusterCIDR` 保持一致。
 - `flannel.image.repository` 与 `flannel.image_cni.repository`：指定 flannel 相关镜像地址，默认使用 `ghcr.io`，对节点的网络条件有要求，改为 dockerhub 上的 mirror 地址，在 TKE 环境有镜像加速（包括注册节点），可直接内网拉取镜像。
 
-## 通过注册节点纳管第三方机器
+## 使用注册节点纳管第三方机器
 
 使用以下方式将第三方机器通过注册节点纳管到 TKE 集群中：
 
