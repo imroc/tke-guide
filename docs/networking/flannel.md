@@ -44,11 +44,14 @@
 为了能让 Flannel CNI 在 TKE 集群上安装和运行，我们需要对 TKE 自带的一些网络组件进行卸载，避免冲突：
 
 ```bash
-kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+# 卸载 VPC-CNI 相关网络组件
 kubectl -n kube-system patch daemonset tke-eni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 kubectl -n kube-system patch deployment tke-eni-ipamd -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 kubectl -n kube-system patch deployment tke-eni-ip-scheduler -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 kubectl delete mutatingwebhookconfigurations.admissionregistration.k8s.io add-pod-eni-ip-limit-webhook
+
+# tke-cni-agent 不卸载，用于拷贝基础的 CNI 二进制（如 loopback）到 CNI 二进制目录给 flannel 用，但要禁用 CNI 配置文件，避免与 flannel 的 CNI 配置文件冲突
+kubectl patch configmap tke-cni-agent-conf -n kube-system --type='merge' -p '{"data": {}}'
 ```
 
 ## 使用 helm 安装 podcidr-controller
