@@ -52,7 +52,8 @@ kubectl -n kube-system patch deployment tke-eni-ipamd -p '{"spec":{"replicas":0,
 kubectl -n kube-system patch deployment tke-eni-ip-scheduler -p '{"spec":{"replicas":0,"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 kubectl delete mutatingwebhookconfigurations.admissionregistration.k8s.io add-pod-eni-ip-limit-webhook
 
-# tke-cni-agent 不卸载，用于拷贝基础的 CNI 二进制（如 loopback）到 CNI 二进制目录给 flannel 用，但要禁用 CNI 配置文件，避免与 flannel 的 CNI 配置文件冲突
+# tke-cni-agent 不卸载，用于拷贝基础的 CNI 二进制（如 loopback）到 CNI 二进制目录给 flannel 用，
+# 但要禁用生成 TKE 的 CNI 配置文件，避免与 flannel 的 CNI 配置文件冲突
 kubectl patch configmap tke-cni-agent-conf -n kube-system --type='json' -p='[{"op": "remove", "path": "/data"}]'
 ```
 
