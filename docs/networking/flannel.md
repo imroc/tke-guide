@@ -1,5 +1,13 @@
 # 在 TKE 自建 Flannel
 
+:::warning[警告]
+
+本方案是本人探索的在 TKE 上自建 Flannel 网络的非标方案，不是 TKE 官方方案，没有技术支持和 SLA 保障，请谨慎参考。
+
+目前基础功能跑通了，但未经过其它测试和生产验证。
+
+:::
+
 ## 概述
 
 如果需要使用 TKE 注册节点纳管第三方节点且需要使用容器网络（Pod 分配 IP），但不希望使用 CiliumOverlay 网络插件（Cilium 有很多限制，且引入了额外的复杂度，大规模场景也可能对 apiserver 有压力），可以在 TKE 自建 Flannel CNI，为注册节点的 Pod 分配 Pod IP。
