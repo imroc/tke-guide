@@ -68,13 +68,23 @@ helm upgrade --install podcidr-controller podcidr-controller/podcidr-controller 
   -n kube-system \
   --set clusterCIDR="10.244.0.0/16" \
   --set nodeCIDRMaskSize=24 \
-  --set allocateNodeSelector='[{"key":"node.kubernetes.io/instance-type","operator":"In","values":["external"]}]'
+  --set removeTaints[0]=tke.cloud.tencent.com/eni-ip-unavailable \
+  --set tolerations[0].key=tke.cloud.tencent.com/eni-ip-unavailable \
+  --set tolerations[0].operator=Exists \
+  --set tolerations[1].key=node-role.kubernetes.io/master \
+  --set tolerations[1].operator=Exists \
+  --set tolerations[2].key=tke.cloud.tencent.com/uninitialized \
+  --set tolerations[2].operator=Exists \
+  --set tolerations[3].key=node.cloudprovider.kubernetes.io/uninitialized 、
+  --set tolerations[3].operator=Exists
 ```
 
 参数说明：
 
 - `clusterCIDR`：集群网段，需与后续安装 flannel 时的 `podCidr` 保持一致。
 - `nodeCIDRMaskSize`：每个节点分配的子网掩码大小，如设为 24 表示每个节点可分配 254 个 Pod IP。
+- `removeTaints`: 自动移除节点污点。如果向 TKE 集群加入普通节点或原生节点（非注册节点），默认会给节点添加 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点，等待节点上 VPC-CNI 相关组件就绪后，会自动移除该污点，但由于我们需要使用 flannel 来完全替代 TKE 自带的网络插件，就不会自动移除该污点了，所以利用当前组件来自动移除该污点，避免 Pod 无法调度。
+- `tolerations`: 配置 podcidr-controller 的污点容忍，因为 Flannel CNI 依赖此组件为节点分配 podCIDR，而节点初始化完成也依赖 CNI 就绪，所以这个组件优先级很高，需要容忍一些污点。
 
 ## 使用 helm 安装 flannel
 
@@ -90,15 +100,13 @@ helm repo add flannel https://flannel-io.github.io/flannel/
 helm upgrade --install flannel --namespace kube-flannel flannel/flannel \
   --set podCidr="10.244.0.0/16" \
   --set flannel.image.repository="docker.io/flannel/flannel" \
-  --set flannel.image_cni.repository="docker.io/flannel/flannel-cni-plugin" \
-  --set removeTaints[0]=tke.cloud.tencent.com/eni-ip-unavailable
+  --set flannel.image_cni.repository="docker.io/flannel/flannel-cni-plugin"
 ```
 
 参数说明：
 
 - `podCidr`: 集群网段，需与 podcidr-controller 中的 `clusterCIDR` 保持一致。
 - `flannel.image.repository` 与 `flannel.image_cni.repository`：指定 flannel 相关镜像地址，默认使用 `ghcr.io`，对节点的网络条件有要求，改为 dockerhub 上的 mirror 地址，在 TKE 环境有镜像加速，可直接内网拉取镜像。
-- `removeTaints`: 自动移除节点污点。如果向 TKE 集群加入普通节点或原生节点（非注册节点），默认会给节点添加 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点，等待节点上 VPC-CNI 相关组件就绪后，会自动移除该污点，但由于我们需要使用 flannel 来完全替代 TKE 自带的网络插件，就不会自动移除该污点了，所以利用当前组件来自动移除该污点，避免 Pod 无法调度。
 
 ## 通过注册节点纳管第三方机器
 
