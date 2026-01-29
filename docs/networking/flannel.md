@@ -21,51 +21,11 @@
 1. 如果可以互通就开启内网访问。
 2. 如果不能互通就开启公网访问。当前开启公网访问需要向集群下发 `kubernetes-proxy` 组件作为中转，依赖集群中需要有节点存在（未来可能会取消该依赖，但当前现状是需要依赖），如果要使用公网访问方式，建议向集群先添加个超级节点，以便 `kubernetes-proxy` 的 pod 能够正常调度，等 flannel 安装完成后，再删除该超级节点。
 
-## 准备 helm 环境
-
-1. 确保 [helm](https://helm.sh/zh/docs/intro/install/) 和 [kubectl](https://kubernetes.io/zh-cn/docs/tasks/tools/install-kubectl-linux/) 已安装，并配置好可以连接集群的 kubeconfig（参考 [连接集群](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)）。
-2. 添加 flannel 的 helm repo:
-   ```bash
-   helm repo add flannel https://flannel-io.github.io/flannel/
-   ```
-
 ## 开启注册节点能力
 
 1. 进入 TKE 集群基本信息页面。
 2. 点击 **基础信息** 选项卡。
 3. 开启 **注册节点能力**：勾选 **专线连接**，选择代理弹性网卡所在子网（用于代理注册节点访问云上资源），最后点击 **确认开启**。
-
-## 调整 TKE CNI 插件
-
-由于我们要自建 Flannel CNI，为避免冲突，我们需要避免 TKE 的 CNI 组件调度到注册节点（让 `tke-cni-agent` 这个 DaemonSet 不调度到注册节点）：
-
-```bash
-kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
-  {
-    "op": "add",
-    "path": "/spec/template/spec/affinity",
-    "value": {
-      "nodeAffinity": {
-        "requiredDuringSchedulingIgnoredDuringExecution": {
-          "nodeSelectorTerms": [
-            {
-              "matchExpressions": [
-                {
-                  "key": "node.kubernetes.io/instance-type",
-                  "operator": "NotIn",
-                  "values": ["external"]
-                }
-              ]
-            }
-          ]
-        }
-      }
-    }
-  }
-]'
-```
-
-> 注册节点的 `node.kubernetes.io/instance-type` 标签值为 `external`，通过上述 nodeAffinity 配置，可以让 `tke-cni-agent` 不调度到注册节点上。
 
 ## 规划集群网段
 
@@ -75,7 +35,24 @@ kubectl -n kube-system patch daemonset tke-cni-agent --type='json' -p='[
 - 网段大小决定了集群可分配的 Pod IP 数量（如 /16 可分配约 65534 个 IP）。
 - 确定后不建议更改，请根据业务规模预留足够空间。
 
-## 安装 podcidr-controller
+## 准备安装工具
+
+确保 [helm](https://helm.sh/zh/docs/intro/install/) 和 [kubectl](https://kubernetes.io/zh-cn/docs/tasks/tools/install-kubectl-linux/) 已安装，并配置好可以连接集群的 kubeconfig（参考 [连接集群](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)）。
+
+## 使用 kubectl 卸载 TKE 原生网络组件
+
+为了能让 Flannel CNI 在 TKE 集群上安装和运行，我们需要对 TKE 自带的一些网络组件进行卸载，避免冲突：
+
+```bash
+kubectl -n kube-system delete configmap tke-cni-agent-conf
+kubectl -n kube-system delete daemonset tke-cni-agent
+kubectl -n kube-system delete daemonset tke-eni-agent
+kubectl -n kube-system delete deployment tke-eni-ipamd
+kubectl -n kube-system delete deployment tke-eni-ip-scheduler
+kubectl delete mutatingwebhookconfigurations.admissionregistration.k8s.io add-pod-eni-ip-limit-webhook
+```
+
+## 使用 helm 安装 podcidr-controller
 
 由于 TKE VPC-CNI 模式下没有集群网段概念，kube-controller-manager 不会自动为节点分配 podCIDR，也无法通过自定义参数来实现。而默认情况下 flannel 依赖 kube-controller-manager 先为节点分配 podCIDR，然后 flannel 再根据当前节点的分配到的 podCIDR 为 Pod 分配 IP。flannel 另外也支持使用 etcd 来存储网段配置和 IP 分配信息，但会引入额外的 etcd，维护成本较高。
 
@@ -90,7 +67,8 @@ helm repo update podcidr-controller
 helm upgrade --install podcidr-controller podcidr-controller/podcidr-controller \
   -n kube-system \
   --set clusterCIDR="10.244.0.0/16" \
-  --set nodeCIDRMaskSize=24
+  --set nodeCIDRMaskSize=24 \
+  --set allocateNodeSelector='[{"key":"node.kubernetes.io/instance-type","operator":"In","values":["external"]}]'
 ```
 
 参数说明：
@@ -110,11 +88,17 @@ kubectl label --overwrite ns kube-flannel pod-security.kubernetes.io/enforce=pri
 
 helm repo add flannel https://flannel-io.github.io/flannel/
 helm upgrade --install flannel --namespace kube-flannel flannel/flannel \
+  --set podCidr="10.244.0.0/16" \
   --set flannel.image.repository="docker.io/flannel/flannel" \
   --set flannel.image_cni.repository="docker.io/flannel/flannel-cni-plugin" \
-  --set flannel.nodeSelector."node\.kubernetes\.io/instance-type"=external \
-  --set podCidr="10.244.0.0/16"
+  --set removeTaints[0]=tke.cloud.tencent.com/eni-ip-unavailable
 ```
+
+参数说明：
+
+- `podCidr`: 集群网段，需与 podcidr-controller 中的 `clusterCIDR` 保持一致。
+- `flannel.image.repository` 与 `flannel.image_cni.repository`：指定 flannel 相关镜像地址，默认使用 `ghcr.io`，对节点的网络条件有要求，改为 dockerhub 上的 mirror 地址，在 TKE 环境有镜像加速，可直接内网拉取镜像。
+- `removeTaints`: 自动移除节点污点。如果向 TKE 集群加入普通节点或原生节点（非注册节点），默认会给节点添加 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点，等待节点上 VPC-CNI 相关组件就绪后，会自动移除该污点，但由于我们需要使用 flannel 来完全替代 TKE 自带的网络插件，就不会自动移除该污点了，所以利用当前组件来自动移除该污点，避免 Pod 无法调度。
 
 ## 通过注册节点纳管第三方机器
 
