@@ -44,11 +44,10 @@
 为了能让 Flannel CNI 在 TKE 集群上安装和运行，我们需要对 TKE 自带的一些网络组件进行卸载，避免冲突：
 
 ```bash
-kubectl -n kube-system delete configmap tke-cni-agent-conf
-kubectl -n kube-system delete daemonset tke-cni-agent
-kubectl -n kube-system delete daemonset tke-eni-agent
-kubectl -n kube-system delete deployment tke-eni-ipamd
-kubectl -n kube-system delete deployment tke-eni-ip-scheduler
+kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+kubectl -n kube-system patch daemonset tke-eni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+kubectl -n kube-system patch deployment tke-eni-ipamd -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+kubectl -n kube-system patch deployment tke-eni-ip-scheduler -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 kubectl delete mutatingwebhookconfigurations.admissionregistration.k8s.io add-pod-eni-ip-limit-webhook
 ```
 
@@ -75,7 +74,7 @@ helm upgrade --install podcidr-controller podcidr-controller/podcidr-controller 
   --set tolerations[1].operator=Exists \
   --set tolerations[2].key=tke.cloud.tencent.com/uninitialized \
   --set tolerations[2].operator=Exists \
-  --set tolerations[3].key=node.cloudprovider.kubernetes.io/uninitialized 、
+  --set tolerations[3].key=node.cloudprovider.kubernetes.io/uninitialized \
   --set tolerations[3].operator=Exists
 ```
 
@@ -106,7 +105,7 @@ helm upgrade --install flannel --namespace kube-flannel flannel/flannel \
 参数说明：
 
 - `podCidr`: 集群网段，需与 podcidr-controller 中的 `clusterCIDR` 保持一致。
-- `flannel.image.repository` 与 `flannel.image_cni.repository`：指定 flannel 相关镜像地址，默认使用 `ghcr.io`，对节点的网络条件有要求，改为 dockerhub 上的 mirror 地址，在 TKE 环境有镜像加速，可直接内网拉取镜像。
+- `flannel.image.repository` 与 `flannel.image_cni.repository`：指定 flannel 相关镜像地址，默认使用 `ghcr.io`，对节点的网络条件有要求，改为 dockerhub 上的 mirror 地址，在 TKE 环境有镜像加速（包括注册节点），可直接内网拉取镜像。
 
 ## 通过注册节点纳管第三方机器
 
