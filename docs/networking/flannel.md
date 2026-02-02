@@ -88,7 +88,7 @@ helm upgrade --install flannel --namespace kube-flannel flannel/flannel \
 
 参数说明：
 
-- `podCidr`: 集群网段，需与 podcidr-controller 中的 `clusterCIDR` 保持一致。
+- `podCidr`: 集群网段，指定规划好的集群网段。
 - `flannel.image.repository` 与 `flannel.image_cni.repository`：指定 flannel 相关镜像地址，默认使用 `ghcr.io`，对节点的网络条件有要求，改为 dockerhub 上的 mirror 地址，在 TKE 环境有镜像加速（包括注册节点），可直接内网拉取镜像。
 
 ## 分配 PodCIDR 与移除污点
@@ -106,7 +106,7 @@ helm upgrade --install flannel --namespace kube-flannel flannel/flannel \
 
 方案一是手动维护，比较麻烦。也可以使用这个方案来实现自动化：
 
-- **引入 etcd**：flannel 另外也支持使用 etcd 来存储网段配置和 IP 分配信息，需引入额外的 etcd，需要准备好 etcd（自行部署或购买 [云原生etcd](https://cloud.tencent.com/document/product/457/58176?from=console_document_search) 实例），然后在安装 flannel 时配置好 etcd 相关参数（对应 helm chart 的 `flannel.args` 参数），flannel 参数参考 [flannel 配置文档](https://github.com/flannel-io/flannel/blob/master/Documentation/configuration.md#key-command-line-options)。
+- **引入 etcd**：flannel 也支持使用 etcd 来存储网段配置和 IP 分配信息，只是需要引入额外的 etcd，要求提前准备好 etcd（可以自行部署维护或购买 [云原生etcd](https://cloud.tencent.com/document/product/457/58176?from=console_document_search) 实例），然后在安装 flannel 时配置好 etcd 相关参数（对应 helm chart 的 `flannel.args` 参数），flannel 参数参考 [flannel 配置文档](https://github.com/flannel-io/flannel/blob/master/Documentation/configuration.md#key-command-line-options)。
 - **自研自动移除污点工具**：如果希望添加普通节点或原生节点，又不想手动去移除污点，这个逻辑非常简单，完全可以自己写个小工具来自动移除 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点，比如让 AI 基于 shell-operator 写一个方案，提示词示例：
   ```txt
   使用 shell-operator （https://github.com/flant/shell-operator）实现这个功能：当检测到有 node 加入且包含 tke.cloud.tencent.com/eni-ip-unavailable 这个污点时，自动移除该污点。
@@ -145,7 +145,7 @@ helm upgrade --install podcidr-controller podcidr-controller/podcidr-controller 
 
 参数说明：
 
-- `clusterCIDR`：集群网段，需与后续安装 flannel 时的 `podCidr` 保持一致。
+- `clusterCIDR`：集群网段，需与安装 flannel 时配置的 `podCidr` 保持一致。
 - `nodeCIDRMaskSize`：每个节点分配的子网掩码大小，如设为 24 表示每个节点可分配 254 个 Pod IP。
 - `removeTaints`: 要自动移除节点污点。这里我们指定 `tke.cloud.tencent.com/eni-ip-unavailable` 来移除 TKE 自动为 VPC-CNI 集群普通节点和原生节点自动添加的污点。
 - `tolerations`: 配置 podcidr-controller 的污点容忍，因为 Flannel CNI 依赖此组件为节点分配 podCIDR，而节点初始化完成也依赖 CNI 就绪，所以这个组件优先级很高，需要容忍一些污点。
