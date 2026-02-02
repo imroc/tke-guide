@@ -100,17 +100,26 @@ helm upgrade --install flannel --namespace kube-flannel flannel/flannel \
 
 当节点加入集群后，手动为节点分配 PodCIDR，并将其写入 Node 的 `podCIDR` 字段，如果是普通节点或原生节点，手动移除下 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点，然后节点就可以调度 Pod 了。
 
-### 方案二：维护 etcd + 自研自动移除污点工具
+### 方案二：引入 etcd + 自研自动移除污点工具
 
-flannel 另外也支持使用 etcd 来存储网段配置和 IP 分配信息，需引入额外的 etcd，需要准备好 etcd（自行部署或购买 [云原生etcd](https://cloud.tencent.com/document/product/457/58176?from=console_document_search) 实例），然后在安装 flannel 时配置好 etcd 相关参数（对应 helm 的 `flannel.args` 参数），flannel 参数参考 [flannel 配置文档](https://github.com/flannel-io/flannel/blob/master/Documentation/configuration.md#key-command-line-options)。
+方案一是手动维护，比较麻烦。也可以使用这个方案来实现自动化：
+
+- **引入 etcd**：flannel 另外也支持使用 etcd 来存储网段配置和 IP 分配信息，需引入额外的 etcd，需要准备好 etcd（自行部署或购买 [云原生etcd](https://cloud.tencent.com/document/product/457/58176?from=console_document_search) 实例），然后在安装 flannel 时配置好 etcd 相关参数（对应 helm 的 `flannel.args` 参数），flannel 参数参考 [flannel 配置文档](https://github.com/flannel-io/flannel/blob/master/Documentation/configuration.md#key-command-line-options)。
+- **自研自动移除污点工具**：如果希望添加普通节点或原生节点，又不想手动去移除污点，这个逻辑非常简单，完全可以自己写个小工具来自动移除 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点，比如让 AI 基于 shell-operator 写一个方案，提示词示例：
+
+```txt
+使用 shell-operator （https://github.com/flant/shell-operator）实现这个功能：当检测到有 node 加入且包含 tke.cloud.tencent.com/eni-ip-unavailable 这个污点时，自动移除该污点。
+```
 
 ### 方案三: 使用 podcidr-controller
 
+[podcidr-controller](https://github.com/imroc/podcidr-controller) 是一个开源工具，提供了自动为节点分配 podCIDR 和自动移除节点污点的能力，可以利用此组件来实现自动为 TKE 节点分配 PodCIDR 并移除 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点。
+
 :::info[注意]
 
-:::
+podcidr-controller 不是 TKE 官方维护的组件，仅供参考，不保证其稳定性。
 
-[podcidr-controller](https://github.com/imroc/podcidr-controller) 是一个开源工具，提供了自动为节点分配 podCIDR 和自动移除节点污点的能力，可以利用此组件来实现自动为 TKE 节点分配 PodCIDR 并移除 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点。
+:::
 
 使用以下命令安装：
 
