@@ -113,7 +113,7 @@ helm upgrade --install flannel --namespace kube-flannel flannel/flannel \
 使用 shell-operator （https://github.com/flant/shell-operator）实现这个功能：当检测到有 node 加入且包含 tke.cloud.tencent.com/eni-ip-unavailable 这个污点时，自动移除该污点。
 ```
 
-### 方案三: 使用 podcidr-controller
+### 方案三：使用 podcidr-controller
 
 [podcidr-controller](https://github.com/imroc/podcidr-controller) 是一个开源工具，提供了自动为节点分配 podCIDR 和自动移除节点污点的能力，可以利用此组件来实现自动为 TKE 节点分配 PodCIDR 并移除 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点。
 
