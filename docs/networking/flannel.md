@@ -96,6 +96,8 @@ helm upgrade --install flannel --namespace kube-flannel flannel/flannel \
 - **分配 PodCIDR**：由于 TKE VPC-CNI 模式下没有集群网段概念，kube-controller-manager 不会自动为节点分配 podCIDR，也无法通过自定义参数来实现。而默认情况下 flannel 依赖 kube-controller-manager 先为节点分配 podCIDR，然后 flannel 再根据当前节点的分配到的 podCIDR 为 Pod 分配 IP，所以我们还需要一个能为节点分配 PodCIDR 的方案。
 - **自动移除节点污点**：如果向 TKE VPC-CNI 集群加入普通节点或原生节点（非注册节点），默认会给节点添加 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点，等待节点上 VPC-CNI 相关组件就绪后，会自动移除该污点，但由于我们需要使用 flannel 来完全替代 TKE 自带的网络插件，就不会自动移除该污点了，所以我们还需要为节点移除该污点的方案，避免 Pod 无法调度。
 
+下面给出三种参考方案，可根据自身情况选择合适的方案。
+
 ### 方案一：手动维护 PodCIDR 与污点
 
 当节点加入集群后，手动为节点分配 PodCIDR，并将其写入 Node 的 `podCIDR` 字段，如果是普通节点或原生节点，手动移除下 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点，然后节点就可以调度 Pod 了。
