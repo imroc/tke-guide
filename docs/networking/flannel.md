@@ -104,7 +104,7 @@ helm upgrade --install flannel --namespace kube-flannel flannel/flannel \
 
 方案一是手动维护，比较麻烦。也可以使用这个方案来实现自动化：
 
-- **引入 etcd**：flannel 另外也支持使用 etcd 来存储网段配置和 IP 分配信息，需引入额外的 etcd，需要准备好 etcd（自行部署或购买 [云原生etcd](https://cloud.tencent.com/document/product/457/58176?from=console_document_search) 实例），然后在安装 flannel 时配置好 etcd 相关参数（对应 helm 的 `flannel.args` 参数），flannel 参数参考 [flannel 配置文档](https://github.com/flannel-io/flannel/blob/master/Documentation/configuration.md#key-command-line-options)。
+- **引入 etcd**：flannel 另外也支持使用 etcd 来存储网段配置和 IP 分配信息，需引入额外的 etcd，需要准备好 etcd（自行部署或购买 [云原生etcd](https://cloud.tencent.com/document/product/457/58176?from=console_document_search) 实例），然后在安装 flannel 时配置好 etcd 相关参数（对应 chart 的 `flannel.args` 参数），flannel 参数参考 [flannel 配置文档](https://github.com/flannel-io/flannel/blob/master/Documentation/configuration.md#key-command-line-options)。
 - **自研自动移除污点工具**：如果希望添加普通节点或原生节点，又不想手动去移除污点，这个逻辑非常简单，完全可以自己写个小工具来自动移除 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点，比如让 AI 基于 shell-operator 写一个方案，提示词示例：
 
 ```txt
