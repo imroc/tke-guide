@@ -4,7 +4,7 @@
 
 本方案是在 TKE 上自建 Flannel 容器网络的非标方案，不代表 TKE 官方，没有技术支持和 SLA 保障，请谨慎参考。
 
-目前基础功能跑通了，但未经过其它测试和生产验证。
+步骤中会卸载 TKE 自带的网络组件，原有的容器网络能力将不再可用。目前基础功能跑通了，但未经过其它测试和生产验证。
 
 :::
 
@@ -69,11 +69,48 @@ kubectl -n kube-system delete replicasets.apps --all
 kubectl patch configmap tke-cni-agent-conf -n kube-system --type='json' -p='[{"op": "remove", "path": "/data"}]'
 ```
 
-## 安装 podcidr-controller
+## 安装 flannel
 
-由于 TKE VPC-CNI 模式下没有集群网段概念，kube-controller-manager 不会自动为节点分配 podCIDR，也无法通过自定义参数来实现。而默认情况下 flannel 依赖 kube-controller-manager 先为节点分配 podCIDR，然后 flannel 再根据当前节点的分配到的 podCIDR 为 Pod 分配 IP。flannel 另外也支持使用 etcd 来存储网段配置和 IP 分配信息，但会引入额外的 etcd，维护成本较高。
+flannel 默认使用基于 vxlan 的 overlay 网络，需要指定一个集群网段（podCidr 参数），集群中所有的 Pod IP 都是从该网段分配，根据自己需求配置 podCidr 参数。
 
-为了解决这个问题，可以使用轻量级的 [podcidr-controller](https://github.com/imroc/podcidr-controller) 来自动为节点分配 podCIDR。
+使用如下命令安装 flannel：
+
+```bash
+kubectl create ns kube-flannel
+kubectl label --overwrite ns kube-flannel pod-security.kubernetes.io/enforce=privileged
+
+helm repo add flannel https://flannel-io.github.io/flannel/
+helm upgrade --install flannel --namespace kube-flannel flannel/flannel \
+  --set podCidr="10.244.0.0/16" \
+  --set flannel.image.repository="docker.io/flannel/flannel" \
+  --set flannel.image_cni.repository="docker.io/flannel/flannel-cni-plugin"
+```
+
+参数说明：
+
+- `podCidr`: 集群网段，需与 podcidr-controller 中的 `clusterCIDR` 保持一致。
+- `flannel.image.repository` 与 `flannel.image_cni.repository`：指定 flannel 相关镜像地址，默认使用 `ghcr.io`，对节点的网络条件有要求，改为 dockerhub 上的 mirror 地址，在 TKE 环境有镜像加速（包括注册节点），可直接内网拉取镜像。
+
+## 分配 PodCIDR 与移除污点
+
+- **分配 PodCIDR**：由于 TKE VPC-CNI 模式下没有集群网段概念，kube-controller-manager 不会自动为节点分配 podCIDR，也无法通过自定义参数来实现。而默认情况下 flannel 依赖 kube-controller-manager 先为节点分配 podCIDR，然后 flannel 再根据当前节点的分配到的 podCIDR 为 Pod 分配 IP，所以我们还需要一个能为节点分配 PodCIDR 的方案。
+- **自动移除节点污点**：如果向 TKE VPC-CNI 集群加入普通节点或原生节点（非注册节点），默认会给节点添加 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点，等待节点上 VPC-CNI 相关组件就绪后，会自动移除该污点，但由于我们需要使用 flannel 来完全替代 TKE 自带的网络插件，就不会自动移除该污点了，所以我们还需要为节点移除该污点的方案，避免 Pod 无法调度。
+
+### 方案一：手动维护 PodCIDR 与污点
+
+当节点加入集群后，手动为节点分配 PodCIDR，并将其写入 Node 的 `podCIDR` 字段，如果是普通节点或原生节点，手动移除下 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点，然后节点就可以调度 Pod 了。
+
+### 方案二：维护 etcd + 自研自动移除污点工具
+
+flannel 另外也支持使用 etcd 来存储网段配置和 IP 分配信息，需引入额外的 etcd，需要准备好 etcd（自行部署或购买 [云原生etcd](https://cloud.tencent.com/document/product/457/58176?from=console_document_search) 实例），然后在安装 flannel 时配置好 etcd 相关参数（对应 helm 的 `flannel.args` 参数），flannel 参数参考 [flannel 配置文档](https://github.com/flannel-io/flannel/blob/master/Documentation/configuration.md#key-command-line-options)。
+
+### 方案三: 使用 podcidr-controller
+
+:::info[注意]
+
+:::
+
+[podcidr-controller](https://github.com/imroc/podcidr-controller) 是一个开源工具，提供了自动为节点分配 podCIDR 和自动移除节点污点的能力，可以利用此组件来实现自动为 TKE 节点分配 PodCIDR 并移除 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点。
 
 使用以下命令安装：
 
@@ -100,30 +137,8 @@ helm upgrade --install podcidr-controller podcidr-controller/podcidr-controller 
 
 - `clusterCIDR`：集群网段，需与后续安装 flannel 时的 `podCidr` 保持一致。
 - `nodeCIDRMaskSize`：每个节点分配的子网掩码大小，如设为 24 表示每个节点可分配 254 个 Pod IP。
-- `removeTaints`: 自动移除节点污点。如果向 TKE 集群加入普通节点或原生节点（非注册节点），默认会给节点添加 `tke.cloud.tencent.com/eni-ip-unavailable` 这个污点，等待节点上 VPC-CNI 相关组件就绪后，会自动移除该污点，但由于我们需要使用 flannel 来完全替代 TKE 自带的网络插件，就不会自动移除该污点了，所以利用当前组件来自动移除该污点，避免 Pod 无法调度。
+- `removeTaints`: 要自动移除节点污点。这里我们指定 `tke.cloud.tencent.com/eni-ip-unavailable` 来移除 TKE 自动为 VPC-CNI 集群普通节点和原生节点自动添加的污点。
 - `tolerations`: 配置 podcidr-controller 的污点容忍，因为 Flannel CNI 依赖此组件为节点分配 podCIDR，而节点初始化完成也依赖 CNI 就绪，所以这个组件优先级很高，需要容忍一些污点。
-
-## 安装 flannel
-
-flannel 默认使用基于 vxlan 的 overlay 网络，需要指定一个集群网段（podCidr 参数），集群中所有的 Pod IP 都是从该网段分配，根据自己需求配置 podCidr 参数。
-
-使用如下命令安装 flannel：
-
-```bash
-kubectl create ns kube-flannel
-kubectl label --overwrite ns kube-flannel pod-security.kubernetes.io/enforce=privileged
-
-helm repo add flannel https://flannel-io.github.io/flannel/
-helm upgrade --install flannel --namespace kube-flannel flannel/flannel \
-  --set podCidr="10.244.0.0/16" \
-  --set flannel.image.repository="docker.io/flannel/flannel" \
-  --set flannel.image_cni.repository="docker.io/flannel/flannel-cni-plugin"
-```
-
-参数说明：
-
-- `podCidr`: 集群网段，需与 podcidr-controller 中的 `clusterCIDR` 保持一致。
-- `flannel.image.repository` 与 `flannel.image_cni.repository`：指定 flannel 相关镜像地址，默认使用 `ghcr.io`，对节点的网络条件有要求，改为 dockerhub 上的 mirror 地址，在 TKE 环境有镜像加速（包括注册节点），可直接内网拉取镜像。
 
 ## 使用注册节点纳管第三方机器
 
