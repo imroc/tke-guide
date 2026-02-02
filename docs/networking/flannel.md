@@ -69,9 +69,9 @@ kubectl -n kube-system delete replicasets.apps --all
 kubectl patch configmap tke-cni-agent-conf -n kube-system --type='json' -p='[{"op": "remove", "path": "/data"}]'
 ```
 
-## 安装 flannel
+## 安装 Flannel
 
-flannel 默认使用基于 vxlan 的 overlay 网络，需要指定一个集群网段（podCidr 参数），集群中所有的 Pod IP 都是从该网段分配，根据自己需求配置 podCidr 参数。
+Flannel 默认使用基于 vxlan 的 overlay 网络，需要指定一个集群网段（podCidr 参数），集群中所有的 Pod IP 都是从该网段分配，根据自己需求配置 podCidr 参数。
 
 使用如下命令安装 flannel：
 
