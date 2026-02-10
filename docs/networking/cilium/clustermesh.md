@@ -13,14 +13,14 @@
 安装 cilium 时指定下集群名称（可与 TKE 集群 ID 相同，格式 cls-xxx）、集群数字 ID（1-255）和 clustermesh-apiserver 组件内网 CLB 所在子网 ID（该组件用于暴露当前集群 cilium 控制面给其它 cilium 集群，使用 LoadBalancer 类型 Service 方式创建 CLB，内网 CLB 需指定子网 ID）：
 
 ```bash
-helm --kube-context=$CLUSTER1 upgrade --install cilium cilium/cilium --version 1.18.6 \
+helm --kube-context=$CLUSTER1 upgrade --install cilium cilium/cilium --version 1.19.0 \
   --namespace kube-system \
   --set cluster.name=$CLUSTER1 \
   --set cluster.id=1 \
   --set clustermesh.apiserver.service.annotations."service\.kubernetes\.io\/qcloud\-loadbalancer\-internal\-subnetid"="$CLUSTER1_SUBNET_ID" \
   # 省略其它参数
 
-helm --kube-context=$CLUSTER2 upgrade --install cilium cilium/cilium --version 1.18.6 \
+helm --kube-context=$CLUSTER2 upgrade --install cilium cilium/cilium --version 1.19.0 \
   --namespace kube-system \
   --set cluster.name=$CLUSTER2 \
   --set cluster.id=2 \

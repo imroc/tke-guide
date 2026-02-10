@@ -22,22 +22,27 @@ Kubernetes 原生的 NetworkPolicy 和 Cilium 的 CiliumNetworkPolicy 都用于�
 ### 主要差异说明
 
 **1. L7 协议感知**
+
 - NetworkPolicy 只能控制到 L3/L4 层（IP 地址和端口）。
 - CiliumNetworkPolicy 可以深入到 L7 层，控制 HTTP 方法、路径、header，gRPC 方法等。
 
 **2. FQDN 域名支持**
+
 - NetworkPolicy 只能使用 IP 或 CIDR，无法直接控制域名访问。
 - CiliumNetworkPolicy 支持 `toFQDNs`，可以直接使用域名和通配符模式。
 
 **3. 显式拒绝规则**
+
 - NetworkPolicy 采用白名单模式，未匹配的流量默认拒绝，但无法显式拒绝特定流量。
 - CiliumNetworkPolicy 支持 `egressDeny`/`ingressDeny`，可以在允许大部分流量的同时显式拒绝特定目标。
 
 **4. 实体选择器**
+
 - NetworkPolicy 需要通过 CIDR 或选择器间接指定目标。
 - CiliumNetworkPolicy 提供 `toEntities`/`fromEntities`，可以直接选择 `kube-apiserver`、`host`、`remote-node`、`world` 等预定义实体。
 
 **5. 选择器灵活性**
+
 - NetworkPolicy 使用标准的 `podSelector` 和 `namespaceSelector`。
 - CiliumNetworkPolicy 的 `endpointSelector` 支持更复杂的表达式。
 
@@ -66,39 +71,47 @@ CiliumNetworkPolicy 和 CiliumClusterwideNetworkPolicy 的核心区别在于作�
 ### 主要差异说明
 
 **1. 作用域和资源位置**
+
 - CiliumNetworkPolicy 必须创建在特定命名空间中，通过 `metadata.namespace` 指定。
 - CiliumClusterwideNetworkPolicy 是集群级资源，没有命名空间概念。
 
 **2. 选择器行为**
+
 - CiliumNetworkPolicy 的 `endpointSelector` 默认只选择同命名空间的 Pod。
 - CiliumClusterwideNetworkPolicy 的 `endpointSelector` 可以选择集群中任意命名空间的 Pod。
 
 **3. 跨命名空间访问控制**
+
 - CiliumNetworkPolicy 控制跨命名空间访问时，需要在 `toEndpoints`/`fromEndpoints` 中显式指定命名空间标签。
 - CiliumClusterwideNetworkPolicy 可以直接通过命名空间标签统一管理多个命名空间的策略。
 
 **4. 管理权限和职责分离**
+
 - CiliumNetworkPolicy 可以由命名空间管理员（有该命名空间权限的用户）管理。
 - CiliumClusterwideNetworkPolicy 需要集群管理员权限，适合平台团队管理。
 
 **5. 策略合并和优先级**
+
 - 当同一个 Pod 同时被两种策略选中时，规则会合并生效。
 - 拒绝规则（`egressDeny`/`ingressDeny`）优先于允许规则。
 - 通常使用 CiliumClusterwideNetworkPolicy 设置安全基线，用 CiliumNetworkPolicy 添加应用特定规则。
 
 **6. 配置节点防火墙**
+
 - CiliumClusterwideNetworkPolicy 支持将网络策略应用到节点上，用于设置节点维度防火墙。
 - 这种策略只能由 CiliumClusterwideNetworkPolicy 来配置，CiliumNetworkPolicy 不支持。
 
 ### 典型使用场景
 
 **CiliumNetworkPolicy 适用于：**
+
 - 微服务之间的访问控制。
 - 应用特定的网络隔离需求。
 - 开发团队自主管理的网络策略。
 - 命名空间内的细粒度控制。
 
 **CiliumClusterwideNetworkPolicy 适用于：**
+
 - 集群默认拒绝策略（default deny）。
 - 统一管理多个基础设施命名空间的网络策略。
 - 全局安全基线和合规要求。
@@ -109,18 +122,22 @@ CiliumNetworkPolicy 和 CiliumClusterwideNetworkPolicy 的核心区别在于作�
 ### 最佳实践
 
 **分层管理策略：**
+
 1. 使用 CiliumClusterwideNetworkPolicy 设置集群安全基线（如默认拒绝、DNS 访问、基础设施互通）。
 2. 使用 CiliumNetworkPolicy 实现应用特定的网络策略（如服务间调用、外部 API 访问）。
 
 **权限分离：**
+
 - 平台团队管理 CiliumClusterwideNetworkPolicy，确保集群整体安全。
 - 应用团队管理 CiliumNetworkPolicy，满足业务需求。
 
 **命名规范：**
+
 - 集群策略使用描述性前缀，如 `default-deny-all`、`global-infrastructure`。
 - 命名空间策略使用应用相关名称，如 `frontend-to-backend`、`allow-external-api`。
 
 ## 用法实践
+
 ### 安全基线：默认拒绝
 
 集群默认拒绝 egress 流量（dns 解析除外，kube-system 命名空间中的 pod 除外），严格控制集群 Pod 的网络访问权限：
@@ -131,89 +148,77 @@ CiliumNetworkPolicy 和 CiliumClusterwideNetworkPolicy 的核心区别在于作�
 
 :::
 
- ```yaml
+```yaml
 apiVersion: cilium.io/v2
 kind: CiliumClusterwideNetworkPolicy
 metadata:
-  name: default-deny
+ name: default-deny
 spec:
-  description: "Block all the traffic (except DNS) by default"
-  egress:
-  - toEndpoints: # 允许集群所有 Pod 通过 coredns 解析域名
-    - matchLabels:
-        io.kubernetes.pod.namespace: kube-system
-        k8s-app: kube-dns
-    toPorts:
-    - ports:
-      - port: "53"
-        protocol: ANY
-      rules:
-        dns:
-        - matchPattern: "*"
-  endpointSelector:
-    matchExpressions: # 不限制 kube-system 命名空间中 Pod 的 egress 流量
-    - key: io.kubernetes.pod.namespace
-      operator: NotIn
-      values:
-      - kube-system
- ```
+ description: "Block all the traffic (except DNS) by default"
+ egress:
+ - toEndpoints: # 允许集群所有 Pod 通过 coredns 解析域名
+   - matchLabels:
+       io.kubernetes.pod.namespace: kube-system
+       k8s-app: kube-dns
+   toPorts:
+   - ports:
+     - port: "53"
+       protocol: ANY
+     rules:
+       dns:
+       - matchPattern: "*"
+ endpointSelector:
+   matchExpressions: # 不限制 kube-system 命名空间中 Pod 的 egress 流量
+   - key: io.kubernetes.pod.namespace
+     operator: NotIn
+     values:
+     - kube-system
+```
 
 ### 统一管控基础设施的网络策略
 
 集群中可能会部署许多基础设施相关应用，分散在多个命名空间，我们可以用 CiliumClusterwideNetworkPolicy 和命名空间标签来统一设置这些命名空间的网络策略（假设这些命名空间都打上了 `role=infrastructure` 这个 label）：
 
- ```yaml
+```yaml
 apiVersion: cilium.io/v2
 kind: CiliumClusterwideNetworkPolicy
 metadata:
-  name: default-infrastructure
+ name: default-infrastructure
 spec:
-  endpointSelector: # 选中所有基础设施命名空间中的 Pod
-    matchLabels:
-      io.cilium.k8s.namespace.labels.role: infrastructure
-  egress: # 配置 egress 策略
-  - toEndpoints: # 允许访问所有基础设施命名空间中的 Pod
-    - matchLabels:
-        io.cilium.k8s.namespace.labels.role: infrastructure
-  - toEndpoints: # 允许 访问 coredns 解析域名
-    - matchLabels:
-        io.kubernetes.pod.namespace: kube-system
-        k8s-app: kube-dns
-    toPorts:
-    - ports:
-      - port: "53"
-        protocol: ANY
-      rules:
-        dns:
-        - matchPattern: "*"
-  - toFQDNs: # 允许调用腾讯云相关 API
-    - matchPattern: '*.tencent.com'
-    - matchPattern: '*.*.tencent.com'
-    - matchPattern: '*.*.*.tencent.com'
-    - matchPattern: '*.*.*.*.tencent.com'
-    - matchPattern: '*.*.*.*.*.tencent.com'
-    - matchPattern: '*.tencentcloudapi.com'
-    - matchPattern: '*.*.tencentcloudapi.com'
-    - matchPattern: '*.*.*.tencentcloudapi.com'
-    - matchPattern: '*.*.*.*.tencentcloudapi.com'
-    - matchPattern: '*.*.*.*.*.tencentcloudapi.com'
-    - matchPattern: '*.tencentyun.com'
-    - matchPattern: '*.*.tencentyun.com'
-    - matchPattern: '*.*.*.tencentyun.com'
-    - matchPattern: '*.*.*.*.tencentyun.com'
-    - matchPattern: '*.*.*.*.*.tencentyun.com'
-  - toCIDR: # 允许访问腾讯云上的平台服务
-    - 169.254.0.0/16 # 169.254.0.0/16 是腾讯云上的保留网段，一些平台服务会使用这个 IP，如 TKE 集群 apiserver 的 VIP、COS 存储、镜像仓库等，一些 TKE 自带的组件也会调用该网段提供的接口（如 ipamd），且配置了 hostAlias，不会经过 dns 解析，通过 toFQDNs 去放通 egress 流量将不会生效（toFQDNs 依赖请求要经过 dns 解析）。
-  - toEntities: # 允许访问 apiserver
-    - kube-apiserver
-  - toEntities: # 允许访问集群中所有节点的 10250 端口，可用于监控指标采集
-    - host
-    - remote-node
-    toPorts:
-    - ports:
-      - port: "10250"
-        protocol: TCP
- ```
+ endpointSelector: # 选中所有基础设施命名空间中的 Pod
+   matchLabels:
+     io.cilium.k8s.namespace.labels.role: infrastructure
+ egress: # 配置 egress 策略
+ - toEndpoints: # 允许访问所有基础设施命名空间中的 Pod
+   - matchLabels:
+       io.cilium.k8s.namespace.labels.role: infrastructure
+ - toEndpoints: # 允许 访问 coredns 解析域名
+   - matchLabels:
+       io.kubernetes.pod.namespace: kube-system
+       k8s-app: kube-dns
+   toPorts:
+   - ports:
+     - port: "53"
+       protocol: ANY
+     rules:
+       dns:
+       - matchPattern: "*"
+ - toFQDNs: # 允许调用腾讯云相关 API
+   - matchPattern: '**.tencent.com'
+   - matchPattern: '**.tencentcloudapi.com'
+   - matchPattern: '**.tencentyun.com'
+ - toCIDR: # 允许访问腾讯云上的平台服务
+   - 169.254.0.0/16 # 169.254.0.0/16 是腾讯云上的保留网段，一些平台服务会使用这个 IP，如 TKE 集群 apiserver 的 VIP、COS 存储、镜像仓库等，一些 TKE 自带的组件也会调用该网段提供的接口（如 ipamd），且配置了 hostAlias，不会经过 dns 解析，通过 toFQDNs 去放通 egress 流量将不会生效（toFQDNs 依赖请求要经过 dns 解析）。
+ - toEntities: # 允许访问 apiserver
+   - kube-apiserver
+ - toEntities: # 允许访问集群中所有节点的 10250 端口，可用于监控指标采集
+   - host
+   - remote-node
+   toPorts:
+   - ports:
+     - port: "10250"
+       protocol: TCP
+```
 
 ### 配置节点防火墙
 
@@ -314,8 +319,8 @@ spec:
     - kube-apiserver
 ```
 
-
 ### 限制业务的入流量：保护敏感服务
+
 #### 限制 A 只能被 B 访问，且只能访问 80/TCP 端口
 
 ```yaml
@@ -339,37 +344,37 @@ spec:
 
 #### 限制 A 只能被 B 访问，且只能访问部分接口
 
- ```yaml
+```yaml
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: from-b-to-a-api
+ name: from-b-to-a-api
 spec:
-  description: "Allow HTTP API from a to b"
-  endpointSelector:
-    matchLabels:
-      role: a
-  ingress:
-  - fromEndpoints:
-    - matchLabels:
-        role: b
-    toPorts:
-    - ports:
-      - port: "80"
-        protocol: TCP
-      rules:
-        http:
-        - method: "GET" # 允许 GET /public
-          path: "/public"
-        - method: "PUT" # 允许 PUT /avatar，但需要携带 X-My-Header: true 的 header
-          path: "/avatar$" 
-          headers:
-          - 'X-My-Header: true'
- ```
+ description: "Allow HTTP API from a to b"
+ endpointSelector:
+   matchLabels:
+     role: a
+ ingress:
+ - fromEndpoints:
+   - matchLabels:
+       role: b
+   toPorts:
+   - ports:
+     - port: "80"
+       protocol: TCP
+     rules:
+       http:
+       - method: "GET" # 允许 GET /public
+         path: "/public"
+       - method: "PUT" # 允许 PUT /avatar，但需要携带 X-My-Header: true 的 header
+         path: "/avatar$"
+         headers:
+         - 'X-My-Header: true'
+```
 
 #### 限制 A 只能被集群外部访问
 
-如果 A 对外提供服务， CLB 直连  Pod（参考 [使用 LoadBalancer 直连 Pod 模式 Service](https://cloud.tencent.com/document/product/457/41897)），处理来自公网的请求，不允许其它流量（如来自集群内 Pod 或节点），可配置如下策略：
+如果 A 对外提供服务， CLB 直连 Pod（参考 [使用 LoadBalancer 直连 Pod 模式 Service](https://cloud.tencent.com/document/product/457/41897)），处理来自公网的请求，不允许其它流量（如来自集群内 Pod 或节点），可配置如下策略：
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -403,6 +408,7 @@ spec:
 ```
 
 ### 限制业务的出流量
+
 #### A 只能访问 B
 
 ```yaml
@@ -420,7 +426,7 @@ spec:
         app: b
 ```
 
-#### A 只能访问同名空间下的 Pod 
+#### A 只能访问同名空间下的 Pod
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -475,7 +481,7 @@ spec:
           protocol: TCP
 ```
 
-####  A 只能访问指定域名的服务
+#### A 只能访问指定域名的服务
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -500,23 +506,11 @@ spec:
         - matchPattern: "*"
   - toFQDNs:
     - matchName: 'imroc.cc'
-    - matchPattern: '*.imroc.cc'
-    - matchPattern: '*.*.*.myqcloud.com'
-    - matchPattern: '*.tencent.com'
-    - matchPattern: '*.*.tencent.com'
-    - matchPattern: '*.*.*.tencent.com'
-    - matchPattern: '*.*.*.*.tencent.com'
-    - matchPattern: '*.*.*.*.*.tencent.com'
-    - matchPattern: '*.tencentcloudapi.com'
-    - matchPattern: '*.*.tencentcloudapi.com'
-    - matchPattern: '*.*.*.tencentcloudapi.com'
-    - matchPattern: '*.*.*.*.tencentcloudapi.com'
-    - matchPattern: '*.*.*.*.*.tencentcloudapi.com'
-    - matchPattern: '*.tencentyun.com'
-    - matchPattern: '*.*.tencentyun.com'
-    - matchPattern: '*.*.*.tencentyun.com'
-    - matchPattern: '*.*.*.*.tencentyun.com'
-    - matchPattern: '*.*.*.*.*.tencentyun.com'
+    - matchPattern: '**.imroc.cc'
+    - matchPattern: '**.myqcloud.com'
+    - matchPattern: '**.tencent.com'
+    - matchPattern: '**.tencentcloudapi.com'
+    - matchPattern: '**.tencentyun.com'
 ```
 
 #### 显式禁止：A 不能访问 B
@@ -542,4 +536,3 @@ spec:
 ## 参考资料
 
 - [Cilium NetworkPolicy Examples](https://docs.cilium.io/en/stable/security/policy/language/)
-

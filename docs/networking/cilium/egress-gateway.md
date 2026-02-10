@@ -21,7 +21,7 @@
 启用 Egress Gateway 的 cilium 安装方法：
 
 ```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.18.6 \
+helm upgrade --install cilium cilium/cilium --version 1.19.0 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -77,7 +77,7 @@ kubectl rollout restart deploy cilium-operator -n kube-system
 如果你已经使用了 [安装cilium](install.md) 中 **使用 helm 安装 cilium** 给的安装方法进行了安装，启用 Egress Gateway 的命令可以简化成这样：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.18.6 \
+helm upgrade cilium cilium/cilium --version 1.19.0 \
   --namespace kube-system \
   --reuse-values \
   --set egressGateway.enabled=true \

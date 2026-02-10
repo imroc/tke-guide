@@ -43,7 +43,7 @@ TCR 镜像仓库创建完成后，新建一个命名空间：
 上传 Cilium 镜像之前，得先确认当前的安装配置依赖了哪些镜像，可以使用 `helm template` 并加上计划添加的安装参数，看渲染出来的 YAML 实际使用了哪些镜像：
 
 ```bash
-$ helm template cilium cilium/cilium --version 1.18.6 \
+$ helm template cilium cilium/cilium --version 1.19.0 \
   --namespace kube-system \
   --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
   --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
@@ -66,8 +66,8 @@ $ helm template cilium cilium/cilium --version 1.18.6 \
   --set k8sServicePort=60002 \
   | grep image: | awk -F 'image: "' '/image:/ {gsub(/@sha256:[^"]+"/, ""); print $2}' | sort | uniq
 quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222
-quay.io/cilium/cilium:v1.18.6
-quay.io/cilium/operator-generic:v1.18.6
+quay.io/cilium/cilium:v1.19.0
+quay.io/cilium/operator-generic:v1.19.0
 ```
 
 接着准备上传镜像，可以使用 [skopeo](https://github.com/containers/skopeo) 这个工具将 cilium 依赖镜像搬运到 TCR 镜像仓库中，参考 [Installing Skopeo](https://github.com/containers/skopeo/blob/main/install.md) 进行安装。
@@ -82,8 +82,8 @@ skopeo login xxx.tencentcloudcr.com --username xxx --password xxx
 
 ```bash
 skopeo copy -a docker://quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222
-skopeo copy -a docker://quay.io/cilium/cilium:v1.18.6  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium:v1.18.6
-skopeo copy -a docker://quay.io/cilium/operator-generic:v1.18.6  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/operator-generic:v1.18.6
+skopeo copy -a docker://quay.io/cilium/cilium:v1.19.0  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium:v1.19.0
+skopeo copy -a docker://quay.io/cilium/operator-generic:v1.19.0  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/operator-generic:v1.19.0
 ```
 
 如果你的安装配置所依赖镜像较多，也可以通过脚本来实现一键将所有依赖镜像全部同步到 TCR 镜像仓库中，保存下面的脚本内容到 `sync-cilium-images.sh` 文件中:
@@ -102,7 +102,7 @@ set -e
 
 TARGET_REGISTRY="your-tcr-name.tencentcloudcr.com"
 
-source_images=$(helm template cilium cilium/cilium --version 1.18.6 \
+source_images=$(helm template cilium cilium/cilium --version 1.19.0 \
   --namespace kube-system \
   --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
   --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
@@ -165,7 +165,7 @@ chmod +x sync-cilium-images.sh
 参考 [安装 cilium](https://imroc.cc/tke/networking/cilium/install) 进行安装，替换下依赖镜像为 TCR 镜像仓库中对应的镜像地址：
 
 ```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.18.6 \
+helm upgrade --install cilium cilium/cilium --version 1.19.0 \
   --namespace kube-system \
   # highlight-add-start
   --set image.repository=your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium \
@@ -197,7 +197,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.6 \
 如果已经执行过安装，可通过以下方式修改依赖镜像地址：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.18.6 \
+helm upgrade cilium cilium/cilium --version 1.19.0 \
   --namespace kube-system \
   --reuse-values \
   --set image.repository=your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium \
