@@ -22,22 +22,27 @@ Kubernetes native NetworkPolicy and Cilium's CiliumNetworkPolicy are both used t
 ### Key Differences Explanation
 
 **1. L7 Protocol Awareness**
+
 - NetworkPolicy can only control up to L3/L4 layers (IP addresses and ports).
 - CiliumNetworkPolicy can reach deep into L7 layer, controlling HTTP methods, paths, headers, gRPC methods, etc.
 
 **2. FQDN Domain Name Support**
+
 - NetworkPolicy can only use IPs or CIDRs, unable to directly control domain name access.
 - CiliumNetworkPolicy supports `toFQDNs`, allowing direct use of domain names and wildcard patterns.
 
 **3. Explicit Deny Rules**
+
 - NetworkPolicy uses a whitelist model, implicitly denying unmatched traffic but unable to explicitly deny specific traffic.
 - CiliumNetworkPolicy supports `egressDeny`/`ingressDeny`, allowing explicit denial of specific targets while permitting most traffic.
 
 **4. Entity Selector**
+
 - NetworkPolicy needs to indirectly specify targets through CIDRs or selectors.
 - CiliumNetworkPolicy provides `toEntities`/`fromEntities`, allowing direct selection of predefined entities like `kube-apiserver`, `host`, `remote-node`, `world`.
 
 **5. Selector Flexibility**
+
 - NetworkPolicy uses standard `podSelector` and `namespaceSelector`.
 - CiliumNetworkPolicy's `endpointSelector` supports more complex expressions.
 
@@ -66,39 +71,47 @@ CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy differ primarily in scope
 ### Key Differences Explanation
 
 **1. Scope and Resource Location**
+
 - CiliumNetworkPolicy must be created in specific namespaces, specified via `metadata.namespace`.
 - CiliumClusterwideNetworkPolicy is a cluster-level resource with no namespace concept.
 
 **2. Selector Behavior**
+
 - CiliumNetworkPolicy's `endpointSelector` by default only selects Pods in the same namespace.
 - CiliumClusterwideNetworkPolicy's `endpointSelector` can select Pods from any namespace in the cluster.
 
 **3. Cross-Namespace Access Control**
+
 - When controlling cross-namespace access, CiliumNetworkPolicy needs to explicitly specify namespace labels in `toEndpoints`/`fromEndpoints`.
 - CiliumClusterwideNetworkPolicy can directly manage policies across multiple namespaces through namespace labels.
 
 **4. Management Permissions and Responsibility Separation**
+
 - CiliumNetworkPolicy can be managed by namespace administrators (users with namespace permissions).
 - CiliumClusterwideNetworkPolicy requires cluster administrator permissions, suitable for platform teams.
 
 **5. Policy Merging and Priority**
+
 - When the same Pod is selected by both policy types, rules are merged and take effect.
 - Deny rules (`egressDeny`/`ingressDeny`) take precedence over allow rules.
 - Typically, use CiliumClusterwideNetworkPolicy to set security baselines and CiliumNetworkPolicy to add application-specific rules.
 
 **6. Configuring Node Firewall**
+
 - CiliumClusterwideNetworkPolicy supports applying network policies to nodes for node-level firewall configuration.
 - This type of policy can only be configured by CiliumClusterwideNetworkPolicy; CiliumNetworkPolicy does not support it.
 
 ### Typical Use Cases
 
 **CiliumNetworkPolicy is suitable for:**
+
 - Access control between microservices.
 - Application-specific network isolation requirements.
 - Network policies managed autonomously by development teams.
 - Fine-grained control within namespaces.
 
 **CiliumClusterwideNetworkPolicy is suitable for:**
+
 - Cluster default deny policies.
 - Unified management of network policies across multiple infrastructure namespaces.
 - Global security baselines and compliance requirements.
@@ -109,18 +122,22 @@ CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy differ primarily in scope
 ### Best Practices
 
 **Layered Policy Management:**
+
 1. Use CiliumClusterwideNetworkPolicy to set cluster security baselines (e.g., default deny, DNS access, infrastructure communication).
 2. Use CiliumNetworkPolicy to implement application-specific network policies (e.g., service-to-service calls, external API access).
 
 **Permission Separation:**
+
 - Platform teams manage CiliumClusterwideNetworkPolicy to ensure overall cluster security.
 - Application teams manage CiliumNetworkPolicy to meet business requirements.
 
 **Naming Conventions:**
+
 - Use descriptive prefixes for cluster policies, like `default-deny-all`, `global-infrastructure`.
 - Use application-related names for namespace policies, like `frontend-to-backend`, `allow-external-api`.
 
 ## Usage Practices
+
 ### Security Baseline: Default Deny
 
 Cluster default denies egress traffic (except DNS resolution, and Pods in kube-system namespace), strictly controlling network access permissions for cluster Pods:
@@ -131,89 +148,77 @@ Typically, ingress traffic is not set with global default deny; specific ingress
 
 :::
 
- ```yaml
+```yaml
 apiVersion: cilium.io/v2
 kind: CiliumClusterwideNetworkPolicy
 metadata:
-  name: default-deny
+ name: default-deny
 spec:
-  description: "Block all the traffic (except DNS) by default"
-  egress:
-  - toEndpoints: # Allow all cluster Pods to resolve domain names via coredns
-    - matchLabels:
-        io.kubernetes.pod.namespace: kube-system
-        k8s-app: kube-dns
-    toPorts:
-    - ports:
-      - port: "53"
-        protocol: ANY
-      rules:
-        dns:
-        - matchPattern: "*"
-  endpointSelector:
-    matchExpressions: # Do not restrict egress traffic for Pods in kube-system namespace
-    - key: io.kubernetes.pod.namespace
-      operator: NotIn
-      values:
-      - kube-system
- ```
+ description: "Block all the traffic (except DNS) by default"
+ egress:
+ - toEndpoints: # Allow all cluster Pods to resolve domain names via coredns
+   - matchLabels:
+       io.kubernetes.pod.namespace: kube-system
+       k8s-app: kube-dns
+   toPorts:
+   - ports:
+     - port: "53"
+       protocol: ANY
+     rules:
+       dns:
+       - matchPattern: "*"
+ endpointSelector:
+   matchExpressions: # Do not restrict egress traffic for Pods in kube-system namespace
+   - key: io.kubernetes.pod.namespace
+     operator: NotIn
+     values:
+     - kube-system
+```
 
 ### Unified Management of Infrastructure Network Policies
 
 A cluster may deploy many infrastructure-related applications scattered across multiple namespaces. We can use CiliumClusterwideNetworkPolicy and namespace labels to uniformly set network policies for these namespaces (assuming these namespaces have the `role=infrastructure` label):
 
- ```yaml
+```yaml
 apiVersion: cilium.io/v2
 kind: CiliumClusterwideNetworkPolicy
 metadata:
-  name: default-infrastructure
+ name: default-infrastructure
 spec:
-  endpointSelector: # Select all Pods in infrastructure namespaces
-    matchLabels:
-      io.cilium.k8s.namespace.labels.role: infrastructure
-  egress: # Configure egress policies
-  - toEndpoints: # Allow access to all Pods in infrastructure namespaces
-    - matchLabels:
-        io.cilium.k8s.namespace.labels.role: infrastructure
-  - toEndpoints: # Allow access to coredns for domain resolution
-    - matchLabels:
-        io.kubernetes.pod.namespace: kube-system
-        k8s-app: kube-dns
-    toPorts:
-    - ports:
-      - port: "53"
-        protocol: ANY
-      rules:
-        dns:
-        - matchPattern: "*"
-  - toFQDNs: # Allow calling Tencent Cloud related APIs
-    - matchPattern: '*.tencent.com'
-    - matchPattern: '*.*.tencent.com'
-    - matchPattern: '*.*.*.tencent.com'
-    - matchPattern: '*.*.*.*.tencent.com'
-    - matchPattern: '*.*.*.*.*.tencent.com'
-    - matchPattern: '*.tencentcloudapi.com'
-    - matchPattern: '*.*.tencentcloudapi.com'
-    - matchPattern: '*.*.*.tencentcloudapi.com'
-    - matchPattern: '*.*.*.*.tencentcloudapi.com'
-    - matchPattern: '*.*.*.*.*.tencentcloudapi.com'
-    - matchPattern: '*.tencentyun.com'
-    - matchPattern: '*.*.tencentyun.com'
-    - matchPattern: '*.*.*.tencentyun.com'
-    - matchPattern: '*.*.*.*.tencentyun.com'
-    - matchPattern: '*.*.*.*.*.tencentyun.com'
-  - toCIDR: # Allow access to platform services on Tencent Cloud
-    - 169.254.0.0/16 # 169.254.0.0/16 is a reserved network segment on Tencent Cloud, used by some platform services like TKE cluster apiserver VIP, COS storage, image repositories, etc. Some TKE built-in components also call the API provided by this network cidr (such as ipamd) and are configured with hostAlias, so they will not go through DNS resolution. Therefore, allowing egress traffic through toFQDNs will not work (toFQDNs depends on the request going through DNS resolution).
-  - toEntities: # Allow access to apiserver
-    - kube-apiserver
-  - toEntities: # Allow access to port 10250 on all nodes in the cluster, useful for monitoring metrics collection
-    - host
-    - remote-node
-    toPorts:
-    - ports:
-      - port: "10250"
-        protocol: TCP
- ```
+ endpointSelector: # Select all Pods in infrastructure namespaces
+   matchLabels:
+     io.cilium.k8s.namespace.labels.role: infrastructure
+ egress: # Configure egress policies
+ - toEndpoints: # Allow access to all Pods in infrastructure namespaces
+   - matchLabels:
+       io.cilium.k8s.namespace.labels.role: infrastructure
+ - toEndpoints: # Allow access to coredns for domain resolution
+   - matchLabels:
+       io.kubernetes.pod.namespace: kube-system
+       k8s-app: kube-dns
+   toPorts:
+   - ports:
+     - port: "53"
+       protocol: ANY
+     rules:
+       dns:
+       - matchPattern: "*"
+ - toFQDNs: # Allow calling Tencent Cloud related APIs
+   - matchPattern: '**.tencent.com'
+   - matchPattern: '**.tencentcloudapi.com'
+   - matchPattern: '**.tencentyun.com'
+ - toCIDR: # Allow access to platform services on Tencent Cloud
+   - 169.254.0.0/16 # 169.254.0.0/16 is a reserved network segment on Tencent Cloud, used by some platform services like TKE cluster apiserver VIP, COS storage, image repositories, etc. Some TKE built-in components also call the API provided by this network cidr (such as ipamd) and are configured with hostAlias, so they will not go through DNS resolution. Therefore, allowing egress traffic through toFQDNs will not work (toFQDNs depends on the request going through DNS resolution).
+ - toEntities: # Allow access to apiserver
+   - kube-apiserver
+ - toEntities: # Allow access to port 10250 on all nodes in the cluster, useful for monitoring metrics collection
+   - host
+   - remote-node
+   toPorts:
+   - ports:
+     - port: "10250"
+       protocol: TCP
+```
 
 ### Configuring Node Firewall
 
@@ -315,6 +320,7 @@ spec:
 ```
 
 ### Restricting Business Ingress Traffic: Protecting Sensitive Services
+
 #### Restricting A to only be accessed by B, and only on port 80/TCP
 
 ```yaml
@@ -338,33 +344,33 @@ spec:
 
 #### Restricting A to only be accessed by B, and only specific endpoints
 
- ```yaml
+```yaml
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: from-b-to-a-api
+ name: from-b-to-a-api
 spec:
-  description: "Allow HTTP API from a to b"
-  endpointSelector:
-    matchLabels:
-      role: a
-  ingress:
-  - fromEndpoints:
-    - matchLabels:
-        role: b
-    toPorts:
-    - ports:
-      - port: "80"
-        protocol: TCP
-      rules:
-        http:
-        - method: "GET" # Allow GET /public
-          path: "/public"
-        - method: "PUT" # Allow PUT /avatar, but requires X-My-Header: true header
-          path: "/avatar$" 
-          headers:
-          - 'X-My-Header: true'
- ```
+ description: "Allow HTTP API from a to b"
+ endpointSelector:
+   matchLabels:
+     role: a
+ ingress:
+ - fromEndpoints:
+   - matchLabels:
+       role: b
+   toPorts:
+   - ports:
+     - port: "80"
+       protocol: TCP
+     rules:
+       http:
+       - method: "GET" # Allow GET /public
+         path: "/public"
+       - method: "PUT" # Allow PUT /avatar, but requires X-My-Header: true header
+         path: "/avatar$"
+         headers:
+         - 'X-My-Header: true'
+```
 
 #### Restricting A to only be accessed from outside the cluster
 
@@ -402,6 +408,7 @@ spec:
 ```
 
 ### Restricting Business Egress Traffic
+
 #### A can only access B
 
 ```yaml
@@ -499,23 +506,11 @@ spec:
         - matchPattern: "*"
   - toFQDNs:
     - matchName: 'imroc.cc'
-    - matchPattern: '*.imroc.cc'
-    - matchPattern: '*.*.*.myqcloud.com'
-    - matchPattern: '*.tencent.com'
-    - matchPattern: '*.*.tencent.com'
-    - matchPattern: '*.*.*.tencent.com'
-    - matchPattern: '*.*.*.*.tencent.com'
-    - matchPattern: '*.*.*.*.*.tencent.com'
-    - matchPattern: '*.tencentcloudapi.com'
-    - matchPattern: '*.*.tencentcloudapi.com'
-    - matchPattern: '*.*.*.tencentcloudapi.com'
-    - matchPattern: '*.*.*.*.tencentcloudapi.com'
-    - matchPattern: '*.*.*.*.*.tencentcloudapi.com'
-    - matchPattern: '*.tencentyun.com'
-    - matchPattern: '*.*.tencentyun.com'
-    - matchPattern: '*.*.*.tencentyun.com'
-    - matchPattern: '*.*.*.*.tencentyun.com'
-    - matchPattern: '*.*.*.*.*.tencentyun.com'
+    - matchPattern: '**.imroc.cc'
+    - matchPattern: '**.myqcloud.com'
+    - matchPattern: '**.tencent.com'
+    - matchPattern: '**.tencentcloudapi.com'
+    - matchPattern: '**.tencentyun.com'
 ```
 
 #### Explicit Denial: A cannot access B

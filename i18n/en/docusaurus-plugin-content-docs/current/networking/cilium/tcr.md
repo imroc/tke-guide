@@ -43,7 +43,7 @@ Before uploading Cilium images, you need to configure TCR access credentials. Re
 Before uploading Cilium images, you need to confirm which images your current installation configuration depends on. You can use `helm template` with the planned installation parameters to see which images are actually used in the rendered YAML:
 
 ```bash
-$ helm template cilium cilium/cilium --version 1.18.6 \
+$ helm template cilium cilium/cilium --version 1.19.0 \
   --namespace kube-system \
   --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
   --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
@@ -66,8 +66,8 @@ $ helm template cilium cilium/cilium --version 1.18.6 \
   --set k8sServicePort=60002 \
   | grep image: | awk -F 'image: "' '/image:/ {gsub(/@sha256:[^"]+"/, ""); print $2}' | sort | uniq
 quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222
-quay.io/cilium/cilium:v1.18.6
-quay.io/cilium/operator-generic:v1.18.6
+quay.io/cilium/cilium:v1.19.0
+quay.io/cilium/operator-generic:v1.19.0
 ```
 
 Next, prepare to upload the images. You can use [skopeo](https://github.com/containers/skopeo) to transfer Cilium dependency images to the TCR image repository. Refer to [Installing Skopeo](https://github.com/containers/skopeo/blob/main/install.md) for installation instructions.
@@ -82,8 +82,8 @@ Finally, use skopeo to synchronize all Cilium dependency images to the TCR image
 
 ```bash
 skopeo copy -a docker://quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222
-skopeo copy -a docker://quay.io/cilium/cilium:v1.18.6  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium:v1.18.6
-skopeo copy -a docker://quay.io/cilium/operator-generic:v1.18.6  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/operator-generic:v1.18.6
+skopeo copy -a docker://quay.io/cilium/cilium:v1.19.0  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium:v1.19.0
+skopeo copy -a docker://quay.io/cilium/operator-generic:v1.19.0  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/operator-generic:v1.19.0
 ```
 
 If your installation configuration depends on many images, you can also use a script to synchronize all dependency images to the TCR image repository with one click. Save the following script content to a file named `sync-cilium-images.sh`:
@@ -102,7 +102,7 @@ set -e
 
 TARGET_REGISTRY="your-tcr-name.tencentcloudcr.com"
 
-source_images=$(helm template cilium cilium/cilium --version 1.18.6 \
+source_images=$(helm template cilium cilium/cilium --version 1.19.0 \
   --namespace kube-system \
   --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
   --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
@@ -165,7 +165,7 @@ chmod +x sync-cilium-images.sh
 Refer to [Installing Cilium](https://imroc.cc/tke/networking/cilium/install) for installation, replacing the dependency images with the corresponding image addresses from the TCR image repository:
 
 ```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.18.6 \
+helm upgrade --install cilium cilium/cilium --version 1.19.0 \
   --namespace kube-system \
   # highlight-add-start
   --set image.repository=your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium \
@@ -197,7 +197,7 @@ helm upgrade --install cilium cilium/cilium --version 1.18.6 \
 If you have already performed the installation, you can modify the dependency image addresses in the following way:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.18.6 \
+helm upgrade cilium cilium/cilium --version 1.19.0 \
   --namespace kube-system \
   --reuse-values \
   --set image.repository=your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium \
