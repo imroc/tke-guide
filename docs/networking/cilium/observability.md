@@ -200,3 +200,9 @@ spec:
 找到对应的日志主题，在 CLS 控制台的**索引配置**启用索引的自动配置:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2026%2F02%2F24%2F20260224171517.png)
+
+## 常见问题
+
+### hubble 日志导出的过滤表达式支持哪些字段？
+
+完整列表参考源码 [flow.proto](https://github.com/cilium/cilium/blob/main/api/v1/flow/flow.proto) 中的 `FlowFilter`。
