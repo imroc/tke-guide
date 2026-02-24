@@ -201,21 +201,14 @@ spec:
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
       containZH: false
     - indexName: flow.l4.TCP.source_port
-      indexType: text
-      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
-      containZH: false
+      indexType: long
     - indexName: flow.l4.TCP.destination_port
-      indexType: text
-      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
-      containZH: false
+      indexType: long
     - indexName: flow.l4.UDP.source_port
-      indexType: text
-      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      indexType: long
       containZH: false
     - indexName: flow.l4.UDP.destination_port
-      indexType: text
-      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
-      containZH: false
+      indexType: long
     - indexName: flow.Summary
       indexType: text
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
