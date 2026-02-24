@@ -137,7 +137,7 @@ helm upgrade cilium cilium/cilium --version 1.19.1 \
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2026%2F02%2F24%2F20260224170258.png)
 
-#### 通过 YAML 配置
+#### 通过 YAML 配置（推荐）
 
 TKE 使用 LogConfig 这个 CRD 配置日志采集规则，参考以下 YAML 进行配置（通过 `kubectl apply -f <your-logconfig-yaml-file>` 进行配置）：
 
@@ -148,8 +148,9 @@ metadata:
   name: cilium-network-flow
 spec:
   clsDetail:
-    logsetId: 7466d748-23ce-4c9b-8a9b-40739e4d6bc7 # 替换成你的 CLS 日志集 ID。如不配置，则会自动创建日志集+日志主题，如配置了，只会自动创建日志主题
     region: ap-chengdu # 替换成你的 CLS 所在地域，可用列表参考 https://cloud.tencent.com/document/product/215/106009
+    logsetName: "TKE-cls-k398qwbj-102564" # 替换成你的 CLS 日志集名称。如果存在该名称的日志集，则会使用该日志集，如果不存在，则会新建一个该名称的日志集。
+    topicName: "tke-cls-k398qwbj-cilium-network-flow" # 替换成你的 CLS 日志主题名称，自动创建出来的日志主题会使用该名称。
     extractRule:
       backtracking: "0"
       isGBK: "false"
@@ -158,14 +159,52 @@ spec:
       timeKey: time
       unMatchUpload: "true"
       unMatchedKey: LogParseFailure
+    indexStatus: "on"
     indexs:
     - indexName: namespace
     - indexName: pod_name
     - indexName: container_name
     - indexName: flow.verdict
-      tokenizer: '@&?|#()=''",;:<>[]{}/ \n\t\r\\'
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
       containZH: false
-    autoIndex: true
+    - indexName: flow.IP.source
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.IP.destination
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.l4.TCP.source_port
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.l4.TCP.destination_port
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.Summary
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.traffic_direction
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.trace_reason
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.is_reply
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.Type
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    autoIndex: "true"
     logFormat: default
     logType: json_log
     maxSplitPartitions: 0
