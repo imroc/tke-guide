@@ -114,7 +114,9 @@ helm upgrade cilium cilium/cilium --version 1.19.1 \
    --set hubble.enabled=true \
    --set hubble.export.dynamic.enabled=true \
    --set hubble.export.dynamic.config.content[0].name=all \
-   --set hubble.export.dynamic.config.content[0].filePath=/var/run/cilium/hubble/events-all.log
+   --set hubble.export.dynamic.config.content[0].filePath=/var/run/cilium/hubble/events-all.log \
+   --set hubble.export.dynamic.config.content[0].excludeFilters[0].source_ip="169.254.0.71" \
+   --set hubble.export.dynamic.config.content[0].excludeFilters[1].destination_ip="169.254.0.71"
 ```
 
 日志文件示例：
