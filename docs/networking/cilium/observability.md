@@ -168,6 +168,30 @@ spec:
       indexType: text
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
       containZH: false
+    - indexName: flow.source.pod_name
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.source.namespace
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.source.cluster_name
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.destination.pod_name
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.destination.namespace
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.destination.cluster_name
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
     - indexName: flow.IP.source
       indexType: text
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
@@ -181,6 +205,14 @@ spec:
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
       containZH: false
     - indexName: flow.l4.TCP.destination_port
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.l4.UDP.source_port
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.l4.UDP.destination_port
       indexType: text
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
       containZH: false
