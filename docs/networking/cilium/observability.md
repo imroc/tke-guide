@@ -336,4 +336,4 @@ metadata:
 
 ### excludeFilters 为什么要加 169.254.0.71？
 
-169.254.0.71 是 CLS 的 API 地址的目标 IP，采集的日志会通过这个 IP 上报，如果没有指定 includeFilters，需加上这个 excludeFilters 避免将上报 CLS 日志的流量也记录下来，导致无限循环采集，造成不必要的开销。
+169.254.0.71 是 CLS 的 API 地址的目标 IP，采集的日志会通过这个 IP 上报，如果没有指定 includeFilters，需加上这个 excludeFilters 避免将上报 CLS 日志的流量也作为 cilium 网络日志流记录下来，然后又采集这个日志，又上报，导致无限循环采集，造成不必要的开销。
