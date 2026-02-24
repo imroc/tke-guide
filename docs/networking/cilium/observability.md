@@ -206,3 +206,32 @@ spec:
 ### hubble 日志导出的过滤表达式支持哪些字段？
 
 完整列表参考源码 [flow.proto](https://github.com/cilium/cilium/blob/main/api/v1/flow/flow.proto) 中的 `FlowFilter`。
+
+### hubble 动态日志导出配置存到哪里的？
+
+存在 `kube-system/cilium-flowlog-config` 这个 ConfigMap 中的，可以通过 kubectl 查看当前配置：
+
+```bash
+$ kubectl -n kube-system get cm cilium-flowlog-config -o yaml
+apiVersion: v1
+data:
+  flowlogs.yaml: |
+    flowLogs:
+      - excludeFilters:
+        - source_ip: 169.254.0.71
+        - destination_ip: 169.254.0.71
+        filePath: /var/run/cilium/hubble/events-all.log
+        name: all
+kind: ConfigMap
+metadata:
+  annotations:
+    meta.helm.sh/release-name: cilium
+    meta.helm.sh/release-namespace: kube-system
+  creationTimestamp: "2026-02-24T08:35:22Z"
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  name: cilium-flowlog-config
+  namespace: kube-system
+  resourceVersion: "3967075561"
+  uid: 87978d03-638a-4c31-80d2-0a3e0fe17049
+```
