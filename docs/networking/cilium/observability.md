@@ -99,7 +99,9 @@ $ cilium hubble ui
 
 更多请参考 [Network Observability with Hubble / Service Map & Hubble UI](https://docs.cilium.io/en/stable/observability/hubble/hubble-ui/)。
 
-## 导出网络日志流
+## 网络日志流检索分析
+
+cilium 支持将网络日志流导出到文件，可结合腾讯云 CLS 日志服务采集网络日志流日志文件并进行检索分析，在排障分析时很有用，下面介绍如何操作。
 
 ### 将网络日志流导出到文件
 
