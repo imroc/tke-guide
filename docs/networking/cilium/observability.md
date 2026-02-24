@@ -131,15 +131,15 @@ helm upgrade cilium cilium/cilium --version 1.19.1 \
 
 配置 TKE 日志采集，将所有 cilium-agent 中的日志流文件采集到 CLS。
 
-#### 通过控制台配置
+#### 启用日志采集功能
 
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2026%2F02%2F24%2F20260224170002.png)
-
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2026%2F02%2F24%2F20260224170258.png)
+在配置日志采集规则前，先确保集群开通了日志采集功能，控制台操作路径：**监控告警>日志>业务日志**。
 
 #### 通过 YAML 配置（推荐）
 
-TKE 使用 LogConfig 这个 CRD 配置日志采集规则，参考以下 YAML 进行配置（通过 `kubectl apply -f <your-logconfig-yaml-file>` 进行配置）：
+TKE 使用 LogConfig 这个 CRD 配置日志采集规则，通过这种方式配置可以快捷配置索引，避免在控制台大量手动操作。参考以下 YAML 进行配置：
+
+> 通过 `kubectl apply -f <your-logconfig-yaml-file>` 进行配置。
 
 ```yaml
 apiVersion: cls.cloud.tencent.com/v1
@@ -236,13 +236,13 @@ spec:
       - __NULL__
 ```
 
-### 配置自动索引
+#### 通过控制台配置
 
-如果希望在 CLS 中方便的检索集群中的网络日志流，可以配置自动索引，将 cilium 生成的 json 日志的字段自动解析为索引，下面是配置方法。
+如有必要，你也可以在 TKE 控制台配置日志采集规则，在 TKE 集群的 **监控告警>日志>业务日志** 下新建日志规则：
 
-找到对应的日志主题，在 CLS 控制台的**索引配置**启用索引的自动配置:
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2026%2F02%2F24%2F20260224170002.png)
 
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2026%2F02%2F24%2F20260224171517.png)
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2026%2F02%2F24%2F20260224170258.png)
 
 ## 常见问题
 
