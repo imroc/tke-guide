@@ -330,6 +330,10 @@ metadata:
 
 确保 `logsetName` 和 `topicName` 都配置，且没有跟 `topicName` 同名的已有日志主题存在，也不要指定 `topicId` 和 `logsetId`。
 
-### 哪里查看完整的 LogConfig 配置字段参考
+### 哪里查看完整的 LogConfig 配置字段参考?
 
 参考 [LogConfig json 格式说明](https://cloud.tencent.com/document/product/457/111541)
+
+### excludeFilters 为什么要加 169.254.0.71？
+
+169.254.0.71 是 CLS 的 API 地址的目标 IP，采集的日志会通过这个 IP 上报，如果没有指定 includeFilters，需加上这个 excludeFilters 避免将上报 CLS 日志的流量也记录下来，导致无限循环采集，造成不必要的开销。
