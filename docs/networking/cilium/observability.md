@@ -115,8 +115,8 @@ helm upgrade cilium cilium/cilium --version 1.19.1 \
    --set hubble.export.dynamic.enabled=true \
    --set hubble.export.dynamic.config.content[0].name=all \
    --set hubble.export.dynamic.config.content[0].filePath=/var/run/cilium/hubble/events-all.log \
-   --set hubble.export.dynamic.config.content[0].excludeFilters[0].source_ip="169.254.0.71" \
-   --set hubble.export.dynamic.config.content[0].excludeFilters[1].destination_ip="169.254.0.71"
+   --set hubble.export.dynamic.config.content[0].excludeFilters[0].source_ip[0]=169.254.0.71 \
+   --set hubble.export.dynamic.config.content[0].excludeFilters[1].destination_ip[0]=169.254.0.71
 ```
 
 日志文件示例：
@@ -148,6 +148,8 @@ metadata:
   name: cilium-network-flow
 spec:
   clsDetail:
+    logsetId: 7466d748-23ce-4c9b-8a9b-40739e4d6bc7 # 替换成你的 CLS 日志集 ID。如不配置，则会自动创建日志集+日志主题，如配置了，只会自动创建日志主题
+    region: ap-chengdu # 替换成你的 CLS 所在地域，可用列表参考 https://cloud.tencent.com/document/product/215/106009
     extractRule:
       backtracking: "0"
       isGBK: "false"
@@ -160,13 +162,15 @@ spec:
     - indexName: namespace
     - indexName: pod_name
     - indexName: container_name
+    - indexName: flow.verdict
+      tokenizer: '@&?|#()=''",;:<>[]{}/ \n\t\r\\'
+      containZH: false
+    autoIndex: true
     logFormat: default
     logType: json_log
     maxSplitPartitions: 0
     period: 30
-    region: ap-chengdu # 替换成你的 CLS 所在地域，可用列表参考 https://cloud.tencent.com/document/product/215/106009
     storageType: ""
-    topicId: bcaad2ed-2061-48bc-94b0-a70fb4acc732 # 替换成你的 CLS 主题 ID
   inputDetail:
     type: container_file
     containerFile:
@@ -218,8 +222,10 @@ data:
   flowlogs.yaml: |
     flowLogs:
       - excludeFilters:
-        - source_ip: 169.254.0.71
-        - destination_ip: 169.254.0.71
+        - source_ip:
+          - 169.254.0.71
+        - destination_ip:
+          - 169.254.0.71
         filePath: /var/run/cilium/hubble/events-all.log
         name: all
 kind: ConfigMap
@@ -232,6 +238,6 @@ metadata:
     app.kubernetes.io/managed-by: Helm
   name: cilium-flowlog-config
   namespace: kube-system
-  resourceVersion: "3967075561"
+  resourceVersion: "3969239884"
   uid: 87978d03-638a-4c31-80d2-0a3e0fe17049
 ```
