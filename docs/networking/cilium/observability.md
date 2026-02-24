@@ -168,6 +168,10 @@ spec:
       indexType: text
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
       containZH: false
+    - indexName: flow.uuid
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
     - indexName: flow.source.pod_name
       indexType: text
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
@@ -180,6 +184,10 @@ spec:
       indexType: text
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
       containZH: false
+    - indexName: flow.source.labels
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
     - indexName: flow.destination.pod_name
       indexType: text
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
@@ -189,6 +197,10 @@ spec:
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
       containZH: false
     - indexName: flow.destination.cluster_name
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.destination.labels
       indexType: text
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
       containZH: false
@@ -209,6 +221,14 @@ spec:
       containZH: false
     - indexName: flow.l4.UDP.destination_port
       indexType: long
+    - indexName: flow.event_type.type
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.event_type.sub_type
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
     - indexName: flow.Summary
       indexType: text
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
