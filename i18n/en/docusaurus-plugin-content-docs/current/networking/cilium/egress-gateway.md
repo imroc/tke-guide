@@ -21,7 +21,7 @@ To enable Egress Gateway, the following conditions must be met:
 Method to enable Egress Gateway during cilium installation:
 
 ```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.19.0 \
+helm upgrade --install cilium cilium/cilium --version 1.19.1 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -77,7 +77,7 @@ kubectl rollout restart deploy cilium-operator -n kube-system
 If you already installed cilium using the **Install cilium using helm** provided in [Installing Cilium](install.md), the command to enable Egress Gateway can be simplified to:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.0 \
+helm upgrade cilium cilium/cilium --version 1.19.1 \
   --namespace kube-system \
   --reuse-values \
   --set egressGateway.enabled=true \

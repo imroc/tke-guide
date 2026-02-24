@@ -98,7 +98,7 @@ CiliumLocalRedirectPolicy 的能力没有默认开启，需在安装时加参数
 
 ```bash
 
-helm upgrade cilium cilium/cilium --version 1.19.0 \
+helm upgrade cilium cilium/cilium --version 1.19.1 \
   --namespace kube-system \
   --reuse-values \
   --set localRedirectPolicies.enabled=true

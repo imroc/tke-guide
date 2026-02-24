@@ -122,7 +122,7 @@ Execute the installation using Helm:
 :::
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.0 \
+helm upgrade --install cilium cilium/cilium --version 1.19.1 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -280,7 +280,7 @@ authentication:
 For production environment deployment, it's recommended to save parameters to YAML files, then execute commands similar to the following during installation or update (if upgrading version, just replace `--version`):
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.0 \
+helm upgrade --install cilium cilium/cilium --version 1.19.1 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml
@@ -289,7 +289,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.0 \
 If you have many custom configurations, it's recommended to split them into multiple yaml files for maintenance, for example, put configurations for enabling Egress Gateway in `egress-values.yaml`, put container request and limit configurations in `resources-values.yaml`, and merge multiple yaml files by adding multiple `-f` parameters when updating configurations:
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.0 \
+helm upgrade --install cilium cilium/cilium --version 1.19.1 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml \
@@ -502,7 +502,7 @@ Cilium's helm installation package provides a large number of custom configurati
 Execute the following command to view all installation configuration items:
 
 ```bash
-helm show values cilium/cilium --version 1.19.0
+helm show values cilium/cilium --version 1.19.1
 ```
 
 ### Why add local-router-ipv4 configuration?
@@ -516,22 +516,22 @@ When using helm to install Cilium, helm will get chart related information from 
 The solution is to download the chart compressed package in an environment that can connect:
 
 ```bash
-$ helm pull cilium/cilium --version 1.19.0
+$ helm pull cilium/cilium --version 1.19.1
 $ ls cilium-*.tgz
-cilium-1.19.0.tgz
+cilium-1.19.1.tgz
 ```
 
 Then copy the chart compressed package to the machine where helm installation is executed, and specify the path of the chart compressed package during installation:
 
 ```bash
-helm upgrade --install cilium ./cilium-1.19.0.tgz \
+helm upgrade --install cilium ./cilium-1.19.1.tgz \
   --namespace kube-system \
   -f values.yaml
 ```
 
 ### How to optimize for large-scale scenarios?
 
-If the cluster scale is large, it's recommended to enable the [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) feature. This feature was introduced in version 1.11 and is still in Beta stage in the current version (1.19.0) (see [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)). In large-scale scenarios, this feature can significantly improve Cilium performance and reduce apiserver pressure.
+If the cluster scale is large, it's recommended to enable the [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) feature. This feature was introduced in version 1.11 and is still in Beta stage in the current version (1.19.1) (see [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)). In large-scale scenarios, this feature can significantly improve Cilium performance and reduce apiserver pressure.
 
 It's not enabled by default. The enablement method is to add the `--set ciliumEndpointSlice.enabled=true` parameter when using helm to install Cilium.
 
@@ -571,7 +571,7 @@ In TKE environment, the mirror repository address `quay.tencentcloudcr.com` is p
 If you configure more installation parameters, it may involve more image dependencies. If you don't configure image address replacement, it may cause image pull failures. Use the following command to replace all Cilium dependent images with mirror repository addresses that can be directly pulled from internal network in TKE environment:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.0 \
+helm upgrade cilium cilium/cilium --version 1.19.1 \
   --namespace kube-system \
   --reuse-values \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
@@ -642,7 +642,7 @@ authentication:
 When updating Cilium, add a `-f image-values.yaml` to include the image replacement configuration:
 
 ```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.19.0 \
+helm upgrade --install cilium cilium/cilium --version 1.19.1 \
   --namespace=kube-system \
   -f values.yaml \
   # highlight-add-line

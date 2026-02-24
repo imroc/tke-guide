@@ -21,7 +21,7 @@ Cilium 支持以下加密方式：
 启用 wireguard 加密的方法：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.0 \
+helm upgrade cilium cilium/cilium --version 1.19.1 \
   --namespace kube-system \
   --reuse-values \
   --set encryption.enabled=true \
