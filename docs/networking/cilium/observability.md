@@ -150,7 +150,7 @@ spec:
   clsDetail:
     region: ap-chengdu # 替换成你的 CLS 所在地域，可用列表参考 https://cloud.tencent.com/document/product/215/106009
     logsetName: "TKE-cls-k398qwbj-102564" # 替换成你的 CLS 日志集名称。如果存在该名称的日志集，则会使用该日志集，如果不存在，则会新建一个该名称的日志集。
-    topicName: "tke-cls-k398qwbj-cilium-network-flow" # 替换成你的 CLS 日志主题名称，自动创建出来的日志主题会使用该名称。
+    topicName: "tke-cls-k398qwbj-cilium-network-logs" # 替换成你的 CLS 日志主题名称，自动创建出来的日志主题会使用该名称。
     extractRule:
       backtracking: "0"
       isGBK: "false"
@@ -325,3 +325,11 @@ metadata:
   resourceVersion: "3969239884"
   uid: 87978d03-638a-4c31-80d2-0a3e0fe17049
 ```
+
+### CLS 为什么没有自动创建日志主题？
+
+确保 `logsetName` 和 `topicName` 都配置，且没有跟 `topicName` 同名的已有日志主题存在，也不要指定 `topicId` 和 `logsetId`。
+
+### 哪里查看完整的 LogConfig 配置字段参考
+
+参考 [LogConfig json 格式说明](https://cloud.tencent.com/document/product/457/111541)
