@@ -438,6 +438,12 @@ TKE uses the LogConfig CRD to configure log collection rules. This method allows
 
 > Configure with `kubectl apply -f <your-logconfig-yaml-file>`.
 
+:::info[note]
+
+The relevant fields need to be replaced according to the comments.
+
+:::
+
 ```yaml
 apiVersion: cls.cloud.tencent.com/v1
 kind: LogConfig

@@ -438,16 +438,22 @@ TKE 使用 LogConfig 这个 CRD 配置日志采集规则，通过这种方式配
 
 > 通过 `kubectl apply -f <your-logconfig-yaml-file>` 进行配置。
 
+:::info[注意]
+
+需根据注释替换相关字段。
+
+:::
+
 ```yaml
 apiVersion: cls.cloud.tencent.com/v1
 kind: LogConfig
 metadata:
-  name: cilium-network-logs
+  name: cilium-flow-logs
 spec:
   clsDetail:
     region: ap-chengdu # 替换成你的 CLS 所在地域，可用列表参考 https://cloud.tencent.com/document/product/614/18940
     logsetName: "TKE-cls-k398qwbj-102564" # 替换成你的 CLS 日志集名称。如果存在该名称的日志集，则会使用该日志集，如果不存在，则会新建一个该名称的日志集。
-    topicName: "tke-cls-k398qwbj-cilium-network-logs" # 替换成你的 CLS 日志主题名称，自动创建出来的日志主题会使用该名称。
+    topicName: "tke-cls-k398qwbj-cilium-flow-logs" # 替换成你的 CLS 日志主题名称，自动创建出来的日志主题会使用该名称。
     extractRule:
       backtracking: "0"
       isGBK: "false"
