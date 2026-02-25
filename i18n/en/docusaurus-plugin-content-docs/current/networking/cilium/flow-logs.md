@@ -199,45 +199,106 @@ helm upgrade cilium cilium/cilium --version 1.19.1 \
 
 ### Log Format
 
-Each line of the exported log is a JSON object containing complete network flow log information. Here is a sample log entry (formatted):
+Each exported line is a JSON object containing the full network flow log. Below is a formatted sample log entry — a `curl` Pod in the `test` namespace sending an HTTP request to an `nginx` Pod:
 
 ```json
 {
   "flow": {
-    "time": "2026-02-24T08:47:58.042012383Z",
-    "uuid": "c938628b-0c3a-4440-9ecd-3e3ca00d3a16",
-    "verdict": "FORWARDED",
     "IP": {
-      "source": "169.254.128.9",
-      "destination": "10.20.0.4",
-      "ipVersion": "IPv4"
+      "destination": "10.20.0.9",
+      "ipVersion": "IPv4",
+      "source": "10.20.0.10"
     },
+    "Summary": "TCP Flags: ACK",
+    "Type": "L3_L4",
+    "destination": {
+      "cluster_name": "default",
+      "identity": 27312,
+      "labels": [
+        "k8s:app=nginx",
+        "k8s:io.cilium.k8s.namespace.labels.kubernetes.io/metadata.name=test",
+        "k8s:io.cilium.k8s.policy.cluster=default",
+        "k8s:io.cilium.k8s.policy.serviceaccount=default",
+        "k8s:io.kubernetes.pod.namespace=test"
+      ],
+      "namespace": "test",
+      "pod_name": "nginx-54c98b4f84-sw9q9"
+    },
+    "emitter": {
+      "name": "Hubble",
+      "version": "1.19.1+gd0d0c879"
+    },
+    "ethernet": {
+      "destination": "02:21:a9:ff:89:f4",
+      "source": "ce:0a:b9:d8:63:61"
+    },
+    "event_type": {
+      "sub_type": 3,
+      "type": 4
+    },
+    "is_reply": false,
     "l4": {
       "TCP": {
-        "source_port": 60002,
-        "destination_port": 57706,
-        "flags": { "PSH": true, "ACK": true }
+        "destination_port": 80,
+        "flags": {
+          "ACK": true
+        },
+        "source_port": 56598
       }
     },
+    "node_labels": [
+      "beta.kubernetes.io/arch=amd64",
+      "beta.kubernetes.io/instance-type=S5.MEDIUM4",
+      "beta.kubernetes.io/os=linux",
+      "cloud.tencent.com/auto-scaling-group-id=asg-q9zxcooe",
+      "cloud.tencent.com/node-instance-id=ins-f5wpfrc5",
+      "failure-domain.beta.kubernetes.io/region=cd",
+      "failure-domain.beta.kubernetes.io/zone=160001",
+      "kubernetes.io/arch=amd64",
+      "kubernetes.io/hostname=10.10.21.35",
+      "kubernetes.io/os=linux",
+      "node.kubernetes.io/instance-type=S5.MEDIUM4",
+      "node.tke.cloud.tencent.com/accelerator-type=cpu",
+      "node.tke.cloud.tencent.com/cpu=2",
+      "node.tke.cloud.tencent.com/memory=4",
+      "os=tencentos4",
+      "tke.cloud.tencent.com/cbs-mountable=true",
+      "tke.cloud.tencent.com/nodepool-id=np-p8uyib3x",
+      "tke.cloud.tencent.com/route-eni-subnet-ids=subnet-fg9qdb1f",
+      "topology.com.tencent.cloud.csi.cbs/zone=ap-chengdu-1",
+      "topology.kubernetes.io/region=cd",
+      "topology.kubernetes.io/zone=160001"
+    ],
+    "node_name": "10.10.21.35",
     "source": {
-      "identity": 16777217,
-      "labels": ["reserved:kube-apiserver", "reserved:world"]
+      "ID": 3863,
+      "cluster_name": "default",
+      "identity": 4368,
+      "labels": [
+        "k8s:app=curl",
+        "k8s:io.cilium.k8s.namespace.labels.kubernetes.io/metadata.name=test",
+        "k8s:io.cilium.k8s.policy.cluster=default",
+        "k8s:io.cilium.k8s.policy.serviceaccount=default",
+        "k8s:io.kubernetes.pod.namespace=test"
+      ],
+      "namespace": "test",
+      "pod_name": "curl-7d4d858f75-j76f7",
+      "workloads": [
+        {
+          "kind": "Deployment",
+          "name": "curl"
+        }
+      ]
     },
-    "destination": {
-      "ID": 3106,
-      "identity": 20252,
-      "namespace": "kube-system",
-      "pod_name": "csi-cbs-controller-7788964bc-lsfw5",
-      "workloads": [{ "name": "csi-cbs-controller", "kind": "Deployment" }]
-    },
-    "Type": "L3_L4",
-    "node_name": "10.10.21.166",
+    "time": "2026-02-25T03:25:54.227004477Z",
+    "trace_observation_point": "TO_STACK",
+    "trace_reason": "ESTABLISHED",
     "traffic_direction": "EGRESS",
-    "is_reply": true,
-    "Summary": "TCP Flags: ACK, PSH"
+    "uuid": "a38e44fa-b7b7-4f8f-a40b-2c1dd2621140",
+    "verdict": "FORWARDED"
   },
-  "node_name": "10.10.21.166",
-  "time": "2026-02-24T08:47:58.042012383Z"
+  "node_name": "10.10.21.35",
+  "time": "2026-02-25T03:25:54.227004477Z"
 }
 ```
 
