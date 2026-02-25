@@ -216,6 +216,14 @@ spec:
       indexType: text
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
       containZH: false
+    - indexName: flow.destination_service.name
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
+    - indexName: flow.destination_service.namespace
+      indexType: text
+      tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
+      containZH: false
     - indexName: flow.IP.ipVersion
       indexType: text
       tokenizer: "@&?|#()='\",;:<>[]{}/ \n\t\r\\"
