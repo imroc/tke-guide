@@ -57,12 +57,12 @@ This configuration:
 
 Hubble supports two export methods: **static export** and **dynamic export**:
 
-| Comparison     | Static Export                       | Dynamic Export                       |
-| -------------- | ----------------------------------- | ------------------------------------ |
-| Enable Method  | `hubble.export.static.enabled=true` | `hubble.export.dynamic.enabled=true` |
-| Rule Count     | Only one set of filter rules        | Multiple rules, each exporting to a different file |
+| Comparison     | Static Export                       | Dynamic Export                                         |
+| -------------- | ----------------------------------- | ------------------------------------------------------ |
+| Enable Method  | `hubble.export.static.enabled=true` | `hubble.export.dynamic.enabled=true`                   |
+| Rule Count     | Only one set of filter rules        | Multiple rules, each exporting to a different file     |
 | Config Changes | Requires cilium pod restart         | No restart needed, auto-applies after ConfigMap change |
-| Filter Syntax  | `allowList` / `denyList`            | `includeFilters` / `excludeFilters`  |
+| Filter Syntax  | `allowList` / `denyList`            | `includeFilters` / `excludeFilters`                    |
 
 **Dynamic export** is recommended as it is more flexible, supports multiple rules, and does not require pod restarts when configuration changes.
 
@@ -70,14 +70,14 @@ Hubble supports two export methods: **static export** and **dynamic export**:
 
 For the complete list of filter fields supported by `includeFilters` and `excludeFilters`, refer to the `FlowFilter` message in [flow.proto](https://github.com/cilium/cilium/blob/main/api/v1/flow/flow.proto). Common fields include:
 
-| Field             | Description                            | Example                        |
-| ----------------- | -------------------------------------- | ------------------------------ |
-| `source_pod`      | Source Pod (`namespace/pod-name`)      | `["kube-system/coredns"]`      |
-| `destination_pod` | Destination Pod                        | `["default/nginx"]`            |
-| `source_ip`       | Source IP                              | `["10.0.1.100"]`           |
-| `destination_ip`  | Destination IP                         | `["10.0.2.200"]`             |
-| `verdict`         | Policy verdict                         | `["DROPPED"]`, `["FORWARDED"]` |
-| `event_type`      | Event type                             | `[{"type": 1}]`               |
+| Field             | Description                       | Example                        |
+| ----------------- | --------------------------------- | ------------------------------ |
+| `source_pod`      | Source Pod (`namespace/pod-name`) | `["kube-system/coredns"]`      |
+| `destination_pod` | Destination Pod                   | `["default/nginx"]`            |
+| `source_ip`       | Source IP                         | `["10.0.1.100"]`               |
+| `destination_ip`  | Destination IP                    | `["10.0.2.200"]`               |
+| `verdict`         | Policy verdict                    | `["DROPPED"]`, `["FORWARDED"]` |
+| `event_type`      | Event type                        | `[{"type": 1}]`                |
 
 Multiple fields within the same filter object have an **AND** relationship, while multiple filter objects in the same array have an **OR** relationship.
 
@@ -109,46 +109,46 @@ This configuration exports only DROPPED traffic and keeps only the key fields: t
 
 fieldMask field paths use dots (`.`) to separate nested fields. The complete list of available fields is based on the `Flow` message in [flow.proto](https://github.com/cilium/cilium/blob/main/api/v1/flow/flow.proto). Common fields include:
 
-| Field Path                      | Description                                              |
-| ------------------------------- | -------------------------------------------------------- |
-| `time`                          | Time when the flow occurred                              |
-| `verdict`                       | Policy verdict (FORWARDED / DROPPED / TRACED / ERROR)    |
-| `drop_reason_desc`              | Drop reason description                                  |
-| `IP`                            | Full IP info (source/destination IP)                     |
-| `IP.source`                     | Source IP                                                |
-| `IP.destination`                | Destination IP                                           |
-| `l4`                            | Full L4 protocol info                                    |
-| `l4.TCP.source_port`            | TCP source port                                          |
-| `l4.TCP.destination_port`       | TCP destination port                                     |
-| `l4.UDP.source_port`            | UDP source port                                          |
-| `l4.UDP.destination_port`       | UDP destination port                                     |
-| `source`                        | Full source endpoint info                                |
-| `source.namespace`              | Source Pod namespace                                     |
-| `source.pod_name`               | Source Pod name                                          |
-| `source.labels`                 | Source endpoint labels                                   |
-| `source.identity`               | Source endpoint Cilium Identity                          |
-| `source.workloads`              | Source endpoint workload info                            |
-| `destination`                   | Full destination endpoint info                           |
-| `destination.namespace`         | Destination Pod namespace                                |
-| `destination.pod_name`          | Destination Pod name                                     |
-| `destination.labels`            | Destination endpoint labels                              |
-| `destination.identity`          | Destination endpoint Cilium Identity                     |
-| `destination.workloads`         | Destination endpoint workload info                       |
-| `node_name`                     | Node name                                                |
-| `node_labels`                   | Node labels                                              |
-| `is_reply`                      | Whether this is a reply packet                           |
-| `traffic_direction`             | Traffic direction (INGRESS / EGRESS)                     |
-| `trace_reason`                  | Trace reason                                             |
-| `event_type`                    | Event type                                               |
-| `source_service.name`           | Source Service name                                      |
-| `source_service.namespace`      | Source Service namespace                                 |
-| `destination_service.name`      | Destination Service name                                 |
-| `destination_service.namespace` | Destination Service namespace                            |
-| `l7`                            | L7 protocol info (DNS/HTTP, etc.)                        |
-| `l7.dns`                        | DNS request/response info                                |
-| `l7.http`                       | HTTP request/response info                               |
-| `interface`                     | Network interface info                                   |
-| `Summary`                       | Flow summary (deprecated)                                |
+| Field Path                      | Description                                           |
+| ------------------------------- | ----------------------------------------------------- |
+| `time`                          | Time when the flow occurred                           |
+| `verdict`                       | Policy verdict (FORWARDED / DROPPED / TRACED / ERROR) |
+| `drop_reason_desc`              | Drop reason description                               |
+| `IP`                            | Full IP info (source/destination IP)                  |
+| `IP.source`                     | Source IP                                             |
+| `IP.destination`                | Destination IP                                        |
+| `l4`                            | Full L4 protocol info                                 |
+| `l4.TCP.source_port`            | TCP source port                                       |
+| `l4.TCP.destination_port`       | TCP destination port                                  |
+| `l4.UDP.source_port`            | UDP source port                                       |
+| `l4.UDP.destination_port`       | UDP destination port                                  |
+| `source`                        | Full source endpoint info                             |
+| `source.namespace`              | Source Pod namespace                                  |
+| `source.pod_name`               | Source Pod name                                       |
+| `source.labels`                 | Source endpoint labels                                |
+| `source.identity`               | Source endpoint Cilium Identity                       |
+| `source.workloads`              | Source endpoint workload info                         |
+| `destination`                   | Full destination endpoint info                        |
+| `destination.namespace`         | Destination Pod namespace                             |
+| `destination.pod_name`          | Destination Pod name                                  |
+| `destination.labels`            | Destination endpoint labels                           |
+| `destination.identity`          | Destination endpoint Cilium Identity                  |
+| `destination.workloads`         | Destination endpoint workload info                    |
+| `node_name`                     | Node name                                             |
+| `node_labels`                   | Node labels                                           |
+| `is_reply`                      | Whether this is a reply packet                        |
+| `traffic_direction`             | Traffic direction (INGRESS / EGRESS)                  |
+| `trace_reason`                  | Trace reason                                          |
+| `event_type`                    | Event type                                            |
+| `source_service.name`           | Source Service name                                   |
+| `source_service.namespace`      | Source Service namespace                              |
+| `destination_service.name`      | Destination Service name                              |
+| `destination_service.namespace` | Destination Service namespace                         |
+| `l7`                            | L7 protocol info (DNS/HTTP, etc.)                     |
+| `l7.dns`                        | DNS request/response info                             |
+| `l7.http`                       | HTTP request/response info                            |
+| `interface`                     | Network interface info                                |
+| `Summary`                       | Flow summary (deprecated)                             |
 
 #### Multiple Rule Configuration
 
@@ -180,11 +180,11 @@ This configuration defines two rules:
 
 Exported log files are automatically rotated. Configure with the following parameters:
 
-| Parameter                      | Description                          | Default |
-| ------------------------------ | ------------------------------------ | ------- |
-| `hubble.export.fileMaxSizeMb`  | Max size per log file (MB)           | 10      |
-| `hubble.export.fileMaxBackups` | Number of rotated files to keep      | 5       |
-| `hubble.export.fileCompress`   | Whether to compress rotated files    | false   |
+| Parameter                      | Description                       | Default |
+| ------------------------------ | --------------------------------- | ------- |
+| `hubble.export.fileMaxSizeMb`  | Max size per log file (MB)        | 10      |
+| `hubble.export.fileMaxBackups` | Number of rotated files to keep   | 5       |
+| `hubble.export.fileCompress`   | Whether to compress rotated files | false   |
 
 For high log volumes, you can increase the file size and backup count:
 
@@ -304,17 +304,125 @@ Each exported line is a JSON object containing the full network flow log. Below 
 
 Key field descriptions:
 
-| Field                              | Description                                                                   |
-| ---------------------------------- | ----------------------------------------------------------------------------- |
-| `flow.time`                        | Time when the flow occurred                                                   |
+| Field                              | Description                                                                                   |
+| ---------------------------------- | --------------------------------------------------------------------------------------------- |
+| `flow.time`                        | Time when the flow occurred                                                                   |
 | `flow.verdict`                     | Policy verdict: `FORWARDED` (allowed), `DROPPED` (denied), `TRACED` (traced), `ERROR` (error) |
-| `flow.IP`                          | Source/destination IP addresses                                               |
-| `flow.l4`                          | L4 protocol info (TCP/UDP ports, flags, etc.)                                 |
-| `flow.source` / `flow.destination` | Source/destination Pod name, namespace, labels, workload, etc.                |
-| `flow.traffic_direction`           | Traffic direction: `INGRESS` or `EGRESS`                                      |
-| `flow.drop_reason_desc`            | Drop reason description (only present when verdict is DROPPED)                |
-| `flow.is_reply`                    | Whether this is a reply packet                                                |
-| `flow.Summary`                     | Flow summary info                                                             |
+| `flow.IP`                          | Source/destination IP addresses                                                               |
+| `flow.l4`                          | L4 protocol info (TCP/UDP ports, flags, etc.)                                                 |
+| `flow.source` / `flow.destination` | Source/destination Pod name, namespace, labels, workload, etc.                                |
+| `flow.traffic_direction`           | Traffic direction: `INGRESS` or `EGRESS`                                                      |
+| `flow.drop_reason_desc`            | Drop reason description (only present when verdict is DROPPED)                                |
+| `flow.is_reply`                    | Whether this is a reply packet                                                                |
+| `flow.Summary`                     | Flow summary info                                                                             |
+
+### Enabling Layer 7 (L7) Network Flow Logs
+
+By default, Hubble only records L3/L4 network flow logs (IP, port, protocol, etc.). To capture Layer 7 protocol details (such as DNS query content, HTTP request methods and URLs), you need to enable L7 rules through a CiliumNetworkPolicy.
+
+:::warning[Note]
+
+Enabling L7 observability requires L7 Proxy (Envoy) support. Cilium deploys an Envoy DaemonSet by default. Traffic matching L7 rules is redirected to the Envoy proxy for parsing, which introduces some performance overhead. It is recommended to enable L7 rules only for traffic that requires auditing.
+
+:::
+
+#### Configuration Example
+
+The following CiliumNetworkPolicy enables DNS and HTTP Layer 7 observability for Pods in the `default` namespace:
+
+```yaml
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "l7-visibility"
+  namespace: default
+spec:
+  endpointSelector:
+    matchLabels: {}
+  egress:
+    - toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchPattern: "*"
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": default
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+            - port: "8080"
+              protocol: TCP
+          rules:
+            http: [{}]
+```
+
+This policy means:
+
+- **DNS rule**: Enables L7 observability for all DNS egress traffic (TCP/UDP 53), using `matchPattern: "*"` to allow all DNS queries.
+- **HTTP rule**: Enables L7 observability for HTTP egress traffic (TCP 80/8080) destined for Pods in the `default` namespace, using `http: [{}]` to allow all HTTP requests.
+
+:::warning[Note]
+
+L7 rules not only enable observability but also restrict traffic — traffic that does not match the rules will be denied. Configure rules according to your actual needs to ensure legitimate traffic is not blocked.
+
+:::
+
+#### Supported Layer 7 Protocols
+
+| Protocol | Rule Type | Description                                                   |
+| -------- | --------- | ------------------------------------------------------------- |
+| DNS      | `dns`     | Records DNS query domain, response IPs, TTL, etc. Egress only |
+| HTTP     | `http`    | Records HTTP method, URL, status code, response latency, etc. |
+| Kafka    | `kafka`   | Deprecated                                                    |
+
+#### L7 Log Fields
+
+After enabling L7 observability, the `flow.l7` field in exported flow logs will contain detailed Layer 7 protocol information:
+
+**DNS log fields:**
+
+| Field            | Description                                   |
+| ---------------- | --------------------------------------------- |
+| `l7.type`        | Flow type: `REQUEST` or `RESPONSE`            |
+| `l7.latency_ns`  | Response latency (nanoseconds)                |
+| `l7.dns.query`   | DNS query domain name                         |
+| `l7.dns.ips`     | List of IPs in DNS response                   |
+| `l7.dns.ttl`     | DNS response TTL                              |
+| `l7.dns.rcode`   | DNS return code (0=success, 3=NXDOMAIN, etc.) |
+| `l7.dns.qtypes`  | Query types (A, AAAA, CNAME, etc.)            |
+| `l7.dns.rrtypes` | Response resource record types                |
+
+**HTTP log fields:**
+
+| Field              | Description                            |
+| ------------------ | -------------------------------------- |
+| `l7.type`          | Flow type: `REQUEST` or `RESPONSE`     |
+| `l7.latency_ns`    | Response latency (nanoseconds)         |
+| `l7.http.code`     | HTTP status code (e.g., 200, 404)      |
+| `l7.http.method`   | HTTP method (GET, POST, etc.)          |
+| `l7.http.url`      | Request URL                            |
+| `l7.http.protocol` | HTTP protocol version (e.g., HTTP/1.1) |
+| `l7.http.headers`  | HTTP headers (key/value list)          |
+
+#### Security Considerations
+
+L7 logs may contain sensitive information (query parameters in URLs, authentication credentials, etc.). Cilium provides redaction options:
+
+```bash
+helm upgrade cilium cilium/cilium --version 1.19.1 \
+   --namespace kube-system \
+   --reuse-values \
+   --set hubble.redact.enabled=true \
+   --set hubble.redact.http.urlQuery=true \
+   --set hubble.redact.http.userInfo=true
+```
+
+- `hubble.redact.http.urlQuery`: Redacts query parameters in URLs.
+- `hubble.redact.http.userInfo`: Redacts user authentication info in URLs.
 
 ## Delivering Network Flow Logs to CLS
 
@@ -580,12 +688,12 @@ flow.traffic_direction:"INGRESS"
 
 [Tencent Cloud Flow Logs (FL)](https://cloud.tencent.com/product/fl) also provides similar network flow log capabilities. It collects flow logs at the VPC level. Here are the differences compared to Cilium Hubble flow logs:
 
-| Comparison       | Cilium Hubble Flow Logs                                             | Tencent Cloud Flow Logs (FL)            |
-| ---------------- | ------------------------------------------------------------------- | --------------------------------------- |
-| Collection Level | Pod level, based on eBPF                                            | VPC level, based on ENI                 |
-| Information      | Includes Pod name, labels, Namespace, NetworkPolicy verdict, etc.   | Mainly IP, port, protocol info          |
-| Filtering        | Supports filtering by Pod, labels, verdict, and other K8s dimensions | Supports filtering by VPC, subnet, ENI  |
-| Use Case         | Kubernetes cluster network observability                            | VPC-level network traffic auditing      |
+| Comparison       | Cilium Hubble Flow Logs                                              | Tencent Cloud Flow Logs (FL)           |
+| ---------------- | -------------------------------------------------------------------- | -------------------------------------- |
+| Collection Level | Pod level, based on eBPF                                             | VPC level, based on ENI                |
+| Information      | Includes Pod name, labels, Namespace, NetworkPolicy verdict, etc.    | Mainly IP, port, protocol info         |
+| Filtering        | Supports filtering by Pod, labels, verdict, and other K8s dimensions | Supports filtering by VPC, subnet, ENI |
+| Use Case         | Kubernetes cluster network observability                             | VPC-level network traffic auditing     |
 
 Choose based on your needs. The two can also complement each other: Cilium provides fine-grained K8s-level flow logs, while FL provides global VPC-level flow logs.
 
@@ -637,5 +745,6 @@ For the complete TKE LogConfig field reference, see [LogConfig JSON Format Refer
 ## References
 
 - [Configuring Hubble exporter](https://docs.cilium.io/en/latest/observability/hubble/configuration/export/)
+- [Layer 7 Protocol Visibility](https://docs.cilium.io/en/stable/observability/visibility/)
 - [LogConfig JSON Format Reference](https://cloud.tencent.com/document/product/457/111541)
 - [CLS Available Regions](https://cloud.tencent.com/document/product/614/18940)

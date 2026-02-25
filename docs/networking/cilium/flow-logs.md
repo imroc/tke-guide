@@ -316,6 +316,114 @@ helm upgrade cilium cilium/cilium --version 1.19.1 \
 | `flow.is_reply`                    | 是否为回复包                                                      |
 | `flow.Summary`                     | 流量摘要信息                                                      |
 
+### 启用七层（L7）网络流日志
+
+默认情况下，Hubble 只记录 L3/L4 层的网络流日志（IP、端口、协议等）。如果需要记录七层协议的详细信息（如 DNS 查询内容、HTTP 请求方法和 URL 等），需要通过 CiliumNetworkPolicy 配置 L7 规则来启用。
+
+:::warning[注意]
+
+启用 L7 可观测需要 L7 Proxy（Envoy）支持，Cilium 默认已部署 Envoy DaemonSet。匹配 L7 规则的流量会被重定向到 Envoy 代理进行解析，这会带来一定的性能开销。建议仅对需要审计的流量启用 L7 规则。
+
+:::
+
+#### 配置示例
+
+以下 CiliumNetworkPolicy 对 `default` 命名空间的 Pod 启用 DNS 和 HTTP 的七层可观测：
+
+```yaml
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "l7-visibility"
+  namespace: default
+spec:
+  endpointSelector:
+    matchLabels: {}
+  egress:
+    - toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchPattern: "*"
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": default
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+            - port: "8080"
+              protocol: TCP
+          rules:
+            http: [{}]
+```
+
+以上策略的含义：
+
+- **DNS 规则**：对所有 DNS 出口流量（TCP/UDP 53）启用七层可观测，使用 `matchPattern: "*"` 放行所有 DNS 查询。
+- **HTTP 规则**：对发往 `default` 命名空间 Pod 的 HTTP 出口流量（TCP 80/8080）启用七层可观测，使用 `http: [{}]` 放行所有 HTTP 请求。
+
+:::warning[注意]
+
+L7 规则不仅启用可观测，同时也会限制流量 —— 不匹配规则的流量将被拒绝。请根据实际需求配置规则，确保合法流量不被误拦截。
+
+:::
+
+#### 支持的七层协议
+
+| 协议  | 规则类型 | 说明                                                         |
+| ----- | -------- | ------------------------------------------------------------ |
+| DNS   | `dns`    | 记录 DNS 查询域名、响应 IP、TTL 等。仅支持出口（egress）方向 |
+| HTTP  | `http`   | 记录 HTTP 方法、URL、状态码、响应延迟等                      |
+| Kafka | `kafka`  | 已废弃（deprecated）                                         |
+
+#### L7 日志字段
+
+启用七层可观测后，导出的网络流日志中 `flow.l7` 字段会包含七层协议的详细信息：
+
+**DNS 日志字段：**
+
+| 字段             | 说明                                |
+| ---------------- | ----------------------------------- |
+| `l7.type`        | 流类型：`REQUEST` 或 `RESPONSE`     |
+| `l7.latency_ns`  | 响应延迟（纳秒）                    |
+| `l7.dns.query`   | DNS 查询的域名                      |
+| `l7.dns.ips`     | DNS 响应中的 IP 列表                |
+| `l7.dns.ttl`     | DNS 响应的 TTL                      |
+| `l7.dns.rcode`   | DNS 返回码（0=成功，3=NXDOMAIN 等） |
+| `l7.dns.qtypes`  | 查询类型（A、AAAA、CNAME 等）       |
+| `l7.dns.rrtypes` | 响应资源记录类型                    |
+
+**HTTP 日志字段：**
+
+| 字段               | 说明                            |
+| ------------------ | ------------------------------- |
+| `l7.type`          | 流类型：`REQUEST` 或 `RESPONSE` |
+| `l7.latency_ns`    | 响应延迟（纳秒）                |
+| `l7.http.code`     | HTTP 状态码（如 200、404）      |
+| `l7.http.method`   | HTTP 方法（GET、POST 等）       |
+| `l7.http.url`      | 请求 URL                        |
+| `l7.http.protocol` | HTTP 协议版本（如 HTTP/1.1）    |
+| `l7.http.headers`  | HTTP 头信息（key/value 列表）   |
+
+#### 安全注意事项
+
+L7 日志可能包含敏感信息（URL 中的查询参数、认证信息等）。Cilium 提供了脱敏配置：
+
+```bash
+helm upgrade cilium cilium/cilium --version 1.19.1 \
+   --namespace kube-system \
+   --reuse-values \
+   --set hubble.redact.enabled=true \
+   --set hubble.redact.http.urlQuery=true \
+   --set hubble.redact.http.userInfo=true
+```
+
+- `hubble.redact.http.urlQuery`：脱敏 URL 中的查询参数。
+- `hubble.redact.http.userInfo`：脱敏 URL 中的用户认证信息。
+
 ## 将网络流日志投递到 CLS
 
 配置 TKE 日志采集，将所有 cilium-agent 中的日志流文件采集到 CLS。
@@ -637,5 +745,6 @@ TKE 的日志采集规则 LogConfig 完整字段参考 [LogConfig json 格式说
 ## 参考资料
 
 - [Configuring Hubble exporter](https://docs.cilium.io/en/latest/observability/hubble/configuration/export/)
+- [Layer 7 Protocol Visibility](https://docs.cilium.io/en/stable/observability/visibility/)
 - [LogConfig json 格式说明](https://cloud.tencent.com/document/product/457/111541)
 - [CLS 可用地域列表](https://cloud.tencent.com/document/product/614/18940)
