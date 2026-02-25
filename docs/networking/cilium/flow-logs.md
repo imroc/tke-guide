@@ -316,7 +316,7 @@ helm upgrade cilium cilium/cilium --version 1.19.1 \
 | `flow.is_reply`                    | 是否为回复包                                                      |
 | `flow.Summary`                     | 流量摘要信息                                                      |
 
-### 启用七层（L7）网络流日志
+### 启用七层日志
 
 默认情况下，Hubble 只记录 L3/L4 层的网络流日志（IP、端口、协议等）。如果需要记录七层协议的详细信息（如 DNS 查询内容、HTTP 请求方法和 URL 等），需要通过 CiliumNetworkPolicy 配置 L7 规则来启用。
 

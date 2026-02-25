@@ -316,7 +316,7 @@ Key field descriptions:
 | `flow.is_reply`                    | Whether this is a reply packet                                                                |
 | `flow.Summary`                     | Flow summary info                                                                             |
 
-### Enabling Layer 7 (L7) Network Flow Logs
+### Enabling L7 Logs
 
 By default, Hubble only records L3/L4 network flow logs (IP, port, protocol, etc.). To capture Layer 7 protocol details (such as DNS query content, HTTP request methods and URLs), you need to enable L7 rules through a CiliumNetworkPolicy.
 
