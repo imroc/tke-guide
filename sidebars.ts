@@ -29,6 +29,7 @@ const sidebars: SidebarsConfig = {
             'networking/cilium/egress-gateway',
             'networking/cilium/networkpolicy',
             'networking/cilium/observability',
+            'networking/cilium/flow-logs',
             'networking/cilium/with-node-local-dns',
             'networking/cilium/clustermesh',
             'networking/cilium/encryption',
