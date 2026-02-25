@@ -688,12 +688,12 @@ flow.traffic_direction:"INGRESS"
 
 [Tencent Cloud Flow Logs (FL)](https://cloud.tencent.com/product/fl) also provides similar network flow log capabilities. It collects flow logs at the VPC level. Here are the differences compared to Cilium Hubble flow logs:
 
-| Comparison       | Cilium Hubble Flow Logs                                              | Tencent Cloud Flow Logs (FL)           |
-| ---------------- | -------------------------------------------------------------------- | -------------------------------------- |
-| Collection Level | Pod level, based on eBPF                                             | VPC level, based on ENI                |
-| Information      | Includes Pod name, labels, Namespace, NetworkPolicy verdict, etc.    | Mainly IP, port, protocol info         |
-| Filtering        | Supports filtering by Pod, labels, verdict, and other K8s dimensions | Supports filtering by VPC, subnet, ENI |
-| Use Case         | Kubernetes cluster network observability                             | VPC-level network traffic auditing     |
+| Comparison       | Cilium Hubble Flow Logs                                                                                     | Tencent Cloud Flow Logs (FL)           |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Collection Level | Pod level, based on eBPF                                                                                    | VPC level, based on ENI                |
+| Information      | Includes Pod name, labels, Namespace, NetworkPolicy verdict, etc, and it even supports layer 7 information. | Mainly IP, port, protocol info         |
+| Filtering        | Supports filtering by Pod, labels, verdict, and other K8s dimensions                                        | Supports filtering by VPC, subnet, ENI |
+| Use Case         | Kubernetes cluster network observability                                                                    | VPC-level network traffic auditing     |
 
 Choose based on your needs. The two can also complement each other: Cilium provides fine-grained K8s-level flow logs, while FL provides global VPC-level flow logs.
 
