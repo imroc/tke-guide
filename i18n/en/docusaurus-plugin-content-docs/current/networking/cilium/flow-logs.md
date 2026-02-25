@@ -261,7 +261,7 @@ Configure TKE log collection to collect log files from all cilium-agents and del
 
 ### Enable Log Collection
 
-Before configuring log collection rules, ensure that the cluster has enabled the log collection feature. Console path: **Monitoring & Alerting > Logs > Business Logs**.
+Before configuring log collection rules, ensure that the cluster has enabled the log collection feature. Console path: **Monitoring and alarms > Log > Business Logs**.
 
 ### Configure via YAML (Recommended)
 
@@ -451,7 +451,7 @@ spec:
 
 ### Configure via Console
 
-If needed, you can also configure log collection rules in the TKE console. Create a new log rule under **Monitoring & Alerting > Logs > Business Logs** in the TKE cluster. Refer to the following screenshots for configuration:
+If needed, you can also configure log collection rules in the TKE console. Create a new log rule under **Monitoring and alarms > Log > Business Logs** in the TKE cluster. Refer to the following screenshots for configuration:
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2026%2F02%2F24%2F20260224170002.png)
 
@@ -567,7 +567,7 @@ Ensure both `logsetName` and `topicName` are configured, there is no existing lo
 
 ### Where can I find the complete LogConfig field reference?
 
-Refer to [LogConfig JSON Format Reference](https://cloud.tencent.com/document/product/457/111541)
+For the complete TKE LogConfig field reference, see [LogConfig JSON Format Reference](https://cloud.tencent.com/document/product/457/111541)
 
 ### Why add 169.254.0.71 to excludeFilters?
 

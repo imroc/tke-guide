@@ -567,7 +567,7 @@ metadata:
 
 ### 哪里查看完整的 LogConfig 配置字段参考?
 
-参考 [LogConfig json 格式说明](https://cloud.tencent.com/document/product/457/111541)
+TKE 的日志采集规则 LogConfig 完整字段参考 [LogConfig json 格式说明](https://cloud.tencent.com/document/product/457/111541)
 
 ### excludeFilters 为什么要加 169.254.0.71?
 
