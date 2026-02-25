@@ -1,11 +1,5 @@
 # Enhancing Observability with Cilium
 
-:::info[Note]
-
-This article is currently being drafted. Please wait for it to be completed before referencing.
-
-:::
-
 ## Enable Hubble Relay
 
 Hubble includes Hubble Server and Hubble Relay. Hubble Server is built into each node's cilium-agent and is enabled by default. Hubble Relay is a component that needs to be deployed separately to aggregate data from all Hubble Servers in the cluster and provide a unified API entry point.
@@ -100,3 +94,7 @@ $ cilium hubble ui
 ```
 
 For more information, refer to [Network Observability with Hubble / Service Map & Hubble UI](https://docs.cilium.io/en/stable/observability/hubble/hubble-ui/).
+
+## Auditing Network Flow Logs
+
+If you want to audit network packets (e.g., for troubleshooting or security auditing), refer to [Auditing Network Flow Logs with Cilium + CLS](flow-logs.md).

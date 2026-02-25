@@ -1,11 +1,5 @@
 # 使用 Cilium 增强可观测性
 
-:::info[注意]
-
-本文正在起草中，请等完善后再参考。
-
-:::
-
 ## 启用 Hubble Relay
 
 Hubble 包括 Hubble Server 和 Hubble Relay，其中 Hubble Server 已内置到每个节点的 cilium-agent 中并默认开启，Hubble Relay 是一个需要单独部署的组件，用于聚合集群所有节点 Hubble Server 的数据，提供统一的 API 入口。
