@@ -37,7 +37,7 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   cluster_deploy_type = "MANAGED_CLUSTER"
   # Kubernetes Version >= 1.30.0
   cluster_version = "1.32.2"
-  # Operating System, TencentOS 4 image ID, currently requires submitting a ticket to apply for using this image
+  # Operating System, TencentOS 4 image ID
   cluster_os = "img-gqmik24x"
   # Container Network Plugin: VPC-CNI
   network_type = "VPC-CNI"
@@ -489,7 +489,7 @@ If you want to create a regular node pool through terraform, refer to the follow
 resource "tencentcloud_kubernetes_node_pool" "cilium" {
   name       = "cilium"
   cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
-  node_os    = "img-gqmik24x" # TencentOS 4 image ID, currently using this system image still requires submitting a ticket to apply
+  node_os    = "img-gqmik24x" # TencentOS 4 image ID
 }
 ```
 
@@ -656,12 +656,6 @@ Using the mirror repository address provided by TKE to pull external images itse
 If you want image pulling to have higher availability, you can [use TCR to host Cilium images](tcr.md) to synchronize Cilium dependent images to your own [TCR image repository](https://cloud.tencent.com/product/tcr), then refer to the dependent image replacement configuration here, and replace the corresponding images with your own synchronized image addresses.
 
 :::
-
-### Unable to use TencentOS 4?
-
-TencentOS 4 system image is currently in internal testing and requires [submitting a ticket](https://console.cloud.tencent.com/workorder/category) to apply.
-
-If not applied, adding regular nodes will not be able to select TencentOS 4 system image. If native nodes specify annotation to use TencentOS 4, the nodes will not be able to initialize successfully.
 
 ### cilium-operator cannot become ready on super nodes?
 

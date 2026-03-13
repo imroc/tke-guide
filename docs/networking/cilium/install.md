@@ -37,7 +37,7 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   cluster_deploy_type = "MANAGED_CLUSTER"
   # Kubernetes 版本 >= 1.30.0
   cluster_version = "1.32.2"
-  # 操作系统， TencentOS 4 的镜像 ID，当前使用该镜像还需要提工单申请
+  # 操作系统，TencentOS 4 的镜像 ID
   cluster_os = "img-gqmik24x"
   # 容器网络插件: VPC-CNI
   network_type = "VPC-CNI"
@@ -488,7 +488,7 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
 resource "tencentcloud_kubernetes_node_pool" "cilium" {
   name       = "cilium"
   cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
-  node_os    = "img-gqmik24x" # TencentOS 4 的镜像 ID，当前使用该系统镜像还需要提工单申请
+  node_os    = "img-gqmik24x" # TencentOS 4 的镜像 ID
 }
 ```
 
@@ -655,12 +655,6 @@ helm upgrade --install cilium cilium/cilium --version 1.19.1 \
 如果希望拉取镜像具备更高的可用性，可 [使用 TCR 托管 Cilium 镜像](tcr.md) 将 cilium 依赖镜像同步到自己的 [TCR 镜像仓库](https://cloud.tencent.com/product/tcr)，然后参考这里的依赖镜像替换的配置，将相应镜像再替换为自己同步后的镜像地址。
 
 :::
-
-### 无法使用 TencentOS 4 ？
-
-TencentOS 4 系统镜像目前内测中，需要 [提交工单](https://console.cloud.tencent.com/workorder/category) 进行申请。
-
-如果没有申请，添加普通节点将无法选择到 TencentOS 4 的系统镜像，原生节点如果指定了注解使用 TencentOS 4，节点将无法成功初始化。
 
 ### cilium-operator 在超级节点无法就绪？
 
