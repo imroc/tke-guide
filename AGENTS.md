@@ -77,21 +77,32 @@ npm run serve
 - `i18n/en/docusaurus-plugin-content-docs/current/` - 英文翻译文档
 - `i18n/en/docusaurus-plugin-content-docs/current.json` - 侧边栏目录名称翻译
 
-### 翻译流程
+### 自动同步翻译（必须遵守）
 
-当用户说"翻译 @xxx.md"时（一个或多个 md 文件），执行中译英：
+对 `docs/` 下的文档执行任何操作时，**必须**自动同步到英文版（`i18n/en/docusaurus-plugin-content-docs/current/` 对应路径）。具体规则：
 
-1. **翻译文档内容**：将 `docs/` 下的中文文档翻译为英文，放到 `i18n/en/docusaurus-plugin-content-docs/current/` 对应路径下
-   - 例如：`docs/networking/pod-eip.md` → `i18n/en/docusaurus-plugin-content-docs/current/networking/pod-eip.md`
-   - 如果文档已存在，则对比中文版本和英文版本，只更新差异部分
-
-2. **翻译目录名称**（如有新目录）：在 `i18n/en/docusaurus-plugin-content-docs/current.json` 中添加侧边栏分类的英文翻译，格式：
+1. **修改文档**：将修改的部分同步翻译到对应英文文件。如果英文文件不存在，则创建完整的英文翻译
+2. **新增文档**：同时在对应路径下创建英文翻译
+3. **删除文档**：同步删除对应的英文文件
+4. **重命名/移动文档**：同步重命名/移动对应的英文文件
+5. **新增侧边栏目录**：在 `i18n/en/docusaurus-plugin-content-docs/current.json` 中添加目录名翻译，格式：
    ```json
    "sidebar.tkeSidebar.category.中文目录名": {
      "message": "English Category Name",
      "description": "The label for category 中文目录名 in sidebar tkeSidebar"
    }
    ```
+
+路径映射示例：`docs/networking/pod-eip.md` → `i18n/en/docusaurus-plugin-content-docs/current/networking/pod-eip.md`
+
+### 手动翻译
+
+当用户说"翻译 @xxx.md"时（一个或多个 md 文件），执行中译英：
+
+1. **翻译文档内容**：将 `docs/` 下的中文文档翻译为英文，放到 `i18n/en/docusaurus-plugin-content-docs/current/` 对应路径下
+   - 如果文档已存在，则对比中文版本和英文版本，只更新差异部分
+
+2. **翻译目录名称**（如有新目录）：同"自动同步翻译"第 5 条
 
 ### 本地预览英文版
 
