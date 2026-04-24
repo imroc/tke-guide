@@ -14,8 +14,7 @@ This article describes how to install EnvoyGateway on TKE and use the `Gateway A
 
 Kubernetes provides the `Ingress API` to handle layer 7 north-south traffic, but its functionality is limited. Each implementation adds different annotations to enhance Ingress capabilities, resulting in poor flexibility and extensibility. Driven by community efforts, the `Gateway API` was introduced as a better solution that addresses Ingress API pain points while unifying layer 4/7 north-south traffic, and also supports service mesh east-west traffic (refer to [GAMMA](https://gateway-api.sigs.k8s.io/mesh/gamma/)). Various cloud providers and open-source proxy software are actively adapting to the `Gateway API`. Refer to the [Gateway API Implementations List](https://gateway-api.sigs.k8s.io/implementations/), where Envoy Gateway is one of the popular implementations.
 
-Using EnvoyGateway on TKE has a clear advantage over the built-in CLB Ingress: multiple forwarding rule resources (like `HTTPRoute`) can reuse the same CLB and can cross namespaces. CLB Ingress requires all forwarding rules to be written in the same Ingress resource, which is inconvenient to manage, and if different backend Services are in different namespaces, they cannot be managed with the same Ingress (CLB).
-
+Using EnvoyGateway on TKE has a clear advantage over the built-in CLB Ingress: multiple forwarding rule resources (like `HTTPRoute`) can reuse the same CLB and can cross namespaces.
 :::
 
 ## Prerequisites
