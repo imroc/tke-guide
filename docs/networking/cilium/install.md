@@ -15,7 +15,7 @@
 在 [容器服务控制台](https://console.cloud.tencent.com/tke2/cluster) 创建 TKE 集群，注意以下关键选项：
 
 - 集群类型：标准集群
-- Kubernetes 版本: 不低于 1.30.0，建议选择最新版（参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)）。
+- Kubernetes 版本: 不低于 1.32，建议选择最新版（参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)）。
 - 操作系统：TencentOS 4 或者 Ubuntu >= 22.04。
 - 容器网络插件：VPC-CNI 共享网卡多 IP。
 - 节点：安装前不要向集群添加任何普通节点或原生节点，避免残留相关规则和配置，等安装完成后再添加。
@@ -35,7 +35,7 @@
 resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   # 标准集群
   cluster_deploy_type = "MANAGED_CLUSTER"
-  # Kubernetes 版本 >= 1.30.0
+  # Kubernetes 版本 >= 1.32
   cluster_version = "1.32.2"
   # 操作系统，TencentOS 4 的镜像 ID
   cluster_os = "img-gqmik24x"

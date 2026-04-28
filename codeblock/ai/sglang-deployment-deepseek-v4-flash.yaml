@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepseek-v4-flash
+  labels:
+    app: deepseek-v4-flash
+spec:
+  selector:
+    matchLabels:
+      app: deepseek-v4-flash
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: deepseek-v4-flash
+    spec:
+      containers:
+      - name: sglang
+        image: lmsysorg/sglang:deepseek-v4-hopper # H20/H200 使用 hopper 版镜像
+        env:
+        - name: TOTAL_GPU
+          value: "8"
+        - name: MODEL_DIRECTORY
+          value: "DeepSeek-V4-Flash-FP8"
+        - name: MODEL_NAME
+          value: "DeepSeek-V4-Flash"
+        - name: API_KEY
+          value: ""
+        command:
+        - bash
+        - -c
+        - |
+          set -x
+          MODEL_DIRECTORY="${MODEL_DIRECTORY:-MODEL_NAME}"
+          EXTRA_ARGS=""
+          if [[ "$API_KEY" != "" ]]; then
+              EXTRA_ARGS="--api-key $API_KEY"
+          fi
+          exec python3 -m sglang.launch_server \
+            --model-path /data/model/$MODEL_DIRECTORY \
+            --served-model-name $MODEL_NAME \
+            --tp $TOTAL_GPU \
+            --log-requests \
+            --enable-metric \
+            --allow-auto-truncate \
+            --watchdog-timeout 3600 \
+            --trust-remote-code \
+            --mem-fraction-static 0.85 \
+            --max-running-requests 64 \
+            --chunked-prefill-size 4096 \
+            --host 0.0.0.0 \
+            --port 30000 $EXTRA_ARGS
+        resources:
+          limits:
+            nvidia.com/gpu: "8"
+        ports:
+        - containerPort: 30000
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 30000
+          periodSeconds: 5
+          initialDelaySeconds: 120
+        volumeMounts:
+        - name: data
+          mountPath: /data/model
+        - name: shm
+          mountPath: /dev/shm
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: ai-model
+      - name: shm
+        emptyDir:
+          medium: Memory
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deepseek-v4-flash-api
+spec:
+  type: ClusterIP
+  selector:
+    app: deepseek-v4-flash
+  ports:
+  - name: api
+    protocol: TCP
+    port: 30000
+    targetPort: 30000

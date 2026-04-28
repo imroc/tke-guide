@@ -15,7 +15,7 @@ Installing Cilium is a significant change to the cluster. It is not recommended 
 Create a TKE cluster in the [Container Service Console](https://console.cloud.tencent.com/tke2/cluster), paying attention to the following key options:
 
 - Cluster Type: Standard Cluster
-- Kubernetes Version: No lower than 1.30.0, recommended to choose the latest version (refer to [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)).
+- Kubernetes Version: No lower than 1.32, recommended to choose the latest version (refer to [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)).
 - Operating System: TencentOS 4 or Ubuntu >= 22.04.
 - Container Network Plugin: VPC-CNI shared NIC multi-IP.
 - Nodes: Do not add any regular nodes or native nodes to the cluster before installation to avoid residual rules and configurations. Add them after the installation is complete.
@@ -35,7 +35,7 @@ If using Terraform to create a cluster, refer to the following code snippet:
 resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   # Standard Cluster
   cluster_deploy_type = "MANAGED_CLUSTER"
-  # Kubernetes Version >= 1.30.0
+  # Kubernetes Version >= 1.32
   cluster_version = "1.32.2"
   # Operating System, TencentOS 4 image ID
   cluster_os = "img-gqmik24x"

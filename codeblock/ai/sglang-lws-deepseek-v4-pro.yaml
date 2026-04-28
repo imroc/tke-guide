@@ -1,0 +1,144 @@
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: deepseek-v4-pro
+spec:
+  replicas: 1
+  leaderWorkerTemplate:
+    size: 2
+    restartPolicy: RecreateGroupOnPodRestart
+    leaderTemplate:
+      metadata:
+        labels:
+          role: leader
+      spec:
+        hostNetwork: true # 使用 HCCPNV6 机型时，需要 HostNetwork 以启用 RDMA。
+        hostPID: true
+        dnsPolicy: ClusterFirstWithHostNet # HostNetwork 下需要此配置以使用 coredns 解析 LWS_LEADER_ADDRESS。
+        containers:
+        - name: leader
+          image: lmsysorg/sglang:deepseek-v4-hopper # H20 使用 hopper 版镜像
+          env:
+          - name: LWS_WORKER_INDEX
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']
+          - name: TOTAL_GPU
+            value: "16"
+          - name: MODEL_DIRECTORY
+            value: "DeepSeek-V4-Pro-FP8"
+          - name: MODEL_NAME
+            value: "DeepSeek-V4-Pro"
+          - name: API_KEY
+            value: ""
+          command:
+          - bash
+          - -c
+          - |
+            set -x
+            MODEL_DIRECTORY="${MODEL_DIRECTORY:-MODEL_NAME}"
+            EXTRA_ARGS=""
+            if [[ "$API_KEY" != "" ]]; then
+                EXTRA_ARGS="--api-key $API_KEY"
+            fi
+            exec python3 -m sglang.launch_server \
+              --model-path /data/model/$MODEL_DIRECTORY \
+              --served-model-name $MODEL_NAME \
+              --nnodes $LWS_GROUP_SIZE \
+              --tp $TOTAL_GPU \
+              --node-rank $LWS_WORKER_INDEX \
+              --dist-init-addr $LWS_LEADER_ADDRESS:5000 \
+              --log-requests \
+              --enable-metric \
+              --allow-auto-truncate \
+              --watchdog-timeout 3600 \
+              --trust-remote-code \
+              --mem-fraction-static 0.82 \
+              --max-running-requests 128 \
+              --host 0.0.0.0 \
+              --port 30000 $EXTRA_ARGS
+          resources:
+            limits:
+              nvidia.com/gpu: "8" # 每台节点 8 张 GPU 卡，每个 Pod 独占 1 台节点。
+          ports:
+          - containerPort: 30000
+          volumeMounts:
+          - mountPath: /dev/shm
+            name: dshm
+          - mountPath: /data/model
+            name: data
+        volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+        - name: data
+          persistentVolumeClaim:
+            claimName: ai-model
+    workerTemplate:
+      spec:
+        hostNetwork: true # worker 与 leader 保持一致
+        hostPID: true
+        dnsPolicy: ClusterFirstWithHostNet # worker 与 leader 保持一致
+        containers:
+        - name: worker
+          image: lmsysorg/sglang:deepseek-v4-hopper # H20 使用 hopper 版镜像
+          env:
+          - name: LWS_WORKER_INDEX
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']
+          - name: TOTAL_GPU
+            value: "16"
+          - name: MODEL_DIRECTORY
+            value: "DeepSeek-V4-Pro-FP8"
+          - name: MODEL_NAME
+            value: "DeepSeek-V4-Pro"
+          command:
+          - bash
+          - -c
+          - |
+            set -x
+            MODEL_DIRECTORY="${MODEL_DIRECTORY:-MODEL_NAME}"
+            exec python3 -m sglang.launch_server \
+              --model-path /data/model/$MODEL_DIRECTORY \
+              --served-model-name $MODEL_NAME \
+              --nnodes $LWS_GROUP_SIZE \
+              --tp $TOTAL_GPU \
+              --node-rank $LWS_WORKER_INDEX \
+              --dist-init-addr $LWS_LEADER_ADDRESS:5000 \
+              --log-requests \
+              --enable-metric \
+              --allow-auto-truncate \
+              --watchdog-timeout 3600 \
+              --trust-remote-code
+          resources:
+            limits:
+              nvidia.com/gpu: "8" # 每台节点 8 张 GPU 卡，每个 Pod 独占 1 台节点。
+          volumeMounts:
+          - mountPath: /dev/shm
+            name: dshm
+          - mountPath: /data/model
+            name: data
+        volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+        - name: data
+          persistentVolumeClaim:
+            claimName: ai-model
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deepseek-v4-pro-api
+spec:
+  type: ClusterIP
+  selector:
+    leaderworkerset.sigs.k8s.io/name: deepseek-v4-pro
+    role: leader
+  ports:
+  - name: api
+    protocol: TCP
+    port: 30000
+    targetPort: 30000
