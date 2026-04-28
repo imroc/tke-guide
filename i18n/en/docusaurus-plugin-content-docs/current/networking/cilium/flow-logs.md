@@ -37,7 +37,7 @@ The overall data flow is as follows:
 Enable Hubble dynamic log export and configure export rules:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.1 \
+helm upgrade cilium cilium/cilium --version 1.19.3 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.enabled=true \
@@ -86,7 +86,7 @@ Multiple fields within the same filter object have an **AND** relationship, whil
 If you don't need to export all fields, use `fieldMask` to keep only the fields you need, reducing log size:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.1 \
+helm upgrade cilium cilium/cilium --version 1.19.3 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.enabled=true \
@@ -155,7 +155,7 @@ fieldMask field paths use dots (`.`) to separate nested fields. The complete lis
 Dynamic export supports configuring multiple rules simultaneously, each exporting to a different file, suitable for categorized export by scenario:
 
 ```bash showLineNumbers
-helm upgrade cilium cilium/cilium --version 1.19.1 \
+helm upgrade cilium cilium/cilium --version 1.19.3 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.enabled=true \
@@ -189,7 +189,7 @@ Exported log files are automatically rotated. Configure with the following param
 For high log volumes, you can increase the file size and backup count:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.1 \
+helm upgrade cilium cilium/cilium --version 1.19.3 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.export.fileMaxSizeMb=50 \
@@ -226,7 +226,7 @@ Each exported line is a JSON object containing the full network flow log. Below 
     },
     "emitter": {
       "name": "Hubble",
-      "version": "1.19.1+gd0d0c879"
+      "version": "1.19.3+gd0d0c879"
     },
     "ethernet": {
       "destination": "02:21:a9:ff:89:f4",
@@ -413,7 +413,7 @@ After enabling L7 observability, the `flow.l7` field in exported flow logs will 
 L7 logs may contain sensitive information (query parameters in URLs, authentication credentials, etc.). Cilium provides redaction options:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.1 \
+helm upgrade cilium cilium/cilium --version 1.19.3 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.redact.enabled=true \
