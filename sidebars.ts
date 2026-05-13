@@ -77,6 +77,7 @@ const sidebars: SidebarsConfig = {
         'networking/clb-to-pod-directly',
         'networking/pod-eip',
         'networking/migrate-tcm-to-istio',
+        'networking/dpv2-install-localdns',
         'networking/ipv6',
         'networking/tke-extend-network-controller',
         'networking/sign-free-certs-for-dnspod',
