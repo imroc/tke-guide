@@ -15,9 +15,9 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@docusaurus/core": "^3.9.2",
-    "@docusaurus/plugin-pwa": "^3.9.2",
-    "@docusaurus/preset-classic": "^3.9.2",
+    "@docusaurus/core": "^3.10.1",
+    "@docusaurus/plugin-pwa": "^3.10.1",
+    "@docusaurus/preset-classic": "^3.10.1",
     "@docusaurus/theme-mermaid": "^3.10.1",
     "@giscus/react": "^3.1.0",
     "@mdx-js/react": "^3.1.1",
@@ -27,15 +27,15 @@
     "path-browserify": "^1.0.1",
     "prism-react-renderer": "^2.4.1",
     "raw-loader": "^4.0.2",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1",
-    "sass": "^1.94.2"
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "sass": "^1.99.0"
   },
   "devDependencies": {
-    "@docusaurus/module-type-aliases": "^3.9.2",
-    "@docusaurus/tsconfig": "^3.9.2",
-    "@docusaurus/types": "^3.9.2",
-    "typescript": "^5.9.3"
+    "@docusaurus/module-type-aliases": "^3.10.1",
+    "@docusaurus/tsconfig": "^3.10.1",
+    "@docusaurus/types": "^3.10.1",
+    "typescript": "^6.0.3"
   },
   "browserslist": {
     "production": [
