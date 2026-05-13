@@ -7,6 +7,9 @@ const DefaultLocale = "zh"
 const beian = '蜀ICP备2021009081号-1'
 
 const config: Config = {
+  markdown: {
+    mermaid: true,
+  },
   title: 'TKE 实践指南', // 网站标题
   tagline: 'TKE 老司机带你飞', // slogan
   favicon: 'img/logo.svg', // 电子书 favicon 文件，注意替换
