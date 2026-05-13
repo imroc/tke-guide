@@ -27,7 +27,6 @@ graph LR
 ## 前提条件
 
 - TKE DataPlaneV2 集群（VPC-CNI 网络模式 + cilium eBPF 数据面）
-- 集群版本 >= 1.24
 
 :::tip[说明]
 
