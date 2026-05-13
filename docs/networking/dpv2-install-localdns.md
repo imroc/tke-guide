@@ -27,10 +27,22 @@ graph LR
 ## 前提条件
 
 - TKE DataPlaneV2 集群（VPC-CNI 网络模式 + cilium eBPF 数据面）
+- cilium 已启用 LocalRedirectPolicy 功能且相关 CRD 已安装
+
+确认方式：
+
+```bash
+# 确认 enable-local-redirect-policy 为 true
+kubectl get cm -n kube-system cilium-config -o jsonpath='{.data.enable-local-redirect-policy}'
+# 预期输出: true
+
+# 确认 CRD 已安装
+kubectl get crd ciliumlocalredirectpolicies.cilium.io
+```
 
 :::tip[说明]
 
-DataPlaneV2 集群已默认启用 `enable-local-redirect-policy: true` 并预装了 `ciliumlocalredirectpolicies.cilium.io` CRD，无需额外配置。
+DataPlaneV2 集群通常已默认满足以上条件，无需额外配置。如果输出不符合预期，请联系 TKE 支持。
 
 :::
 
