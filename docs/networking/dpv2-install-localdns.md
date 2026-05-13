@@ -2,7 +2,7 @@
 
 ## 背景
 
-TKE 的 DataPlaneV2 集群使用 cilium eBPF 完全替代了 kube-proxy，通过 cilium 来处理 Service 的负载均衡。这意味着 TKE 控制台提供的 [NodeLocalDNSCache 扩展组件](https://cloud.tencent.com/document/product/457/49423) **不支持** DataPlaneV2 集群。
+TKE 的 DataPlaneV2 集群使用 cilium eBPF 完全替代了 kube-proxy，Service 的负载均衡由 eBPF 在内核层直接完成，不经过 iptables。而 TKE 控制台提供的 [NodeLocalDNSCache 扩展组件](https://cloud.tencent.com/document/product/457/49423) 依赖 iptables 规则拦截 DNS 流量，因此**无法在 DataPlaneV2 集群中生效**。
 
 当集群 DNS 出现性能瓶颈时（如高并发 DNS 查询、跨地域双活场景等），可以通过自建 NodeLocal DNSCache 并配合 CiliumLocalRedirectPolicy 来实现本地 DNS 缓存。
 
