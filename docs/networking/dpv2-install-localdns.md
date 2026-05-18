@@ -84,7 +84,7 @@ echo "kube-dns ClusterIP: $kubedns"
 
 :::
 
-<FileBlock file="networking/dpv2-node-local-dns.yaml" title="node-local-dns.yaml" />
+<FileBlock file="networking/dpv2-node-local-dns-lrp.yaml" title="node-local-dns.yaml" />
 
 替换占位符并安装：
 
@@ -295,31 +295,42 @@ echo "kube-dns ClusterIP: $kubedns"
 
 #### 2. 部署 NodeLocal DNSCache
 
-复用同一份 [`node-local-dns.yaml`](#fileblock--codeblocknetworkingdpv2-node-local-dnsyaml)，但需要对 DaemonSet 修改以下几处：
+保存以下内容到文件 `node-local-dns.yaml`:
 
-| 字段                             | 方案一（LocalRedirectPolicy） | 方案二（hostNetwork） |
-| -------------------------------- | ----------------------------- | --------------------- |
-| `spec.template.spec.hostNetwork` | `false`                       | **`true`**            |
-| 启动参数 `-setupinterface`       | `false`                       | **`true`**            |
-| 启动参数 `-setupiptables`        | `false`                       | `false`（保持不变）   |
-| 启动参数 `-localip`              | （不需要）                    | **`169.254.20.10`**   |
+:::tip[与方案一 yaml 的关键差异]
+
+本方案使用独立的 yaml 模板，与方案一相比的关键差异：
+
+- `hostNetwork: true`（Pod 共享节点网络命名空间，便于绑定 link-local IP）
+- `-setupinterface=true`（在节点创建 `nodelocaldns` dummy 网卡并绑定 `169.254.20.10`）
+- `-localip "169.254.20.10,..."`（声明本地监听 IP）
+- Corefile 中所有 server block 的 `bind` 改为 `169.254.20.10`（不绑 0.0.0.0，避免与节点其它 53 端口监听冲突）
+- 容器端口 53/9253 配置 `hostPort`（由 hostNetwork 决定）
+- livenessProbe 探测 `169.254.20.10:8080/health`（hostNetwork 下需显式指定 host）
+
+:::
+
+<FileBlock file="networking/dpv2-node-local-dns-hostnet.yaml" title="node-local-dns.yaml" />
 
 替换占位符并安装：
 
 ```bash
-# 获取 kube-dns-upstream 的 ClusterIP
+# 获取 kube-dns-upstream 的 ClusterIP 作为集群内 DNS 转发目标
 kubedns_upstream=$(kubectl get svc kube-dns-upstream -n kube-system -o jsonpath={.spec.clusterIP} 2>/dev/null)
+
+# 如果 kube-dns-upstream 还不存在（首次安装），先 apply 创建 Service 再获取
 if [ -z "$kubedns_upstream" ]; then
   kubectl apply -f node-local-dns.yaml
   kubedns_upstream=$(kubectl get svc kube-dns-upstream -n kube-system -o jsonpath={.spec.clusterIP})
 fi
 
+# 替换占位符
 sed -i "s/__PILLAR__DNS__SERVER__/$kubedns/g" node-local-dns.yaml
-sed -i "s/__PILLAR__LOCAL__DNS__/169.254.20.10/g" node-local-dns.yaml
 sed -i "s/__PILLAR__DNS__DOMAIN__/cluster.local/g" node-local-dns.yaml
 sed -i "s/__PILLAR__CLUSTER__DNS__/$kubedns_upstream/g" node-local-dns.yaml
 sed -i "s/__PILLAR__UPSTREAM__SERVERS__/\/etc\/resolv.conf/g" node-local-dns.yaml
 
+# 安装
 kubectl apply -f node-local-dns.yaml
 ```
 
