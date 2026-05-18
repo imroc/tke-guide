@@ -15,7 +15,7 @@ TKE 的 DataPlaneV2 集群使用 cilium eBPF 完全替代了 kube-proxy，Servic
 | **方案一：CiliumLocalRedirectPolicy** | 全集群默认接入，业务无感知                   | 集群整体 DNS QPS 高、想"装上即生效"全局加速；或集群内极少有 DNS 切换高可用敏感业务                              |
 | **方案二：hostNetwork + dnsConfig**   | 业务显式接入（修改 workload 的 `dnsConfig`） | 仅想为部分高 QPS 业务加速；或集群内存在 DNS 切换高可用敏感业务（DB 主备切换、CLB 漂移、跨地域双活），需精细控制 |
 
-两种方案使用同一份 `node-local-dns.yaml`（仅个别参数差异），互斥部署，**不要同时启用**。
+两种方案使用各自独立的 `node-local-dns.yaml` 模板（在 `hostNetwork`、`setupinterface`、Corefile 绑定地址等关键参数上有差异），**互斥部署，不要同时启用**。
 
 ## 方案一：CiliumLocalRedirectPolicy
 
