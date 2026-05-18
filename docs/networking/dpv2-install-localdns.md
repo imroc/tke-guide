@@ -168,6 +168,70 @@ kubectl exec dnstest -- wget -qO- http://$NODE_LOCAL_DNS_IP:9253/metrics | grep 
 kubectl delete pod dnstest
 ```
 
+## 高级配置：按域名分流（对 DNS 切换敏感的高可用场景）
+
+### 适用场景
+
+部分业务依赖 **DNS 切换** 实现高可用，例如：
+
+- **云数据库主备切换**：如 TencentDB MySQL/Redis 主实例故障时，控制台或主备探活会把读写域名解析到备实例
+- **CLB VIP 漂移 / 跨可用区容灾**：用域名（而非固定 VIP）连接 CLB，故障时 DNS 指向新 VIP
+- **跨地域双活切流**：通过 GSLB / 智能 DNS 把流量在地域间切换
+
+这类场景下，**业务对域名切换的感知速度上限 = DNS 解析结果的 TTL**。引入 LocalDNS 后，node-local-dns 会按 Corefile 中 `cache` 插件的配置缓存响应：
+
+- 如果 `cache` 配置的最大 TTL **大于权威 DNS 的 TTL**，会**额外放大切换延迟**
+- 默认配置下 `success 9984 30`（最长 30s）对绝大多数场景够用，但 **对秒级 RTO 敏感的业务（如金融交易）需要更激进的策略**
+
+解决思路：为这类高敏感域名单独写一个 server block，**不缓存或仅做请求合并**（1s 缓存），其它域名维持默认缓存以保留性能收益。
+
+### 配置方法
+
+编辑 `node-local-dns` ConfigMap，在 Corefile 中**新增一个 server block**（其余 block 保持不变）：
+
+```bash
+kubectl edit configmap node-local-dns -n kube-system
+```
+
+在 `.:53 { ... }` 这个 catch-all block **之前**插入：
+
+```
+tencentcdb.com:53 clb.tencentyun.com:53 {
+    errors
+    cache 1
+    reload
+    loop
+    bind 0.0.0.0
+    forward . /etc/resolv.conf
+    prometheus :9253
+    }
+```
+
+说明：
+
+- **Zone 匹配最长前缀优先**：CoreDNS 会自动把 `xxx-db.tencentcdb.com` 路由到这个 block，不会落到 `.:53`
+- **一个 block 可写多个 zone**，空格分隔；按需把自己业务的高敏感域名加进去
+- **`cache 1`**：最大缓存 1 秒。比"完全不缓存"更推荐，原因是 CoreDNS cache 插件在缓存有效期内会**合并并发请求**，避免上游 VPC DNS 被打爆，1 秒延迟对 RTO 影响几乎可忽略
+- 若需完全透传（每次都查上游），**删除 `cache 1` 这一行**即可
+- **`prometheus :9253` 每个 block 都要写**，否则该 block 的 DNS 请求不会被纳入指标
+
+修改后由 `reload` 插件自动加载（约 30 秒内生效），如需立即生效可手动重启：
+
+```bash
+kubectl rollout restart ds/node-local-dns -n kube-system
+```
+
+### 验证
+
+在业务 Pod 内连续解析目标域名，观察 TTL：
+
+```bash
+kubectl exec dnstest -- sh -c 'for i in 1 2 3; do dig +noall +answer your-db.tencentcdb.com; sleep 2; done'
+```
+
+- **高敏感域名（命中新 block）**：每次返回的 TTL 都是权威 DNS 的原始值，不会随时间递减
+- **其它域名（命中 `.:53`）**：TTL 会随时间递减（说明命中了 LocalDNS 缓存）
+
 ## 与自建 Cilium 集群的差异
 
 | 对比项              | 自建 Cilium 集群                                         | DataPlaneV2 集群                       |
