@@ -181,6 +181,20 @@ kubectl exec dnstest -- wget -qO- http://$NODE_LOCAL_DNS_IP:9253/metrics | grep 
 kubectl delete pod dnstest
 ```
 
+### 与自建 Cilium 集群的差异
+
+方案一依赖 cilium 的 LocalRedirectPolicy 能力，DPv2 集群与自建 Cilium 集群在该能力上的差异如下：
+
+| 对比项              | 自建 Cilium 集群                                         | DataPlaneV2 集群                       |
+| ------------------- | -------------------------------------------------------- | -------------------------------------- |
+| LocalRedirectPolicy | 需手动启用（`--set localRedirectPolicies.enabled=true`） | 默认已启用                             |
+| CRD                 | 需确认已安装                                             | 默认已安装                             |
+| Cilium 部署形式     | 独立 DaemonSet                                           | sidecar 形式集成在 `tke-eni-agent` 中  |
+| kube-proxy          | 需手动移除                                               | 不存在（创建时就不部署）               |
+| 配置方式            | helm values 或 cilium-config ConfigMap                   | 不可直接修改（由 eniipamd addon 管理） |
+
+自建 Cilium 集群的部署方式参考：[Cilium 与 Nodelocal DNSCache 共存（自建 Cilium 场景）](/networking/cilium/with-node-local-dns)。
+
 ### 高级配置：按域名分流（对 DNS 切换敏感的高可用场景）
 
 #### 适用场景
@@ -413,16 +427,6 @@ kubectl exec dnstest -- wget -qO- http://169.254.20.10:9253/metrics | grep cored
 ```bash
 kubectl delete pod dnstest
 ```
-
-## 与自建 Cilium 集群的差异
-
-| 对比项              | 自建 Cilium 集群                                         | DataPlaneV2 集群                       |
-| ------------------- | -------------------------------------------------------- | -------------------------------------- |
-| LocalRedirectPolicy | 需手动启用（`--set localRedirectPolicies.enabled=true`） | 默认已启用                             |
-| CRD                 | 需确认已安装                                             | 默认已安装                             |
-| Cilium 部署形式     | 独立 DaemonSet                                           | sidecar 形式集成在 `tke-eni-agent` 中  |
-| kube-proxy          | 需手动移除                                               | 不存在（创建时就不部署）               |
-| 配置方式            | helm values 或 cilium-config ConfigMap                   | 不可直接修改（由 eniipamd addon 管理） |
 
 ## 参考资料
 
