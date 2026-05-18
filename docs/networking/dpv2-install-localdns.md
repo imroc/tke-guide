@@ -362,7 +362,41 @@ kubectl delete ciliumlocalredirectpolicy nodelocaldns -n kube-system --ignore-no
 
 #### 3. 业务接入
 
-在需要本地 DNS 缓存的 workload 上配置 `dnsConfig`：
+在需要本地 DNS 缓存的 workload 上配置 `dnsConfig`，**保留默认的 `dnsPolicy: ClusterFirst`**（即不显式声明 `dnsPolicy`），只追加一个 nameserver 即可：
+
+```yaml
+spec:
+  template:
+    spec:
+      # dnsPolicy 不写，默认就是 ClusterFirst
+      dnsConfig:
+        nameservers:
+          - 169.254.20.10    # 追加到 kubelet 注入的 kube-dns ClusterIP 之前
+```
+
+`ClusterFirst` 下 kubelet 会自动注入 `kube-dns` ClusterIP 作为 nameserver，并补全 `searches`（含 `<ns>.svc.cluster.local`、`svc.cluster.local`、`cluster.local`）和 `ndots: 5`。`dnsConfig.nameservers` 中的 `169.254.20.10` 会**追加**到 `/etc/resolv.conf` 的 nameserver 列表中。
+
+:::tip[nameserver 顺序与 LocalDNS 故障兜底]
+
+`ClusterFirst` + `dnsConfig` 合并后，最终 `/etc/resolv.conf` 的 nameserver 顺序大致是：
+
+```
+nameserver <kube-dns ClusterIP>     # kubelet 注入（优先）
+nameserver 169.254.20.10            # dnsConfig 追加
+```
+
+也就是说默认还是先查 kube-dns，**没有真正用上 LocalDNS 缓存**。如果想让 `169.254.20.10` 优先，需要使用 `dnsPolicy: None` + 完整 `dnsConfig`（见下方进阶用法）。
+
+实践中有两种取舍：
+
+- **追求"装上即用、零侵入"**：保留 `ClusterFirst` + 仅追加 nameserver。这种方式对集群内域名加速效果有限（kube-dns 在前），主要价值是 LocalDNS 作为兜底；但配置最简单、出问题影响面最小
+- **追求"真正命中本地缓存"**：使用下方的 `dnsPolicy: None` 写法，把 `169.254.20.10` 放到 nameserver 列表第一位
+
+:::
+
+##### 进阶：让 LocalDNS 真正优先（dnsPolicy: None）
+
+如果业务对 DNS 性能敏感、希望解析请求**优先走本地缓存**，需要用 `dnsPolicy: None` 完全接管 DNS 配置：
 
 ```yaml
 spec:
@@ -379,18 +413,23 @@ spec:
           - cluster.local
         options:
           - name: ndots
-            value: "3"
+            value: "5"
 ```
 
-:::warning[searches 必须手动列全]
+:::warning[None 模式下 searches/ndots 必须手动列全]
 
-`dnsPolicy: None` 时 kubelet **不会自动注入** `searches` 和 `ndots`。如果遗漏，集群内短域名（如 `my-svc`、`my-svc.my-ns`）将无法解析。`<namespace>` 必须替换为业务实际所在 namespace。
+`dnsPolicy: None` 时 kubelet **完全不注入** `searches` 和 `ndots`，必须自己写全：
+
+- `<namespace>` 必须替换为业务实际所在 namespace，否则集群内短域名（如 `my-svc`）无法解析
+- `ndots` 建议保持 `5`（与 ClusterFirst 默认值一致）；若需减少 search 域轮询可降到 `3`，但要确认所有依赖的域名解析仍正常
+
+跨 namespace 部署同一份 yaml 时，建议通过 mutating webhook 动态注入正确的 namespace。
 
 :::
 
 :::tip[批量接入建议]
 
-如果需要接入的业务较多，推荐通过 **mutating webhook** 根据 namespace label 或 Pod annotation 自动注入 `dnsConfig`，避免逐个 workload 修改。
+如果需要接入的业务较多，推荐通过 **mutating webhook** 根据 namespace label 或 Pod annotation 自动注入 `dnsConfig`（以及在 `None` 模式下注入正确的 `searches`），避免逐个 workload 修改。
 
 :::
 
