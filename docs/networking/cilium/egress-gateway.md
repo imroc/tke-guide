@@ -99,6 +99,7 @@ helm upgrade cilium cilium/cilium --version 1.19.3 \
 2. 如果需要出公网，要为节点分配公网 IP。
 3. 如果不希望普通 Pod 调度过去，可以加下污点。
 4. Egress 节点池通常不启用自动伸缩，设置固定数量的节点。
+5. 如果存在 NAT 网关共存的需求（部分 Pod 走 NAT 网关、部分走 Egress 节点），egress 节点池应使用**独立的子网**，该子网的路由表不配置 NAT 网关路由，详见常见问题 [如何让 Egress Gateway 与 NAT 网关共存？](#如何让-egress-gateway-与-nat-网关共存)。
 
 以下是操作创建节点池的具体注意事项参考。
 
@@ -533,7 +534,7 @@ spec:
 另外还可以登录 egress 节点所在的 cilium pod，执行 `cilium-dbg bpf egress list` 查看当前节点上的 egress bpf 规则：
 
 ```bash
-$ kubectl -n kube-systme exec -it cilium-nz5hd -- bash
+$ kubectl -n kube-system exec -it cilium-nz5hd -- bash
 root@VM-49-119-tencentos:/home/cilium# cilium-dbg bpf egress list
 Source IP      Destination CIDR   Egress IP       Gateway IP
 172.22.48.4    0.0.0.0/0          172.22.49.119   172.22.49.119
@@ -555,7 +556,63 @@ Source IP      Destination CIDR   Egress IP       Gateway IP
 
 ### 出口 IP 不符预期
 
-通常是跟 NAT 网关冲突，如果 VPC 路由表配置了公网走 NAT 网关，最终就可能走 NAT 网关出公网而不是用 egress 节点绑定的公网 IP 出去，所以可以检查下 VPC 路由表，是否有配置发往 NAT 网关的路由规则。
+Egress Gateway 的流量最终是从 egress 节点出去的，如果 egress 节点所在子网的 VPC 路由表配置了 `0.0.0.0/0` 下一跳为 NAT 网关，那么流量从 egress 节点出公网时会被 NAT 网关截获，最终出口 IP 变成 NAT 网关的 IP 而非 egress 节点绑定的 EIP。
+
+排查步骤：
+
+1. 确认 egress 节点所在子网绑定的路由表中，是否存在 `0.0.0.0/0` 指向 NAT 网关的路由规则。
+2. 如果存在，移除该路由规则或将 egress 节点迁移到不绑 NAT 网关路由的子网中。
+
+:::tip[注意]
+
+这里的关键是 **egress 节点所在子网**的路由表，而非 work 节点（client Pod 所在节点）子网的路由表。Egress Gateway 通过隧道将流量从 work 节点转发到 egress 节点，该隧道通信走 VPC 内网路由，不受 work 子网公网路由的影响。
+
+:::
+
+### 如何让 Egress Gateway 与 NAT 网关共存？
+
+场景：集群中大部分 Pod 默认走 NAT 网关出公网，仅部分工作负载需要通过 Egress Gateway 走固定的 EIP 出去。
+
+方案：将 work 节点和 egress 节点放在**不同子网**，两个子网绑定不同的路由表：
+
+- **work 子网**的路由表：`0.0.0.0/0` 下一跳为 NAT 网关（未命中 Egress 策略的 Pod 通过 NAT 网关出公网）
+- **egress 子网**的路由表：不配置 NAT 网关路由（命中 Egress 策略的流量通过 egress 节点 EIP 出公网）
+
+这个方案可行的原因是 Cilium Egress Gateway 使用**隧道封装**（VXLAN）将流量从 work 节点转发到 egress 节点，隧道外层目的 IP 是 egress 节点的内网 IP，走的是 VPC 内网路由，不会被 work 子网的 NAT 网关路由截获：
+
+```mermaid
+flowchart LR
+    subgraph work子网[work 子网<br/>路由表: 0.0.0.0/0 → NAT 网关]
+        Pod[Client Pod]
+        CiliumW[Cilium BPF]
+    end
+    subgraph egress子网[egress 子网<br/>路由表: 无 NAT 网关路由]
+        CiliumE[Cilium BPF]
+        EIP[EIP: 1.2.3.4]
+    end
+    Pod -->|1. 外访流量| CiliumW
+    CiliumW -->|2. VXLAN 隧道<br/>dst=egress内网IP<br/>走 VPC 内网路由| CiliumE
+    CiliumE -->|3. SNAT + 出公网| EIP
+    EIP -->|4. 出口IP=EIP| Internet((公网))
+```
+
+配置步骤：
+
+1. 在 VPC 中创建两个子网（如 `work-subnet` 和 `egress-subnet`），并分别关联不同的路由表。
+2. `work-subnet` 路由表中添加 `0.0.0.0/0 → NAT 网关`。
+3. `egress-subnet` 路由表中**不添加** NAT 网关路由。
+4. work 节点池使用 `work-subnet`，egress 节点池使用 `egress-subnet`。
+5. 按正常流程配置 CiliumEgressGatewayPolicy 即可。
+
+未命中 Egress 策略的 Pod 外访流量走正常路径（BPF masquerade 将 Pod IP SNAT 为 work 节点 IP → 从 work 节点出去 → work 子网路由表将流量导向 NAT 网关）。
+
+:::tip[注意]
+
+1. 确保 work 子网和 egress 子网之间的安全组互通 **UDP 4789**（VXLAN 隧道端口）。
+2. `egressIP` 填 egress 节点的**内网 IP**，不是 EIP。
+3. 如果 egress 节点本身也需要访问公网（如拉取镜像），可以单独给 egress 子网配置特定的路由规则，或确保 egress 节点有 EIP 且安全组出方向放通。
+
+:::
 
 ### 如何让外访流量走 VPC 之外的机器出去？
 
