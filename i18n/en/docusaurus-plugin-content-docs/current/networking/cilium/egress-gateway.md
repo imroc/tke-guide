@@ -99,6 +99,7 @@ Things to note:
 2. If internet access is needed, assign public IPs to the nodes.
 3. To prevent regular Pods from being scheduled there, add taints.
 4. Egress node pools typically don't enable auto-scaling and set a fixed number of nodes.
+5. If you need Egress Gateway to coexist with a NAT gateway (some Pods use NAT gateway, others use Egress nodes), the egress node pool should use a **separate subnet** whose route table does not have NAT gateway routes. See FAQ [How to make Egress Gateway coexist with NAT Gateway?](#how-to-make-egress-gateway-coexist-with-nat-gateway) for details.
 
 Below are specific operational considerations for creating node pools:
 
@@ -533,7 +534,7 @@ First confirm if the CiliumEgressGatewayPolicy configuration method is correct. 
 You can also log into the cilium pod on the egress node and execute `cilium-dbg bpf egress list` to view current egress bpf rules on the node:
 
 ```bash
-$ kubectl -n kube-systme exec -it cilium-nz5hd -- bash
+$ kubectl -n kube-system exec -it cilium-nz5hd -- bash
 root@VM-49-119-tencentos:/home/cilium# cilium-dbg bpf egress list
 Source IP      Destination CIDR   Egress IP       Gateway IP
 172.22.48.4    0.0.0.0/0          172.22.49.119   172.22.49.119
@@ -555,7 +556,63 @@ Source IP      Destination CIDR   Egress IP       Gateway IP
 
 ### Unexpected Egress IP
 
-Usually conflicts with NAT gateway. If the VPC routing table is configured to route public traffic through a NAT gateway, traffic may eventually go through the NAT gateway instead of using the public IP bound to the egress node. Check if the VPC routing table has routing rules configured to send traffic to the NAT gateway.
+Egress Gateway traffic ultimately exits from the egress node. If the VPC route table of the subnet where the egress node is located has a `0.0.0.0/0` route pointing to a NAT gateway, traffic leaving the egress node for the internet will be intercepted by the NAT gateway, resulting in the egress IP being the NAT gateway's IP instead of the EIP bound to the egress node.
+
+Troubleshooting steps:
+
+1. Check if the route table bound to the egress node's subnet has a `0.0.0.0/0` route pointing to a NAT gateway.
+2. If so, remove that route rule or migrate the egress node to a subnet without NAT gateway routes.
+
+:::tip[Note]
+
+The key here is the route table of the **egress node's subnet**, not the work node (client Pod's node) subnet's route table. Egress Gateway forwards traffic from work nodes to egress nodes via tunnel, and that tunnel communication uses VPC internal routing, which is not affected by the work subnet's public network routes.
+
+:::
+
+### How to make Egress Gateway coexist with NAT Gateway?
+
+Scenario: Most Pods in the cluster use NAT gateway for internet access by default, while only specific workloads need to go through Egress Gateway with a fixed EIP.
+
+Solution: Place work nodes and egress nodes in **different subnets**, with different route tables bound to each:
+
+- **Work subnet** route table: `0.0.0.0/0` next hop is NAT gateway (Pods not matching Egress policy access internet through NAT gateway)
+- **Egress subnet** route table: no NAT gateway route (traffic matching Egress policy exits through the egress node's EIP)
+
+This works because Cilium Egress Gateway uses **tunnel encapsulation** (VXLAN) to forward traffic from work nodes to egress nodes. The outer destination IP of the tunnel is the egress node's internal IP, which uses VPC internal routing and will not be intercepted by the work subnet's NAT gateway route:
+
+```mermaid
+flowchart LR
+    subgraph workSubnet[Work Subnet<br/>Route: 0.0.0.0/0 → NAT Gateway]
+        Pod[Client Pod]
+        CiliumW[Cilium BPF]
+    end
+    subgraph egressSubnet[Egress Subnet<br/>Route: No NAT Gateway]
+        CiliumE[Cilium BPF]
+        EIP[EIP: 1.2.3.4]
+    end
+    Pod -->|1. Outbound traffic| CiliumW
+    CiliumW -->|2. VXLAN tunnel<br/>dst=egress internal IP<br/>VPC internal routing| CiliumE
+    CiliumE -->|3. SNAT + egress| EIP
+    EIP -->|4. Egress IP=EIP| Internet((Internet))
+```
+
+Configuration steps:
+
+1. Create two subnets in the VPC (e.g., `work-subnet` and `egress-subnet`), each associated with different route tables.
+2. Add `0.0.0.0/0 → NAT Gateway` to the `work-subnet` route table.
+3. **Do not add** NAT gateway routes to the `egress-subnet` route table.
+4. Use `work-subnet` for the work node pool and `egress-subnet` for the egress node pool.
+5. Configure CiliumEgressGatewayPolicy as normal.
+
+Pods not matching the Egress policy will follow the normal path (BPF masquerade SNATs Pod IP to work node IP → exits from work node → work subnet route table directs traffic to NAT gateway).
+
+:::tip[Note]
+
+1. Ensure security groups between work subnet and egress subnet allow **UDP 4789** (VXLAN tunnel port).
+2. `egressIP` must be the egress node's **internal IP**, not the EIP.
+3. If the egress node itself needs internet access (e.g., pulling images), you can configure specific routing rules for the egress subnet separately, or ensure the egress node has an EIP with security group outbound rules allowing traffic.
+
+:::
 
 ### How to route outbound traffic through machines outside the VPC?
 
