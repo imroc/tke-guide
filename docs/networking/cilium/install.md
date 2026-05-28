@@ -96,7 +96,13 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
 可使用脚本自动检测集群环境并引导安装：
 
 ```bash
-curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/scripts/cilium.sh | bash -s install-cilium
+curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s install-cilium
+```
+
+如果网络环境无法连接 GitHub，可使用站点地址：
+
+```bash
+curl -sfL https://imroc.cc/tke/scripts/cilium.sh | bash -s install-cilium
 ```
 
 脚本会自动检测集群网络模式、引导选择安装方案和版本，然后执行安装。如需手动安装，参考后续步骤。

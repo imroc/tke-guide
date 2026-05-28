@@ -5,9 +5,9 @@ set -euo pipefail
 # Docs: https://imroc.cc/tke/networking/cilium/install
 #
 # Usage:
-#   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/scripts/cilium.sh | bash -s install-cilium
-#   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/scripts/cilium.sh | bash -s install-localdns
-#   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/scripts/cilium.sh | bash -s help
+#   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s install-cilium
+#   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s install-localdns
+#   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s help
 
 DEFAULT_CILIUM_VERSION="1.19.4"
 DEFAULT_POD_CIDR="10.244.0.0/16"
@@ -131,7 +131,7 @@ fatal() { error "$*"; exit 1; }
 
 show_help() {
   local script_name="cilium.sh"
-  local url="https://raw.githubusercontent.com/imroc/tke-guide/main/scripts/cilium.sh"
+  local url="https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh"
   echo ""
   msg HELP_TITLE
   echo ""
