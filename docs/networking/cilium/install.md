@@ -295,7 +295,9 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
   --set ipam.mode=delegated-plugin \
-  --set enableIPv4Masquerade=false \
+  --set enableIPv4Masquerade=true \
+  --set bpf.masquerade=true \
+  --set ipMasqAgent.enabled=true \
   --set devices=eth+ \
   --set cni.externalRouting=true \
   --set extraConfig.local-router-ipv4=169.254.32.16 \
@@ -306,13 +308,34 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set k8sServicePort=60002
 ```
 
+安装完成后，还需创建 `ip-masq-agent` ConfigMap 配置哪些网段不做 SNAT（将 TKE 的 `ip-masq-agent-config` 中的 `NonMasqueradeCIDRs` 复制过来）：
+
+```yaml title="ip-masq-agent.yaml"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ip-masq-agent
+  namespace: kube-system
+data:
+  config: |
+    nonMasqueradeCIDRs:
+    - <GR ClusterCIDR>
+    - <VPC CIDR>
+    masqLinkLocal: true
+```
+
+```bash
+kubectl apply -f ip-masq-agent.yaml
+```
+
 :::tip[与 VPC-CNI chaining 的差异]
 
 | 参数                                    | 说明                                                                             |
 | --------------------------------------- | -------------------------------------------------------------------------------- |
 | `cni.chainingTarget=tke-bridge`         | cilium 自动监视名为 `tke-bridge` 的 CNI 配置并追加自己，适配每节点不同的 PodCIDR |
-| `cni.exclusive=false`                   | 不独占 CNI 目录，保留 tke-bridge-agent 的配置文件                                |
 | 无需 `cni.customConf` / `cni.configMap` | 不需要手动创建 CNI ConfigMap                                                     |
+| `enableIPv4Masquerade=true`             | GR Pod IP 访问 CVM metadata 等公共服务需要 SNAT 为节点 IP                        |
+| 不禁用 `tke-cni-agent`                  | 需要保留以拷贝 bridge 等 CNI 二进制到节点                                        |
 
 :::
 

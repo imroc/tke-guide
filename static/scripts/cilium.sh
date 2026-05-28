@@ -357,6 +357,33 @@ setup_native_gr() {
   else
     info "$(is_zh && echo "tke-bridge-agent 已配置完毕，跳过" || echo "tke-bridge-agent already configured, skipping")"
   fi
+
+  # 配置 IP masquerade（GR Pod IP 访问 CVM metadata 等公共服务需要 SNAT 为节点 IP）
+  info "$(is_zh && echo "配置 IP masquerade..." || echo "Configuring IP masquerade...")"
+  local non_masq_cidrs=""
+  # 从 TKE 自动生成的 ip-masq-agent-config 中获取 NonMasqueradeCIDRs
+  local tke_cidrs
+  tke_cidrs=$(kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}' 2>/dev/null | grep -A100 'NonMasqueradeCIDRs:' | grep '^\s*-' | sed 's/.*- //' || true)
+  if [[ -n "$tke_cidrs" ]]; then
+    while IFS= read -r cidr; do
+      [[ -z "$cidr" ]] && continue
+      non_masq_cidrs="${non_masq_cidrs}    - ${cidr}\n"
+    done <<< "$tke_cidrs"
+  fi
+  # 创建 cilium 的 ip-masq-agent ConfigMap
+  kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ip-masq-agent
+  namespace: kube-system
+data:
+  config: |
+    nonMasqueradeCIDRs:
+$(echo -e "$non_masq_cidrs" | sed '/^$/d')
+    masqLinkLocal: true
+EOF
+  info "$(is_zh && echo "ip-masq-agent ConfigMap 已创建" || echo "ip-masq-agent ConfigMap created")"
 }
 
 setup_overlay_vpccni() {
@@ -415,7 +442,7 @@ helm_install_cilium() {
     mode_args=(--set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=false --set devices=eth+ --set cni.chainingMode=generic-veth --set cni.customConf=true --set cni.configMap=cni-config --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
     ;;
   GR_native)
-    mode_args=(--set cni.chainingMode=generic-veth --set cni.chainingTarget=tke-bridge --set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=false --set devices=eth+ --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
+    mode_args=(--set cni.chainingMode=generic-veth --set cni.chainingTarget=tke-bridge --set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=true --set bpf.masquerade=true --set ipMasqAgent.enabled=true --set devices=eth+ --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
     ;;
   VPC-CNI_overlay)
     toleration_args+=(--set 'operator.tolerations[5].key=tke.cloud.tencent.com/eni-ip-unavailable,operator.tolerations[5].operator=Exists')
