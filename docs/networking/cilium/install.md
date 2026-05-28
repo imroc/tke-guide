@@ -604,8 +604,10 @@ kubectl apply -f cilium-apf.yaml
 
 Cilium 要求 Linux kernel >= 5.10。本文的安装脚本和手动安装命令已处理了不同模式下的 sysctl 兼容性：
 
-- **Native Routing 模式**：禁用 cilium 的 `sysctlfix`（避免重启 systemd-sysctl 导致 eth0 的 rp_filter 被重置为 1 使网络不通）。所有满足最低内核要求的 OS 均可正常使用。
-- **Overlay 模式**：启用 cilium 的 `sysctlfix`（确保 lxc 接口的 rp_filter=0，否则 host↔Pod 回包会被内核丢弃）。所有满足最低内核要求的 OS 均可正常使用。
+- **Native Routing 模式**：禁用 cilium 的 `sysctlfix`（避免重启 systemd-sysctl 导致 eth0 的 rp_filter 被重置为 1 使网络不通）。
+- **Overlay 模式**：启用 cilium 的 `sysctlfix`（确保 lxc 接口的 rp_filter=0，否则 host↔Pod 回包会被内核丢弃）。
+
+**实测覆盖**：4 种安装模式（VPC-CNI/GR × Native/Overlay）× 3 种 OS（TencentOS 4 / Ubuntu 22.04 / Ubuntu 24.04，对应 kernel 6.6 / 5.15 / 6.8）全部验证通过——`cilium-health` 全通、`coredns` 和 `node-local-dns` 健康检查正常。
 
 **推荐 OS**：Ubuntu 24.04（kernel 6.8+，性能最优）或 TencentOS 4 最新版。
 
