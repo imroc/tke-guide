@@ -308,7 +308,14 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set k8sServicePort=60002
 ```
 
-安装完成后，还需创建 `ip-masq-agent` ConfigMap 配置哪些网段不做 SNAT（将 TKE 的 `ip-masq-agent-config` 中的 `NonMasqueradeCIDRs` 复制过来）：
+安装完成后，还需创建 `ip-masq-agent` ConfigMap 配置哪些网段不做 SNAT。可参考 TKE 自动生成的 `ip-masq-agent-config` ConfigMap 中的 `NonMasqueradeCIDRs`（包含 VPC 网段及所有辅助网段）：
+
+```bash
+# 查看 TKE 自动生成的 NonMasqueradeCIDRs
+kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}'
+```
+
+将其中的网段填入 cilium 的 `ip-masq-agent` ConfigMap：
 
 ```yaml title="ip-masq-agent.yaml"
 apiVersion: v1
@@ -319,8 +326,8 @@ metadata:
 data:
   config: |
     nonMasqueradeCIDRs:
-    - <GR ClusterCIDR>
     - <VPC CIDR>
+    - <VPC 辅助 CIDR (GR 网段)>
     masqLinkLocal: true
 ```
 
