@@ -1011,7 +1011,22 @@ spec:
         configMap: {name: node-local-dns, items: [{key: Corefile, path: Corefile.base}]}
 EOF
 
+  # Wait for CiliumLocalRedirectPolicy CRD to be available (created by cilium-operator).
+  # In empty clusters, operator may not be scheduled yet — prompt user to add nodes.
   info "$(is_zh && echo "创建 CiliumLocalRedirectPolicy..." || echo "Creating CiliumLocalRedirectPolicy...")"
+  if ! kubectl get crd ciliumlocalredirectpolicies.cilium.io &>/dev/null; then
+    if is_zh; then
+      warn "CiliumLocalRedirectPolicy CRD 尚未就绪（cilium-operator 可能还未启动）。"
+      info "请添加节点到集群，等待 cilium-operator 启动后脚本将自动继续..."
+    else
+      warn "CiliumLocalRedirectPolicy CRD not ready (cilium-operator may not be running yet)."
+      info "Please add nodes to the cluster. The script will continue once cilium-operator starts..."
+    fi
+    while ! kubectl get crd ciliumlocalredirectpolicies.cilium.io &>/dev/null; do
+      sleep 5
+    done
+    info "$(is_zh && echo "CRD 已就绪，继续安装" || echo "CRD ready, continuing")"
+  fi
   kubectl apply -f - <<'EOF'
 apiVersion: cilium.io/v2
 kind: CiliumLocalRedirectPolicy
