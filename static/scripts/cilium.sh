@@ -927,11 +927,16 @@ data:
   Corefile: |
     cluster.local:53 {
         errors
-        cache { success 9984 30; denial 9984 5 }
+        cache {
+                success 9984 30
+                denial 9984 5
+        }
         reload
         loop
         bind 0.0.0.0
-        forward . ${upstream_ip} { force_tcp }
+        forward . ${upstream_ip} {
+                force_tcp
+        }
         prometheus :9253
         health
     }
@@ -941,7 +946,9 @@ data:
         reload
         loop
         bind 0.0.0.0
-        forward . ${upstream_ip} { force_tcp }
+        forward . ${upstream_ip} {
+                force_tcp
+        }
         prometheus :9253
     }
     ip6.arpa:53 {
@@ -950,11 +957,15 @@ data:
         reload
         loop
         bind 0.0.0.0
-        forward . ${upstream_ip} { force_tcp }
+        forward . ${upstream_ip} {
+                force_tcp
+        }
         prometheus :9253
     }
     .:53 {
-        template ANY HINFO . { rcode NXDOMAIN }
+        template ANY HINFO . {
+            rcode NXDOMAIN
+        }
         errors
         cache 30
         reload
