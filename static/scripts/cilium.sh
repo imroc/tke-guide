@@ -199,9 +199,9 @@ check_nodes() {
 detect_network_mode() {
   info "$(msg DETECT)"
   local has_bridge_agent has_eni_agent has_cilium cilium_image
-  has_bridge_agent=$(kubectl -n kube-system get ds tke-bridge-agent --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
-  has_eni_agent=$(kubectl -n kube-system get ds tke-eni-agent --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
-  has_cilium=$(kubectl -n kube-system get ds cilium --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+  has_bridge_agent=$(kubectl -n kube-system get ds tke-bridge-agent --no-headers 2>/dev/null | wc -l | tr -d ' '; exit 0)
+  has_eni_agent=$(kubectl -n kube-system get ds tke-eni-agent --no-headers 2>/dev/null | wc -l | tr -d ' '; exit 0)
+  has_cilium=$(kubectl -n kube-system get ds cilium --no-headers 2>/dev/null | wc -l | tr -d ' '; exit 0)
 
   if [[ "$has_cilium" -gt 0 ]]; then
     cilium_image=$(kubectl -n kube-system get ds cilium -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)
