@@ -2,7 +2,10 @@
 
 TKE 实践指南 - 腾讯云 TKE (Tencent Kubernetes Engine) 的实战经验电子书，使用 Docusaurus 构建。
 
-在线地址: https://imroc.cc/tke
+- 在线地址: https://imroc.cc/tke
+- 作者：roc（腾讯云 TKE 团队）
+- 定位：个人 TKE 实践经验沉淀，同时作为客户文档参考（有对应方案时直接抛链接给客户）
+- 相关电子书：[kubernetes 实践指南](https://imroc.cc/kubernetes)
 
 ## 常用命令
 
@@ -37,7 +40,13 @@ npm run serve
 - `sidebars.ts` - 侧边栏导航配置
 - `docusaurus.config.ts` - 站点配置
 
-### 自定义组件
+### 全局可用 MDX 组件
+
+在 `src/theme/MDXComponents.tsx` 中注册了以下组件，文档中可直接使用无需 import：
+
+- `FileBlock` - 引用代码文件
+- `CodeBlock` - 代码块
+- `Tabs` / `TabItem` - 标签页切换
 
 **FileBlock** - 用于在文档中引用 `codeblock/` 目录下的代码文件：
 
@@ -54,18 +63,44 @@ npm run serve
 
 ### 代码高亮标记
 
-支持自定义魔法注释用于高亮代码行：
+支持自定义魔法注释用于高亮代码行（单行和块注释两种形式）：
 
-- `// highlight-next-line` - 高亮下一行
-- `// highlight-add-line` - 标记为新增行（绿色）
-- `// highlight-update-line` - 标记为更新行
-- `// highlight-error-line` - 标记为错误行
+| 效果     | 单行注释（高亮下一行）     | 块注释（高亮区间）                                        |
+| -------- | -------------------------- | --------------------------------------------------------- |
+| 普通高亮 | `// highlight-next-line`   | `// highlight-start` ... `// highlight-end`               |
+| 新增行   | `// highlight-add-line`    | `// highlight-add-start` ... `// highlight-add-end`       |
+| 更新行   | `// highlight-update-line` | `// highlight-update-start` ... `// highlight-update-end` |
+| 错误行   | `// highlight-error-line`  | `// highlight-error-start` ... `// highlight-error-end`   |
+
+注释前缀 `//` 适用于 YAML 时替换为 `#`。
 
 ## 内容编写
 
 - 文档使用 MDX 格式，支持在 Markdown 中使用 React 组件
-- 新增文档后需在 `sidebars.ts` 中添加对应条目
+- 新增文档后需在 `sidebars.ts` 中添加对应条目（sidebar 名为 `tkeSidebar`）
 - 代码示例优先放在 `codeblock/` 目录并用 FileBlock 引用，便于复用和维护
+- 文档路由前缀为 `/`（docs 即站点根路径），如 `docs/networking/pod-eip.md` 对应 URL `/tke/networking/pod-eip`
+- 支持 Mermaid 图表（已启用 `@docusaurus/theme-mermaid`）
+- 支持图片缩放（`docusaurus-plugin-zooming`）
+- 每篇文档底部自动展示 Giscus 评论（通过 `src/theme/DocItem/Layout/index.tsx` 注入）
+
+### 文档主题分类
+
+| 目录               | 内容                                         |
+| ------------------ | -------------------------------------------- |
+| `networking/`      | 网络指南（CNI、Ingress、Service、DNS 等）    |
+| `storage/`         | 存储指南（CBS、CFS）                         |
+| `autoscaling/`     | 弹性伸缩（KEDA、超级节点预占）               |
+| `ai/`              | AI 推理部署（SGLang、vLLM、Ollama）          |
+| `game/`            | 游戏方案（OKG、Agones、房间网络）            |
+| `monitoring/`      | 监控指南（Prometheus、Grafana）              |
+| `opa/`             | OPA 策略管理（Gatekeeper）                   |
+| `images/`          | 镜像与仓库                                   |
+| `deploy/`          | 常见应用部署（cert-manager、Harbor、GitLab） |
+| `apps/`            | 应用管理（原地升级等）                       |
+| `faq/`             | 常见问题                                     |
+| `troubleshooting/` | 故障排查                                     |
+| `appendix/`        | 附录（实用 YAML、kubectl 脚本、错误码）      |
 
 ## 多语言支持
 
