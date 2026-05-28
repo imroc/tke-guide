@@ -343,7 +343,7 @@ setup_native_gr() {
   fi
   info "$(is_zh && echo "删除残留的 multus 配置..." || echo "Removing leftover multus config...")"
   local pods
-  pods=$(kubectl -n kube-system get pod --no-headers 2>/dev/null | grep tke-bridge-agent | awk '{print $1}')
+  pods=$(kubectl -n kube-system get pod --no-headers 2>/dev/null | grep tke-bridge-agent | awk '{print $1}' || true)
   for pod in $pods; do
     kubectl -n kube-system exec "$pod" -- rm -f /host/etc/cni/net.d/00-multus.conf 2>/dev/null || true
   done
