@@ -756,8 +756,13 @@ helm_enable_egress() {
   info "$(is_zh && echo "重启 cilium..." || echo "Restarting cilium...")"
   kubectl -n kube-system rollout restart ds/cilium
   kubectl -n kube-system rollout restart deploy/cilium-operator
-  kubectl -n kube-system rollout status ds/cilium --timeout=120s
-  kubectl -n kube-system rollout status deploy/cilium-operator --timeout=120s
+  # Only wait for rollout if cluster has nodes (empty clusters can't schedule pods)
+  local node_count
+  node_count=$(kubectl get node --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  if [[ "$node_count" -gt 0 ]]; then
+    kubectl -n kube-system rollout status ds/cilium --timeout=120s
+    kubectl -n kube-system rollout status deploy/cilium-operator --timeout=120s
+  fi
 }
 
 # print_replay_command — Prints a non-interactive command that reproduces the current install.
@@ -824,12 +829,7 @@ cmd_install_cilium() {
   helm_install_cilium
   apply_apf
 
-  # Optional: enable egress gateway
-  if [[ "${ENABLE_EGRESS:-false}" == "true" ]]; then
-    helm_enable_egress
-  fi
-
-  # Optional: install localdns
+  # Optional: install localdns (egress is already merged into helm_install_cilium)
   if [[ "${ENABLE_LOCALDNS:-false}" == "true" ]]; then
     install_localdns_internal
   fi
