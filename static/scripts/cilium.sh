@@ -122,10 +122,13 @@ YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
-warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
+info() { echo -e "${GREEN}[INFO]${NC} $*"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*"; }
-fatal() { error "$*"; exit 1; }
+fatal() {
+  error "$*"
+  exit 1
+}
 
 # ====== Help ======
 
@@ -151,12 +154,12 @@ show_help() {
   echo ""
   if is_zh; then
     echo "文档:"
-    echo "  Cilium 安装: https://imroc.cc/tke/networking/cilium/install"
-    echo "  Localdns:    https://imroc.cc/tke/networking/cilium/with-node-local-dns"
+    echo "  安装 cilium:   https://imroc.cc/tke/networking/cilium/install"
+    echo "  安装 localdns: https://imroc.cc/tke/networking/cilium/with-node-local-dns"
   else
     echo "Docs:"
-    echo "  Cilium Install: https://imroc.cc/tke/en/networking/cilium/install"
-    echo "  Localdns:       https://imroc.cc/tke/en/networking/cilium/with-node-local-dns"
+    echo "  Install cilium:   https://imroc.cc/tke/en/networking/cilium/install"
+    echo "  Install localdns: https://imroc.cc/tke/en/networking/cilium/with-node-local-dns"
   fi
   echo ""
 }
@@ -184,7 +187,7 @@ check_nodes() {
     if [[ ! "$node" =~ ^eklet- ]]; then
       bad_nodes+=("$node")
     fi
-  done <<< "$nodes"
+  done <<<"$nodes"
   if [[ ${#bad_nodes[@]} -gt 0 ]]; then
     local node_list
     node_list=$(printf '  - %s\n' "${bad_nodes[@]}")
@@ -251,12 +254,18 @@ select_routing_mode() {
   while true; do
     read -rp "$(msg INPUT_OPTION)" choice
     case "$choice" in
-      1) ROUTING_MODE="native"; break ;;
-      2) ROUTING_MODE="overlay"; break ;;
-      *) msg INVALID_OPTION ;;
+    1)
+      ROUTING_MODE="native"
+      break
+      ;;
+    2)
+      ROUTING_MODE="overlay"
+      break
+      ;;
+    *) msg INVALID_OPTION ;;
     esac
   done
-  info "$(is_zh && echo "已选择:" || echo "Selected:") $( [[ $ROUTING_MODE == "native" ]] && echo "Native Routing" || echo "Overlay (vxlan)" )"
+  info "$(is_zh && echo "已选择:" || echo "Selected:") $([[ $ROUTING_MODE == "native" ]] && echo "Native Routing" || echo "Overlay (vxlan)")"
 }
 
 confirm_cilium_version() {
@@ -389,20 +398,20 @@ helm_install_cilium() {
 
   local -a mode_args=()
   case "${NETWORK_MODE}_${ROUTING_MODE}" in
-    VPC-CNI_native)
-      toleration_args+=(--set 'operator.tolerations[5].key=tke.cloud.tencent.com/eni-ip-unavailable,operator.tolerations[5].operator=Exists')
-      mode_args=(--set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=false --set devices=eth+ --set cni.chainingMode=generic-veth --set cni.customConf=true --set cni.configMap=cni-config --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
-      ;;
-    GR_native)
-      mode_args=(--set cni.chainingMode=generic-veth --set cni.chainingTarget=tke-bridge --set cni.exclusive=false --set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=false --set devices=eth+ --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
-      ;;
-    VPC-CNI_overlay)
-      toleration_args+=(--set 'operator.tolerations[5].key=tke.cloud.tencent.com/eni-ip-unavailable,operator.tolerations[5].operator=Exists')
-      mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=cluster-pool --set "ipam.operator.clusterPoolIPv4PodCIDRList={${POD_CIDR}}" --set ipam.operator.clusterPoolIPv4MaskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true)
-      ;;
-    GR_overlay)
-      mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=cluster-pool --set "ipam.operator.clusterPoolIPv4PodCIDRList={${POD_CIDR}}" --set ipam.operator.clusterPoolIPv4MaskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true)
-      ;;
+  VPC-CNI_native)
+    toleration_args+=(--set 'operator.tolerations[5].key=tke.cloud.tencent.com/eni-ip-unavailable,operator.tolerations[5].operator=Exists')
+    mode_args=(--set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=false --set devices=eth+ --set cni.chainingMode=generic-veth --set cni.customConf=true --set cni.configMap=cni-config --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
+    ;;
+  GR_native)
+    mode_args=(--set cni.chainingMode=generic-veth --set cni.chainingTarget=tke-bridge --set cni.exclusive=false --set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=false --set devices=eth+ --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
+    ;;
+  VPC-CNI_overlay)
+    toleration_args+=(--set 'operator.tolerations[5].key=tke.cloud.tencent.com/eni-ip-unavailable,operator.tolerations[5].operator=Exists')
+    mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=cluster-pool --set "ipam.operator.clusterPoolIPv4PodCIDRList={${POD_CIDR}}" --set ipam.operator.clusterPoolIPv4MaskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true)
+    ;;
+  GR_overlay)
+    mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=cluster-pool --set "ipam.operator.clusterPoolIPv4PodCIDRList={${POD_CIDR}}" --set ipam.operator.clusterPoolIPv4MaskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true)
+    ;;
   esac
 
   info "$(msg HELM_INSTALL) (${NETWORK_MODE} + ${ROUTING_MODE}, cilium ${CILIUM_VERSION})"
@@ -481,10 +490,10 @@ cmd_install_cilium() {
 
   uninstall_tke_components
   case "${NETWORK_MODE}_${ROUTING_MODE}" in
-    VPC-CNI_native)  setup_native_vpccni ;;
-    GR_native)       setup_native_gr ;;
-    VPC-CNI_overlay) setup_overlay_vpccni ;;
-    GR_overlay)      ;;
+  VPC-CNI_native) setup_native_vpccni ;;
+  GR_native) setup_native_gr ;;
+  VPC-CNI_overlay) setup_overlay_vpccni ;;
+  GR_overlay) ;;
   esac
 
   helm_install_cilium
@@ -699,15 +708,15 @@ EOF
 main() {
   local cmd="${1:-}"
   case "$cmd" in
-    install-cilium)  cmd_install_cilium ;;
-    install-localdns) cmd_install_localdns ;;
-    help|--help|-h|"") show_help ;;
-    *)
-      error "$(is_zh && echo "未知命令" || echo "Unknown command"): $cmd"
-      echo ""
-      show_help
-      exit 1
-      ;;
+  install-cilium) cmd_install_cilium ;;
+  install-localdns) cmd_install_localdns ;;
+  help | --help | -h | "") show_help ;;
+  *)
+    error "$(is_zh && echo "未知命令" || echo "Unknown command"): $cmd"
+    echo ""
+    show_help
+    exit 1
+    ;;
   esac
 }
 
