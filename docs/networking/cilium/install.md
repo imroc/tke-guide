@@ -109,17 +109,22 @@ curl -sfL https://imroc.cc/tke/scripts/cilium.sh | bash -s install-cilium
 
 ### 卸载 TKE 组件
 
-所有方案都需要卸载 kube-proxy（由 cilium 替代）和 tke-cni-agent（避免 CNI 配置冲突）：
+所有方案都需要卸载 kube-proxy（由 cilium 替代）：
 
 ```bash
 kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+```
+
+除 GR + Native Routing 外，其余方案还需要卸载 tke-cni-agent（避免 CNI 配置冲突）：
+
+```bash
 kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 ```
 
 :::tip[说明]
 
 1. 通过加 nodeSelector 方式让 DaemonSet 不部署到任何节点，等同于卸载，同时也留个退路；当前 kube-proxy 也只能通过这种方式卸载，如果直接删除 kube-proxy，后续集群升级会被阻塞。
-2. **GR + Native Routing 模式不要禁用 tke-cni-agent**，因为它负责拷贝 bridge 等 CNI 二进制到节点。该模式下 cilium 通过 `cni.exclusive=true` 自动将 multus 配置重命名为 `.cilium_bak` 使其失效。
+2. GR + Native Routing 模式需要保留 tke-cni-agent，因为它负责拷贝 bridge 等 CNI 二进制到节点。该模式下 cilium 通过 `cni.exclusive=true`（默认）自动将 multus 配置重命名为 `.cilium_bak` 使其失效，不会产生冲突。
 3. 前面提到过安装 cilium 之前不建议添加节点，如果因某些原因导致在安装 cilium 前添加了普通节点或原生节点，需重启下存量节点，避免残留相关规则和配置。
 4. 如果创建集群时忘记了取消勾选 ip-masq-agent，可以手动卸载下：
    ```bash
