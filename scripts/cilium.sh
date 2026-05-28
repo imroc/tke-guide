@@ -186,7 +186,9 @@ check_nodes() {
     fi
   done <<< "$nodes"
   if [[ ${#bad_nodes[@]} -gt 0 ]]; then
-    fatal "$(msg BAD_NODES)\n  ${bad_nodes[*]}"
+    local node_list
+    node_list=$(printf '  - %s\n' "${bad_nodes[@]}")
+    fatal "$(msg BAD_NODES)\n${node_list}"
   fi
   info "$(msg NODES_OK)"
 }
