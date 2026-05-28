@@ -1,6 +1,23 @@
 # 安装 Cilium
 
-本文介绍如何在 TKE 集群中安装 cilium。
+本文介绍如何在 TKE 集群中安装 cilium，支持以下网络模式：
+
+- **Native Routing（原生路由）**：与 TKE CNI 共存，Pod 使用 TKE 分配的 IP，cilium 提供 NetworkPolicy、可观测性、kube-proxy 替代等增强能力。
+- **Overlay（vxlan 隧道）**：完全替代 TKE 所有 CNI，Pod IP 不占用 underlay 的 IP，可用于 IP 申请困难的场景，也可用于替代 TKE 内置的 CiliumOverlay 网络模式以获得满血功能。
+
+每种模式都支持 VPC-CNI 和 GlobalRouter（GR）两种基础集群，共 4 种组合：
+
+:::tip[如何选择]
+
+| 对比项         | Native Routing (VPC-CNI) | Native Routing (GR)    | Overlay (VPC-CNI)                    | Overlay (GR)                            |
+| -------------- | ------------------------ | ---------------------- | ------------------------------------ | --------------------------------------- |
+| 网络性能       | 最优                     | 较优（多一层网桥转发） | 略有开销（vxlan 封装）               | 略有开销（vxlan 封装）                  |
+| Pod IP 范围    | VPC IP                   | VPC 辅助网段 IP        | 独立 CIDR，不占用 VPC IP             | 独立 CIDR，不占用 VPC IP                |
+| 集群外访问 Pod | 可直接路由               | VPC 内可路由           | 不可直接路由，需通过 Service/Ingress | 不可直接路由                            |
+| 节点数量限制   | 无                       | 受 ClusterCIDR 限制    | 无                                   | 受 ClusterCIDR 限制                     |
+| 适用场景       | 常规场景                 | 常规场景               | IP 资源紧张、纳管 IDC、满血 cilium   | 纳管 IDC、满血 cilium、节点数量要求不高 |
+
+:::
 
 ## 前期准备
 
@@ -14,10 +31,10 @@
 
 在 [容器服务控制台](https://console.cloud.tencent.com/tke2/cluster) 创建 TKE 集群，注意以下关键选项：
 
-- 集群类型：标准集群
+- 容器网络插件：根据上表选择 **VPC-CNI 共享网卡多 IP** 或 **GlobalRouter**。
+- 集群类型：标准集群。
 - Kubernetes 版本: 不低于 1.32，建议选择最新版（参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)）。
 - 操作系统：TencentOS 4 或者 Ubuntu >= 22.04，其它 OS 暂未验证，主要要求 Linux kernel >= 5.10（参考 [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)），如有需要可自行验证。
-- 容器网络插件：VPC-CNI 共享网卡多 IP。
 - 节点：安装前不要向集群添加任何普通节点或原生节点，避免残留相关规则和配置，等安装完成后再添加。
 - 基础组件：取消勾选 ip-masq-agent，避免冲突。
 - 增强组件：如果节点池希望使用 Karpenter 节点池，需勾选安装 Karpenter 组件，否则无需勾选（参考后文的节点池选型）。
@@ -36,10 +53,14 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   # 标准集群
   cluster_deploy_type = "MANAGED_CLUSTER"
   # Kubernetes 版本 >= 1.32
-  cluster_version = "1.32.2"
-  # 操作系统，TencentOS 4 的镜像 ID
-  cluster_os = "img-gqmik24x"
-  # 容器网络插件: VPC-CNI
+  cluster_version = "1.34.1"
+  # 节点默认操作系统，以下是验证过的
+  # tlinux4_x86_64_public (TencentOS 4)
+  # ubuntu22.04x86_64 (Ubuntu 22.04)
+  # ubuntu24.04x86_64 (Ubuntu 24.04)
+  # 需要注意的是，节点的实际 OS 由节点池自身的 OS 属性决定，不受 cluster_os 的限制
+  cluster_os = "tlinux4_x86_64_public"
+  # 容器网络插件: VPC-CNI / GR
   network_type = "VPC-CNI"
   # 集群 APIServer 开启访问
   cluster_internet = true
@@ -70,9 +91,44 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
 
 ## 安装 cilium
 
-### 配置 CNI
+### 一键安装脚本
 
-为 cilium 准备 CNI 配置的 ConfigMap `cni-config.yaml`：
+可使用脚本自动检测集群环境并引导安装：
+
+```bash
+curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/scripts/cilium.sh | bash -s install-cilium
+```
+
+脚本会自动检测集群网络模式、引导选择安装方案和版本，然后执行安装。如需手动安装，参考后续步骤。
+
+### 卸载 TKE 组件
+
+所有方案都需要卸载 kube-proxy（由 cilium 替代）和 tke-cni-agent（避免 CNI 配置冲突）：
+
+```bash
+kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+```
+
+:::tip[说明]
+
+1. 通过加 nodeSelector 方式让 DaemonSet 不部署到任何节点，等同于卸载，同时也留个退路；当前 kube-proxy 也只能通过这种方式卸载，如果直接删除 kube-proxy，后续集群升级会被阻塞。
+2. 前面提到过安装 cilium 之前不建议添加节点，如果因某些原因导致在安装 cilium 前添加了普通节点或原生节点，需重启下存量节点，避免残留相关规则和配置。
+3. 如果创建集群时忘记了取消勾选 ip-masq-agent，可以手动卸载下：
+   ```bash
+   kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+   ```
+
+:::
+
+### 方案特定的前置操作
+
+根据所选方案，执行对应的前置操作：
+
+<Tabs>
+<TabItem value="native-vpccni" label="Native Routing (VPC-CNI)" default>
+
+创建 CNI 配置 ConfigMap，定义 VPC-CNI 与 cilium 的 chaining 关系：
 
 ```yaml title="cni-config.yaml"
 apiVersion: v1
@@ -104,21 +160,58 @@ data:
     }
 ```
 
-创建 CNI ConfigMap:
-
 ```bash
 kubectl apply -f cni-config.yaml
 ```
 
-### 使用 helm 安装 cilium
+</TabItem>
+<TabItem value="native-gr" label="Native Routing (GR)">
 
-使用 helm 执行安装：
+修改 tke-bridge-agent 的配置输出目录（从 multus 子目录改到 CNI 根目录），以便 cilium 能通过 `chainingTarget` 发现并追加到 bridge 配置：
+
+```bash
+# 获取当前 apiserver 地址
+MASTER_ADDR=$(kubectl -n kube-system get ds tke-bridge-agent -o jsonpath='{.spec.template.spec.containers[0].args}' | grep -oP '(?<=--master=)\S+')
+# 修改 CNI 配置输出目录
+kubectl -n kube-system patch ds tke-bridge-agent --type='json' \
+  -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args\",\"value\":[\"--cni-conf-dir\",\"/host/etc/cni/net.d\",\"--master=$MASTER_ADDR\"]}]"
+```
+
+等待 tke-bridge-agent 滚动重启完成后，删除残留的 multus 配置：
+
+```bash
+for pod in $(kubectl -n kube-system get pod --no-headers 2>/dev/null | grep tke-bridge-agent | awk '{print $1}'); do
+  kubectl -n kube-system exec "$pod" -- rm -f /host/etc/cni/net.d/00-multus.conf
+done
+```
+
+</TabItem>
+<TabItem value="overlay-gr" label="Overlay (GR)">
+
+无额外前置操作。
+
+</TabItem>
+<TabItem value="overlay-vpccni" label="Overlay (VPC-CNI)">
+
+禁用 `add-pod-eni-ip-limit-webhook`（否则 Pod 会被自动注入 `tke.cloud.tencent.com/eni-ip` 资源请求，导致 ip-scheduler 拦截调度）：
+
+```bash
+kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook
+```
+
+</TabItem>
+</Tabs>
+
+### 使用 helm 安装 cilium
 
 :::info[注意]
 
 `k8sServiceHost` 是 apiserver 地址，通过命令动态获取。
 
 :::
+
+<Tabs>
+<TabItem value="native-vpccni" label="Native Routing (VPC-CNI)" default>
 
 ```bash
 helm upgrade --install cilium cilium/cilium --version 1.19.4 \
@@ -158,6 +251,133 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002
 ```
+
+</TabItem>
+<TabItem value="native-gr" label="Native Routing (GR)">
+
+```bash
+helm upgrade --install cilium cilium/cilium --version 1.19.4 \
+  --namespace kube-system \
+  --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
+  --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
+  --set operator.image.repository=quay.tencentcloudcr.com/cilium/operator \
+  --set certgen.image.repository=quay.tencentcloudcr.com/cilium/certgen \
+  --set hubble.relay.image.repository=quay.tencentcloudcr.com/cilium/hubble-relay \
+  --set hubble.ui.backend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui-backend \
+  --set hubble.ui.frontend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui \
+  --set nodeinit.image.repository=quay.tencentcloudcr.com/cilium/startup-script \
+  --set preflight.image.repository=quay.tencentcloudcr.com/cilium/cilium \
+  --set preflight.envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
+  --set clustermesh.apiserver.image.repository=quay.tencentcloudcr.com/cilium/clustermesh-apiserver \
+  --set authentication.mutual.spire.install.agent.image.repository=docker.io/k8smirror/spire-agent \
+  --set authentication.mutual.spire.install.server.image.repository=docker.io/k8smirror/spire-server \
+  --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
+  --set operator.tolerations[1].key="node.kubernetes.io/not-ready",operator.tolerations[1].operator="Exists" \
+  --set operator.tolerations[2].key="node.cloudprovider.kubernetes.io/uninitialized",operator.tolerations[2].operator="Exists" \
+  --set cni.chainingMode=generic-veth \
+  --set cni.chainingTarget=tke-bridge \
+  --set cni.exclusive=false \
+  --set routingMode=native \
+  --set endpointRoutes.enabled=true \
+  --set ipam.mode=delegated-plugin \
+  --set enableIPv4Masquerade=false \
+  --set devices=eth+ \
+  --set cni.externalRouting=true \
+  --set extraConfig.local-router-ipv4=169.254.32.16 \
+  --set localRedirectPolicies.enabled=true \
+  --set sysctlfix.enabled=false \
+  --set kubeProxyReplacement=true \
+  --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
+  --set k8sServicePort=60002
+```
+
+:::tip[与 VPC-CNI chaining 的差异]
+
+| 参数                                    | 说明                                                                             |
+| --------------------------------------- | -------------------------------------------------------------------------------- |
+| `cni.chainingTarget=tke-bridge`         | cilium 自动监视名为 `tke-bridge` 的 CNI 配置并追加自己，适配每节点不同的 PodCIDR |
+| `cni.exclusive=false`                   | 不独占 CNI 目录，保留 tke-bridge-agent 的配置文件                                |
+| 无需 `cni.customConf` / `cni.configMap` | 不需要手动创建 CNI ConfigMap                                                     |
+
+:::
+
+</TabItem>
+<TabItem value="overlay-gr" label="Overlay (GR)">
+
+```bash
+helm upgrade --install cilium cilium/cilium --version 1.19.4 \
+  --namespace kube-system \
+  --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
+  --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
+  --set operator.image.repository=quay.tencentcloudcr.com/cilium/operator \
+  --set certgen.image.repository=quay.tencentcloudcr.com/cilium/certgen \
+  --set hubble.relay.image.repository=quay.tencentcloudcr.com/cilium/hubble-relay \
+  --set hubble.ui.backend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui-backend \
+  --set hubble.ui.frontend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui \
+  --set nodeinit.image.repository=quay.tencentcloudcr.com/cilium/startup-script \
+  --set preflight.image.repository=quay.tencentcloudcr.com/cilium/cilium \
+  --set preflight.envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
+  --set clustermesh.apiserver.image.repository=quay.tencentcloudcr.com/cilium/clustermesh-apiserver \
+  --set authentication.mutual.spire.install.agent.image.repository=docker.io/k8smirror/spire-agent \
+  --set authentication.mutual.spire.install.server.image.repository=docker.io/k8smirror/spire-server \
+  --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
+  --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
+  --set operator.tolerations[2].key="node.kubernetes.io/not-ready",operator.tolerations[2].operator="Exists" \
+  --set operator.tolerations[3].key="node.cloudprovider.kubernetes.io/uninitialized",operator.tolerations[3].operator="Exists" \
+  --set operator.tolerations[4].key="tke.cloud.tencent.com/uninitialized",operator.tolerations[4].operator="Exists" \
+  --set routingMode=tunnel \
+  --set tunnelProtocol=vxlan \
+  --set ipam.mode=cluster-pool \
+  --set ipam.operator.clusterPoolIPv4PodCIDRList="{10.244.0.0/16}" \
+  --set ipam.operator.clusterPoolIPv4MaskSize=24 \
+  --set enableIPv4Masquerade=true \
+  --set localRedirectPolicies.enabled=true \
+  --set sysctlfix.enabled=false \
+  --set kubeProxyReplacement=true \
+  --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
+  --set k8sServicePort=60002
+```
+
+</TabItem>
+<TabItem value="overlay-vpccni" label="Overlay (VPC-CNI)">
+
+```bash
+helm upgrade --install cilium cilium/cilium --version 1.19.4 \
+  --namespace kube-system \
+  --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
+  --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
+  --set operator.image.repository=quay.tencentcloudcr.com/cilium/operator \
+  --set certgen.image.repository=quay.tencentcloudcr.com/cilium/certgen \
+  --set hubble.relay.image.repository=quay.tencentcloudcr.com/cilium/hubble-relay \
+  --set hubble.ui.backend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui-backend \
+  --set hubble.ui.frontend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui \
+  --set nodeinit.image.repository=quay.tencentcloudcr.com/cilium/startup-script \
+  --set preflight.image.repository=quay.tencentcloudcr.com/cilium/cilium \
+  --set preflight.envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
+  --set clustermesh.apiserver.image.repository=quay.tencentcloudcr.com/cilium/clustermesh-apiserver \
+  --set authentication.mutual.spire.install.agent.image.repository=docker.io/k8smirror/spire-agent \
+  --set authentication.mutual.spire.install.server.image.repository=docker.io/k8smirror/spire-server \
+  --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
+  --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
+  --set operator.tolerations[2].key="node.kubernetes.io/not-ready",operator.tolerations[2].operator="Exists" \
+  --set operator.tolerations[3].key="node.cloudprovider.kubernetes.io/uninitialized",operator.tolerations[3].operator="Exists" \
+  --set operator.tolerations[4].key="tke.cloud.tencent.com/uninitialized",operator.tolerations[4].operator="Exists" \
+  --set operator.tolerations[5].key="tke.cloud.tencent.com/eni-ip-unavailable",operator.tolerations[5].operator="Exists" \
+  --set routingMode=tunnel \
+  --set tunnelProtocol=vxlan \
+  --set ipam.mode=cluster-pool \
+  --set ipam.operator.clusterPoolIPv4PodCIDRList="{10.244.0.0/16}" \
+  --set ipam.operator.clusterPoolIPv4MaskSize=24 \
+  --set enableIPv4Masquerade=true \
+  --set localRedirectPolicies.enabled=true \
+  --set sysctlfix.enabled=false \
+  --set kubeProxyReplacement=true \
+  --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
+  --set k8sServicePort=60002
+```
+
+</TabItem>
+</Tabs>
 
 :::tip[说明]
 
@@ -312,27 +532,6 @@ cilium-operator-896cdbf88-jlgt7   1/1     Running   0          1m
 cilium-operator-896cdbf88-nj6jc   1/1     Running   0          1m
 cilium-zrxwn                      1/1     Running   0          1m
 ```
-
-### 卸载 TKE 组件
-
-通过 kubectl patch 来卸载 tke-cni-agent 和 kube-proxy：
-
-```bash
-kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-```
-
-:::tip[说明]
-
-1. 通过加 nodeSelector 方式让 daemonset 不部署到任何节点，等同于卸载，同时也留个退路；当前 kube-proxy 也只能通过这种方式卸载，如果直接删除 kube-proxy，后续集群升级会被阻塞。
-2. 使用 VPC-CNI 网络，且 CNI 配置完全自定义了，可以不需要 tke-cni-agent，卸载以避免 CNI 配置文件冲突。
-3. 前面提到过安装 cilium 之前不建议添加节点，如果因某些原因导致在安装 cilium 前添加了普通节点或原生节点，需重启下存量节点，避免残留相关规则和配置。
-4. 如果创建集群时忘记了取消勾选 ip-masq-agent，可以手动卸载下：
-   ```bash
-   kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-   ```
-
-:::
 
 ### 配置 APF 限速
 
@@ -536,12 +735,9 @@ helm upgrade --install cilium ./cilium-1.19.4.tgz \
 
 ### Global Router 网络模式的集群能否安装？
 
-测试结论是：不能。
+可以。通过 cilium 的 `chainingTarget` 功能可以实现 GR + cilium chaining，具体方法参考前文 "Native Routing（GR）" Tab 的安装步骤。
 
-应该是 cilium 不支持 bridge CNI 插件（Global Router 网络插件基于 bridge CNI 插件），相关 issue:
-
-- [CFP: eBPF with bridge mode](https://github.com/cilium/cilium/issues/35011)
-- [CFP: cilium CNI chaining can support cni-bridge](https://github.com/cilium/cilium/issues/20336)
+关键原理：cilium 的 `cni.chainingTarget=tke-bridge` 会监视节点上名为 `tke-bridge` 的 CNI 配置文件，自动复制其内容并追加 `cilium-cni` 插件，因此能适配 GR 模式下每个节点不同 PodCIDR 的配置。
 
 ### 能否勾选 DataPlaneV2？
 
