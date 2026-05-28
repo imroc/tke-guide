@@ -443,7 +443,8 @@ confirm_enable_egress() {
     prompt="Enable Egress Gateway? [y/N]: "
   fi
   read -rp "$(echo -e "${BLUE}${prompt}${NC}")" egress_input
-  if [[ "${egress_input,,}" == "y" || "${egress_input,,}" == "yes" ]]; then
+  egress_input=$(echo "$egress_input" | tr '[:upper:]' '[:lower:]')
+  if [[ "$egress_input" == "y" || "$egress_input" == "yes" ]]; then
     ENABLE_EGRESS=true
   else
     ENABLE_EGRESS=false
@@ -465,7 +466,8 @@ confirm_enable_localdns() {
     prompt="Install Nodelocal DNSCache? [y/N]: "
   fi
   read -rp "$(echo -e "${BLUE}${prompt}${NC}")" localdns_input
-  if [[ "${localdns_input,,}" == "y" || "${localdns_input,,}" == "yes" ]]; then
+  localdns_input=$(echo "$localdns_input" | tr '[:upper:]' '[:lower:]')
+  if [[ "$localdns_input" == "y" || "$localdns_input" == "yes" ]]; then
     ENABLE_LOCALDNS=true
   else
     ENABLE_LOCALDNS=false
