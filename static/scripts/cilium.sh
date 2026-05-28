@@ -330,15 +330,17 @@ EOF
 
 setup_native_gr() {
   info "$(is_zh && echo "配置 tke-bridge-agent 输出目录..." || echo "Configuring tke-bridge-agent output directory...")"
-  local master_addr
-  master_addr=$(kubectl -n kube-system get ds tke-bridge-agent -o jsonpath='{.spec.template.spec.containers[0].args}' | grep -oP '(?<=--master=)\S+' | tr -d '"]')
-  if [[ -z "$master_addr" ]]; then
-    fatal "$(is_zh && echo "无法从 tke-bridge-agent 获取 --master 参数" || echo "Cannot get --master from tke-bridge-agent")"
+  local current_args patched_args
+  current_args=$(kubectl -n kube-system get ds tke-bridge-agent -o jsonpath='{.spec.template.spec.containers[0].args}')
+  patched_args=$(echo "$current_args" | sed 's|/host/etc/cni/net.d/multus|/host/etc/cni/net.d|g')
+  if [[ "$current_args" == "$patched_args" ]]; then
+    info "$(is_zh && echo "tke-bridge-agent 已配置为 CNI 根目录，跳过" || echo "tke-bridge-agent already configured to CNI root dir, skipping")"
+  else
+    kubectl -n kube-system patch ds tke-bridge-agent --type='json' \
+      -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args\",\"value\":${patched_args}}]"
+    info "$(is_zh && echo "等待 tke-bridge-agent 滚动重启..." || echo "Waiting for tke-bridge-agent rollout...")"
+    kubectl -n kube-system rollout status ds/tke-bridge-agent --timeout=120s
   fi
-  kubectl -n kube-system patch ds tke-bridge-agent --type='json' \
-    -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args\",\"value\":[\"--cni-conf-dir\",\"/host/etc/cni/net.d\",\"--master=$master_addr\"]}]"
-  info "$(is_zh && echo "等待 tke-bridge-agent 滚动重启..." || echo "Waiting for tke-bridge-agent rollout...")"
-  kubectl -n kube-system rollout status ds/tke-bridge-agent --timeout=120s
   info "$(is_zh && echo "删除残留的 multus 配置..." || echo "Removing leftover multus config...")"
   local pods
   pods=$(kubectl -n kube-system get pod --no-headers 2>/dev/null | grep tke-bridge-agent | awk '{print $1}')
