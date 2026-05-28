@@ -662,19 +662,22 @@ helm_install_cilium() {
     ;;
   esac
 
-  # Egress Gateway: merge params into helm install if enabled
+  # Egress Gateway: merge params into helm install if enabled.
+  # NOTE: egress_args is appended LAST in helm call below — its --set values
+  # take precedence over both common_args and mode_args (helm last-wins).
+  local -a egress_args=()
   if [[ "${ENABLE_EGRESS:-false}" == "true" ]]; then
-    common_args+=(--set egressGateway.enabled=true)
+    egress_args+=(--set egressGateway.enabled=true)
     # masquerade params - only add if not already in mode_args (GR_native already has them)
     if [[ "${NETWORK_MODE}_${ROUTING_MODE}" != "GR_native" ]]; then
-      common_args+=(--set enableIPv4Masquerade=true --set bpf.masquerade=true --set ipMasqAgent.enabled=true --set ipMasqAgent.config.masqLinkLocal=true)
+      egress_args+=(--set enableIPv4Masquerade=true --set bpf.masquerade=true --set ipMasqAgent.enabled=true --set ipMasqAgent.config.masqLinkLocal=true)
     fi
   fi
 
   info "$(msg HELM_INSTALL) (${NETWORK_MODE} + ${ROUTING_MODE}, cilium ${CILIUM_VERSION})"
   helm upgrade --install cilium cilium/cilium --version "$CILIUM_VERSION" \
     --namespace kube-system \
-    "${image_args[@]}" "${toleration_args[@]}" "${common_args[@]}" "${mode_args[@]}"
+    "${image_args[@]}" "${toleration_args[@]}" "${common_args[@]}" "${mode_args[@]}" "${egress_args[@]}"
 }
 
 # apply_apf — Creates APF (API Priority and Fairness) rate limiting rules for cilium.
