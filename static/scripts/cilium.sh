@@ -45,6 +45,8 @@ MSG_ZH_HELP_CMD_CILIUM="  install-cilium     安装 Cilium 到 TKE 集群（自�
 MSG_EN_HELP_CMD_CILIUM="  install-cilium     Install Cilium to TKE cluster (auto-detect network mode, interactive)"
 MSG_ZH_HELP_CMD_LOCALDNS="  install-localdns   安装 Nodelocal DNSCache 并配置与 Cilium 共存"
 MSG_EN_HELP_CMD_LOCALDNS="  install-localdns   Install Nodelocal DNSCache with Cilium integration"
+MSG_ZH_HELP_CMD_E2ETEST="  e2e-test           运行 Cilium 连通性端到端测试"
+MSG_EN_HELP_CMD_E2ETEST="  e2e-test           Run Cilium connectivity end-to-end tests"
 MSG_ZH_HELP_CMD_HELP="  help               显示本帮助信息"
 MSG_EN_HELP_CMD_HELP="  help               Show this help message"
 # Check
@@ -144,6 +146,7 @@ show_help() {
   msg HELP_COMMANDS
   msg HELP_CMD_CILIUM
   msg HELP_CMD_LOCALDNS
+  msg HELP_CMD_E2ETEST
   msg HELP_CMD_HELP
   echo ""
   msg HELP_EXAMPLES
@@ -290,7 +293,10 @@ confirm_pod_cidr() {
 uninstall_tke_components() {
   info "$(msg UNINSTALL_TKE)"
   kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}' 2>/dev/null || true
-  kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}' 2>/dev/null || true
+  # GR + native routing 模式需要保留 tke-cni-agent（负责拷贝 CNI 二进制到节点）
+  if [[ "${NETWORK_MODE}_${ROUTING_MODE}" != "GR_native" ]]; then
+    kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}' 2>/dev/null || true
+  fi
   kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}' 2>/dev/null || true
   info "$(msg UNINSTALL_TKE_OK)"
 }
@@ -329,24 +335,28 @@ EOF
 }
 
 setup_native_gr() {
-  info "$(is_zh && echo "配置 tke-bridge-agent 输出目录..." || echo "Configuring tke-bridge-agent output directory...")"
-  local current_args patched_args
+  info "$(is_zh && echo "配置 tke-bridge-agent..." || echo "Configuring tke-bridge-agent...")"
+  local current_args patched_args needs_patch=false
   current_args=$(kubectl -n kube-system get ds tke-bridge-agent -o jsonpath='{.spec.template.spec.containers[0].args}')
-  patched_args=$(echo "$current_args" | sed 's|/host/etc/cni/net.d/multus|/host/etc/cni/net.d|g')
-  if [[ "$current_args" == "$patched_args" ]]; then
-    info "$(is_zh && echo "tke-bridge-agent 已配置为 CNI 根目录，跳过" || echo "tke-bridge-agent already configured to CNI root dir, skipping")"
-  else
+  patched_args="$current_args"
+  # 修改 CNI 配置输出到根目录
+  if echo "$patched_args" | grep -q '/host/etc/cni/net.d/multus'; then
+    patched_args=$(echo "$patched_args" | sed 's|/host/etc/cni/net.d/multus|/host/etc/cni/net.d|g')
+    needs_patch=true
+  fi
+  # 禁用 portmap（cilium 的 kubeProxyReplacement 已包含 HostPort 能力，portmap 依赖已被卸载的 kube-proxy 的 iptables chain）
+  if ! echo "$patched_args" | grep -q 'port-mapping=false'; then
+    patched_args=$(echo "$patched_args" | sed 's/\]$/,"--port-mapping=false"]/')
+    needs_patch=true
+  fi
+  if [[ "$needs_patch" == "true" ]]; then
     kubectl -n kube-system patch ds tke-bridge-agent --type='json' \
       -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args\",\"value\":${patched_args}}]"
     info "$(is_zh && echo "等待 tke-bridge-agent 滚动重启..." || echo "Waiting for tke-bridge-agent rollout...")"
     kubectl -n kube-system rollout status ds/tke-bridge-agent --timeout=120s
+  else
+    info "$(is_zh && echo "tke-bridge-agent 已配置完毕，跳过" || echo "tke-bridge-agent already configured, skipping")"
   fi
-  info "$(is_zh && echo "删除残留的 multus 配置..." || echo "Removing leftover multus config...")"
-  local pods
-  pods=$(kubectl -n kube-system get pod --no-headers 2>/dev/null | grep tke-bridge-agent | awk '{print $1}' || true)
-  for pod in $pods; do
-    kubectl -n kube-system exec "$pod" -- rm -f /host/etc/cni/net.d/00-multus.conf 2>/dev/null || true
-  done
 }
 
 setup_overlay_vpccni() {
@@ -405,7 +415,7 @@ helm_install_cilium() {
     mode_args=(--set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=false --set devices=eth+ --set cni.chainingMode=generic-veth --set cni.customConf=true --set cni.configMap=cni-config --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
     ;;
   GR_native)
-    mode_args=(--set cni.chainingMode=generic-veth --set cni.chainingTarget=tke-bridge --set cni.exclusive=false --set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=false --set devices=eth+ --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
+    mode_args=(--set cni.chainingMode=generic-veth --set cni.chainingTarget=tke-bridge --set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=false --set devices=eth+ --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
     ;;
   VPC-CNI_overlay)
     toleration_args+=(--set 'operator.tolerations[5].key=tke.cloud.tencent.com/eni-ip-unavailable,operator.tolerations[5].operator=Exists')
@@ -705,6 +715,39 @@ EOF
   echo ""
 }
 
+# ====== e2e-test ======
+
+cmd_e2e_test() {
+  echo ""
+  echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
+  echo -e "${BLUE}║      Cilium Connectivity Test        ║${NC}"
+  echo -e "${BLUE}╚══════════════════════════════════════╝${NC}"
+  echo ""
+
+  command -v cilium &>/dev/null || fatal "$(is_zh && echo "cilium CLI 未安装，请先安装: https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/#install-the-cilium-cli" || echo "cilium CLI not installed. Install: https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/#install-the-cilium-cli")"
+  command -v kubectl &>/dev/null || fatal "$(msg NO_KUBECTL)"
+  kubectl cluster-info &>/dev/null || fatal "$(msg NO_CLUSTER)"
+
+  info "$(is_zh && echo "运行 cilium connectivity test（跳过公网测试）..." || echo "Running cilium connectivity test (skipping external tests)...")"
+  echo ""
+
+  cilium connectivity test \
+    --test '!/pod-to-world' \
+    --test '!/pod-to-cidr' \
+    --curl-image quay.tencentcloudcr.com/cilium/alpine-curl:v1.10.0 \
+    --json-mock-image quay.tencentcloudcr.com/cilium/json-mock:v1.3.9 \
+    --dns-test-server-image docker.io/k8smirror/coredns:v1.14.2 \
+    --echo-image docker.io/k8smirror/echo-advanced:v20251204-v1.4.1 \
+    --test-conn-disrupt-image quay.tencentcloudcr.com/cilium/test-connection-disruption:v0.0.17 \
+    "$@"
+
+  echo ""
+  info "============================================"
+  info "$(is_zh && echo "测试完成！" || echo "Tests completed!")"
+  info "============================================"
+  echo ""
+}
+
 # ====== Main ======
 
 main() {
@@ -712,6 +755,7 @@ main() {
   case "$cmd" in
   install-cilium) cmd_install_cilium ;;
   install-localdns) cmd_install_localdns ;;
+  e2e-test) shift; cmd_e2e_test "$@" ;;
   help | --help | -h | "") show_help ;;
   *)
     error "$(is_zh && echo "未知命令" || echo "Unknown command"): $cmd"

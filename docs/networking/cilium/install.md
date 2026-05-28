@@ -119,8 +119,9 @@ kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"s
 :::tip[说明]
 
 1. 通过加 nodeSelector 方式让 DaemonSet 不部署到任何节点，等同于卸载，同时也留个退路；当前 kube-proxy 也只能通过这种方式卸载，如果直接删除 kube-proxy，后续集群升级会被阻塞。
-2. 前面提到过安装 cilium 之前不建议添加节点，如果因某些原因导致在安装 cilium 前添加了普通节点或原生节点，需重启下存量节点，避免残留相关规则和配置。
-3. 如果创建集群时忘记了取消勾选 ip-masq-agent，可以手动卸载下：
+2. **GR + Native Routing 模式不要禁用 tke-cni-agent**，因为它负责拷贝 bridge 等 CNI 二进制到节点。该模式下 cilium 通过 `cni.exclusive=true` 自动将 multus 配置重命名为 `.cilium_bak` 使其失效。
+3. 前面提到过安装 cilium 之前不建议添加节点，如果因某些原因导致在安装 cilium 前添加了普通节点或原生节点，需重启下存量节点，避免残留相关规则和配置。
+4. 如果创建集群时忘记了取消勾选 ip-masq-agent，可以手动卸载下：
    ```bash
    kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
    ```
@@ -176,20 +177,24 @@ kubectl apply -f cni-config.yaml
 修改 tke-bridge-agent 的配置输出目录（从 multus 子目录改到 CNI 根目录），以便 cilium 能通过 `chainingTarget` 发现并追加到 bridge 配置：
 
 ```bash
-# 获取当前 apiserver 地址
-MASTER_ADDR=$(kubectl -n kube-system get ds tke-bridge-agent -o jsonpath='{.spec.template.spec.containers[0].args}' | grep -oP '(?<=--master=)\S+')
-# 修改 CNI 配置输出目录
+# 获取当前完整 args 并替换路径
+CURRENT_ARGS=$(kubectl -n kube-system get ds tke-bridge-agent -o jsonpath='{.spec.template.spec.containers[0].args}')
+PATCHED_ARGS=$(echo "$CURRENT_ARGS" | sed 's|/host/etc/cni/net.d/multus|/host/etc/cni/net.d|g')
 kubectl -n kube-system patch ds tke-bridge-agent --type='json' \
-  -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args\",\"value\":[\"--cni-conf-dir\",\"/host/etc/cni/net.d\",\"--master=$MASTER_ADDR\"]}]"
+  -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args\",\"value\":${PATCHED_ARGS}}]"
 ```
 
-等待 tke-bridge-agent 滚动重启完成后，删除残留的 multus 配置：
+等待 tke-bridge-agent 滚动重启完成：
 
 ```bash
-for pod in $(kubectl -n kube-system get pod --no-headers 2>/dev/null | grep tke-bridge-agent | awk '{print $1}'); do
-  kubectl -n kube-system exec "$pod" -- rm -f /host/etc/cni/net.d/00-multus.conf
-done
+kubectl -n kube-system rollout status ds/tke-bridge-agent --timeout=120s
 ```
+
+:::tip[说明]
+
+安装 cilium 后，cilium 的 `cni.exclusive=true`（默认）会自动将 `00-multus.conf` 重命名为 `00-multus.conf.cilium_bak`，无需手动删除。
+
+:::
 
 </TabItem>
 <TabItem value="overlay-gr" label="Overlay (GR)">
@@ -282,7 +287,6 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set operator.tolerations[2].key="node.cloudprovider.kubernetes.io/uninitialized",operator.tolerations[2].operator="Exists" \
   --set cni.chainingMode=generic-veth \
   --set cni.chainingTarget=tke-bridge \
-  --set cni.exclusive=false \
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
   --set ipam.mode=delegated-plugin \
