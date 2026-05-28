@@ -35,7 +35,7 @@
 - 容器网络插件：根据上表选择 **VPC-CNI 共享网卡多 IP** 或 **GlobalRouter**。
 - 集群类型：标准集群。
 - Kubernetes 版本: 不低于 1.32，建议选择最新版（参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)）。
-- 操作系统：TencentOS 4 或者 Ubuntu >= 22.04，其它 OS 暂未验证，主要要求 Linux kernel >= 5.10（参考 [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)），如有需要可自行验证。
+- 操作系统：**推荐 TencentOS 4 最新版（kernel 6.6.119+）或 Ubuntu 24.04（kernel 6.8+）**。Ubuntu 22.04（kernel 5.15）和 TencentOS 4 旧版（kernel ≤ 6.6.117）在 Overlay 模式下存在 BPF 兼容性问题，Native Routing 模式不受影响。最低要求 Linux kernel >= 5.10（参考 [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)）。
 - 节点：安装前不要向集群添加任何普通节点或原生节点，避免残留相关规则和配置，等安装完成后再添加。
 - 基础组件：取消勾选 ip-masq-agent，避免冲突。
 - 增强组件：如果节点池希望使用 Karpenter 节点池，需勾选安装 Karpenter 组件，否则无需勾选（参考后文的节点池选型）。
@@ -600,6 +600,25 @@ kubectl apply -f cilium-apf.yaml
 ```
 
 ## 新建节点池
+
+:::warning[Overlay 模式内核兼容性]
+
+Overlay (vxlan) 模式下，cilium 的 BPF 数据路径需要内核正确支持 host → Pod 的流量 redirect。经测试验证：
+
+| 内核                    | BPF Attach Mode | Overlay 是否正常 |
+| ----------------------- | --------------- | ---------------- |
+| Ubuntu 24.04 (6.8+)     | TCX             | 正常             |
+| TencentOS 4 (6.6.119+)  | TCX             | 正常             |
+| TencentOS 4 (≤ 6.6.117) | TCX             | **不通**         |
+| Ubuntu 22.04 (5.15)     | Legacy TC       | **不通**         |
+
+- **TCX** 是 Linux 6.6 引入的新 BPF attach 机制（[参考](https://eunomia.dev/zh/tutorials/50-tcx/)），cilium 1.16+ 在 kernel >= 6.6 时默认启用。TencentOS 4 的 6.6.117 内核虽支持 TCX 但存在 bug，6.6.119 已修复。
+- **Legacy TC** 是旧的 tc filter BPF attach 方式，kernel < 6.6 时自动 fallback，但在 5.15 上与 overlay 模式存在兼容性问题。
+- **Native Routing 模式不受上述影响**，所有内核版本均正常。
+
+**推荐**：Overlay 模式使用 **Ubuntu 24.04** 或 **TencentOS 4 最新版（kernel 6.6.119+）**。
+
+:::
 
 ### 节点池选型
 
