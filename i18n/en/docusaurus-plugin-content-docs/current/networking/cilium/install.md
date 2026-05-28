@@ -32,7 +32,7 @@ Create a TKE cluster in the [Container Service Console](https://console.cloud.te
 
 - Cluster Type: Standard Cluster
 - Kubernetes Version: No lower than 1.32, recommended to choose the latest version (refer to [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)).
-- Operating System: TencentOS 4 or Ubuntu >= 22.04. Other operating systems have not yet been verified; the primary requirement is Linux kernel >= 5.10 (refer to [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)). If necessary, you may perform the verification yourself.
+- Operating System: **Recommended Ubuntu 24.04 (kernel 6.8+) or TencentOS 4 latest**. Minimum requirement: Linux kernel >= 5.10 (refer to [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)). See the "Create Node Pool" section below for OS compatibility details.
 - Nodes: Do not add any regular nodes or native nodes to the cluster before installation to avoid residual rules and configurations. Add them after the installation is complete.
 - Basic Components: Uncheck ip-masq-agent to avoid conflicts.
 
@@ -327,7 +327,6 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set ipam.operator.clusterPoolIPv4MaskSize=24 \
   --set enableIPv4Masquerade=true \
   --set localRedirectPolicies.enabled=true \
-  --set sysctlfix.enabled=false \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002
@@ -404,7 +403,8 @@ extraConfig:
 # Enable CiliumLocalRedirectPolicy capability, refer to https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
 localRedirectPolicies:
   enabled: true
-# Disable sysctlfix to prevent restarting systemd-sysctl from resetting eth0's rp_filter to 1, which could cause network unavailable in some scenarios.
+# Native Routing mode: disable sysctlfix to prevent restarting systemd-sysctl from resetting eth0's rp_filter to 1.
+# Overlay mode: do NOT set this (keep default true), otherwise lxc interface rp_filter won't be 0 and host↔Pod will break.
 sysctlfix:
   enabled: false
 # Replace kube-proxy, including ClusterIP forwarding, NodePort forwarding, plus HostPort forwarding capability
@@ -549,6 +549,26 @@ kubectl apply -f cilium-apf.yaml
 ```
 
 ## Create New Node Pools
+
+:::tip[OS Compatibility Notes]
+
+Cilium requires Linux kernel >= 5.10. The installation script and manual installation commands in this guide have handled sysctl compatibility for different modes:
+
+- **Native Routing mode**: Disables Cilium's `sysctlfix` (to prevent restarting systemd-sysctl from resetting eth0's rp_filter to 1, which would break networking). All OS versions meeting the minimum kernel requirement work fine.
+- **Overlay mode**: Enables Cilium's `sysctlfix` (to ensure lxc interface rp_filter=0, otherwise host↔Pod reply packets will be dropped by the kernel). All OS versions meeting the minimum kernel requirement work fine.
+
+**Recommended OS**: Ubuntu 24.04 (kernel 6.8+, optimal performance) or TencentOS 4 latest.
+
+If after installation `cilium-health status` shows localhost endpoint as 0/1 (host→Pod broken), it's usually an rp_filter configuration issue. Troubleshoot with:
+
+```bash
+# Check if lxc interface rp_filter is 0
+sysctl net.ipv4.conf.lxc_health.rp_filter
+# If not 0, check if cilium sysctlfix init container ran successfully
+kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{.items[0].status.initContainerStatuses}'
+```
+
+:::
 
 ### Node Pool Selection
 

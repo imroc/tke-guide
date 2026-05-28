@@ -630,7 +630,6 @@ helm_install_cilium() {
   )
 
   local -a common_args=(
-    --set sysctlfix.enabled=false
     --set localRedirectPolicies.enabled=true
     --set kubeProxyReplacement=true
     --set k8sServiceHost="$apiserver_ip"
@@ -649,10 +648,10 @@ helm_install_cilium() {
   case "${NETWORK_MODE}_${ROUTING_MODE}" in
   VPC-CNI_native)
     toleration_args+=(--set 'operator.tolerations[5].key=tke.cloud.tencent.com/eni-ip-unavailable,operator.tolerations[5].operator=Exists')
-    mode_args=(--set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=false --set devices=eth+ --set cni.chainingMode=generic-veth --set cni.customConf=true --set cni.configMap=cni-config --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
+    mode_args=(--set sysctlfix.enabled=false --set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=false --set devices=eth+ --set cni.chainingMode=generic-veth --set cni.customConf=true --set cni.configMap=cni-config --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
     ;;
   GR_native)
-    mode_args=(--set cni.chainingMode=generic-veth --set cni.chainingTarget=tke-bridge --set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=true --set bpf.masquerade=true --set ipMasqAgent.enabled=true --set devices=eth+ --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
+    mode_args=(--set sysctlfix.enabled=false --set cni.chainingMode=generic-veth --set cni.chainingTarget=tke-bridge --set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=true --set bpf.masquerade=true --set ipMasqAgent.enabled=true --set devices=eth+ --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
     ;;
   VPC-CNI_overlay)
     toleration_args+=(--set 'operator.tolerations[5].key=tke.cloud.tencent.com/eni-ip-unavailable,operator.tolerations[5].operator=Exists')

@@ -35,7 +35,7 @@
 - 容器网络插件：根据上表选择 **VPC-CNI 共享网卡多 IP** 或 **GlobalRouter**。
 - 集群类型：标准集群。
 - Kubernetes 版本: 不低于 1.32，建议选择最新版（参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)）。
-- 操作系统：**推荐 TencentOS 4 最新版（kernel 6.6.119+）或 Ubuntu 24.04（kernel 6.8+）**。Ubuntu 22.04（kernel 5.15）和 TencentOS 4 旧版（kernel ≤ 6.6.117）在 Overlay 模式下存在 BPF 兼容性问题，Native Routing 模式不受影响。最低要求 Linux kernel >= 5.10（参考 [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)）。
+- 操作系统：**推荐 Ubuntu 24.04（kernel 6.8+）或 TencentOS 4 最新版**。最低要求 Linux kernel >= 5.10（参考 [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)）。具体 OS 兼容性详见后文"新建节点池"一节。
 - 节点：安装前不要向集群添加任何普通节点或原生节点，避免残留相关规则和配置，等安装完成后再添加。
 - 基础组件：取消勾选 ip-masq-agent，避免冲突。
 - 增强组件：如果节点池希望使用 Karpenter 节点池，需勾选安装 Karpenter 组件，否则无需勾选（参考后文的节点池选型）。
@@ -378,7 +378,6 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set ipam.operator.clusterPoolIPv4MaskSize=24 \
   --set enableIPv4Masquerade=true \
   --set localRedirectPolicies.enabled=true \
-  --set sysctlfix.enabled=false \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002
@@ -416,7 +415,6 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set ipam.operator.clusterPoolIPv4MaskSize=24 \
   --set enableIPv4Masquerade=true \
   --set localRedirectPolicies.enabled=true \
-  --set sysctlfix.enabled=false \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002
@@ -476,7 +474,8 @@ extraConfig:
 # 启用 CiliumLocalRedirectPolicy 的能力，参考 https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
 localRedirectPolicies:
   enabled: true
-# 禁用 sysctlfix，避免重启 systemd-sysctl 导致 eth0 的 rp_filter 被重置为 1，使得部分场景网络不通
+# Native Routing 模式需禁用 sysctlfix，避免重启 systemd-sysctl 导致 eth0 的 rp_filter 被重置为 1 使网络不通。
+# Overlay 模式不要设置此项（保持默认 true），否则 lxc 接口的 rp_filter 不为 0 会导致 host↔Pod 不通。
 sysctlfix:
   enabled: false
 # 替代 kube-proxy，包括 ClusterIP 转发、NodePort 转发，另外还附带了 HostPort 转发的能力
@@ -601,22 +600,23 @@ kubectl apply -f cilium-apf.yaml
 
 ## 新建节点池
 
-:::warning[Overlay 模式内核兼容性]
+:::tip[OS 兼容性说明]
 
-Overlay (vxlan) 模式下，cilium 的 BPF 数据路径需要内核正确支持 host → Pod 的流量 redirect。经测试验证：
+Cilium 要求 Linux kernel >= 5.10。本文的安装脚本和手动安装命令已处理了不同模式下的 sysctl 兼容性：
 
-| 内核                    | BPF Attach Mode | Overlay 是否正常 |
-| ----------------------- | --------------- | ---------------- |
-| Ubuntu 24.04 (6.8+)     | TCX             | 正常             |
-| TencentOS 4 (6.6.119+)  | TCX             | 正常             |
-| TencentOS 4 (≤ 6.6.117) | TCX             | **不通**         |
-| Ubuntu 22.04 (5.15)     | Legacy TC       | **不通**         |
+- **Native Routing 模式**：禁用 cilium 的 `sysctlfix`（避免重启 systemd-sysctl 导致 eth0 的 rp_filter 被重置为 1 使网络不通）。所有满足最低内核要求的 OS 均可正常使用。
+- **Overlay 模式**：启用 cilium 的 `sysctlfix`（确保 lxc 接口的 rp_filter=0，否则 host↔Pod 回包会被内核丢弃）。所有满足最低内核要求的 OS 均可正常使用。
 
-- **TCX** 是 Linux 6.6 引入的新 BPF attach 机制（[参考](https://eunomia.dev/zh/tutorials/50-tcx/)），cilium 1.16+ 在 kernel >= 6.6 时默认启用。TencentOS 4 的 6.6.117 内核虽支持 TCX 但存在 bug，6.6.119 已修复。
-- **Legacy TC** 是旧的 tc filter BPF attach 方式，kernel < 6.6 时自动 fallback，但在 5.15 上与 overlay 模式存在兼容性问题。
-- **Native Routing 模式不受上述影响**，所有内核版本均正常。
+**推荐 OS**：Ubuntu 24.04（kernel 6.8+，性能最优）或 TencentOS 4 最新版。
 
-**推荐**：Overlay 模式使用 **Ubuntu 24.04** 或 **TencentOS 4 最新版（kernel 6.6.119+）**。
+如果安装后发现 `cilium-health status` 中 localhost endpoint 显示 0/1（host→Pod 不通），通常是 rp_filter 配置问题，可通过以下方式排查：
+
+```bash
+# 检查 lxc 接口的 rp_filter 是否为 0
+sysctl net.ipv4.conf.lxc_health.rp_filter
+# 如果不为 0，检查 cilium sysctlfix init container 是否正常运行
+kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{.items[0].status.initContainerStatuses}'
+```
 
 :::
 
