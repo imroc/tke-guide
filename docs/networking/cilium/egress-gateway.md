@@ -18,6 +18,22 @@
 1. 启用 cilium 替代 kube-proxy。
 2. 启用 ip masquerade，且使用 bpf 的实现进行 masquerade 而非默认的 iptables 实现。
 
+### 一键启用
+
+可使用脚本一键启用 Egress Gateway（自动处理 helm upgrade 和组件重启）：
+
+```bash
+curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s enable-egress-gateway
+```
+
+如果网络环境无法连接 GitHub，可使用站点地址：
+
+```bash
+curl -sfL https://imroc.cc/tke/scripts/cilium.sh | bash -s enable-egress-gateway
+```
+
+### 手动启用
+
 启用 Egress Gateway 的 cilium 安装方法：
 
 ```bash showLineNumbers

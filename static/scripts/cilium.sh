@@ -1,26 +1,123 @@
 #!/bin/bash
 set -euo pipefail
 
+###############################################################################
 # TKE Cilium Toolkit
-# Docs: https://imroc.cc/tke/networking/cilium/install
+#
+# A multi-function script for installing and managing Cilium on Tencent Cloud
+# TKE (Tencent Kubernetes Engine) clusters.
+#
+# Docs:
+#   Chinese: https://imroc.cc/tke/networking/cilium/install
+#   English: https://imroc.cc/tke/en/networking/cilium/install
 #
 # Usage:
-#   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s install-cilium
-#   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s install-localdns
-#   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s help
+#   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s <command>
+#
+# Commands:
+#   install-cilium          Install Cilium (auto-detect network mode, interactive)
+#   install-localdns        Install Nodelocal DNSCache with Cilium integration
+#   e2e-test                Run Cilium connectivity end-to-end tests
+#   enable-egress-gateway   Enable Cilium Egress Gateway
+#   help                    Show help message
+#
+###############################################################################
+#
+# MODIFICATION GUIDE (for AI agents and human contributors)
+# =========================================================
+#
+# 1. I18N (Internationalization)
+#    - The script auto-detects locale via LANG/LC_ALL/LANGUAGE env vars.
+#    - Chinese locale (zh_CN*, zh_TW*) shows Chinese; everything else shows English.
+#    - All user-facing strings MUST have both ZH and EN variants:
+#        MSG_ZH_<KEY>="中文消息"
+#        MSG_EN_<KEY>="English message"
+#      Then use: msg <KEY>  OR  $(is_zh && echo "中文" || echo "English")
+#    - When adding/modifying any user-facing text, always update BOTH languages.
+#
+# 2. ADDING A NEW SUBCOMMAND
+#    - Define a function: cmd_<name>() { ... }
+#    - Add MSG_ZH/EN_HELP_CMD_<NAME> for help text.
+#    - Add `msg HELP_CMD_<NAME>` in show_help() between the last command and HELP_CMD_HELP.
+#    - Add a case branch in main(): <name>) cmd_<name> ;;
+#    - If the command should be optionally triggered from install-cilium,
+#      extract core logic into a separate function (like install_localdns_internal)
+#      and add an interactive confirm_enable_<name>() + call it from cmd_install_cilium.
+#
+# 3. IMAGE REFERENCES
+#    - TKE nodes can pull from: docker.io (direct), quay.tencentcloudcr.com (quay.io mirror).
+#    - Images from registry.k8s.io / gcr.io are NOT accessible; sync them to docker.io/k8smirror:
+#        skopeo copy -a docker://<source> docker://docker.io/k8smirror/<name>:<tag>
+#    - Update image references in: helm_install_cilium() image_args, cmd_e2e_test(), NODE_LOCAL_DNS_IMAGE.
+#
+# 4. NETWORK MODE DETECTION (detect_network_mode)
+#    Detection logic for TKE cluster network type:
+#    - ds/tke-bridge-agent exists        → GlobalRouter (GR)
+#    - ds/tke-eni-agent exists           → VPC-CNI
+#    - ds/cilium exists (tkeimages)      → CiliumOverlay (built-in, not supported)
+#    - ds/cilium exists (non-tkeimages)  → Already installed (not supported)
+#    - VPC-CNI + ds/cilium (tkeimages)   → DataPlaneV2 (not supported)
+#
+# 5. INSTALL MODES (4 combinations: NETWORK_MODE x ROUTING_MODE)
+#    ┌──────────────────┬──────────────────────────────────────────────────┐
+#    │ VPC-CNI + native │ CNI chaining via ConfigMap (cni-config)         │
+#    │ GR + native      │ CNI chaining via chainingTarget=tke-bridge      │
+#    │                  │ + keep tke-cni-agent + enable masquerade        │
+#    │                  │ + disable portmap + create ip-masq-agent CM     │
+#    │ VPC-CNI + overlay│ Full cilium CNI (tunnel/vxlan, cluster-pool)    │
+#    │                  │ + delete mutatingwebhookconfiguration           │
+#    │ GR + overlay     │ Full cilium CNI (tunnel/vxlan, cluster-pool)    │
+#    └──────────────────┴──────────────────────────────────────────────────┘
+#
+# 6. CILIUM VERSION
+#    - DEFAULT_CILIUM_VERSION is the recommended version tested with this script.
+#    - When upgrading, test all 4 install modes before updating the default.
+#
+# 7. NON-INTERACTIVE MODE (environment variables)
+#    All interactive prompts in install-cilium can be skipped by setting env vars:
+#      ROUTING_MODE     "native" or "overlay" (required)
+#      CILIUM_VERSION   e.g. "1.19.4" (optional, defaults to DEFAULT_CILIUM_VERSION)
+#      POD_CIDR         e.g. "10.244.0.0/16" (only for overlay mode)
+#      POD_CIDR_MASK    e.g. "24" (only for overlay mode)
+#      ENABLE_EGRESS    "true" or "false" (optional, default false)
+#      ENABLE_LOCALDNS  "true" or "false" (optional, default false)
+#    NETWORK_MODE is always auto-detected and cannot be overridden.
+#    When adding a new interactive prompt, follow the pattern:
+#      - Check if the env var is already set → if yes, skip the prompt.
+#      - Add the env var to print_replay_command() output.
+#      - Document the env var in this section.
+#
+# 8. STYLE
+#    - Comments in English only.
+#    - Use info/warn/error/fatal for output (colored, prefixed).
+#    - Interactive prompts use blue color (${BLUE}...${NC}) and read -rp.
+#    - Default answers for optional features (egress, localdns): N (no).
+#    - set -euo pipefail is on; use `|| true` or `; exit 0` to suppress errors in pipes.
+#
+###############################################################################
 
+# ====== Defaults ======
+
+# Cilium helm chart version. Bump this when a new version is tested and verified.
 DEFAULT_CILIUM_VERSION="1.19.4"
+# Default Pod CIDR for overlay mode. Only used when ROUTING_MODE=overlay.
 DEFAULT_POD_CIDR="10.244.0.0/16"
+# Default per-node subnet mask for overlay mode (24 = max 254 pods per node).
 DEFAULT_POD_CIDR_MASK="24"
+# Nodelocal DNSCache image. Synced from registry.k8s.io/dns/k8s-dns-node-cache to dockerhub mirror.
 NODE_LOCAL_DNS_IMAGE="docker.io/k8smirror/k8s-dns-node-cache:1.26.4"
 
-# ====== i18n ======
+# ====== I18N ======
+# Locale detection: checks LANG, LC_ALL, LANGUAGE for Chinese locale prefixes.
+# Returns 0 (true) for Chinese, 1 (false) for everything else.
 
 is_zh() {
   [[ "${LANG:-}" == zh_CN* ]] || [[ "${LANG:-}" == zh_TW* ]] || [[ "${LC_ALL:-}" == zh* ]] || [[ "${LANGUAGE:-}" == zh* ]]
 }
 
-# msg KEY - print localized message
+# msg KEY — prints the localized message for the given key.
+# Looks up MSG_ZH_<KEY> or MSG_EN_<KEY> based on locale.
+# Usage: msg CHECK_PREREQ  →  prints "检查前置条件..." or "Checking prerequisites..."
 msg() {
   local key="$1"
   shift
@@ -31,8 +128,11 @@ msg() {
   fi
 }
 
-# --- Messages ---
-# Help
+# --- Localized Messages ---
+# Convention: MSG_ZH_<KEY> for Chinese, MSG_EN_<KEY> for English.
+# When adding a new message, always add BOTH variants.
+
+# Help messages
 MSG_ZH_HELP_TITLE="TKE Cilium 工具脚本"
 MSG_EN_HELP_TITLE="TKE Cilium Toolkit"
 MSG_ZH_HELP_USAGE="用法:"
@@ -47,6 +147,8 @@ MSG_ZH_HELP_CMD_LOCALDNS="  install-localdns   安装 Nodelocal DNSCache 并配�
 MSG_EN_HELP_CMD_LOCALDNS="  install-localdns   Install Nodelocal DNSCache with Cilium integration"
 MSG_ZH_HELP_CMD_E2ETEST="  e2e-test           运行 Cilium 连通性端到端测试"
 MSG_EN_HELP_CMD_E2ETEST="  e2e-test           Run Cilium connectivity end-to-end tests"
+MSG_ZH_HELP_CMD_EGRESS="  enable-egress-gateway  启用 Cilium Egress Gateway 功能"
+MSG_EN_HELP_CMD_EGRESS="  enable-egress-gateway  Enable Cilium Egress Gateway"
 MSG_ZH_HELP_CMD_HELP="  help               显示本帮助信息"
 MSG_EN_HELP_CMD_HELP="  help               Show this help message"
 # Check
@@ -115,8 +217,13 @@ MSG_ZH_NO_CLRP_CRD="CiliumLocalRedirectPolicy CRD 不存在，请确保安装 ci
 MSG_EN_NO_CLRP_CRD="CiliumLocalRedirectPolicy CRD not found. Ensure localRedirectPolicies.enabled=true in cilium install."
 MSG_ZH_LOCALDNS_DONE="Nodelocal DNSCache 安装完成！"
 MSG_EN_LOCALDNS_DONE="Nodelocal DNSCache installed!"
+# Egress Gateway
+MSG_ZH_EGRESS_DONE="Egress Gateway 已启用！"
+MSG_EN_EGRESS_DONE="Egress Gateway enabled!"
 
 # ====== Utility ======
+# Colored log output functions. All user-facing output should go through these.
+# info: green [INFO], warn: yellow [WARN], error: red [ERROR], fatal: error + exit 1.
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -147,6 +254,7 @@ show_help() {
   msg HELP_CMD_CILIUM
   msg HELP_CMD_LOCALDNS
   msg HELP_CMD_E2ETEST
+  msg HELP_CMD_EGRESS
   msg HELP_CMD_HELP
   echo ""
   msg HELP_EXAMPLES
@@ -168,6 +276,7 @@ show_help() {
 }
 
 # ====== Common Checks ======
+# Shared validation functions used by multiple subcommands.
 
 check_prerequisites() {
   info "$(msg CHECK_PREREQ)"
@@ -177,6 +286,9 @@ check_prerequisites() {
   info "$(msg CHECK_PREREQ_OK)"
 }
 
+# check_nodes — Ensures no non-super nodes exist before cilium install.
+# Only eklet-* prefixed nodes (super nodes) are allowed. Regular/native nodes
+# should be added AFTER cilium is installed to avoid leftover iptables rules.
 check_nodes() {
   info "$(msg CHECK_NODES)"
   local nodes
@@ -199,6 +311,10 @@ check_nodes() {
   info "$(msg NODES_OK)"
 }
 
+# detect_network_mode — Identifies the TKE cluster's network type.
+# Sets global variable NETWORK_MODE to "GR" or "VPC-CNI".
+# Exits with error if the cluster is CiliumOverlay, DataPlaneV2, or already has cilium.
+# Detection order: tke-bridge-agent → GR, tke-eni-agent → VPC-CNI, cilium → error.
 detect_network_mode() {
   info "$(msg DETECT)"
   local has_bridge_agent has_eni_agent has_cilium cilium_image
@@ -246,9 +362,18 @@ get_apiserver_ip() {
   kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null
 }
 
-# ====== install-cilium ======
+# ====== install-cilium subcommand ======
+# Interactive functions for gathering user input during cilium installation.
+
+# select_routing_mode — Prompts user to choose Native Routing or Overlay.
+# Sets global variable ROUTING_MODE to "native" or "overlay".
+# Skipped if ROUTING_MODE env var is already set.
 
 select_routing_mode() {
+  if [[ -n "${ROUTING_MODE:-}" ]]; then
+    info "$(is_zh && echo "已选择:" || echo "Selected:") $([[ $ROUTING_MODE == "native" ]] && echo "Native Routing" || echo "Overlay (vxlan)")"
+    return
+  fi
   echo ""
   echo -e "${BLUE}$(msg SELECT_MODE)${NC}"
   msg MODE_NATIVE
@@ -271,15 +396,28 @@ select_routing_mode() {
   info "$(is_zh && echo "已选择:" || echo "Selected:") $([[ $ROUTING_MODE == "native" ]] && echo "Native Routing" || echo "Overlay (vxlan)")"
 }
 
+# confirm_cilium_version — Prompts user to confirm or override Cilium version.
+# Skipped if CILIUM_VERSION env var is already set.
 confirm_cilium_version() {
+  if [[ -n "${CILIUM_VERSION:-}" ]]; then
+    info "Cilium: $CILIUM_VERSION"
+    return
+  fi
   echo ""
   read -rp "$(echo -e "${BLUE}$(msg INPUT_VERSION)${NC} [$(is_zh && echo "默认" || echo "default"): ${DEFAULT_CILIUM_VERSION}]: ")" version_input
   CILIUM_VERSION="${version_input:-$DEFAULT_CILIUM_VERSION}"
   info "Cilium: $CILIUM_VERSION"
 }
 
+# confirm_pod_cidr — Prompts user for overlay Pod CIDR (only when ROUTING_MODE=overlay).
+# Skipped if POD_CIDR env var is already set.
 confirm_pod_cidr() {
   if [[ "$ROUTING_MODE" != "overlay" ]]; then
+    return
+  fi
+  if [[ -n "${POD_CIDR:-}" ]]; then
+    POD_CIDR_MASK="${POD_CIDR_MASK:-$DEFAULT_POD_CIDR_MASK}"
+    info "Pod CIDR: $POD_CIDR, mask: /$POD_CIDR_MASK"
     return
   fi
   echo ""
@@ -290,6 +428,55 @@ confirm_pod_cidr() {
   info "Pod CIDR: $POD_CIDR, mask: /$POD_CIDR_MASK"
 }
 
+# confirm_enable_egress — Asks user whether to enable Egress Gateway (default: N).
+# Sets ENABLE_EGRESS=true/false. If true, egress params are merged into helm install.
+# Skipped if ENABLE_EGRESS env var is already set.
+confirm_enable_egress() {
+  if [[ -n "${ENABLE_EGRESS:-}" ]]; then
+    return
+  fi
+  echo ""
+  local prompt
+  if is_zh; then
+    prompt="是否启用 Egress Gateway？[y/N]: "
+  else
+    prompt="Enable Egress Gateway? [y/N]: "
+  fi
+  read -rp "$(echo -e "${BLUE}${prompt}${NC}")" egress_input
+  if [[ "${egress_input,,}" == "y" || "${egress_input,,}" == "yes" ]]; then
+    ENABLE_EGRESS=true
+  else
+    ENABLE_EGRESS=false
+  fi
+}
+
+# confirm_enable_localdns — Asks user whether to install Nodelocal DNSCache (default: N).
+# Sets ENABLE_LOCALDNS=true/false. If true, localdns is deployed after cilium install.
+# Skipped if ENABLE_LOCALDNS env var is already set.
+confirm_enable_localdns() {
+  if [[ -n "${ENABLE_LOCALDNS:-}" ]]; then
+    return
+  fi
+  echo ""
+  local prompt
+  if is_zh; then
+    prompt="是否安装 Nodelocal DNSCache？[y/N]: "
+  else
+    prompt="Install Nodelocal DNSCache? [y/N]: "
+  fi
+  read -rp "$(echo -e "${BLUE}${prompt}${NC}")" localdns_input
+  if [[ "${localdns_input,,}" == "y" || "${localdns_input,,}" == "yes" ]]; then
+    ENABLE_LOCALDNS=true
+  else
+    ENABLE_LOCALDNS=false
+  fi
+}
+
+# uninstall_tke_components — Disables TKE built-in networking components.
+# - kube-proxy: always disabled (cilium replaces it via kubeProxyReplacement).
+# - tke-cni-agent: disabled EXCEPT for GR+native (needed to copy CNI binaries like bridge).
+# - ip-masq-agent: disabled (cilium has its own BPF-based masquerade).
+# Uses nodeSelector trick to prevent scheduling without deleting the DaemonSet.
 uninstall_tke_components() {
   info "$(msg UNINSTALL_TKE)"
   kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}' 2>/dev/null || true
@@ -301,6 +488,8 @@ uninstall_tke_components() {
   info "$(msg UNINSTALL_TKE_OK)"
 }
 
+# setup_native_vpccni — Creates CNI ConfigMap for VPC-CNI + cilium chaining.
+# The ConfigMap defines the CNI plugin chain: tke-route-eni → cilium-cni.
 setup_native_vpccni() {
   info "$(is_zh && echo "创建 CNI 配置 ConfigMap..." || echo "Creating CNI ConfigMap...")"
   kubectl apply -f - <<'EOF'
@@ -334,6 +523,16 @@ data:
 EOF
 }
 
+# setup_native_gr — Configures tke-bridge-agent for GR + cilium chaining.
+# Three changes are made to tke-bridge-agent DaemonSet args:
+#   1. --cni-conf-dir: /host/etc/cni/net.d/multus → /host/etc/cni/net.d
+#      (move bridge conflist to CNI root so cilium's chainingTarget can find it)
+#   2. --port-mapping=false: disable portmap plugin (cilium handles HostPort via
+#      kubeProxyReplacement; portmap depends on kube-proxy's KUBE-MARK-MASQ iptables chain)
+# Also creates ip-masq-agent ConfigMap for BPF masquerade:
+#   - Reads NonMasqueradeCIDRs from TKE's auto-generated ip-masq-agent-config
+#     (contains VPC CIDR + all auxiliary CIDRs including GR subnets)
+#   - GR Pod IPs need SNAT to node IP when accessing CVM metadata (169.254.x.x)
 setup_native_gr() {
   info "$(is_zh && echo "配置 tke-bridge-agent..." || echo "Configuring tke-bridge-agent...")"
   local current_args patched_args needs_patch=false
@@ -386,11 +585,20 @@ EOF
   info "$(is_zh && echo "ip-masq-agent ConfigMap 已创建" || echo "ip-masq-agent ConfigMap created")"
 }
 
+# setup_overlay_vpccni — Deletes webhook that auto-injects ENI IP resource requests.
+# Without this, pods would be blocked by ip-scheduler waiting for ENI IP allocation.
 setup_overlay_vpccni() {
   info "$(is_zh && echo "禁用 add-pod-eni-ip-limit-webhook..." || echo "Disabling add-pod-eni-ip-limit-webhook...")"
   kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook 2>/dev/null || true
 }
 
+# helm_install_cilium — Runs helm upgrade --install with mode-specific parameters.
+# Assembles 4 argument arrays:
+#   - image_args: TKE-accessible mirror image repos (quay.tencentcloudcr.com, k8smirror)
+#   - common_args: shared params (kubeProxyReplacement, APF, etc.)
+#   - toleration_args: operator tolerations for TKE-specific taints
+#   - mode_args: routing/IPAM/CNI params specific to NETWORK_MODE x ROUTING_MODE
+# If ENABLE_EGRESS=true, egress gateway params are merged into the install.
 helm_install_cilium() {
   info "$(is_zh && echo "添加 Cilium Helm 仓库..." || echo "Adding Cilium Helm repo...")"
   helm repo add cilium https://helm.cilium.io/ 2>/dev/null || true
@@ -453,12 +661,24 @@ helm_install_cilium() {
     ;;
   esac
 
+  # Egress Gateway: merge params into helm install if enabled
+  if [[ "${ENABLE_EGRESS:-false}" == "true" ]]; then
+    common_args+=(--set egressGateway.enabled=true)
+    # masquerade params - only add if not already in mode_args (GR_native already has them)
+    if [[ "${NETWORK_MODE}_${ROUTING_MODE}" != "GR_native" ]]; then
+      common_args+=(--set enableIPv4Masquerade=true --set bpf.masquerade=true --set ipMasqAgent.enabled=true --set ipMasqAgent.config.masqLinkLocal=true)
+    fi
+  fi
+
   info "$(msg HELM_INSTALL) (${NETWORK_MODE} + ${ROUTING_MODE}, cilium ${CILIUM_VERSION})"
   helm upgrade --install cilium cilium/cilium --version "$CILIUM_VERSION" \
     --namespace kube-system \
     "${image_args[@]}" "${toleration_args[@]}" "${common_args[@]}" "${mode_args[@]}"
 }
 
+# apply_apf — Creates APF (API Priority and Fairness) rate limiting rules for cilium.
+# Prevents cilium from overwhelming the apiserver in large clusters.
+# FlowSchema matches cilium ServiceAccount's list operations on cilium.io/* and pods.
 apply_apf() {
   info "$(is_zh && echo "应用 APF 限速规则..." || echo "Applying APF rate limiting...")"
   kubectl apply -f - <<'EOF'
@@ -509,6 +729,68 @@ spec:
 EOF
 }
 
+# helm_enable_egress — Enables Egress Gateway via helm upgrade --reuse-values.
+# Auto-detects current cilium version from helm release.
+# Enables: egressGateway, IPv4 masquerade (BPF), ip-masq-agent with masqLinkLocal.
+# Restarts cilium ds and operator to apply changes.
+helm_enable_egress() {
+  local current_version
+  current_version=$(helm -n kube-system list -o json | grep -o '"chart":"cilium-[^"]*"' | sed 's/.*cilium-//' | sed 's/"//')
+  if [[ -z "$current_version" ]]; then
+    fatal "$(is_zh && echo "无法检测当前 Cilium 版本" || echo "Cannot detect current Cilium version")"
+  fi
+  info "$(is_zh && echo "检测到 Cilium 版本: ${current_version}" || echo "Detected Cilium version: ${current_version}")"
+
+  info "$(is_zh && echo "执行 helm upgrade 启用 Egress Gateway..." || echo "Running helm upgrade to enable Egress Gateway...")"
+  helm upgrade cilium cilium/cilium --version "$current_version" \
+    --namespace kube-system \
+    --reuse-values \
+    --set egressGateway.enabled=true \
+    --set enableIPv4Masquerade=true \
+    --set bpf.masquerade=true \
+    --set ipMasqAgent.enabled=true \
+    --set ipMasqAgent.config.masqLinkLocal=true
+
+  info "$(is_zh && echo "重启 cilium..." || echo "Restarting cilium...")"
+  kubectl -n kube-system rollout restart ds/cilium
+  kubectl -n kube-system rollout restart deploy/cilium-operator
+  kubectl -n kube-system rollout status ds/cilium --timeout=120s
+  kubectl -n kube-system rollout status deploy/cilium-operator --timeout=120s
+}
+
+# print_replay_command — Prints a non-interactive command that reproduces the current install.
+# Uses environment variables to skip all interactive prompts on subsequent runs.
+# Called at the end of cmd_install_cilium to help users batch-deploy to multiple clusters.
+print_replay_command() {
+  local script_url="https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh"
+  local env_vars="ROUTING_MODE=${ROUTING_MODE} CILIUM_VERSION=${CILIUM_VERSION}"
+  if [[ "$ROUTING_MODE" == "overlay" ]]; then
+    env_vars="${env_vars} POD_CIDR=${POD_CIDR} POD_CIDR_MASK=${POD_CIDR_MASK}"
+  fi
+  env_vars="${env_vars} ENABLE_EGRESS=${ENABLE_EGRESS:-false} ENABLE_LOCALDNS=${ENABLE_LOCALDNS:-false}"
+  echo ""
+  if is_zh; then
+    info "如需在其他集群重复相同安装，可直接执行以下命令（无需交互）:"
+  else
+    info "To repeat this install on other clusters without interaction, run:"
+  fi
+  echo ""
+  echo "  ${env_vars} \\"
+  echo "    curl -sfL ${script_url} | bash -s install-cilium"
+  echo ""
+}
+
+# cmd_install_cilium — Main install wizard. Interactive flow:
+#   1. check_prerequisites (kubectl, helm, cluster)
+#   2. check_nodes (no non-super nodes)
+#   3. detect_network_mode (GR or VPC-CNI)
+#   4. select_routing_mode (native or overlay)
+#   5. confirm_cilium_version
+#   6. confirm_pod_cidr (overlay only)
+#   7. confirm_enable_egress (optional)
+#   8. confirm_enable_localdns (optional)
+#   9. uninstall_tke_components → setup_* → helm_install → apply_apf
+#  10. (optional) enable egress / install localdns
 cmd_install_cilium() {
   echo ""
   echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
@@ -522,6 +804,8 @@ cmd_install_cilium() {
   select_routing_mode
   confirm_cilium_version
   confirm_pod_cidr
+  confirm_enable_egress
+  confirm_enable_localdns
 
   echo ""
   info "$(is_zh && echo "安装方案" || echo "Plan"): ${ROUTING_MODE} (${NETWORK_MODE}), Cilium ${CILIUM_VERSION}"
@@ -538,36 +822,45 @@ cmd_install_cilium() {
   helm_install_cilium
   apply_apf
 
+  # Optional: enable egress gateway
+  if [[ "${ENABLE_EGRESS:-false}" == "true" ]]; then
+    helm_enable_egress
+  fi
+
+  # Optional: install localdns
+  if [[ "${ENABLE_LOCALDNS:-false}" == "true" ]]; then
+    install_localdns_internal
+  fi
+
   echo ""
   info "============================================"
   info "$(msg CILIUM_DONE)"
   info "  kubectl -n kube-system get pod -l app.kubernetes.io/part-of=cilium"
   info "  kubectl -n kube-system exec ds/cilium -- cilium status --brief"
   info "============================================"
+
+  # Print non-interactive replay command for batch deployment
+  print_replay_command
+
   echo ""
 }
 
-# ====== install-localdns ======
+# ====== install-localdns subcommand ======
+# Deploys Nodelocal DNSCache with CiliumLocalRedirectPolicy for DNS caching.
 
-cmd_install_localdns() {
-  echo ""
-  echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
-  echo -e "${BLUE}║   Nodelocal DNSCache Install        ║${NC}"
-  echo -e "${BLUE}╚══════════════════════════════════════╝${NC}"
-  echo ""
+# install_localdns_internal — Core deployment logic (no prerequisite checks).
+# Called from both cmd_install_localdns (standalone) and cmd_install_cilium (optional).
+# Steps:
+#   1. Create ServiceAccount + kube-dns-upstream Service + headless Service
+#   2. Get kube-dns-upstream ClusterIP (MUST use this instead of kube-dns ClusterIP
+#      to avoid CLRP redirect loop — CLRP redirects kube-dns traffic to localdns,
+#      so localdns must forward to kube-dns-upstream which is NOT intercepted by CLRP)
+#   3. Create ConfigMap with Corefile (forward cluster.local to upstream via TCP)
+#   4. Create DaemonSet (non-hostNetwork, listening on kube-dns ClusterIP)
+#   5. Create CiliumLocalRedirectPolicy to redirect kube-dns traffic to local pod
 
-  check_prerequisites
-
-  local has_cilium
-  has_cilium=$(kubectl -n kube-system get ds cilium --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
-  if [[ "$has_cilium" -eq 0 ]]; then
-    fatal "$(msg NO_CILIUM)"
-  fi
-  if ! kubectl get crd ciliumlocalredirectpolicies.cilium.io &>/dev/null; then
-    fatal "$(msg NO_CLRP_CRD)"
-  fi
-
-  info "$(is_zh && echo "检测到 cilium 已安装，开始部署 Nodelocal DNSCache..." || echo "Cilium detected. Deploying Nodelocal DNSCache...")"
+install_localdns_internal() {
+  info "$(is_zh && echo "开始部署 Nodelocal DNSCache..." || echo "Deploying Nodelocal DNSCache...")"
 
   local kubedns_ip
   kubedns_ip=$(kubectl -n kube-system get svc kube-dns -o jsonpath='{.spec.clusterIP}' 2>/dev/null)
@@ -742,7 +1035,40 @@ EOF
   echo ""
 }
 
-# ====== e2e-test ======
+# cmd_install_localdns — Standalone localdns install subcommand.
+# Checks cilium is installed and CiliumLocalRedirectPolicy CRD exists,
+# then delegates to install_localdns_internal().
+cmd_install_localdns() {
+  echo ""
+  echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
+  echo -e "${BLUE}║   Nodelocal DNSCache Install        ║${NC}"
+  echo -e "${BLUE}╚══════════════════════════════════════╝${NC}"
+  echo ""
+
+  check_prerequisites
+
+  local has_cilium
+  has_cilium=$(kubectl -n kube-system get ds cilium --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+  if [[ "$has_cilium" -eq 0 ]]; then
+    fatal "$(msg NO_CILIUM)"
+  fi
+  if ! kubectl get crd ciliumlocalredirectpolicies.cilium.io &>/dev/null; then
+    fatal "$(msg NO_CLRP_CRD)"
+  fi
+
+  info "$(is_zh && echo "检测到 cilium 已安装" || echo "Cilium detected")"
+  install_localdns_internal
+}
+
+# ====== e2e-test subcommand ======
+# Runs cilium connectivity test with TKE-compatible image overrides.
+# Skips external/internet tests (pod-to-world, pod-to-cidr) because:
+#   - Nodes may not have public internet bandwidth.
+#   - Default external targets (one.one.one.one) may be blocked by GFW in China.
+# Image mapping:
+#   quay.io/cilium/*           → quay.tencentcloudcr.com/cilium/* (internal mirror)
+#   registry.k8s.io/coredns/*  → docker.io/k8smirror/coredns:*   (synced to dockerhub)
+#   gcr.io/*/echo-advanced     → docker.io/k8smirror/echo-advanced:* (synced to dockerhub)
 
 cmd_e2e_test() {
   echo ""
@@ -775,7 +1101,40 @@ cmd_e2e_test() {
   echo ""
 }
 
-# ====== Main ======
+# ====== enable-egress-gateway subcommand ======
+# Standalone subcommand to enable Egress Gateway on an existing cilium installation.
+# Checks cilium is installed, then delegates to helm_enable_egress().
+
+cmd_enable_egress_gateway() {
+  echo ""
+  echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
+  echo -e "${BLUE}║   Enable Cilium Egress Gateway      ║${NC}"
+  echo -e "${BLUE}╚══════════════════════════════════════╝${NC}"
+  echo ""
+
+  check_prerequisites
+
+  local has_cilium
+  has_cilium=$(kubectl -n kube-system get ds cilium --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+  if [[ "$has_cilium" -eq 0 ]]; then
+    fatal "$(msg NO_CILIUM)"
+  fi
+
+  info "$(is_zh && echo "添加 Cilium Helm 仓库..." || echo "Adding Cilium Helm repo...")"
+  helm repo add cilium https://helm.cilium.io/ 2>/dev/null || true
+  helm repo update cilium 2>/dev/null || true
+
+  helm_enable_egress
+
+  echo ""
+  info "============================================"
+  info "$(msg EGRESS_DONE)"
+  info "============================================"
+  echo ""
+}
+
+# ====== Main Entry Point ======
+# Dispatches to the appropriate subcommand based on the first argument.
 
 main() {
   local cmd="${1:-}"
@@ -783,6 +1142,7 @@ main() {
   install-cilium) cmd_install_cilium ;;
   install-localdns) cmd_install_localdns ;;
   e2e-test) shift; cmd_e2e_test "$@" ;;
+  enable-egress-gateway) cmd_enable_egress_gateway ;;
   help | --help | -h | "") show_help ;;
   *)
     error "$(is_zh && echo "未知命令" || echo "Unknown command"): $cmd"

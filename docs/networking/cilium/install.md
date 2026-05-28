@@ -736,6 +736,45 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
 }
 ```
 
+## 验证 Cilium 功能
+
+安装完成并添加节点后，可通过以下方式验证 cilium 功能是否正常。
+
+### 一键测试
+
+使用脚本运行 cilium connectivity test（自动跳过公网测试，使用 TKE 可拉取的镜像）：
+
+```bash
+curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s e2e-test
+```
+
+如果网络环境无法连接 GitHub，可使用站点地址：
+
+```bash
+curl -sfL https://imroc.cc/tke/scripts/cilium.sh | bash -s e2e-test
+```
+
+### 手动测试
+
+需先安装 [cilium CLI](https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/#install-the-cilium-cli)，然后执行：
+
+```bash
+cilium connectivity test \
+  --test '!/pod-to-world' \
+  --test '!/pod-to-cidr' \
+  --curl-image quay.tencentcloudcr.com/cilium/alpine-curl:v1.10.0 \
+  --json-mock-image quay.tencentcloudcr.com/cilium/json-mock:v1.3.9 \
+  --dns-test-server-image docker.io/k8smirror/coredns:v1.14.2 \
+  --echo-image docker.io/k8smirror/echo-advanced:v20251204-v1.4.1
+```
+
+:::tip[说明]
+
+- `--test '!/pod-to-world'` 和 `--test '!/pod-to-cidr'` 跳过公网连通性测试（节点可能没有公网带宽，且默认公网目标可能因 GFW 不通）。
+- 镜像地址替换为 TKE 环境可内网拉取的地址（`quay.io` → `quay.tencentcloudcr.com`，`registry.k8s.io` / `gcr.io` → `docker.io/k8smirror`）。
+
+:::
+
 ## 常见问题
 
 ### 如何查看 Cilium 全部的默认安装配置？
