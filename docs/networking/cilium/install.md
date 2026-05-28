@@ -16,7 +16,7 @@
 
 - 集群类型：标准集群
 - Kubernetes 版本: 不低于 1.32，建议选择最新版（参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)）。
-- 操作系统：TencentOS 4 或者 Ubuntu >= 22.04。
+- 操作系统：TencentOS 4 或者 Ubuntu >= 22.04，其它 OS 暂未验证，主要要求 Linux kernel >= 5.10（参考 [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)），如有需要可自行验证。
 - 容器网络插件：VPC-CNI 共享网卡多 IP。
 - 节点：安装前不要向集群添加任何普通节点或原生节点，避免残留相关规则和配置，等安装完成后再添加。
 - 基础组件：取消勾选 ip-masq-agent，避免冲突。

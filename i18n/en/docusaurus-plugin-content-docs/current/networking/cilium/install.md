@@ -16,7 +16,7 @@ Create a TKE cluster in the [Container Service Console](https://console.cloud.te
 
 - Cluster Type: Standard Cluster
 - Kubernetes Version: No lower than 1.32, recommended to choose the latest version (refer to [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)).
-- Operating System: TencentOS 4 or Ubuntu >= 22.04.
+- Operating System: TencentOS 4 or Ubuntu >= 22.04, Other operating systems have not yet been verified; the primary requirement is Linux kernel >= 5.10 (refer to [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)). If necessary, you may perform the verification yourself.
 - Container Network Plugin: VPC-CNI shared NIC multi-IP.
 - Nodes: Do not add any regular nodes or native nodes to the cluster before installation to avoid residual rules and configurations. Add them after the installation is complete.
 - Basic Components: Uncheck ip-masq-agent to avoid conflicts.
