@@ -552,23 +552,9 @@ kubectl apply -f cilium-apf.yaml
 
 :::tip[OS Compatibility Notes]
 
-Cilium requires Linux kernel >= 5.10. The installation script and manual installation commands in this guide have handled sysctl compatibility for different modes:
-
-- **Native Routing mode**: Disables Cilium's `sysctlfix` (to prevent restarting systemd-sysctl from resetting eth0's rp_filter to 1, which would break networking).
-- **Overlay mode**: Enables Cilium's `sysctlfix` (to ensure lxc interface rp_filter=0, otherwise host↔Pod reply packets will be dropped by the kernel).
-
-**Recommended OS**: Ubuntu 24.04 or TencentOS 4 latest.
+Cilium requires Linux kernel >= 5.10. **Recommended OS**: Ubuntu 24.04 or TencentOS 4 latest.
 
 For the **full list of verified OS versions**, see the [Verified Node Operating Systems](#verified-node-operating-systems) appendix at the end of this document.
-
-If after installation `cilium-health status` shows localhost endpoint as 0/1 (host→Pod broken), it's usually an rp_filter configuration issue. Troubleshoot with:
-
-```bash
-# Check if lxc interface rp_filter is 0
-sysctl net.ipv4.conf.lxc_health.rp_filter
-# If not 0, check if cilium sysctlfix init container ran successfully
-kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{.items[0].status.initContainerStatuses}'
-```
 
 :::
 
@@ -880,6 +866,22 @@ It's not recommended to use super nodes in clusters where Cilium is installed. T
 If when installing Cilium, `k8sServiceHost` points to a CLB address (the CLB used when enabling cluster internal network access), which is either a CLB VIP or a domain name that ultimately resolves to a CLB VIP, then the connection path from cilium-agent to apiserver will be intercepted and forwarded by Cilium itself, not actually going through CLB forwarding. Cilium's forwarding of this address is ultimately implemented by eBPF programs, and the eBPF program forwarding of this address is based on eBPF data (endpoint list) stored in the kernel. Under certain triggering conditions, the eBPF data may be refreshed, and the refresh may cause the endpoint list to be temporarily cleared. Once cleared, cilium-agent can no longer connect to apiserver (reporting `operation not permitted` error), and thus cannot perceive the current real endpoint list to update the eBPF data, forming a circular dependency. Normal operation is only restored after restarting the node.
 
 Therefore, the recommendation is not to configure `k8sServiceHost` with the apiserver's CLB address, but to use the cluster's `169.254.x.x` apiserver address (`kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'`). This address is also a VIP, but it will not be intercepted and forwarded by Cilium, and it will never change after the cluster is created, so it can be safely used as the `k8sServiceHost` configuration. If you want to use a more recognizable domain name configuration, you can also resolve the domain name to this address and then configure it to `k8sServiceHost`.
+
+### Why does Native Routing mode disable sysctlfix while Overlay mode enables it?
+
+Cilium's `sysctlfix` is enabled by default. It runs an init container that writes `/etc/sysctl.d/99-zzz-override_cilium.conf` to set `rp_filter=0` on lxc interfaces, and then **restarts `systemd-sysctl.service`** to apply the change.
+
+- **Native Routing mode**: Cilium coexists with TKE CNI. Pod IPs come from VPC, and reply packets enter via eth0. Restarting `systemd-sysctl.service` re-applies OS defaults; TKE OS images default eth0's `rp_filter` to 1 (strict), under which Pod IPs on eth0 fail the source-route check and get dropped, breaking networking. So Native Routing mode must disable sysctlfix (`--set sysctlfix.enabled=false`).
+- **Overlay mode**: Pod IPs come from cilium's own CIDR; cross-node traffic goes through vxlan tunnel and eth0 never sees Pod IPs, so eth0 `rp_filter=1` is fine. But host→local Pod reply packets pass through lxc interfaces and require `lxc*.rp_filter=0`, otherwise they get dropped. So Overlay mode must keep sysctlfix enabled (default; no explicit setting needed).
+
+**Troubleshooting**: If in Overlay mode `cilium-health status` shows localhost endpoint 0/1 (host→Pod broken), sysctlfix likely didn't take effect:
+
+```bash
+# Check if lxc interface rp_filter is 0
+sysctl net.ipv4.conf.lxc_health.rp_filter
+# If not 0, check if cilium sysctlfix init container ran successfully
+kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{.items[0].status.initContainerStatuses}'
+```
 
 ## References
 

@@ -602,23 +602,9 @@ kubectl apply -f cilium-apf.yaml
 
 :::tip[OS 兼容性说明]
 
-Cilium 要求 Linux kernel >= 5.10。本文的安装脚本和手动安装命令已处理了不同模式下的 sysctl 兼容性：
-
-- **Native Routing 模式**：禁用 cilium 的 `sysctlfix`（避免重启 systemd-sysctl 导致 eth0 的 rp_filter 被重置为 1 使网络不通）。
-- **Overlay 模式**：启用 cilium 的 `sysctlfix`（确保 lxc 接口的 rp_filter=0，否则 host↔Pod 回包会被内核丢弃）。
-
-**推荐 OS**：Ubuntu 24.04 或 TencentOS 4 最新版。
+Cilium 要求 Linux kernel >= 5.10。**推荐 OS**：Ubuntu 24.04 或 TencentOS 4 最新版。
 
 **实测覆盖的 OS 列表**详见本文末尾附录 [已验证的节点操作系统](#已验证的节点操作系统)。
-
-如果安装后发现 `cilium-health status` 中 localhost endpoint 显示 0/1（host→Pod 不通），通常是 rp_filter 配置问题，可通过以下方式排查：
-
-```bash
-# 检查 lxc 接口的 rp_filter 是否为 0
-sysctl net.ipv4.conf.lxc_health.rp_filter
-# 如果不为 0，检查 cilium sysctlfix init container 是否正常运行
-kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{.items[0].status.initContainerStatuses}'
-```
 
 :::
 
@@ -969,6 +955,22 @@ cilium-operator 使用 hostNetwork 并配置了就绪探针，在超级节点上
 如果安装 cilium 时 `k8sServiceHost` 指向的是 CLB 地址（开启集群内网访问时使用的 CLB），地址为 CLB VIP 或最终解析到 CLB VIP 的域名，此时 cilium-agent 连接 apiserver 的链路会被 cilium 自身拦截并转发，不会真正到 CLB 转发。cilium 转发该地址最终是 ebpf 程序实现的，ebpf 程序转发该地址又是基于存放在内核中的 ebpf 数据（endpoint 列表），在某种触发条件下，ebpf 数据可能被刷新，刷新可能导致 endpoint 列表被临时清空，而一旦清空 cilium-agent 就再也连不上 apiserver（报错 `operation not permitted`），也就无法感知当前真实的 endpoint 列表来更新 ebpf 数据，形成循环依赖，重启节点后才会恢复正常。
 
 所以建议是`k8sServiceHost` 不要配置 apiserver 的 CLB 地址，而是使用集群 `169.254.x.x` 的 apiserver 地址（`kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'`），该地址也是一个 VIP，但不会被 cilium 拦截转发，并且是自集群创建完后就再也不会变的，可以放心作为 `k8sServiceHost` 配置。如果希望使用辨识度更高的域名方式配置，也可以将域名解析到该地址然后再配置到 `k8sServiceHost`。
+
+### 为什么 Native Routing 模式禁用 sysctlfix，Overlay 模式却启用？
+
+Cilium 默认会启用 `sysctlfix`，它通过一个 init container 写入 `/etc/sysctl.d/99-zzz-override_cilium.conf` 把 lxc 接口的 `rp_filter` 设置为 0，并**重启 `systemd-sysctl.service`** 让配置生效。
+
+- **Native Routing 模式**：cilium 与 TKE CNI 共存，Pod IP 来自 VPC，回程包从 eth0 进入。重启 `systemd-sysctl.service` 时会重新应用 OS 默认配置，TKE 的 OS 镜像里 `eth0` 的 `rp_filter` 默认为 1（strict 模式），严格校验下 Pod IP 在 eth0 上不匹配会被丢弃，导致网络不通。所以 Native Routing 模式必须禁用 sysctlfix（`--set sysctlfix.enabled=false`）。
+- **Overlay 模式**：Pod IP 来自 cilium 自己的 CIDR，跨节点流量走 vxlan tunnel，eth0 上看不到 Pod IP，eth0 的 `rp_filter=1` 不会引发问题；但 host→本节点 Pod 的回包会经过 lxc 接口，需要 `lxc*.rp_filter=0` 否则被丢弃，所以 Overlay 模式必须启用 sysctlfix（默认即启用，无需显式设置）。
+
+**排查**：如果 Overlay 模式下 `cilium-health status` 显示 localhost endpoint 0/1（host→Pod 不通），多半是 sysctlfix 没生效：
+
+```bash
+# 检查 lxc 接口的 rp_filter 是否为 0
+sysctl net.ipv4.conf.lxc_health.rp_filter
+# 如果不为 0，检查 cilium sysctlfix init container 是否正常运行
+kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{.items[0].status.initContainerStatuses}'
+```
 
 ## 参考资料
 
