@@ -428,34 +428,24 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
 
 :::tip[说明]
 
-以下是是包含各参数解释的 `values.yaml`:
+以下是包含各参数解释的 `values.yaml`，分为通用参数和模式专属参数两部分：
 
 <Tabs>
-  <TabItem value="1" label="适配 TKE 相关">
+  <TabItem value="common" label="通用参数">
 
-```yaml showLineNumbers title="tke-values.yaml"
-# 使用 native routing，Pod 直接使用 VPC IP 路由，无需 overlay，参考 native routing: https://docs.cilium.io/en/stable/network/concepts/routing/#native-routing
-routingMode: "native"
-endpointRoutes:
-  # 使用 native routing，此选项必须置为 true。表示转发 Pod 流量时，直接路由到 veth 设备而不需要经过 cilium_host 网卡
+所有模式共用的配置参数：
+
+```yaml showLineNumbers title="common-values.yaml"
+# 替代 kube-proxy，包括 ClusterIP/NodePort/HostPort 转发
+kubeProxyReplacement: "true"
+# 注意替换为实际的 apiserver 地址
+# 获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
+k8sServiceHost: 169.254.128.112
+k8sServicePort: 60002
+# 启用 CiliumLocalRedirectPolicy 的能力
+# 参考：https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
+localRedirectPolicies:
   enabled: true
-ipam:
-  # TKE Pod IP 分配由 tke-eni-ipamd 组件负责，cilium 无需负责 Pod IP 分配
-  mode: "delegated-plugin"
-# 使用 VPC-CNI 无需 IP 伪装
-enableIPv4Masquerade: false
-# TKE 节点中 eth 开头的网卡都可能出入流量（Pod 流量走辅助网卡，eth1, eth2 ...），用这个参数让所有 eth 开头的网卡都挂载 cilium ebpf 程序，
-# 以便让报文能够根据 conntrack 被正常反向 nat， 否则可能导致部分场景下网络不通（如跨节点访问 HostPort）
-devices: eth+
-cni:
-  # 使用 generic-veth 与 VPC-CNI 做 CNI Chaining，参考：https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/
-  chainingMode: generic-veth
-  # CNI 配置完全自定义
-  customConf: true
-  # 存放 CNI 配置的 ConfigMap 名称
-  configMap: cni-configuration
-  # VPC-CNI 会自动配置 Pod 路由，cilium 不需要配置
-  externalRouting: true
 operator:
   tolerations:
   - key: "node-role.kubernetes.io/control-plane"
@@ -469,27 +459,114 @@ operator:
   # 容忍 TKE 的污点，避免首次安装时循环依赖
   - key: "tke.cloud.tencent.com/uninitialized"
     operator: Exists
-  - key: "tke.cloud.tencent.com/eni-ip-unavailable"
-    operator: Exists
-extraConfig:
-  # cilium 不负责 Pod IP 分配，需手动指定一个不会有冲突的 IP 地址，作为每个节点上 cilium_host 虚拟网卡的 IP 地址
-  local-router-ipv4: 169.254.32.16
-# 启用 CiliumLocalRedirectPolicy 的能力，参考 https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
-localRedirectPolicies:
-  enabled: true
-# Native Routing 模式需禁用 sysctlfix，避免重启 systemd-sysctl 导致 eth0 的 rp_filter 被重置为 1 使网络不通。
-# Overlay 模式不要设置此项（保持默认 true），否则 lxc 接口的 rp_filter 不为 0 会导致 host↔Pod 不通。
-sysctlfix:
-  enabled: false
-# 替代 kube-proxy，包括 ClusterIP 转发、NodePort 转发，另外还附带了 HostPort 转发的能力
-kubeProxyReplacement: "true"
-# 注意替换为实际的 apiserver 地址，获取方法：kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
-k8sServiceHost: 169.254.128.112
-k8sServicePort: 60002
 ```
 
   </TabItem>
-  <TabItem value="2" label="镜像相关">
+  <TabItem value="native-vpccni" label="Native (VPC-CNI)">
+
+VPC-CNI + Native Routing 模式专属参数：
+
+```yaml showLineNumbers title="native-vpccni-values.yaml"
+# 使用 native routing，Pod 直接使用 VPC IP 路由，无需 overlay
+routingMode: "native"
+endpointRoutes:
+  # native routing 必须置为 true，转发 Pod 流量直接路由到 veth 设备
+  enabled: true
+ipam:
+  # Pod IP 分配由 tke-eni-ipamd 负责，cilium 无需负责
+  mode: "delegated-plugin"
+# VPC-CNI 场景 Pod IP 就是 VPC IP，无需 IP 伪装
+enableIPv4Masquerade: false
+# TKE 节点中 eth 开头的网卡都可能出入流量（辅助网卡 eth1/eth2...）
+# 用这个参数让所有 eth 开头的网卡都挂载 cilium ebpf 程序
+devices: eth+
+cni:
+  # 使用 generic-veth 与 VPC-CNI 做 CNI Chaining
+  chainingMode: generic-veth
+  # CNI 配置完全自定义，使用下方 configMap 中预先创建的配置
+  customConf: true
+  configMap: cni-configuration
+  # VPC-CNI 会自动配置 Pod 路由，cilium 无需配置
+  externalRouting: true
+extraConfig:
+  # cilium 不负责 Pod IP 分配，需手动指定 cilium_host 虚拟网卡的 IP
+  local-router-ipv4: 169.254.32.16
+# 禁用 sysctlfix，避免重启 systemd-sysctl 导致 eth0 rp_filter 被重置，详见 FAQ
+sysctlfix:
+  enabled: false
+operator:
+  tolerations:
+  # VPC-CNI 模式额外需要容忍此污点
+  - key: "tke.cloud.tencent.com/eni-ip-unavailable"
+    operator: Exists
+```
+
+  </TabItem>
+  <TabItem value="native-gr" label="Native (GR)">
+
+GR + Native Routing 模式专属参数：
+
+```yaml showLineNumbers title="native-gr-values.yaml"
+# 使用 native routing
+routingMode: "native"
+endpointRoutes:
+  enabled: true
+ipam:
+  # Pod IP 分配由 tke-bridge-agent 负责
+  mode: "delegated-plugin"
+# GR Pod IP 访问 CVM metadata 等公共服务需要 SNAT 为节点 IP
+enableIPv4Masquerade: true
+bpf:
+  masquerade: true
+ipMasqAgent:
+  enabled: true
+# 所有 eth 开头的网卡挂载 cilium ebpf 程序
+devices: eth+
+cni:
+  # 使用 generic-veth + chainingTarget 自动适配 tke-bridge 的 CNI 配置
+  chainingMode: generic-veth
+  chainingTarget: tke-bridge
+  externalRouting: true
+extraConfig:
+  local-router-ipv4: 169.254.32.16
+# 禁用 sysctlfix，详见 FAQ
+sysctlfix:
+  enabled: false
+```
+
+  </TabItem>
+  <TabItem value="overlay" label="Overlay (VPC-CNI/GR)">
+
+Overlay (vxlan) 模式专属参数，VPC-CNI 和 GR 集群通用：
+
+```yaml showLineNumbers title="overlay-values.yaml"
+# 使用 vxlan tunnel 封装跨节点流量
+routingMode: "tunnel"
+tunnelProtocol: "vxlan"
+ipam:
+  mode: "cluster-pool"
+  operator:
+    # Pod CIDR，根据集群规模调整；不与 VPC CIDR 和 Service CIDR 冲突即可
+    clusterPoolIPv4PodCIDRList:
+    - "10.244.0.0/16"
+    # 每节点子网掩码，/24 = 每节点 254 个 Pod IP
+    clusterPoolIPv4MaskSize: "24"
+# Overlay 模式需要 IP 伪装，Pod IP 访问集群外需 SNAT 为节点 IP
+enableIPv4Masquerade: true
+# 不设置 sysctlfix（保持默认 true），确保 lxc 接口 rp_filter=0
+```
+
+VPC-CNI 集群额外需要的 operator toleration：
+
+```yaml
+operator:
+  tolerations:
+  - key: "tke.cloud.tencent.com/eni-ip-unavailable"
+    operator: Exists
+```
+
+  </TabItem>
+  <TabItem value="images" label="镜像相关">
 
 将所有 cilium 依赖镜像替换为在 TKE 环境中能直接内网拉取 mirror 镜像，避免因网络问题导致镜像拉取失败：
 

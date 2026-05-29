@@ -360,34 +360,24 @@ VPC-CNI chaining related parameters are not needed (`cni.chainingMode`, `cni.cus
 
 :::tip[Explanation]
 
-The following is the `values.yaml` containing explanations for each parameter:
+The following is the `values.yaml` with parameter explanations, split into common and mode-specific parts:
 
 <Tabs>
-  <TabItem value="1" label="TKE Adaptation Related">
+  <TabItem value="common" label="Common Parameters">
 
-```yaml showLineNumbers title="tke-values.yaml"
-# Use native routing, Pods directly use VPC IP routing without overlay, refer to native routing: https://docs.cilium.io/en/stable/network/concepts/routing/#native-routing
-routingMode: "native"
-endpointRoutes:
-  # When using native routing, this option must be set to true. Indicates that when forwarding Pod traffic, it routes directly to veth devices without going through cilium_host network card
+Parameters shared by all installation modes:
+
+```yaml showLineNumbers title="common-values.yaml"
+# Replace kube-proxy, including ClusterIP/NodePort/HostPort forwarding
+kubeProxyReplacement: "true"
+# Replace with actual apiserver address
+# How to get: kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
+k8sServiceHost: 169.254.128.112
+k8sServicePort: 60002
+# Enable CiliumLocalRedirectPolicy capability
+# Refer to: https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
+localRedirectPolicies:
   enabled: true
-ipam:
-  # TKE Pod IP allocation is handled by tke-eni-ipamd component, cilium does not need to handle Pod IP allocation
-  mode: "delegated-plugin"
-# No IP masquerade needed when using VPC-CNI
-enableIPv4Masquerade: false
-# In TKE nodes, eth-prefixed network cards may have incoming/outgoing traffic (Pod traffic goes through auxiliary network cards, eth1, eth2 ...), use this parameter to mount cilium ebpf programs on all eth-prefixed network cards,
-# so that packets can be properly reverse NAT based on conntrack, otherwise it may cause network connectivity issues in some scenarios (such as cross-node HostPort access)
-devices: eth+
-cni:
-  # Use generic-veth for CNI Chaining with VPC-CNI, refer to: https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/
-  chainingMode: generic-veth
-  # CNI configuration is fully customized
-  customConf: true
-  # Name of the ConfigMap storing CNI configuration
-  configMap: cni-configuration
-  # VPC-CNI will automatically configure Pod routing, cilium doesn't need to configure it
-  externalRouting: true
 operator:
   tolerations:
   - key: "node-role.kubernetes.io/control-plane"
@@ -401,27 +391,114 @@ operator:
   # Tolerate TKE's taints to avoid circular dependencies during first installation
   - key: "tke.cloud.tencent.com/uninitialized"
     operator: Exists
-  - key: "tke.cloud.tencent.com/eni-ip-unavailable"
-    operator: Exists
-extraConfig:
-  # cilium doesn't handle Pod IP allocation, need to manually specify an IP address that won't conflict, as the IP address for cilium_host virtual network card on each node
-  local-router-ipv4: 169.254.32.16
-# Enable CiliumLocalRedirectPolicy capability, refer to https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/
-localRedirectPolicies:
-  enabled: true
-# Native Routing mode: disable sysctlfix to prevent restarting systemd-sysctl from resetting eth0's rp_filter to 1.
-# Overlay mode: do NOT set this (keep default true), otherwise lxc interface rp_filter won't be 0 and host↔Pod will break.
-sysctlfix:
-  enabled: false
-# Replace kube-proxy, including ClusterIP forwarding, NodePort forwarding, plus HostPort forwarding capability
-kubeProxyReplacement: "true"
-# Note: Replace with actual apiserver address, obtain method: kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'
-k8sServiceHost: 169.254.128.112
-k8sServicePort: 60002
 ```
 
   </TabItem>
-  <TabItem value="2" label="Image Related">
+  <TabItem value="native-vpccni" label="Native (VPC-CNI)">
+
+VPC-CNI + Native Routing mode-specific parameters:
+
+```yaml showLineNumbers title="native-vpccni-values.yaml"
+# Use native routing, Pods directly use VPC IP routing without overlay
+routingMode: "native"
+endpointRoutes:
+  # Must be true for native routing, routes Pod traffic directly to veth device
+  enabled: true
+ipam:
+  # Pod IP allocation handled by tke-eni-ipamd, cilium doesn't manage it
+  mode: "delegated-plugin"
+# VPC-CNI Pods use VPC IPs, no masquerade needed
+enableIPv4Masquerade: false
+# All eth-prefixed NICs may carry traffic (auxiliary NICs eth1/eth2...)
+# Mount cilium eBPF programs on all of them for proper conntrack/reverse NAT
+devices: eth+
+cni:
+  # Use generic-veth for CNI Chaining with VPC-CNI
+  chainingMode: generic-veth
+  # Fully custom CNI config from the ConfigMap created earlier
+  customConf: true
+  configMap: cni-configuration
+  # VPC-CNI handles Pod routing, cilium doesn't need to
+  externalRouting: true
+extraConfig:
+  # cilium doesn't allocate Pod IPs, manually specify cilium_host IP
+  local-router-ipv4: 169.254.32.16
+# Disable sysctlfix to prevent eth0 rp_filter reset, see FAQ for details
+sysctlfix:
+  enabled: false
+operator:
+  tolerations:
+  # VPC-CNI mode additionally needs this toleration
+  - key: "tke.cloud.tencent.com/eni-ip-unavailable"
+    operator: Exists
+```
+
+  </TabItem>
+  <TabItem value="native-gr" label="Native (GR)">
+
+GR + Native Routing mode-specific parameters:
+
+```yaml showLineNumbers title="native-gr-values.yaml"
+# Use native routing
+routingMode: "native"
+endpointRoutes:
+  enabled: true
+ipam:
+  # Pod IP allocation handled by tke-bridge-agent
+  mode: "delegated-plugin"
+# GR Pod IPs need SNAT to node IP for accessing CVM metadata etc.
+enableIPv4Masquerade: true
+bpf:
+  masquerade: true
+ipMasqAgent:
+  enabled: true
+# All eth-prefixed NICs mount cilium eBPF programs
+devices: eth+
+cni:
+  # Use generic-veth + chainingTarget to auto-adapt tke-bridge CNI config
+  chainingMode: generic-veth
+  chainingTarget: tke-bridge
+  externalRouting: true
+extraConfig:
+  local-router-ipv4: 169.254.32.16
+# Disable sysctlfix, see FAQ for details
+sysctlfix:
+  enabled: false
+```
+
+  </TabItem>
+  <TabItem value="overlay" label="Overlay (VPC-CNI/GR)">
+
+Overlay (vxlan) mode-specific parameters, common for both VPC-CNI and GR clusters:
+
+```yaml showLineNumbers title="overlay-values.yaml"
+# Use vxlan tunnel for cross-node traffic
+routingMode: "tunnel"
+tunnelProtocol: "vxlan"
+ipam:
+  mode: "cluster-pool"
+  operator:
+    # Pod CIDR; adjust for cluster size; must not conflict with VPC/Service CIDRs
+    clusterPoolIPv4PodCIDRList:
+    - "10.244.0.0/16"
+    # Per-node subnet mask; /24 = 254 Pod IPs per node
+    clusterPoolIPv4MaskSize: "24"
+# Overlay needs masquerade; Pod IPs need SNAT to node IP for external access
+enableIPv4Masquerade: true
+# Do NOT set sysctlfix (keep default true) to ensure lxc interface rp_filter=0
+```
+
+VPC-CNI clusters additionally need this operator toleration:
+
+```yaml
+operator:
+  tolerations:
+  - key: "tke.cloud.tencent.com/eni-ip-unavailable"
+    operator: Exists
+```
+
+  </TabItem>
+  <TabItem value="images" label="Image Related">
 
 Replace all cilium dependent images with mirror images that can be directly pulled from internal network in TKE environment, avoiding image pull failures due to network issues:
 
