@@ -100,6 +100,8 @@ set -euo pipefail
 
 # Cilium helm chart version. Bump this when a new version is tested and verified.
 DEFAULT_CILIUM_VERSION="1.19.4"
+# Default image registry prefix for cilium images (TKE internal mirror).
+DEFAULT_IMAGE_REGISTRY="quay.tencentcloudcr.com/cilium"
 # Default Pod CIDR for overlay mode. Only used when ROUTING_MODE=overlay.
 DEFAULT_POD_CIDR="10.244.0.0/16"
 # Default per-node subnet mask for overlay mode (24 = max 254 pods per node).
@@ -200,6 +202,8 @@ MSG_ZH_INPUT_VERSION="请输入 Cilium 版本"
 MSG_EN_INPUT_VERSION="Enter Cilium version"
 MSG_ZH_INPUT_POD_CIDR="请输入 Overlay Pod CIDR"
 MSG_EN_INPUT_POD_CIDR="Enter Overlay Pod CIDR"
+MSG_ZH_INPUT_IMAGE_REGISTRY="请输入 Cilium 镜像地址前缀"
+MSG_EN_INPUT_IMAGE_REGISTRY="Enter Cilium image registry prefix"
 MSG_ZH_INPUT_MASK="每节点子网掩码"
 MSG_EN_INPUT_MASK="Per-node subnet mask size"
 MSG_ZH_UNINSTALL_TKE="卸载 TKE 组件 (kube-proxy, tke-cni-agent, ip-masq-agent)..."
@@ -409,6 +413,40 @@ confirm_cilium_version() {
   info "Cilium: $CILIUM_VERSION"
 }
 
+# confirm_image_registry — Prompts user to confirm or override the image registry prefix.
+# Skipped if IMAGE_REGISTRY env var is already set.
+# After confirmation, displays all image addresses that will be used.
+confirm_image_registry() {
+  if [[ -z "${IMAGE_REGISTRY:-}" ]]; then
+    echo ""
+    read -rp "$(echo -e "${BLUE}$(msg INPUT_IMAGE_REGISTRY)${NC} [$(is_zh && echo "默认" || echo "default"): ${DEFAULT_IMAGE_REGISTRY}]: ")" registry_input
+    IMAGE_REGISTRY="${registry_input:-$DEFAULT_IMAGE_REGISTRY}"
+  fi
+  # Display all images that will be used
+  echo ""
+  if is_zh; then
+    info "镜像地址:"
+  else
+    info "Image repositories:"
+  fi
+  local -a images=(
+    "cilium:              ${IMAGE_REGISTRY}/cilium"
+    "cilium-envoy:        ${IMAGE_REGISTRY}/cilium-envoy"
+    "operator:            ${IMAGE_REGISTRY}/operator"
+    "certgen:             ${IMAGE_REGISTRY}/certgen"
+    "hubble-relay:        ${IMAGE_REGISTRY}/hubble-relay"
+    "hubble-ui-backend:   ${IMAGE_REGISTRY}/hubble-ui-backend"
+    "hubble-ui:           ${IMAGE_REGISTRY}/hubble-ui"
+    "startup-script:      ${IMAGE_REGISTRY}/startup-script"
+    "clustermesh:         ${IMAGE_REGISTRY}/clustermesh-apiserver"
+    "spire-agent:         docker.io/k8smirror/spire-agent"
+    "spire-server:        docker.io/k8smirror/spire-server"
+  )
+  for img in "${images[@]}"; do
+    echo "  $img"
+  done
+}
+
 # confirm_pod_cidr — Prompts user for overlay Pod CIDR (only when ROUTING_MODE=overlay).
 # Skipped if POD_CIDR env var is already set.
 confirm_pod_cidr() {
@@ -614,17 +652,17 @@ helm_install_cilium() {
   info "APIServer: $apiserver_ip"
 
   local -a image_args=(
-    --set image.repository=quay.tencentcloudcr.com/cilium/cilium
-    --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy
-    --set operator.image.repository=quay.tencentcloudcr.com/cilium/operator
-    --set certgen.image.repository=quay.tencentcloudcr.com/cilium/certgen
-    --set hubble.relay.image.repository=quay.tencentcloudcr.com/cilium/hubble-relay
-    --set hubble.ui.backend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui-backend
-    --set hubble.ui.frontend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui
-    --set nodeinit.image.repository=quay.tencentcloudcr.com/cilium/startup-script
-    --set preflight.image.repository=quay.tencentcloudcr.com/cilium/cilium
-    --set preflight.envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy
-    --set clustermesh.apiserver.image.repository=quay.tencentcloudcr.com/cilium/clustermesh-apiserver
+    --set image.repository="${IMAGE_REGISTRY}/cilium"
+    --set envoy.image.repository="${IMAGE_REGISTRY}/cilium-envoy"
+    --set operator.image.repository="${IMAGE_REGISTRY}/operator"
+    --set certgen.image.repository="${IMAGE_REGISTRY}/certgen"
+    --set hubble.relay.image.repository="${IMAGE_REGISTRY}/hubble-relay"
+    --set hubble.ui.backend.image.repository="${IMAGE_REGISTRY}/hubble-ui-backend"
+    --set hubble.ui.frontend.image.repository="${IMAGE_REGISTRY}/hubble-ui"
+    --set nodeinit.image.repository="${IMAGE_REGISTRY}/startup-script"
+    --set preflight.image.repository="${IMAGE_REGISTRY}/cilium"
+    --set preflight.envoy.image.repository="${IMAGE_REGISTRY}/cilium-envoy"
+    --set clustermesh.apiserver.image.repository="${IMAGE_REGISTRY}/clustermesh-apiserver"
     --set authentication.mutual.spire.install.agent.image.repository=docker.io/k8smirror/spire-agent
     --set authentication.mutual.spire.install.server.image.repository=docker.io/k8smirror/spire-server
   )
@@ -773,6 +811,9 @@ helm_enable_egress() {
 print_replay_command() {
   local script_url="https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh"
   local env_vars="ROUTING_MODE=${ROUTING_MODE} CILIUM_VERSION=${CILIUM_VERSION}"
+  if [[ "${IMAGE_REGISTRY}" != "${DEFAULT_IMAGE_REGISTRY}" ]]; then
+    env_vars="${env_vars} IMAGE_REGISTRY=${IMAGE_REGISTRY}"
+  fi
   if [[ "$ROUTING_MODE" == "overlay" ]]; then
     env_vars="${env_vars} POD_CIDR=${POD_CIDR} POD_CIDR_MASK=${POD_CIDR_MASK}"
   fi
@@ -812,6 +853,7 @@ cmd_install_cilium() {
   detect_network_mode
   select_routing_mode
   confirm_cilium_version
+  confirm_image_registry
   confirm_pod_cidr
   confirm_enable_egress
   confirm_enable_localdns
