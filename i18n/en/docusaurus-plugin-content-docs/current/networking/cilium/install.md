@@ -829,7 +829,7 @@ It's not enabled by default. The enablement method is to add the `--set ciliumEn
 
 ### Can VPC-CNI be dynamically enabled on a GR cluster after installing Cilium?
 
-Not recommended. GR clusters natively support enabling VPC-CNI coexistence (via [Enable VPC-CNI Network Capability](https://www.tencentcloud.com/document/product/457/50369)), but **after installing Cilium with this guide, this feature no longer works in practice**:
+Not recommended. GR clusters natively support enabling VPC-CNI coexistence via enable VPC-CNI network capability, but **after installing Cilium with this guide, this feature no longer works in practice**:
 
 - Cilium chaining takes over all Pod networking via the multus configuration (`defaultDelegates=tke-bridge`).
 - Pods annotated with `tke.cloud.tencent.com/networks: tke-route-eni` still receive IPs from the GR ClusterCIDR (not the VPC-CNI subnet) — they don't actually use the VPC-CNI datapath.
