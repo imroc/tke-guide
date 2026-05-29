@@ -13,9 +13,9 @@
 | -------------- | --------------------------- | ---------------------------------- | ------------------------------------------ | -------------------------------------------------- |
 | 网络性能       | 最优                        | 较优（多一层网桥转发）             | 略有开销（vxlan 封装）                     | 略有开销（vxlan 封装）                             |
 | Pod IP 范围    | VPC IP                      | VPC 辅助网段 IP                    | 独立 CIDR，不占用 VPC IP                   | 独立 CIDR，不占用 VPC IP                           |
-| 集群外访问 Pod | 可直接路由                  | VPC 内可路由                       | 不可直接路由，需通过 Service/Ingress       | 不可直接路由                                       |
 | IP 容量扩容    | 给集群新增 VPC-CNI 子网     | 给集群新增 GR 网段（VPC 辅助网段） | 追加 CIDR 到 clusterPoolIPv4PodCIDRList    | 同左                                               |
 | 节点数量限制   | 无                          | 受 ClusterCIDR 限制                | 无                                         | 受 GR 集群的 ClusterCIDR 限制（GR 集群本身的限制） |
+| 集群外访问 Pod | 可直接路由                  | VPC 内可路由                       | 不可直接路由，需通过 Service/Ingress       | 不可直接路由                                       |
 | 适用场景       | 常规场景（推荐）            | 已有 GR 集群的场景                 | IP 资源紧张、纳管 IDC、满血 cilium（推荐） | 同左，但已有 GR 集群                               |
 
 :::
@@ -55,11 +55,7 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   cluster_deploy_type = "MANAGED_CLUSTER"
   # Kubernetes 版本 >= 1.32
   cluster_version = "1.34.1"
-  # 节点默认操作系统，以下是验证过的
-  # tlinux4_x86_64_public (TencentOS 4)
-  # ubuntu22.04x86_64 (Ubuntu 22.04)
-  # ubuntu24.04x86_64 (Ubuntu 24.04)
-  # 需要注意的是，节点的实际 OS 由节点池自身的 OS 属性决定，不受 cluster_os 的限制
+  # 节点默认操作系统（OsName），完整已验证 OS 列表见附录
   cluster_os = "tlinux4_x86_64_public"
   # 容器网络插件: VPC-CNI / GR
   network_type = "VPC-CNI"
@@ -746,7 +742,7 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
 resource "tencentcloud_kubernetes_node_pool" "cilium" {
   name       = "cilium"
   cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
-  node_os    = "img-gqmik24x" # TencentOS 4 的镜像 ID
+  node_os    = "tlinux4_x86_64_public" # OsName，完整已验证 OS 列表见附录
 }
 ```
 
@@ -1003,15 +999,15 @@ kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{.items[0].status.
 
 **测试方法**：每种安装模式部署 cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache，验证 `cilium-health status` 所有节点 reachable、`coredns` 与 `node-local-dns` 健康检查正常。
 
-| OS                   | 内核版本 |
-| -------------------- | -------- |
-| TencentOS Server 4   | 6.6.117  |
-| Ubuntu 24.04         | 6.8.0    |
-| Ubuntu 22.04         | 5.15.0   |
-| Debian 12 (bookworm) | 6.1.0    |
-| Debian 11 (bullseye) | 5.10.0   |
-| OpenCloudOS 9.4      | 6.6.119  |
-| Rocky Linux 9.3      | 5.14.0   |
-| RedHat 9.5           | 5.14.0   |
+| OS                   | OsName                  | 内核版本 |
+| -------------------- | ----------------------- | -------- |
+| TencentOS Server 4   | `tlinux4_x86_64_public` | 6.6.117  |
+| Ubuntu 24.04         | `ubuntu24.04x86_64`     | 6.8.0    |
+| Ubuntu 22.04         | `ubuntu22.04x86_64`     | 5.15.0   |
+| Debian 12 (bookworm) | `debian12.8x86_64`      | 6.1.0    |
+| Debian 11 (bullseye) | `debian11.11x86_64`     | 5.10.0   |
+| OpenCloudOS 9.4      | `opencloudos9.0x86_64`  | 6.6.119  |
+| Rocky Linux 9.3      | `rockylinux9.3x86_64`   | 5.14.0   |
+| RedHat 9.5           | `redhat9.5x86_64`       | 5.14.0   |
 
 未在此列表的 OS 如需使用，建议先单节点验证。

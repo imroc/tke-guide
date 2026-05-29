@@ -89,8 +89,8 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   cluster_deploy_type = "MANAGED_CLUSTER"
   # Kubernetes Version >= 1.32
   cluster_version = "1.32.2"
-  # Operating System, TencentOS 4 image ID
-  cluster_os = "img-gqmik24x"
+  # Operating System (OsName), see appendix for full verified OS list
+  cluster_os = "tlinux4_x86_64_public"
   # Container Network Plugin: VPC-CNI
   network_type = "VPC-CNI"
   # Enable Cluster APIServer Access
@@ -696,7 +696,7 @@ If you want to create a regular node pool through terraform, refer to the follow
 resource "tencentcloud_kubernetes_node_pool" "cilium" {
   name       = "cilium"
   cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
-  node_os    = "img-gqmik24x" # TencentOS 4 image ID
+  node_os    = "tlinux4_x86_64_public" # OsName, see appendix for full verified OS list
 }
 ```
 
@@ -914,15 +914,15 @@ The table below lists OS versions and kernels that have been hands-on verified a
 
 **Test method**: For each installation mode, cilium 1.19.4 was deployed with Egress Gateway and Nodelocal DNSCache enabled. Verified that `cilium-health status` shows all nodes reachable, and `coredns` / `node-local-dns` pass health checks.
 
-| OS                   | Kernel  |
-| -------------------- | ------- |
-| TencentOS Server 4   | 6.6.117 |
-| Ubuntu 24.04         | 6.8.0   |
-| Ubuntu 22.04         | 5.15.0  |
-| Debian 12 (bookworm) | 6.1.0   |
-| Debian 11 (bullseye) | 5.10.0  |
-| OpenCloudOS 9.4      | 6.6.119 |
-| Rocky Linux 9.3      | 5.14.0  |
-| RedHat 9.5           | 5.14.0  |
+| OS                   | OsName                  | Kernel  |
+| -------------------- | ----------------------- | ------- |
+| TencentOS Server 4   | `tlinux4_x86_64_public` | 6.6.117 |
+| Ubuntu 24.04         | `ubuntu24.04x86_64`     | 6.8.0   |
+| Ubuntu 22.04         | `ubuntu22.04x86_64`     | 5.15.0  |
+| Debian 12 (bookworm) | `debian12.8x86_64`      | 6.1.0   |
+| Debian 11 (bullseye) | `debian11.11x86_64`     | 5.10.0  |
+| OpenCloudOS 9.4      | `opencloudos9.0x86_64`  | 6.6.119 |
+| Rocky Linux 9.3      | `rockylinux9.3x86_64`   | 5.14.0  |
+| RedHat 9.5           | `redhat9.5x86_64`       | 5.14.0  |
 
 For OS versions not in the list above, a single-node smoke test is recommended first.
