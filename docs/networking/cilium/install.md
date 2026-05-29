@@ -694,15 +694,20 @@ Cilium 要求 Linux kernel >= 5.10。**推荐 OS**：Ubuntu 24.04 或 TencentOS 
 
 :::
 
-:::warning[节点池必须配置 cilium taint]
+:::warning[GR + Native Routing 模式节点池必须配置 cilium taint]
 
-创建节点池时**必须**给节点添加以下污点：
+使用 **GR + Native Routing** 方案时，创建节点池**必须**给节点添加以下污点：
 
 ```
 node.cilium.io/agent-not-ready=true:NoSchedule
 ```
 
-**原因**：节点加入集群后，kubelet 会在 cilium agent 完全就绪之前就开始调度 Pod。如果 Pod 在 cilium 接管 CNI 之前创建，其网络不会经过 cilium BPF 程序，导致 masquerade/策略等功能缺失（例如 Pod 无法访问 CVM metadata service）。此 taint 确保只有 cilium agent 就绪后才调度业务 Pod（cilium agent 启动完成后会自动移除该 taint）。
+**原因**：GR 模式下，节点加入集群时 tke-bridge-agent 会先写好 CNI 配置（`00-multus.conf`），kubelet 认为 CNI 就绪后立即开始调度 Pod。此时 cilium agent 尚未启动，Pod 使用的是原始 tke-bridge CNI 而非 cilium-cni，导致 masquerade、NetworkPolicy 等 cilium 功能缺失。此 taint 确保只有 cilium agent 就绪后才调度业务 Pod（cilium agent 启动完成后会自动移除该 taint）。
+
+VPC-CNI + Native Routing 和 Overlay 模式**不需要**此 taint：
+
+- VPC-CNI native 通过 `cni.customConf=true` 完全自定义 CNI 配置，不存在其他 CNI 先写入的情况。
+- Overlay 模式由 cilium 完全接管 CNI，kubelet 在 cilium CNI 就绪前不会成功创建 Pod sandbox。
 
 控制台创建节点池时在**高级设置**中添加此污点。terraform 参考下方代码片段。
 

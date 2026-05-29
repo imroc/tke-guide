@@ -647,15 +647,20 @@ For the **full list of verified OS versions**, see the [Verified Node Operating 
 
 :::
 
-:::warning[Node pools must have cilium taint configured]
+:::warning[GR + Native Routing node pools must have cilium taint]
 
-When creating node pools, you **must** add the following taint to nodes:
+When using the **GR + Native Routing** option, you **must** add the following taint to nodes when creating node pools:
 
 ```
 node.cilium.io/agent-not-ready=true:NoSchedule
 ```
 
-**Reason**: After a node joins the cluster, kubelet will start scheduling Pods before the cilium agent is fully ready. If a Pod is created before cilium takes over the CNI, its network won't go through cilium's BPF programs, causing masquerade/policy features to be missing (e.g., Pod cannot access CVM metadata service). This taint ensures business Pods are only scheduled after the cilium agent is ready (cilium agent automatically removes this taint once it starts up).
+**Reason**: In GR mode, tke-bridge-agent writes the CNI config (`00-multus.conf`) before cilium agent starts. Kubelet sees CNI as ready and schedules Pods immediately using the original tke-bridge CNI (not cilium-cni), causing masquerade, NetworkPolicy, and other cilium features to be missing. This taint ensures business Pods are only scheduled after the cilium agent is ready (cilium agent automatically removes the taint once started).
+
+VPC-CNI + Native Routing and Overlay modes **do NOT need** this taint:
+
+- VPC-CNI native uses `cni.customConf=true` to fully own the CNI config — no other CNI writes first.
+- Overlay mode has cilium fully manage the CNI — kubelet won't successfully create Pod sandboxes until cilium CNI is ready.
 
 Add this taint in the **Advanced Settings** when creating node pools via the console. For terraform, see the code snippet below.
 
