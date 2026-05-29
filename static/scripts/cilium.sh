@@ -363,7 +363,15 @@ detect_network_mode() {
 }
 
 get_apiserver_ip() {
-  kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null
+  local ip
+  for i in $(seq 1 5); do
+    ip=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null)
+    if [[ -n "$ip" ]]; then
+      echo "$ip"
+      return
+    fi
+    sleep 2
+  done
 }
 
 # ====== install-cilium subcommand ======
