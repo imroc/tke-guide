@@ -559,7 +559,7 @@ Cilium requires Linux kernel >= 5.10. The installation script and manual install
 
 **Recommended OS**: Ubuntu 24.04 (kernel 6.8+, optimal performance) or TencentOS 4 latest.
 
-For the **full list of verified OS versions**, see appendix [Verified Node Operating Systems](../../appendix/verified-os.md).
+For the **full list of verified OS versions**, see the [Verified Node Operating Systems](#verified-node-operating-systems) appendix at the end of this document.
 
 If after installation `cilium-health status` shows localhost endpoint as 0/1 (host→Pod broken), it's usually an rp_filter configuration issue. Troubleshoot with:
 
@@ -886,3 +886,24 @@ Therefore, the recommendation is not to configure `k8sServiceHost` with the apis
 - [Installation using Helm](https://docs.cilium.io/en/stable/installation/k8s-install-helm/)
 - [Generic Veth Chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/)
 - [Kubernetes Without kube-proxy](https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/)
+
+## Appendix
+
+### Verified Node Operating Systems
+
+The table below lists OS versions and kernels that have been hands-on verified across all 4 installation modes (VPC-CNI/GR × Native/Overlay) in this guide.
+
+**Test method**: For each installation mode, cilium 1.19.4 was deployed with Egress Gateway and Nodelocal DNSCache enabled. Verified that `cilium-health status` shows all nodes reachable, and `coredns` / `node-local-dns` pass health checks.
+
+| OS                   | Kernel  | iptables backend | Notes                                                       |
+| -------------------- | ------- | ---------------- | ----------------------------------------------------------- |
+| TencentOS Server 4   | 6.6.117 | legacy           | Recommended: default OS for TKE Native/Karpenter            |
+| Ubuntu 24.04         | 6.8.0   | nf_tables        | Recommended: newest kernel, optimal performance             |
+| Ubuntu 22.04         | 5.15.0  | nf_tables        |                                                             |
+| Debian 12 (bookworm) | 6.1.0   | nf_tables        | Only nftables by default; cilium uses iptables in container |
+| Debian 11 (bullseye) | 5.10.0  | nf_tables        | Same as above                                               |
+| OpenCloudOS 9.4      | 6.6.119 | legacy           | Community open-source variant of TencentOS 4                |
+| Rocky Linux 9.3      | 5.14.0  | nf_tables        |                                                             |
+| RedHat 9.5           | 5.14.0  | nf_tables        |                                                             |
+
+For OS versions not in the list above, a single-node smoke test is recommended first.

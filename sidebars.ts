@@ -343,7 +343,6 @@ const sidebars: SidebarsConfig = {
         },
         'appendix/ingress-error-code',
         'appendix/eks-note',
-        'appendix/verified-os',
       ],
     },
   ]
