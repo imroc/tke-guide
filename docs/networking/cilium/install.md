@@ -694,6 +694,20 @@ Cilium 要求 Linux kernel >= 5.10。**推荐 OS**：Ubuntu 24.04 或 TencentOS 
 
 :::
 
+:::warning[节点池必须配置 cilium taint]
+
+创建节点池时**必须**给节点添加以下污点：
+
+```
+node.cilium.io/agent-not-ready=true:NoSchedule
+```
+
+**原因**：节点加入集群后，kubelet 会在 cilium agent 完全就绪之前就开始调度 Pod。如果 Pod 在 cilium 接管 CNI 之前创建，其网络不会经过 cilium BPF 程序，导致 masquerade/策略等功能缺失（例如 Pod 无法访问 CVM metadata service）。此 taint 确保只有 cilium agent 就绪后才调度业务 Pod（cilium agent 启动完成后会自动移除该 taint）。
+
+控制台创建节点池时在**高级设置**中添加此污点。terraform 参考下方代码片段。
+
+:::
+
 ### 节点池选型
 
 以下三种节点池类型能够适配 cilium:
@@ -827,6 +841,13 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
   name       = "cilium"
   cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
   node_os    = "tlinux4_x86_64_public" # OsName，完整已验证 OS 列表见附录
+
+  # 确保 cilium agent 就绪后才调度业务 Pod
+  taints {
+    key    = "node.cilium.io/agent-not-ready"
+    value  = "true"
+    effect = "NoSchedule"
+  }
 }
 ```
 

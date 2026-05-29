@@ -647,6 +647,20 @@ For the **full list of verified OS versions**, see the [Verified Node Operating 
 
 :::
 
+:::warning[Node pools must have cilium taint configured]
+
+When creating node pools, you **must** add the following taint to nodes:
+
+```
+node.cilium.io/agent-not-ready=true:NoSchedule
+```
+
+**Reason**: After a node joins the cluster, kubelet will start scheduling Pods before the cilium agent is fully ready. If a Pod is created before cilium takes over the CNI, its network won't go through cilium's BPF programs, causing masquerade/policy features to be missing (e.g., Pod cannot access CVM metadata service). This taint ensures business Pods are only scheduled after the cilium agent is ready (cilium agent automatically removes this taint once it starts up).
+
+Add this taint in the **Advanced Settings** when creating node pools via the console. For terraform, see the code snippet below.
+
+:::
+
 ### Node Pool Selection
 
 The following three types of node pools can adapt to cilium:
@@ -780,6 +794,13 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
   name       = "cilium"
   cluster_id = tencentcloud_kubernetes_cluster.tke_cluster.id
   node_os    = "tlinux4_x86_64_public" # OsName, see appendix for full verified OS list
+
+  # Ensure cilium agent is ready before scheduling business Pods
+  taints {
+    key    = "node.cilium.io/agent-not-ready"
+    value  = "true"
+    effect = "NoSchedule"
+  }
 }
 ```
 
