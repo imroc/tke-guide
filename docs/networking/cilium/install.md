@@ -119,7 +119,7 @@ curl -sfL https://imroc.cc/tke/scripts/cilium.sh | bash -s install-cilium
 kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 ```
 
-除 GR + Native Routing 外，其余方案还需要卸载 tke-cni-agent（避免 CNI 配置冲突）：
+除 Native Routing (GR) 外，其余方案还需要卸载 tke-cni-agent（避免 CNI 配置冲突）：
 
 ```bash
 kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
@@ -128,7 +128,7 @@ kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"s
 :::tip[说明]
 
 1. 通过加 nodeSelector 方式让 DaemonSet 不部署到任何节点，等同于卸载，同时也留个退路；当前 kube-proxy 也只能通过这种方式卸载，如果直接删除 kube-proxy，后续集群升级会被阻塞。
-2. GR + Native Routing 模式需要保留 tke-cni-agent，因为它负责拷贝 bridge 等 CNI 二进制到节点。该模式下 cilium 通过 `cni.exclusive=true`（默认）自动将 multus 配置重命名为 `.cilium_bak` 使其失效，不会产生冲突。
+2. Native Routing (GR) 模式需要保留 tke-cni-agent，因为它负责拷贝 bridge 等 CNI 二进制到节点。该模式下 cilium 通过 `cni.exclusive=true`（默认）自动将 multus 配置重命名为 `.cilium_bak` 使其失效，不会产生冲突。
 3. 前面提到过安装 cilium 之前不建议添加节点，如果因某些原因导致在安装 cilium 前添加了普通节点或原生节点，需重启下存量节点，避免残留相关规则和配置。
 4. 如果创建集群时忘记了取消勾选 ip-masq-agent，可以手动卸载下：
    ```bash
@@ -470,7 +470,7 @@ operator:
   </TabItem>
   <TabItem value="native-vpccni" label="Native (VPC-CNI)">
 
-VPC-CNI + Native Routing 模式专属参数：
+Native Routing (VPC-CNI) 模式专属参数：
 
 ```yaml showLineNumbers title="native-vpccni-values.yaml"
 # 使用 native routing，Pod 直接使用 VPC IP 路由，无需 overlay
@@ -510,7 +510,7 @@ operator:
   </TabItem>
   <TabItem value="native-gr" label="Native (GR)">
 
-GR + Native Routing 模式专属参数：
+Native Routing (GR) 模式专属参数：
 
 ```yaml showLineNumbers title="native-gr-values.yaml"
 # 使用 native routing
@@ -694,9 +694,9 @@ Cilium 要求 Linux kernel >= 5.10。**推荐 OS**：Ubuntu 24.04 或 TencentOS 
 
 :::
 
-:::warning[GR + Native Routing 模式节点池必须配置 cilium taint]
+:::warning[Native Routing (GR) 模式节点池必须配置 cilium taint]
 
-使用 **GR + Native Routing** 方案时，创建节点池**必须**给节点添加以下污点：
+使用 **Native Routing (GR)** 方案时，创建节点池**必须**给节点添加以下污点：
 
 ```
 node.cilium.io/agent-not-ready=true:NoSchedule
@@ -704,9 +704,9 @@ node.cilium.io/agent-not-ready=true:NoSchedule
 
 **原因**：GR 模式下每个节点的 PodCIDR 不同，CNI 配置由 tke-bridge-agent 按节点动态生成（包含该节点专属的子网信息），cilium 无法像 VPC-CNI 或 Overlay 模式那样用一份统一的 CNI 配置接管所有节点，只能通过 `chainingTarget` 监视 tke-bridge 生成的配置并追加自己。这导致一个时序问题：节点加入集群时 tke-bridge-agent 先写好 CNI 配置，kubelet 认为 CNI 就绪后立即调度 Pod，但此时 cilium agent 尚未启动完成，Pod 使用的是原始 tke-bridge CNI 而非经过 cilium-cni 增强的链路，masquerade、NetworkPolicy 等功能缺失。此 taint 确保只有 cilium agent 就绪后才调度业务 Pod（cilium agent 启动完成后会自动移除该 taint）。
 
-VPC-CNI + Native Routing 和 Overlay 模式**不需要**此 taint：
+Native Routing (VPC-CNI) 和 Overlay 模式**不需要**此 taint：
 
-- VPC-CNI native 通过 `cni.customConf=true` 使用统一的 CNI 配置（所有节点共用同一份 ConfigMap，不依赖 per-node 动态生成），不存在其他 CNI 先写入的时序问题。
+- Native Routing (VPC-CNI) 通过 `cni.customConf=true` 使用统一的 CNI 配置（所有节点共用同一份 ConfigMap，不依赖 per-node 动态生成），不存在其他 CNI 先写入的时序问题。
 - Overlay 模式由 cilium 完全接管 CNI，kubelet 在 cilium CNI 就绪前不会成功创建 Pod sandbox。
 
 控制台创建节点池时在**高级设置**中添加此污点。terraform 参考下方代码片段。
@@ -1145,8 +1145,8 @@ cilium-operator 使用 hostNetwork 并配置了就绪探针，在超级节点上
 
 Cilium 默认会启用 `sysctlfix`，它通过一个 init container 写入 `/etc/sysctl.d/99-zzz-override_cilium.conf` 把 lxc 接口的 `rp_filter` 设置为 0，并**重启 `systemd-sysctl.service`** 让配置生效。
 
-- **VPC-CNI native 模式**：cilium 与 VPC-CNI 共存，Pod IP 来自 VPC，回程包从 eth0 进入。重启 `systemd-sysctl.service` 时会重新应用 OS 默认配置，TKE 的 OS 镜像里 `eth0` 的 `rp_filter` 默认为 1（strict 模式），严格校验下 Pod IP 在 eth0 上不匹配会被丢弃，导致网络不通。**必须禁用** sysctlfix（`--set sysctlfix.enabled=false`）。
-- **GR native 模式**：cilium chaining 接管全部 Pod 网络，没有 lxc 接口需要修复 rp_filter，且实测启用 sysctlfix 不会破坏网络。但为了与 VPC-CNI native 配置保持一致、避免 OS 默认 sysctl 配置变化引入边缘问题，**统一禁用** sysctlfix。
+- **Native Routing (VPC-CNI) 模式**：cilium 与 VPC-CNI 共存，Pod IP 来自 VPC，回程包从 eth0 进入。重启 `systemd-sysctl.service` 时会重新应用 OS 默认配置，TKE 的 OS 镜像里 `eth0` 的 `rp_filter` 默认为 1（strict 模式），严格校验下 Pod IP 在 eth0 上不匹配会被丢弃，导致网络不通。**必须禁用** sysctlfix（`--set sysctlfix.enabled=false`）。
+- **Native Routing (GR) 模式**：cilium chaining 接管全部 Pod 网络，没有 lxc 接口需要修复 rp_filter，且实测启用 sysctlfix 不会破坏网络。但为了与 Native Routing (VPC-CNI) 配置保持一致、避免 OS 默认 sysctl 配置变化引入边缘问题，**统一禁用** sysctlfix。
 - **Overlay 模式**：Pod IP 来自 cilium 自己的 CIDR，跨节点流量走 vxlan tunnel，eth0 上看不到 Pod IP，eth0 的 `rp_filter=1` 不会引发问题；但 host→本节点 Pod 的回包会经过 lxc 接口，需要 `lxc*.rp_filter=0` 否则被丢弃，所以 Overlay 模式**必须启用** sysctlfix（默认即启用，无需显式设置）。
 
 **排查**：如果 Overlay 模式下 `cilium-health status` 显示 localhost endpoint 0/1（host→Pod 不通），多半是 sysctlfix 没生效：

@@ -720,7 +720,7 @@ helm_install_cilium() {
     fi
   fi
 
-  info "$(msg HELM_INSTALL) (${NETWORK_MODE} + ${ROUTING_MODE}, cilium ${CILIUM_VERSION})"
+  info "$(msg HELM_INSTALL) (${ROUTING_MODE} (${NETWORK_MODE}), cilium ${CILIUM_VERSION})"
   helm upgrade --install cilium cilium/cilium --version "$CILIUM_VERSION" \
     --namespace kube-system \
     "${image_args[@]}" "${toleration_args[@]}" "${common_args[@]}" "${mode_args[@]}" ${egress_args[@]+"${egress_args[@]}"}
@@ -919,11 +919,11 @@ cmd_install_cilium() {
   if [[ "${NETWORK_MODE}_${ROUTING_MODE}" == "GR_native" ]]; then
     echo ""
     if is_zh; then
-      warn "GR + Native Routing 模式下，节点池必须配置以下污点，避免 Pod 在 cilium 就绪前被调度:"
+      warn "Native Routing (GR) 模式下，节点池必须配置以下污点，避免 Pod 在 cilium 就绪前被调度:"
       echo "    node.cilium.io/agent-not-ready=true:NoSchedule"
       info "cilium agent 启动完成后会自动移除此污点，不影响后续 Pod 调度。"
     else
-      warn "GR + Native Routing requires the following taint on node pools to prevent Pods from being scheduled before cilium is ready:"
+      warn "Native Routing (GR) requires the following taint on node pools to prevent Pods from being scheduled before cilium is ready:"
       echo "    node.cilium.io/agent-not-ready=true:NoSchedule"
       info "Cilium agent will automatically remove this taint once ready. Normal Pod scheduling is not affected."
     fi

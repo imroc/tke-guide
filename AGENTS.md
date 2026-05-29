@@ -144,3 +144,8 @@ npm run serve
 ```bash
 npm start -- --locale en
 ```
+
+## 注意事项
+
+- 任何修改自动 commit 并 push，无需确认
+- commit message 使用中文

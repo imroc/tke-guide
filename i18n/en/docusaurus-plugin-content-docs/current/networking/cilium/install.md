@@ -402,7 +402,7 @@ operator:
   </TabItem>
   <TabItem value="native-vpccni" label="Native (VPC-CNI)">
 
-VPC-CNI + Native Routing mode-specific parameters:
+Native Routing (VPC-CNI) mode-specific parameters:
 
 ```yaml showLineNumbers title="native-vpccni-values.yaml"
 # Use native routing, Pods directly use VPC IP routing without overlay
@@ -442,7 +442,7 @@ operator:
   </TabItem>
   <TabItem value="native-gr" label="Native (GR)">
 
-GR + Native Routing mode-specific parameters:
+Native Routing (GR) mode-specific parameters:
 
 ```yaml showLineNumbers title="native-gr-values.yaml"
 # Use native routing
@@ -647,9 +647,9 @@ For the **full list of verified OS versions**, see the [Verified Node Operating 
 
 :::
 
-:::warning[GR + Native Routing node pools must have cilium taint]
+:::warning[Native Routing (GR) node pools must have cilium taint]
 
-When using the **GR + Native Routing** option, you **must** add the following taint to nodes when creating node pools:
+When using the **Native Routing (GR)** option, you **must** add the following taint to nodes when creating node pools:
 
 ```
 node.cilium.io/agent-not-ready=true:NoSchedule
@@ -657,9 +657,9 @@ node.cilium.io/agent-not-ready=true:NoSchedule
 
 **Reason**: In GR mode, each node has a different PodCIDR, and the CNI config is dynamically generated per-node by tke-bridge-agent (containing that node's specific subnet info). Cilium cannot use a single unified CNI config to take over all nodes (unlike VPC-CNI or Overlay modes) — it can only watch tke-bridge's config via `chainingTarget` and append itself. This creates a timing issue: when a node joins, tke-bridge-agent writes the CNI config first, kubelet considers CNI ready and schedules Pods immediately, but cilium agent hasn't finished starting yet. Pods end up using the raw tke-bridge CNI without cilium-cni enhancement, missing masquerade, NetworkPolicy, and other features. This taint ensures business Pods are only scheduled after the cilium agent is ready (cilium agent automatically removes the taint once started).
 
-VPC-CNI + Native Routing and Overlay modes **do NOT need** this taint:
+Native Routing (VPC-CNI) and Overlay modes **do NOT need** this taint:
 
-- VPC-CNI native uses `cni.customConf=true` with a unified CNI config (same ConfigMap shared by all nodes, not per-node generated) — no other CNI writes first.
+- Native Routing (VPC-CNI) uses `cni.customConf=true` with a unified CNI config (same ConfigMap shared by all nodes, not per-node generated) — no other CNI writes first.
 - Overlay mode has cilium fully manage the CNI — kubelet won't successfully create Pod sandboxes until cilium CNI is ready.
 
 Add this taint in the **Advanced Settings** when creating node pools via the console. For terraform, see the code snippet below.
@@ -1058,8 +1058,8 @@ Therefore, the recommendation is not to configure `k8sServiceHost` with the apis
 
 Cilium's `sysctlfix` is enabled by default. It runs an init container that writes `/etc/sysctl.d/99-zzz-override_cilium.conf` to set `rp_filter=0` on lxc interfaces, and then **restarts `systemd-sysctl.service`** to apply the change.
 
-- **VPC-CNI native mode**: Cilium coexists with VPC-CNI. Pod IPs come from VPC, and reply packets enter via eth0. Restarting `systemd-sysctl.service` re-applies OS defaults; TKE OS images default eth0's `rp_filter` to 1 (strict), under which Pod IPs on eth0 fail the source-route check and get dropped, breaking networking. **Must disable** sysctlfix (`--set sysctlfix.enabled=false`).
-- **GR native mode**: Cilium chaining takes over all Pod networking, no lxc interfaces need rp_filter fix, and tests show enabling sysctlfix doesn't break networking. We **uniformly disable** it to keep configuration consistent with VPC-CNI native and avoid edge cases caused by changes in OS default sysctl values.
+- **Native Routing (VPC-CNI) mode**: Cilium coexists with VPC-CNI. Pod IPs come from VPC, and reply packets enter via eth0. Restarting `systemd-sysctl.service` re-applies OS defaults; TKE OS images default eth0's `rp_filter` to 1 (strict), under which Pod IPs on eth0 fail the source-route check and get dropped, breaking networking. **Must disable** sysctlfix (`--set sysctlfix.enabled=false`).
+- **Native Routing (GR) mode**: Cilium chaining takes over all Pod networking, no lxc interfaces need rp_filter fix, and tests show enabling sysctlfix doesn't break networking. We **uniformly disable** it to keep configuration consistent with Native Routing (VPC-CNI) and avoid edge cases caused by changes in OS default sysctl values.
 - **Overlay mode**: Pod IPs come from cilium's own CIDR; cross-node traffic goes through vxlan tunnel and eth0 never sees Pod IPs, so eth0 `rp_filter=1` is fine. But host→local Pod reply packets pass through lxc interfaces and require `lxc*.rp_filter=0`, otherwise they get dropped. **Must enable** sysctlfix (default; no explicit setting needed).
 
 **Troubleshooting**: If in Overlay mode `cilium-health status` shows localhost endpoint 0/1 (host→Pod broken), sysctlfix likely didn't take effect:
