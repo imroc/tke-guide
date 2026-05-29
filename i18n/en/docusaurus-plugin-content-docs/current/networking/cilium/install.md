@@ -296,6 +296,12 @@ Key differences from VPC-CNI chaining mode:
 
 :::
 
+:::warning[GR clusters do NOT support dynamically enabling VPC-CNI after Cilium installation]
+
+GR clusters natively support enabling VPC-CNI coexistence via the `EnableVpcCniNetworkType` API. However, **after installing Cilium with this guide, this feature no longer works** — Cilium chaining takes over all Pod networking via multus's `defaultDelegates=tke-bridge`. Even Pods annotated with `tke.cloud.tencent.com/networks: tke-route-eni` still get IPs from the GR ClusterCIDR (not the VPC-CNI subnet). If you need VPC-CNI coexistence, use a VPC-CNI cluster directly.
+
+:::
+
 </TabItem>
 <TabItem value="overlay" label="Overlay">
 
@@ -742,6 +748,16 @@ Yes. Through Cilium's `chainingTarget` feature, GR + cilium chaining can be achi
 
 Key principle: Cilium's `cni.chainingTarget=tke-bridge` watches the CNI configuration file named `tke-bridge` on the node, automatically copies its content and appends the `cilium-cni` plugin, thus adapting to the different PodCIDR configurations on each node in GR mode.
 
+### Can VPC-CNI be dynamically enabled on a GR cluster after installing Cilium?
+
+Not recommended. GR clusters natively support enabling VPC-CNI coexistence (via [Enable VPC-CNI Network Capability](https://www.tencentcloud.com/document/product/457/50369)), but **after installing Cilium with this guide, this feature no longer works in practice**:
+
+- Cilium chaining takes over all Pod networking via the multus configuration (`defaultDelegates=tke-bridge`).
+- Pods annotated with `tke.cloud.tencent.com/networks: tke-route-eni` still receive IPs from the GR ClusterCIDR (not the VPC-CNI subnet) — they don't actually use the VPC-CNI datapath.
+- The `EnableVpcCniNetworkType` API call succeeds and the components are deployed, but it has no effect on Pod networking.
+
+If you genuinely need VPC-CNI coexistence (some Pods using VPC IPs), use the **VPC-CNI cluster + Native Routing** option directly, not a GR cluster.
+
 ### Can DataPlaneV2 be checked?
 
 Conclusion: No.
@@ -871,8 +887,9 @@ Therefore, the recommendation is not to configure `k8sServiceHost` with the apis
 
 Cilium's `sysctlfix` is enabled by default. It runs an init container that writes `/etc/sysctl.d/99-zzz-override_cilium.conf` to set `rp_filter=0` on lxc interfaces, and then **restarts `systemd-sysctl.service`** to apply the change.
 
-- **Native Routing mode**: Cilium coexists with TKE CNI. Pod IPs come from VPC, and reply packets enter via eth0. Restarting `systemd-sysctl.service` re-applies OS defaults; TKE OS images default eth0's `rp_filter` to 1 (strict), under which Pod IPs on eth0 fail the source-route check and get dropped, breaking networking. So Native Routing mode must disable sysctlfix (`--set sysctlfix.enabled=false`).
-- **Overlay mode**: Pod IPs come from cilium's own CIDR; cross-node traffic goes through vxlan tunnel and eth0 never sees Pod IPs, so eth0 `rp_filter=1` is fine. But host→local Pod reply packets pass through lxc interfaces and require `lxc*.rp_filter=0`, otherwise they get dropped. So Overlay mode must keep sysctlfix enabled (default; no explicit setting needed).
+- **VPC-CNI native mode**: Cilium coexists with VPC-CNI. Pod IPs come from VPC, and reply packets enter via eth0. Restarting `systemd-sysctl.service` re-applies OS defaults; TKE OS images default eth0's `rp_filter` to 1 (strict), under which Pod IPs on eth0 fail the source-route check and get dropped, breaking networking. **Must disable** sysctlfix (`--set sysctlfix.enabled=false`).
+- **GR native mode**: Cilium chaining takes over all Pod networking, no lxc interfaces need rp_filter fix, and tests show enabling sysctlfix doesn't break networking. We **uniformly disable** it to keep configuration consistent with VPC-CNI native and avoid edge cases caused by changes in OS default sysctl values.
+- **Overlay mode**: Pod IPs come from cilium's own CIDR; cross-node traffic goes through vxlan tunnel and eth0 never sees Pod IPs, so eth0 `rp_filter=1` is fine. But host→local Pod reply packets pass through lxc interfaces and require `lxc*.rp_filter=0`, otherwise they get dropped. **Must enable** sysctlfix (default; no explicit setting needed).
 
 **Troubleshooting**: If in Overlay mode `cilium-health status` shows localhost endpoint 0/1 (host→Pod broken), sysctlfix likely didn't take effect:
 

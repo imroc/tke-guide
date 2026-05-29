@@ -347,6 +347,12 @@ kubectl apply -f ip-masq-agent.yaml
 
 :::
 
+:::warning[GR 集群安装 cilium 后不支持动态启用 VPC-CNI]
+
+GR 集群本身支持通过 `EnableVpcCniNetworkType` 接口动态启用 VPC-CNI 共存，但**安装本文方案的 cilium 后此功能将不再可用**——cilium chaining 通过 multus 的 `defaultDelegates=tke-bridge` 接管所有 Pod 网络，即使创建带 `tke.cloud.tencent.com/networks: tke-route-eni` annotation 的 Pod，IP 也仍然来自 GR ClusterCIDR 而非 VPC-CNI 子网。如有 VPC-CNI 共存需求，请直接使用 VPC-CNI 集群。
+
+:::
+
 </TabItem>
 <TabItem value="overlay-gr" label="Overlay (GR)">
 
@@ -831,6 +837,16 @@ helm upgrade --install cilium ./cilium-1.19.4.tgz \
 
 关键原理：cilium 的 `cni.chainingTarget=tke-bridge` 会监视节点上名为 `tke-bridge` 的 CNI 配置文件，自动复制其内容并追加 `cilium-cni` 插件，因此能适配 GR 模式下每个节点不同 PodCIDR 的配置。
 
+### GR 集群安装 cilium 后能否动态启用 VPC-CNI？
+
+不建议。GR 集群本身支持通过 [启用 VPC-CNI 网络能力](https://cloud.tencent.com/document/product/457/50369) 实现 VPC-CNI 共存，但**安装本文方案的 cilium 后此功能将不再实际可用**：
+
+- cilium chaining 通过 multus 配置（`defaultDelegates=tke-bridge`）接管所有 Pod 网络
+- 创建带 `tke.cloud.tencent.com/networks: tke-route-eni` annotation 的 Pod 后，IP 仍然来自 GR 的 ClusterCIDR 段（而不是 VPC-CNI 子网），实际并未走 VPC-CNI 路径
+- 操作上 `EnableVpcCniNetworkType` 接口可以调用成功，组件也会部署，但对 Pod 网络没有实际影响
+
+如果业务确有 VPC-CNI 共存需求（部分 Pod 用 VPC IP），请直接使用 **VPC-CNI 集群 + Native Routing** 方案，不要选择 GR 集群。
+
 ### 能否勾选 DataPlaneV2？
 
 结论是：不能。
@@ -960,8 +976,9 @@ cilium-operator 使用 hostNetwork 并配置了就绪探针，在超级节点上
 
 Cilium 默认会启用 `sysctlfix`，它通过一个 init container 写入 `/etc/sysctl.d/99-zzz-override_cilium.conf` 把 lxc 接口的 `rp_filter` 设置为 0，并**重启 `systemd-sysctl.service`** 让配置生效。
 
-- **Native Routing 模式**：cilium 与 TKE CNI 共存，Pod IP 来自 VPC，回程包从 eth0 进入。重启 `systemd-sysctl.service` 时会重新应用 OS 默认配置，TKE 的 OS 镜像里 `eth0` 的 `rp_filter` 默认为 1（strict 模式），严格校验下 Pod IP 在 eth0 上不匹配会被丢弃，导致网络不通。所以 Native Routing 模式必须禁用 sysctlfix（`--set sysctlfix.enabled=false`）。
-- **Overlay 模式**：Pod IP 来自 cilium 自己的 CIDR，跨节点流量走 vxlan tunnel，eth0 上看不到 Pod IP，eth0 的 `rp_filter=1` 不会引发问题；但 host→本节点 Pod 的回包会经过 lxc 接口，需要 `lxc*.rp_filter=0` 否则被丢弃，所以 Overlay 模式必须启用 sysctlfix（默认即启用，无需显式设置）。
+- **VPC-CNI native 模式**：cilium 与 VPC-CNI 共存，Pod IP 来自 VPC，回程包从 eth0 进入。重启 `systemd-sysctl.service` 时会重新应用 OS 默认配置，TKE 的 OS 镜像里 `eth0` 的 `rp_filter` 默认为 1（strict 模式），严格校验下 Pod IP 在 eth0 上不匹配会被丢弃，导致网络不通。**必须禁用** sysctlfix（`--set sysctlfix.enabled=false`）。
+- **GR native 模式**：cilium chaining 接管全部 Pod 网络，没有 lxc 接口需要修复 rp_filter，且实测启用 sysctlfix 不会破坏网络。但为了与 VPC-CNI native 配置保持一致、避免 OS 默认 sysctl 配置变化引入边缘问题，**统一禁用** sysctlfix。
+- **Overlay 模式**：Pod IP 来自 cilium 自己的 CIDR，跨节点流量走 vxlan tunnel，eth0 上看不到 Pod IP，eth0 的 `rp_filter=1` 不会引发问题；但 host→本节点 Pod 的回包会经过 lxc 接口，需要 `lxc*.rp_filter=0` 否则被丢弃，所以 Overlay 模式**必须启用** sysctlfix（默认即启用，无需显式设置）。
 
 **排查**：如果 Overlay 模式下 `cilium-health status` 显示 localhost endpoint 0/1（host→Pod 不通），多半是 sysctlfix 没生效：
 
