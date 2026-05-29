@@ -702,11 +702,11 @@ Cilium 要求 Linux kernel >= 5.10。**推荐 OS**：Ubuntu 24.04 或 TencentOS 
 node.cilium.io/agent-not-ready=true:NoSchedule
 ```
 
-**原因**：GR 模式下，节点加入集群时 tke-bridge-agent 会先写好 CNI 配置（`00-multus.conf`），kubelet 认为 CNI 就绪后立即开始调度 Pod。此时 cilium agent 尚未启动，Pod 使用的是原始 tke-bridge CNI 而非 cilium-cni，导致 masquerade、NetworkPolicy 等 cilium 功能缺失。此 taint 确保只有 cilium agent 就绪后才调度业务 Pod（cilium agent 启动完成后会自动移除该 taint）。
+**原因**：GR 模式下每个节点的 PodCIDR 不同，CNI 配置由 tke-bridge-agent 按节点动态生成（包含该节点专属的子网信息），cilium 无法像 VPC-CNI 或 Overlay 模式那样用一份统一的 CNI 配置接管所有节点，只能通过 `chainingTarget` 监视 tke-bridge 生成的配置并追加自己。这导致一个时序问题：节点加入集群时 tke-bridge-agent 先写好 CNI 配置，kubelet 认为 CNI 就绪后立即调度 Pod，但此时 cilium agent 尚未启动完成，Pod 使用的是原始 tke-bridge CNI 而非经过 cilium-cni 增强的链路，masquerade、NetworkPolicy 等功能缺失。此 taint 确保只有 cilium agent 就绪后才调度业务 Pod（cilium agent 启动完成后会自动移除该 taint）。
 
 VPC-CNI + Native Routing 和 Overlay 模式**不需要**此 taint：
 
-- VPC-CNI native 通过 `cni.customConf=true` 完全自定义 CNI 配置，不存在其他 CNI 先写入的情况。
+- VPC-CNI native 通过 `cni.customConf=true` 使用统一的 CNI 配置（所有节点共用同一份 ConfigMap，不依赖 per-node 动态生成），不存在其他 CNI 先写入的时序问题。
 - Overlay 模式由 cilium 完全接管 CNI，kubelet 在 cilium CNI 就绪前不会成功创建 Pod sandbox。
 
 控制台创建节点池时在**高级设置**中添加此污点。terraform 参考下方代码片段。

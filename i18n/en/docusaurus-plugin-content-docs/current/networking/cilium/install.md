@@ -655,11 +655,11 @@ When using the **GR + Native Routing** option, you **must** add the following ta
 node.cilium.io/agent-not-ready=true:NoSchedule
 ```
 
-**Reason**: In GR mode, tke-bridge-agent writes the CNI config (`00-multus.conf`) before cilium agent starts. Kubelet sees CNI as ready and schedules Pods immediately using the original tke-bridge CNI (not cilium-cni), causing masquerade, NetworkPolicy, and other cilium features to be missing. This taint ensures business Pods are only scheduled after the cilium agent is ready (cilium agent automatically removes the taint once started).
+**Reason**: In GR mode, each node has a different PodCIDR, and the CNI config is dynamically generated per-node by tke-bridge-agent (containing that node's specific subnet info). Cilium cannot use a single unified CNI config to take over all nodes (unlike VPC-CNI or Overlay modes) — it can only watch tke-bridge's config via `chainingTarget` and append itself. This creates a timing issue: when a node joins, tke-bridge-agent writes the CNI config first, kubelet considers CNI ready and schedules Pods immediately, but cilium agent hasn't finished starting yet. Pods end up using the raw tke-bridge CNI without cilium-cni enhancement, missing masquerade, NetworkPolicy, and other features. This taint ensures business Pods are only scheduled after the cilium agent is ready (cilium agent automatically removes the taint once started).
 
 VPC-CNI + Native Routing and Overlay modes **do NOT need** this taint:
 
-- VPC-CNI native uses `cni.customConf=true` to fully own the CNI config — no other CNI writes first.
+- VPC-CNI native uses `cni.customConf=true` with a unified CNI config (same ConfigMap shared by all nodes, not per-node generated) — no other CNI writes first.
 - Overlay mode has cilium fully manage the CNI — kubelet won't successfully create Pod sandboxes until cilium CNI is ready.
 
 Add this taint in the **Advanced Settings** when creating node pools via the console. For terraform, see the code snippet below.
