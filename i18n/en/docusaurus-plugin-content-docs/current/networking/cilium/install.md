@@ -113,13 +113,19 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
 }
 ```
 
-### Prepare Helm Environment
+### Environment Preparation
 
-1. Ensure [helm](https://helm.sh/docs/intro/install/) and [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/) are installed and configured with a kubeconfig that can connect to the cluster (refer to [Connecting to Cluster](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)).
-2. Add Cilium's helm repo:
-   ```bash
-   helm repo add cilium https://helm.cilium.io/
-   ```
+Installing cilium requires a machine (local computer or bastion host) that can connect to the cluster. Ensure the following tools are installed:
+
+1. **kubectl** — connect to the cluster and run K8s operations (refer to [Install kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)).
+2. **helm** — install the cilium chart (refer to [Install Helm](https://helm.sh/docs/intro/install/)).
+3. **cilium CLI** (optional) — needed for running connectivity tests (refer to [Install cilium CLI](https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/#install-the-cilium-cli)).
+
+Configure a kubeconfig that can connect to the cluster (refer to [Connecting to Cluster](https://cloud.tencent.com/document/product/457/32191#a334f679-7491-4e40-9981-00ae111a9094)), then add cilium's helm repo:
+
+```bash
+helm repo add cilium https://helm.cilium.io/
+```
 
 ## Install Cilium
 
@@ -789,9 +795,11 @@ Execute the following command to view all installation configuration items:
 helm show values cilium/cilium --version 1.19.4
 ```
 
-### Why add local-router-ipv4 configuration?
+### Why does Native Routing mode need local-router-ipv4?
 
-Cilium will create a `cilium_host` virtual network card on each node and needs to configure an IP address. Since we want Cilium to coexist with TKE VPC-CNI network plugin, IP allocation needs to be handled by TKE VPC-CNI plugin, so Cilium doesn't handle IP allocation. Therefore, we need to manually specify an IP address that won't conflict through the `local-router-ipv4` parameter. The IP address `169.254.32.16` won't conflict with other IPs on TKE, so this IP address is specified.
+In Native Routing mode, Cilium creates a `cilium_host` virtual interface on each node that requires an IP address. Since Cilium doesn't manage Pod IP allocation in this mode (IP allocation is handled by TKE CNI), the `local-router-ipv4` parameter must be manually specified with a non-conflicting IP. `169.254.32.16` is a link-local address that won't conflict with any other IP on TKE.
+
+Overlay mode doesn't need this configuration because Cilium manages Pod IP allocation itself (cluster-pool IPAM) and automatically assigns an IP to `cilium_host`.
 
 ### What to do if unable to connect to Cilium's helm repo?
 
@@ -819,12 +827,6 @@ If the cluster scale is large, it's recommended to enable the [CiliumEndpointSli
 
 It's not enabled by default. The enablement method is to add the `--set ciliumEndpointSlice.enabled=true` parameter when using helm to install Cilium.
 
-### Can Global Router network mode clusters be installed?
-
-Yes. Through Cilium's `chainingTarget` feature, GR + cilium chaining can be achieved. Refer to the "Native Routing (GR)" tab installation steps above for the specific method.
-
-Key principle: Cilium's `cni.chainingTarget=tke-bridge` watches the CNI configuration file named `tke-bridge` on the node, automatically copies its content and appends the `cilium-cni` plugin, thus adapting to the different PodCIDR configurations on each node in GR mode.
-
 ### Can VPC-CNI be dynamically enabled on a GR cluster after installing Cilium?
 
 Not recommended. GR clusters natively support enabling VPC-CNI coexistence (via [Enable VPC-CNI Network Capability](https://www.tencentcloud.com/document/product/457/50369)), but **after installing Cilium with this guide, this feature no longer works in practice**:
@@ -835,9 +837,9 @@ Not recommended. GR clusters natively support enabling VPC-CNI coexistence (via 
 
 If you genuinely need VPC-CNI coexistence (some Pods using VPC IPs), use the **VPC-CNI cluster + Native Routing** option directly, not a GR cluster.
 
-### Can DataPlaneV2 be checked?
+### Can DataPlaneV2 be selected when creating a VPC-CNI cluster?
 
-Conclusion: No.
+No.
 
 When selecting VPC-CNI network plugin, there's a DataPlaneV2 option:
 
