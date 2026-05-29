@@ -35,7 +35,7 @@
 - 容器网络插件：根据上表选择 **VPC-CNI 共享网卡多 IP** 或 **GlobalRouter**。
 - 集群类型：标准集群。
 - Kubernetes 版本: 不低于 1.32，建议选择最新版（参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)）。
-- 操作系统：**推荐 Ubuntu 24.04（kernel 6.8+）或 TencentOS 4 最新版**。最低要求 Linux kernel >= 5.10（参考 [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)）。具体 OS 兼容性详见后文"新建节点池"一节。
+- 操作系统：**推荐 Ubuntu 24.04 或 TencentOS 4 最新版**。最低要求 Linux kernel >= 5.10（参考 [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)）。具体 OS 兼容性详见后文"新建节点池"一节。
 - 节点：安装前不要向集群添加任何普通节点或原生节点，避免残留相关规则和配置，等安装完成后再添加。
 - 基础组件：取消勾选 ip-masq-agent，避免冲突。
 - 增强组件：如果节点池希望使用 Karpenter 节点池，需勾选安装 Karpenter 组件，否则无需勾选（参考后文的节点池选型）。
@@ -744,7 +744,7 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
 2. 选择左侧菜单栏中的**节点管理**，点击**节点池**进入节点池列表页面。
 3. 点击**新建**。
 4. 选择 **普通节点**。
-5. **操作系统** 选择 **TencentOS 4**、**Ubuntu 22.04** 或 **Ubuntu 24.04**。
+5. **操作系统** 选择附录 [已验证的节点操作系统](#已验证的节点操作系统) 中的任一镜像（推荐 **TencentOS 4** 或 **Ubuntu 24.04**），也可以使用其他满足最低内核要求（kernel >= 5.10）的 CVM 公共镜像或自定义镜像（建议先单节点验证）。
 6. 其余选项根据自身需求自行选择。
 7. 点击**创建节点池**。
 

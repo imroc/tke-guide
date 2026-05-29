@@ -32,7 +32,7 @@ Create a TKE cluster in the [Container Service Console](https://console.cloud.te
 
 - Cluster Type: Standard Cluster
 - Kubernetes Version: No lower than 1.32, recommended to choose the latest version (refer to [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)).
-- Operating System: **Recommended Ubuntu 24.04 (kernel 6.8+) or TencentOS 4 latest**. Minimum requirement: Linux kernel >= 5.10 (refer to [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)). See the "Create Node Pool" section below for OS compatibility details.
+- Operating System: **Recommended Ubuntu 24.04 or TencentOS 4 latest**. Minimum requirement: Linux kernel >= 5.10 (refer to [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)). See the "Create Node Pool" section below for OS compatibility details.
 - Nodes: Do not add any regular nodes or native nodes to the cluster before installation to avoid residual rules and configurations. Add them after the installation is complete.
 - Basic Components: Uncheck ip-masq-agent to avoid conflicts.
 
@@ -694,7 +694,7 @@ The following are the steps to create a regular node pool through the [Container
 2. Select **Node Management** from the left menu bar, click **Node Pools** to enter the node pool list page.
 3. Click **Create New**.
 4. Select **Regular Nodes**.
-5. **Operating System** select **TencentOS 4**, **Ubuntu 22.04** or **Ubuntu 24.04**.
+5. **Operating System**: choose any image from the [Verified Node Operating Systems](#verified-node-operating-systems) appendix (recommended **TencentOS 4** or **Ubuntu 24.04**). You may also use other CVM public images or custom images that meet the minimum kernel requirement (kernel >= 5.10) — a single-node smoke test is recommended first.
 6. Choose other options according to your needs.
 7. Click **Create Node Pool**.
 
