@@ -557,7 +557,7 @@ Cilium requires Linux kernel >= 5.10. The installation script and manual install
 - **Native Routing mode**: Disables Cilium's `sysctlfix` (to prevent restarting systemd-sysctl from resetting eth0's rp_filter to 1, which would break networking).
 - **Overlay mode**: Enables Cilium's `sysctlfix` (to ensure lxc interface rp_filter=0, otherwise host↔Pod reply packets will be dropped by the kernel).
 
-**Recommended OS**: Ubuntu 24.04 (kernel 6.8+, optimal performance) or TencentOS 4 latest.
+**Recommended OS**: Ubuntu 24.04 or TencentOS 4 latest.
 
 For the **full list of verified OS versions**, see the [Verified Node Operating Systems](#verified-node-operating-systems) appendix at the end of this document.
 
@@ -582,11 +582,11 @@ The following three types of node pools can adapt to cilium:
 
 The following is a comparison of these node pool types, choose the appropriate node pool type based on your situation:
 
-| Node Pool Type      | Node Type           | Available OS Images            | Node Scaling Component |
-| ------------------- | ------------------- | ------------------------------ | ---------------------- |
-| Native Node Pool    | Native Nodes        | TencentOS                      | cluster-autoscaler     |
-| Regular Node Pool   | Regular Nodes (CVM) | Ubuntu/TencentOS/Custom Images | cluster-autoscaler     |
-| Karpenter Node Pool | Native Nodes        | TencentOS                      | Karpenter              |
+| Node Pool Type      | Node Type           | Available OS Images                                           | Node Scaling Component |
+| ------------------- | ------------------- | ------------------------------------------------------------- | ---------------------- |
+| Native Node Pool    | Native Nodes        | TencentOS                                                     | cluster-autoscaler     |
+| Regular Node Pool   | Regular Nodes (CVM) | All CVM public images (Ubuntu/TencentOS/etc.) + custom images | cluster-autoscaler     |
+| Karpenter Node Pool | Native Nodes        | TencentOS                                                     | Karpenter              |
 
 Below are the steps to create various node pools.
 
@@ -895,15 +895,15 @@ The table below lists OS versions and kernels that have been hands-on verified a
 
 **Test method**: For each installation mode, cilium 1.19.4 was deployed with Egress Gateway and Nodelocal DNSCache enabled. Verified that `cilium-health status` shows all nodes reachable, and `coredns` / `node-local-dns` pass health checks.
 
-| OS                   | Kernel  | iptables backend | Notes                                                       |
-| -------------------- | ------- | ---------------- | ----------------------------------------------------------- |
-| TencentOS Server 4   | 6.6.117 | legacy           | Recommended: default OS for TKE Native/Karpenter            |
-| Ubuntu 24.04         | 6.8.0   | nf_tables        | Recommended: newest kernel, optimal performance             |
-| Ubuntu 22.04         | 5.15.0  | nf_tables        |                                                             |
-| Debian 12 (bookworm) | 6.1.0   | nf_tables        | Only nftables by default; cilium uses iptables in container |
-| Debian 11 (bullseye) | 5.10.0  | nf_tables        | Same as above                                               |
-| OpenCloudOS 9.4      | 6.6.119 | legacy           | Community open-source variant of TencentOS 4                |
-| Rocky Linux 9.3      | 5.14.0  | nf_tables        |                                                             |
-| RedHat 9.5           | 5.14.0  | nf_tables        |                                                             |
+| OS                   | Kernel  |
+| -------------------- | ------- |
+| TencentOS Server 4   | 6.6.117 |
+| Ubuntu 24.04         | 6.8.0   |
+| Ubuntu 22.04         | 5.15.0  |
+| Debian 12 (bookworm) | 6.1.0   |
+| Debian 11 (bullseye) | 5.10.0  |
+| OpenCloudOS 9.4      | 6.6.119 |
+| Rocky Linux 9.3      | 5.14.0  |
+| RedHat 9.5           | 5.14.0  |
 
 For OS versions not in the list above, a single-node smoke test is recommended first.
