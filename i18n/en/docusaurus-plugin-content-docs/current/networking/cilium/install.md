@@ -823,9 +823,75 @@ helm upgrade --install cilium ./cilium-1.19.4.tgz \
 
 ### How to optimize for large-scale scenarios?
 
-If the cluster scale is large, it's recommended to enable the [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) feature. This feature was introduced in version 1.11 and is still in Beta stage in the current version (1.19.4) (see [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)). In large-scale scenarios, this feature can significantly improve Cilium performance and reduce apiserver pressure.
+For large clusters (hundreds of nodes / 10K+ Pods), consider the following optimizations:
 
-It's not enabled by default. The enablement method is to add the `--set ciliumEndpointSlice.enabled=true` parameter when using helm to install Cilium.
+**1. Enable CiliumEndpointSlice (Recommended)**
+
+Aggregates multiple CiliumEndpoint resources into a single CiliumEndpointSlice, significantly reducing apiserver watch/list pressure:
+
+```yaml
+ciliumEndpointSlice:
+  enabled: true
+```
+
+Introduced in 1.11, still Beta in 1.19 ([tracking Stable graduation](https://github.com/cilium/cilium/issues/31904)).
+
+**2. Increase K8s Client Rate Limits**
+
+cilium-agent defaults: QPS=10, Burst=20; cilium-operator defaults: QPS=100, Burst=200. These may bottleneck at scale:
+
+```yaml
+k8sClientRateLimit:
+  qps: 20
+  burst: 40
+  operator:
+    qps: 200
+    burst: 400
+```
+
+**3. Reduce Identity Count**
+
+Cilium assigns a Security Identity per unique label set. Too many identities increase memory and policy computation overhead. Exclude high-cardinality labels:
+
+```yaml
+extraConfig:
+  labels: "!pod-template-hash !controller-revision-hash !job-name !batch.kubernetes.io/controller-uid"
+```
+
+**4. Configure Agent / Operator Resources**
+
+Default resource settings are conservative. For large clusters:
+
+```yaml
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+operator:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+```
+
+**5. Use API Priority and Fairness (APF)**
+
+The installation script in this guide already creates dedicated APF FlowSchema and PriorityLevelConfiguration for Cilium to prevent its list requests from impacting other components. If installing manually, replicate this configuration.
+
+**6. BPF Map Dynamic Sizing**
+
+BPF map capacity is auto-calculated based on system memory by default. To manually adjust the ratio:
+
+```yaml
+bpf:
+  mapDynamicSizeRatio: 0.0025
+```
 
 ### Can VPC-CNI be dynamically enabled on a GR cluster after installing Cilium?
 

@@ -909,9 +909,76 @@ helm upgrade --install cilium ./cilium-1.19.4.tgz \
 
 ### 大规模场景如何优化？
 
-如果集群规模较大，建议开启 [CiliumEndpointSlice](https://docs.cilium.io/en/stable/network/kubernetes/ciliumendpointslice/) 特性，该特性于 1.11 开始引入，当前（1.19.4）仍在 Beta 阶段（详见 [CiliumEndpointSlice Graduation to Stable](https://github.com/cilium/cilium/issues/31904)），在大规模场景下，该特性可以显著提升 cilium 性能并降低 apiserver 的压力。
+集群规模较大（数百节点 / 万级 Pod 以上）时，可从以下几方面优化：
 
-默认没有启用，启用方法是在使用 helm 安装 cilium 时，通过加 `--set ciliumEndpointSlice.enabled=true` 参数来开启。
+**1. 启用 CiliumEndpointSlice（推荐）**
+
+将多个 CiliumEndpoint 聚合为一个 CiliumEndpointSlice 资源，显著减少 apiserver 的 watch/list 压力：
+
+```yaml
+ciliumEndpointSlice:
+  enabled: true
+```
+
+该特性于 1.11 引入，1.19 仍为 Beta（[追踪 Stable 进展](https://github.com/cilium/cilium/issues/31904)）。
+
+**2. 调整 K8s Client 限速**
+
+cilium-agent 默认 QPS=10、Burst=20，大规模下可能成为瓶颈；cilium-operator 默认 QPS=100、Burst=200：
+
+```yaml
+k8sClientRateLimit:
+  qps: 20
+  burst: 40
+  operator:
+    qps: 200
+    burst: 400
+```
+
+**3. 精简 Identity 数量**
+
+cilium 为每组唯一的 label 组合分配一个 Security Identity，过多 Identity 会增加内存和策略计算开销。通过排除无关 label 可有效减少 Identity 数：
+
+```yaml
+# 排除高基数 label，减少 Identity 膨胀
+extraConfig:
+  labels: "!pod-template-hash !controller-revision-hash !job-name !batch.kubernetes.io/controller-uid"
+```
+
+**4. 配置 Agent / Operator 资源**
+
+默认资源配置偏保守，大规模集群建议显式设置：
+
+```yaml
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+operator:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+```
+
+**5. 使用 API Priority and Fairness (APF)**
+
+本文的安装脚本已默认创建 cilium 专属的 APF FlowSchema 和 PriorityLevelConfiguration，防止 cilium 的 list 请求影响其他组件。如果手动安装，建议也参照脚本配置。
+
+**6. BPF Map 动态调整**
+
+默认 BPF map 容量基于系统内存自动计算。如需手动调整比例：
+
+```yaml
+bpf:
+  mapDynamicSizeRatio: 0.0025
+```
 
 ### GR 集群安装 cilium 后能否动态启用 VPC-CNI？
 
