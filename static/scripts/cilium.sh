@@ -723,7 +723,7 @@ helm_install_cilium() {
   info "$(msg HELM_INSTALL) (${NETWORK_MODE} + ${ROUTING_MODE}, cilium ${CILIUM_VERSION})"
   helm upgrade --install cilium cilium/cilium --version "$CILIUM_VERSION" \
     --namespace kube-system \
-    "${image_args[@]}" "${toleration_args[@]}" "${common_args[@]}" "${mode_args[@]}" "${egress_args[@]}"
+    "${image_args[@]}" "${toleration_args[@]}" "${common_args[@]}" "${mode_args[@]}" ${egress_args[@]+"${egress_args[@]}"}
 }
 
 # apply_apf — Creates APF (API Priority and Fairness) rate limiting rules for cilium.
