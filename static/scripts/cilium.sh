@@ -1161,7 +1161,55 @@ cmd_e2e_test() {
   command -v kubectl &>/dev/null || fatal "$(msg NO_KUBECTL)"
   kubectl cluster-info &>/dev/null || fatal "$(msg NO_CLUSTER)"
 
-  info "$(is_zh && echo "运行 cilium connectivity test（跳过公网测试）..." || echo "Running cilium connectivity test (skipping external tests)...")"
+  # Phase 1: cilium-health per-node verification
+  info "$(is_zh && echo "[1/2] 验证 cilium-health 全节点连通性..." || echo "[1/2] Verifying cilium-health per-node connectivity...")"
+  echo ""
+  local failed=0
+  local total=0
+  local cilium_pods
+  cilium_pods=$(kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+  if [[ -z "$cilium_pods" ]]; then
+    fatal "$(is_zh && echo "未找到 cilium agent pod" || echo "No cilium agent pods found")"
+  fi
+  while IFS= read -r pod; do
+    [[ -z "$pod" ]] && continue
+    total=$((total + 1))
+    local node_ip
+    node_ip=$(kubectl -n kube-system get pod "$pod" -o jsonpath='{.status.hostIP}')
+    local health_output
+    health_output=$(kubectl -n kube-system exec "$pod" -- cilium-health status 2>&1)
+    local cluster_health
+    cluster_health=$(echo "$health_output" | grep "Cluster health:" | awk '{print $3}')
+    local localhost_line
+    localhost_line=$(echo "$health_output" | grep "localhost")
+    local node_probe endpoint_probe
+    node_probe=$(echo "$localhost_line" | awk '{print $4}')
+    endpoint_probe=$(echo "$localhost_line" | awk '{print $5}')
+
+    local status_icon="✅"
+    if [[ "$node_probe" != "1/1" ]]; then
+      status_icon="❌"
+      failed=$((failed + 1))
+    elif [[ -n "$endpoint_probe" && "$endpoint_probe" != "0/0" && "$endpoint_probe" != "1/1" ]]; then
+      status_icon="❌"
+      failed=$((failed + 1))
+    fi
+    local kernel
+    kernel=$(kubectl get node "$node_ip" -o jsonpath='{.status.nodeInfo.kernelVersion}' 2>/dev/null)
+    local os
+    os=$(kubectl get node "$node_ip" -o jsonpath='{.status.nodeInfo.osImage}' 2>/dev/null)
+    echo "  ${status_icon} ${node_ip} | ${os} (${kernel}) | node=${node_probe} endpoint=${endpoint_probe} | ${cluster_health}"
+  done <<< "$cilium_pods"
+
+  echo ""
+  if [[ $failed -gt 0 ]]; then
+    fatal "$(is_zh && echo "cilium-health 验证失败: ${failed}/${total} 节点异常" || echo "cilium-health verification failed: ${failed}/${total} nodes unhealthy")"
+  fi
+  info "$(is_zh && echo "cilium-health 验证通过: ${total}/${total} 节点健康" || echo "cilium-health passed: ${total}/${total} nodes healthy")"
+  echo ""
+
+  # Phase 2: cilium connectivity test
+  info "$(is_zh && echo "[2/2] 运行 cilium connectivity test（跳过公网测试）..." || echo "[2/2] Running cilium connectivity test (skipping external tests)...")"
   echo ""
 
   cilium connectivity test \
