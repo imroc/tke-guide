@@ -557,20 +557,9 @@ Cilium requires Linux kernel >= 5.10. The installation script and manual install
 - **Native Routing mode**: Disables Cilium's `sysctlfix` (to prevent restarting systemd-sysctl from resetting eth0's rp_filter to 1, which would break networking).
 - **Overlay mode**: Enables Cilium's `sysctlfix` (to ensure lxc interface rp_filter=0, otherwise host↔Pod reply packets will be dropped by the kernel).
 
-**Verified Coverage**: All 4 installation modes (VPC-CNI/GR × Native/Overlay) × 8 OS versions have been verified — `cilium-health` all reachable, `coredns` and `node-local-dns` health checks pass. Verified OS:
-
-| OS                   | Kernel Version |
-| -------------------- | -------------- |
-| TencentOS Server 4   | 6.6.117        |
-| Ubuntu 24.04         | 6.8.0          |
-| Ubuntu 22.04         | 5.15.0         |
-| Debian 12 (bookworm) | 6.1.0          |
-| Debian 11 (bullseye) | 5.10.0         |
-| OpenCloudOS 9.4      | 6.6.119        |
-| Rocky Linux 9.3      | 5.14.0         |
-| RedHat 9.5           | 5.14.0         |
-
 **Recommended OS**: Ubuntu 24.04 (kernel 6.8+, optimal performance) or TencentOS 4 latest.
+
+For the **full list of verified OS versions**, see appendix [Verified Node Operating Systems](../../appendix/verified-os.md).
 
 If after installation `cilium-health status` shows localhost endpoint as 0/1 (host→Pod broken), it's usually an rp_filter configuration issue. Troubleshoot with:
 
