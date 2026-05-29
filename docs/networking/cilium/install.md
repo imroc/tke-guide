@@ -56,6 +56,7 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   # Kubernetes 版本 >= 1.32
   cluster_version = "1.34.1"
   # 节点默认操作系统（OsName），完整已验证 OS 列表见附录
+  # 需要注意的是，节点的实际 OS 由节点池自身的 OS 属性决定，不受 cluster_os 的限制
   cluster_os = "tlinux4_x86_64_public"
   # 容器网络插件: VPC-CNI / GR
   network_type = "VPC-CNI"
