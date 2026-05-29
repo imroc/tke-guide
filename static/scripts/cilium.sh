@@ -813,6 +813,28 @@ helm_enable_egress() {
   fi
 }
 
+# print_installed_values — Exports the actual helm values used for this installation.
+# Uses `helm get values` to show the exact configuration in YAML format.
+# Helps users understand what was configured and customize for their own deployment flow.
+print_installed_values() {
+  echo ""
+  if is_zh; then
+    info "当前安装使用的 Helm Values（可复制保存为 values.yaml 文件自行管理）:"
+  else
+    info "Helm values used for this installation (can be saved as values.yaml for self-managed deployments):"
+  fi
+  echo ""
+  echo "---"
+  helm get values cilium -n kube-system 2>/dev/null
+  echo "---"
+  echo ""
+  if is_zh; then
+    info "导出方法: helm get values cilium -n kube-system > values.yaml"
+  else
+    info "Export: helm get values cilium -n kube-system > values.yaml"
+  fi
+}
+
 # print_replay_command — Prints a non-interactive command that reproduces the current install.
 # Uses environment variables to skip all interactive prompts on subsequent runs.
 # Called at the end of cmd_install_cilium to help users batch-deploy to multiple clusters.
@@ -892,6 +914,9 @@ cmd_install_cilium() {
   info "  kubectl -n kube-system get pod -l app.kubernetes.io/part-of=cilium"
   info "  kubectl -n kube-system exec ds/cilium -- cilium status --brief"
   info "============================================"
+
+  # Export installed values as YAML for user reference
+  print_installed_values
 
   # Print non-interactive replay command for batch deployment
   print_replay_command

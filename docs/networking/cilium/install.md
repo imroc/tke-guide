@@ -352,7 +352,7 @@ kubectl apply -f ip-masq-agent.yaml
 
 :::warning[GR 集群安装 cilium 后不支持动态启用 VPC-CNI]
 
-GR 集群本身支持通过 `EnableVpcCniNetworkType` 接口动态启用 VPC-CNI 共存，但**安装本文方案的 cilium 后此功能将不再可用**——cilium chaining 通过 multus 的 `defaultDelegates=tke-bridge` 接管所有 Pod 网络，即使创建带 `tke.cloud.tencent.com/networks: tke-route-eni` annotation 的 Pod，IP 也仍然来自 GR ClusterCIDR 而非 VPC-CNI 子网。如有 VPC-CNI 共存需求，请直接使用 VPC-CNI 集群。
+GR 集群本身支持动态启用 VPC-CNI （GR 与 VPC-CNI 共存)，但**安装本文方案的 cilium 后此功能将不再可用**——cilium chaining 通过 multus 的 `defaultDelegates=tke-bridge` 接管所有 Pod 网络，即使创建带 `tke.cloud.tencent.com/networks: tke-route-eni` annotation 的 Pod，IP 也仍然来自 GR ClusterCIDR 而非 VPC-CNI 子网。如有 VPC-CNI 共存需求，请直接使用 VPC-CNI 集群。
 
 :::
 
@@ -988,7 +988,7 @@ bpf:
 - 创建带 `tke.cloud.tencent.com/networks: tke-route-eni` annotation 的 Pod 后，IP 仍然来自 GR 的 ClusterCIDR 段（而不是 VPC-CNI 子网），实际并未走 VPC-CNI 路径
 - 操作上 `EnableVpcCniNetworkType` 接口可以调用成功，组件也会部署，但对 Pod 网络没有实际影响
 
-如果业务确有 VPC-CNI 共存需求（部分 Pod 用 VPC IP），请直接使用 **VPC-CNI 集群 + Native Routing** 方案，不要选择 GR 集群。
+如果业务确有 VPC-CNI 需求，请直接使用 **VPC-CNI 集群 + Native Routing** 方案，不要选择 GR 集群。
 
 ### VPC-CNI 集群创建时能否勾选 DataPlaneV2？
 
