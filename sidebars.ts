@@ -36,19 +36,6 @@ const sidebars: SidebarsConfig = {
             'networking/cilium/roadmap',
             {
               type: 'category',
-              label: 'Cilium 问题排查',
-              collapsed: true,
-              link: {
-                type: 'generated-index',
-                slug: '/networking/cilium/troubleshooting'
-              },
-              items: [
-                'networking/cilium/troubleshooting/debug',
-                'networking/cilium/troubleshooting/connect-apiserver-operation-not-permitted'
-              ]
-            },
-            {
-              type: 'category',
               label: 'Cilium 附录',
               collapsed: true,
               link: {
@@ -61,6 +48,19 @@ const sidebars: SidebarsConfig = {
                 'networking/cilium/appendix/sysctlfix',
                 'networking/cilium/appendix/gr-no-l7-dns',
                 'networking/cilium/appendix/gr-agent-not-ready-taint',
+                {
+                  type: 'category',
+                  label: 'Cilium 问题排查',
+                  collapsed: true,
+                  link: {
+                    type: 'generated-index',
+                    slug: '/networking/cilium/appendix/troubleshooting'
+                  },
+                  items: [
+                    'networking/cilium/troubleshooting/debug',
+                    'networking/cilium/troubleshooting/connect-apiserver-operation-not-permitted'
+                  ]
+                }
               ]
             }
           ],
