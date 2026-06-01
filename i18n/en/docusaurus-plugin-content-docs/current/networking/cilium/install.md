@@ -234,12 +234,20 @@ GR mode uses `chainingTarget` to let Cilium automatically watch and append to th
 
 Pre-install steps required:
 
-1. Change the tke-bridge-agent configuration output directory (from multus subdirectory to CNI root directory):
+1. Patch tke-bridge-agent — two changes:
+   - **Change CNI config output directory** (from multus subdirectory to CNI root) so cilium can discover and append to the bridge config via `chainingTarget`.
+   - **Disable the portmap plugin** (`--port-mapping=false`): Cilium's `kubeProxyReplacement=true` already provides HostPort forwarding. The portmap plugin depends on the `KUBE-MARK-MASQ` iptables chain created by kube-proxy, which has been disabled. Without this flag, creating Pods with hostPort fails (CNI portmap call errors out).
    ```bash
-   # Get the current apiserver address (check from tke-bridge-agent's --master parameter)
-   MASTER_ADDR=$(kubectl -n kube-system get ds tke-bridge-agent -o jsonpath='{.spec.template.spec.containers[0].args}' | grep -oP '(?<=--master=)\S+')
+   # Get current full args
+   CURRENT_ARGS=$(kubectl -n kube-system get ds tke-bridge-agent -o jsonpath='{.spec.template.spec.containers[0].args}')
+   # 1. Replace CNI config directory path
+   PATCHED_ARGS=$(echo "$CURRENT_ARGS" | sed 's|/host/etc/cni/net.d/multus|/host/etc/cni/net.d|g')
+   # 2. Append --port-mapping=false to disable portmap (skip if already set)
+   if ! echo "$PATCHED_ARGS" | grep -q 'port-mapping=false'; then
+     PATCHED_ARGS=$(echo "$PATCHED_ARGS" | sed 's/\]$/,"--port-mapping=false"]/')
+   fi
    kubectl -n kube-system patch ds tke-bridge-agent --type='json' \
-     -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args\",\"value\":[\"--cni-conf-dir\",\"/host/etc/cni/net.d\",\"--master=$MASTER_ADDR\"]}]"
+     -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args\",\"value\":${PATCHED_ARGS}}]"
    ```
 2. Disable tke-cni-agent (multus is no longer needed):
    ```bash

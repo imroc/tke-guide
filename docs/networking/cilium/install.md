@@ -183,12 +183,20 @@ kubectl apply -f cni-config.yaml
 </TabItem>
 <TabItem value="native-gr" label="Native Routing (GR)">
 
-修改 tke-bridge-agent 的配置输出目录（从 multus 子目录改到 CNI 根目录），以便 cilium 能通过 `chainingTarget` 发现并追加到 bridge 配置：
+需要对 tke-bridge-agent 做两处修改：
+
+1. **修改 CNI 配置输出目录**：从 multus 子目录改到 CNI 根目录，以便 cilium 能通过 `chainingTarget` 发现并追加到 bridge 配置。
+2. **禁用 portmap 插件**（`--port-mapping=false`）：cilium 的 `kubeProxyReplacement=true` 已包含 HostPort 转发能力，而 portmap 插件依赖已被卸载的 kube-proxy 创建的 `KUBE-MARK-MASQ` iptables chain，不禁用会导致创建 hostPort 的 Pod 报错（CNI 调用 portmap 失败）。
 
 ```bash
-# 获取当前完整 args 并替换路径
+# 获取当前完整 args
 CURRENT_ARGS=$(kubectl -n kube-system get ds tke-bridge-agent -o jsonpath='{.spec.template.spec.containers[0].args}')
+# 1. 替换 CNI 配置目录路径
 PATCHED_ARGS=$(echo "$CURRENT_ARGS" | sed 's|/host/etc/cni/net.d/multus|/host/etc/cni/net.d|g')
+# 2. 追加 --port-mapping=false 禁用 portmap 插件（如已存在则跳过）
+if ! echo "$PATCHED_ARGS" | grep -q 'port-mapping=false'; then
+  PATCHED_ARGS=$(echo "$PATCHED_ARGS" | sed 's/\]$/,"--port-mapping=false"]/')
+fi
 kubectl -n kube-system patch ds tke-bridge-agent --type='json' \
   -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args\",\"value\":${PATCHED_ARGS}}]"
 ```
