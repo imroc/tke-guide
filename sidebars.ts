@@ -44,6 +44,7 @@ const sidebars: SidebarsConfig = {
               },
               items: [
                 'networking/cilium/appendix/large-scale-tuning',
+                'networking/cilium/appendix/verified-os',
                 'networking/cilium/appendix/local-router-ipv4',
                 'networking/cilium/appendix/sysctlfix',
                 'networking/cilium/appendix/gr-no-l7-dns',

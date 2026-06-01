@@ -42,7 +42,7 @@
 - 容器网络插件：根据上表选择 **VPC-CNI 共享网卡多 IP** 或 **GlobalRouter**。
 - 集群类型：标准集群。
 - Kubernetes 版本: 不低于 1.32，建议选择最新版（参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)）。
-- 操作系统：推荐 **TencentOS 4** 或 **Ubuntu 24.04**。最低要求 Linux kernel >= 5.10（参考 [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)）。已验证的 OS 列表见本文末尾的 [已验证的节点操作系统](#已验证的节点操作系统)。
+- 操作系统：推荐 **TencentOS 4** 或 **Ubuntu 24.04**。最低要求 Linux kernel >= 5.10（参考 [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)）。完整已验证 OS 列表参考 [已验证的节点操作系统](./appendix/verified-os.md)。
 - 节点：安装前不要向集群添加任何普通节点或原生节点，避免残留相关规则和配置，等安装完成后再添加。
 - 基础组件：取消勾选 **TKE 自带的 ip-masq-agent** 组件，避免与 cilium 内置的 ipMasqAgent 冲突。Native Routing (GR) 模式后续会启用 cilium 内置的 ipMasqAgent（两者是不同组件，不要混淆）。
 - 增强组件：如果节点池希望使用 Karpenter 节点池，需勾选安装 Karpenter 组件，否则无需勾选（参考后文的节点池选型）。
@@ -729,7 +729,7 @@ kubectl apply -f cilium-apf.yaml
 
 Cilium 要求 Linux kernel >= 5.10。**推荐 OS**：Ubuntu 24.04 或 TencentOS 4 最新版。
 
-**实测覆盖的 OS 列表**详见本文末尾的 [已验证的节点操作系统](#已验证的节点操作系统)。
+**实测覆盖的 OS 列表**详见 [已验证的节点操作系统](./appendix/verified-os.md)。
 
 :::
 
@@ -867,7 +867,7 @@ resource "tencentcloud_kubernetes_native_node_pool" "cilium" {
 2. 选择左侧菜单栏中的**节点管理**，点击**节点池**进入节点池列表页面。
 3. 点击**新建**。
 4. 选择 **普通节点**。
-5. **操作系统** 选择 [已验证的节点操作系统](#已验证的节点操作系统) 中的任一镜像（推荐 **TencentOS 4** 或 **Ubuntu 24.04**），也可以使用其他满足最低内核要求（kernel >= 5.10）的 CVM 公共镜像或自定义镜像（建议先单节点验证）。
+5. **操作系统** 选择 [已验证的节点操作系统](./appendix/verified-os.md) 中的任一镜像（推荐 **TencentOS 4** 或 **Ubuntu 24.04**），也可以使用其他满足最低内核要求（kernel >= 5.10）的 CVM 公共镜像或自定义镜像（建议先单节点验证）。
 6. 其余选项根据自身需求自行选择。
 7. 点击**创建节点池**。
 
@@ -1166,30 +1166,12 @@ cilium-operator 使用 hostNetwork 并配置了就绪探针，在超级节点上
 
 完整的根因分析、复现步骤和 cilium 上游 PR 链接，参见 [问题排查：连接 APIServer 报错 operation not permitted](./troubleshooting/connect-apiserver-operation-not-permitted.md)。
 
-## 已验证的节点操作系统
-
-下表汇总本文 4 种安装模式（VPC-CNI/GR × Native/Overlay）均已实测通过的 OS 及内核。
-
-**测试方法**：每种安装模式部署 cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache，验证 `cilium-health status` 所有节点 reachable、`coredns` 与 `node-local-dns` 健康检查正常。
-
-| OS                   | OsName                  | 内核版本 |
-| -------------------- | ----------------------- | -------- |
-| TencentOS Server 4   | `tlinux4_x86_64_public` | 6.6.117  |
-| Ubuntu 24.04         | `ubuntu24.04x86_64`     | 6.8.0    |
-| Ubuntu 22.04         | `ubuntu22.04x86_64`     | 5.15.0   |
-| Debian 12 (bookworm) | `debian12.8x86_64`      | 6.1.0    |
-| Debian 11 (bullseye) | `debian11.11x86_64`     | 5.10.0   |
-| OpenCloudOS 9.4      | `opencloudos9.0x86_64`  | 6.6.119  |
-| Rocky Linux 9.3      | `rockylinux9.3x86_64`   | 5.14.0   |
-| RedHat 9.5           | `redhat9.5x86_64`       | 5.14.0   |
-
-未在此列表的 OS 如需使用，建议自行验证。
-
 ## 延伸阅读
 
 设计原理与运维指南已拆分到独立文章，归入 [Cilium 附录](./appendix) 目录：
 
 - [大规模集群 Cilium 调优指南](./appendix/large-scale-tuning.md)
+- [已验证的节点操作系统](./appendix/verified-os.md)
 - [为什么 Native Routing 模式要加 local-router-ipv4 配置？](./appendix/local-router-ipv4.md)
 - [为什么 Native Routing 模式禁用 sysctlfix，Overlay 模式却启用？](./appendix/sysctlfix.md)
 - [为什么 GR Native Routing 不支持 L7/DNS NetworkPolicy？](./appendix/gr-no-l7-dns.md)

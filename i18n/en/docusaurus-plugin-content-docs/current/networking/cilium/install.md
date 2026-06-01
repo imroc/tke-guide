@@ -42,7 +42,7 @@ In the [TKE Console](https://console.cloud.tencent.com/tke2/cluster), create a T
 - Container network plugin: choose **VPC-CNI Shared ENI Multi-IP** or **GlobalRouter** based on the comparison table above.
 - Cluster type: Standard cluster.
 - Kubernetes version: 1.32 or later, latest is recommended (see [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)).
-- Operating system: recommend **TencentOS 4** or **Ubuntu 24.04**. Minimum: Linux kernel >= 5.10 (see [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)). For verified OS images see [Verified Node Operating Systems](#verified-node-operating-systems) at the end of this article.
+- Operating system: recommend **TencentOS 4** or **Ubuntu 24.04**. Minimum: Linux kernel >= 5.10 (see [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)). For the full verified OS list, see [Verified Node Operating Systems](./appendix/verified-os.md).
 - Nodes: do not add any regular or native nodes before installation, to avoid leftover rules and configuration. Add them after installation completes.
 - Base addons: uncheck the **TKE built-in ip-masq-agent** component to avoid conflict with cilium's built-in ipMasqAgent. Native Routing (GR) mode will enable cilium's built-in ipMasqAgent later (different components — do not confuse them).
 - Extension addons: if you plan to use Karpenter node pools, enable the Karpenter addon; otherwise skip (see node pool selection below).
@@ -730,7 +730,7 @@ kubectl apply -f cilium-apf.yaml
 
 Cilium requires Linux kernel >= 5.10. **Recommended OS**: Ubuntu 24.04 or the latest TencentOS 4.
 
-For the **full list of verified OS images**, see [Verified Node Operating Systems](#verified-node-operating-systems) at the end of this document.
+For the **full list of verified OS images**, see [Verified Node Operating Systems](./appendix/verified-os.md).
 
 :::
 
@@ -869,7 +869,7 @@ Steps to create a regular node pool via the [TKE Console](https://console.cloud.
 2. In the left menu, click **Node Management**, then click **Node Pools**.
 3. Click **New**.
 4. Select **Regular Node**.
-5. For **Operating System**, choose any image from [Verified Node Operating Systems](#verified-node-operating-systems) at the end of this article (recommend **TencentOS 4** or **Ubuntu 24.04**). You may also use other CVM public images or custom images that meet the kernel requirement (kernel >= 5.10) — single-node validation is recommended first.
+5. For **Operating System**, choose any image from [Verified Node Operating Systems](./appendix/verified-os.md) (recommend **TencentOS 4** or **Ubuntu 24.04**). You may also use other CVM public images or custom images that meet the kernel requirement (kernel >= 5.10) — single-node validation is recommended first.
 6. Configure other options as needed.
 7. Click **Create Node Pool**.
 
@@ -1168,30 +1168,12 @@ So the recommendation is: do **not** configure `k8sServiceHost` with the apiserv
 
 For full root-cause analysis, reproduction steps, and the upstream cilium PR link, see [Troubleshooting: APIServer reports operation not permitted](./troubleshooting/connect-apiserver-operation-not-permitted.md).
 
-## Verified Node Operating Systems
-
-The table below lists OS images and kernels verified across all 4 installation modes (VPC-CNI/GR × Native/Overlay) covered in this guide.
-
-**Test method**: For each installation mode, deploy cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache; verify `cilium-health status` shows all nodes reachable, and `coredns` / `node-local-dns` health checks pass.
-
-| OS                   | OsName                  | Kernel  |
-| -------------------- | ----------------------- | ------- |
-| TencentOS Server 4   | `tlinux4_x86_64_public` | 6.6.117 |
-| Ubuntu 24.04         | `ubuntu24.04x86_64`     | 6.8.0   |
-| Ubuntu 22.04         | `ubuntu22.04x86_64`     | 5.15.0  |
-| Debian 12 (bookworm) | `debian12.8x86_64`      | 6.1.0   |
-| Debian 11 (bullseye) | `debian11.11x86_64`     | 5.10.0  |
-| OpenCloudOS 9.4      | `opencloudos9.0x86_64`  | 6.6.119 |
-| Rocky Linux 9.3      | `rockylinux9.3x86_64`   | 5.14.0  |
-| RedHat 9.5           | `redhat9.5x86_64`       | 5.14.0  |
-
-For OS versions not in the list above, single-node validation is recommended first.
-
 ## Further Reading
 
 Design rationale and operational guides have been split into standalone articles under the [Cilium Appendix](./appendix) directory:
 
 - [Cilium Tuning for Large-Scale Clusters](./appendix/large-scale-tuning.md)
+- [Verified Node Operating Systems](./appendix/verified-os.md)
 - [Why Native Routing mode needs local-router-ipv4](./appendix/local-router-ipv4.md)
 - [Why Native Routing disables sysctlfix while Overlay enables it](./appendix/sysctlfix.md)
 - [Why GR Native Routing does not support L7/DNS NetworkPolicy](./appendix/gr-no-l7-dns.md)
