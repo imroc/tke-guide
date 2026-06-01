@@ -206,6 +206,15 @@ MSG_ZH_INPUT_OPTION="请输入选项 [1/2]: "
 MSG_EN_INPUT_OPTION="Enter option [1/2]: "
 MSG_ZH_INVALID_OPTION="无效选项，请输入 1 或 2"
 MSG_EN_INVALID_OPTION="Invalid option, enter 1 or 2"
+
+# GR Native Routing L7 DNS limitation warning
+MSG_ZH_GR_NATIVE_L7_WARN_TITLE="提醒：GR 集群 + Native Routing 模式不支持 toFQDNs / DNS L7 NetworkPolicy"
+MSG_EN_GR_NATIVE_L7_WARN_TITLE="Warning: GR cluster + Native Routing does not support toFQDNs / DNS L7 NetworkPolicy"
+MSG_ZH_GR_NATIVE_L7_WARN_BODY="原因：GR 模式下 Pod 流量过 tke-bridge 的 cbr0 网桥，cilium 的 DNS 代理依赖\n      iptables TPROXY 把 DNS 包 dispatch 到本机 socket，但桥转发的 frame\n      不会真正进入 IP routing/socket lookup，DNS 代理收不到流量，被含\n      \`rules.dns\` 或 \`toFQDNs\` 的 CiliumNetworkPolicy 选中的 Pod，所有\n      DNS 查询都会超时。\n\n影响：tke-guide 教程 NetworkPolicy 章节中所有用到 \`rules.dns\` 或\n      \`toFQDNs\` 的示例（默认拒绝、统一管控基础设施、A 只能访问指定域名等）\n      在 GR Native Routing 集群下都不可用。\n\n如有需求请二选一：\n  - 必须用域名级出向控制 → 选 Overlay 模式（输入 2）\n  - 可放弃域名级控制 → 继续 Native Routing，避免使用 \`rules.dns\` /\n    \`toFQDNs\`，改用 \`toCIDR\` 列网段或 \`toEntities: [world]\`\n\n详见: https://imroc.cc/tke/networking/cilium/networkpolicy#%E6%A8%A1%E5%BC%8F%E5%85%BC%E5%AE%B9%E6%80%A7"
+MSG_EN_GR_NATIVE_L7_WARN_BODY="Reason: In GR mode, Pod traffic traverses the tke-bridge cbr0 Linux bridge.\n        cilium's DNS proxy relies on iptables TPROXY to dispatch DNS\n        packets to a local socket, but bridge-forwarded frames don't\n        actually enter IP routing/socket lookup, so the DNS proxy receives\n        no traffic. Pods selected by a CiliumNetworkPolicy containing\n        \`rules.dns\` or \`toFQDNs\` will time out on every DNS query.\n\nImpact: All examples in the NetworkPolicy chapter that use \`rules.dns\` or\n        \`toFQDNs\` (default-deny, infrastructure baseline, FQDN egress, ...)\n        are NOT usable on GR Native Routing clusters.\n\nIf affected, choose one:\n  - Need FQDN-based egress control → choose Overlay mode (enter 2)\n  - Can give up FQDN-level control → keep Native Routing, avoid\n    \`rules.dns\` / \`toFQDNs\`; use \`toCIDR\` or \`toEntities: [world]\`\n\nMore: https://imroc.cc/tke/en/networking/cilium/networkpolicy#mode-compatibility"
+MSG_ZH_GR_NATIVE_L7_POST_WARN="提醒：当前模式不支持 toFQDNs / DNS L7 NetworkPolicy（GR + Native Routing 限制）。\n配置 NetworkPolicy 时请避免使用 \`rules.dns\` 和 \`toFQDNs\`，改用 \`toCIDR\` 列网段。\n详见: https://imroc.cc/tke/networking/cilium/networkpolicy#%E6%A8%A1%E5%BC%8F%E5%85%BC%E5%AE%B9%E6%80%A7"
+MSG_EN_GR_NATIVE_L7_POST_WARN="Reminder: This mode does NOT support toFQDNs / DNS L7 NetworkPolicy (GR + Native Routing limitation).\nWhen writing NetworkPolicies, avoid \`rules.dns\` and \`toFQDNs\`; use \`toCIDR\` instead.\nMore: https://imroc.cc/tke/en/networking/cilium/networkpolicy#mode-compatibility"
+
 MSG_ZH_INPUT_VERSION="请输入 Cilium 版本"
 MSG_EN_INPUT_VERSION="Enter Cilium version"
 MSG_ZH_INPUT_POD_CIDR="请输入 Overlay Pod CIDR"
@@ -410,6 +419,13 @@ select_routing_mode() {
   msg MODE_NATIVE
   msg MODE_OVERLAY
   echo ""
+  # GR clusters: warn about L7 DNS NetworkPolicy limitation in Native Routing
+  # (cbr0 bridge breaks TPROXY socket dispatch). VPC-CNI 不走 cbr0，无此限制。
+  if [[ "${NETWORK_MODE:-}" == "GR" ]]; then
+    warn "$(msg GR_NATIVE_L7_WARN_TITLE)"
+    echo -e "$(msg GR_NATIVE_L7_WARN_BODY)"
+    echo ""
+  fi
   while true; do
     read -rp "$(msg INPUT_OPTION)" choice
     case "$choice" in
@@ -946,6 +962,8 @@ cmd_install_cilium() {
       echo "    node.cilium.io/agent-not-ready=true:NoSchedule"
       info "Cilium agent will automatically remove this taint once ready. Normal Pod scheduling is not affected."
     fi
+    echo ""
+    warn "$(msg GR_NATIVE_L7_POST_WARN)"
   fi
 
   # Export installed values as YAML for user reference
