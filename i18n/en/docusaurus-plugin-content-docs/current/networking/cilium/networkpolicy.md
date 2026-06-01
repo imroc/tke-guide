@@ -150,7 +150,7 @@ Some capabilities below depend on cilium's **L7 DNS Proxy** (specifically `toFQD
 
 **Symptom**: In GR Native Routing mode, Pods selected by a CNP containing `rules.dns` or `toFQDNs` will have **all DNS queries time out** (no response — not NXDOMAIN/REFUSED), even cluster-internal names like `kubernetes.default.svc` cannot be resolved.
 
-**Official confirmation**: The cilium documentation explicitly lists "Layer 7 Policy" as a known limitation of generic-veth chaining mode. See [Cilium Docs - Generic Veth Chaining § Limitations](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/#limitations) and tracking issue [cilium/cilium#12454](https://github.com/cilium/cilium/issues/12454).
+The cilium documentation explicitly lists "Layer 7 Policy" as a known limitation of generic-veth chaining mode. See [Cilium Docs - Generic Veth Chaining § Limitations](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/#limitations) and tracking issue [cilium/cilium#12454](https://github.com/cilium/cilium/issues/12454).
 
 **Recommendations**:
 
