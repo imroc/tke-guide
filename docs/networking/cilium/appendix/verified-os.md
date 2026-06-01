@@ -29,9 +29,9 @@
 
 本文 OS 列表的产生过程：
 
-1. 用 [terraform-manifests](https://github.com/imroc/terraform-manifests) 中的模块为每种网络模式（VPC-CNI / GR）创建独立测试集群，每个集群按 OS 清单创建多个节点池（一个 OS 一个节点池，每个节点池 1 个节点）。
+1. 为每种网络模式（VPC-CNI / GR）准备一个测试集群，按 OS 清单创建多个节点池（一个 OS 一个节点池，每个节点池 1 个节点）。
 2. 用 [安装脚本](../install.md#一键安装脚本) 在集群上安装 cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache。
-3. 执行脚本的 e2e 测试子命令：
+3. 在已连接集群的环境（kubeconfig 已配置好）执行脚本的 e2e 测试子命令：
    ```bash
    ./cilium.sh e2e-test
    ```

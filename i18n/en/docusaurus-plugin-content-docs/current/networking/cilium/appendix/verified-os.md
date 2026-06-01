@@ -29,9 +29,9 @@ The `OsName` column matches the `node_os` field of the [tencentcloud_kubernetes_
 
 The list above is produced as follows:
 
-1. Use the modules in [terraform-manifests](https://github.com/imroc/terraform-manifests) to create one isolated test cluster per network mode (VPC-CNI / GR), then create one node pool per OS in the list (1 node per pool).
+1. Prepare one test cluster per network mode (VPC-CNI / GR), and create one node pool per OS in the list (1 node per pool).
 2. Use the [one-click install script](../install.md#one-click-install-script) to install cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache.
-3. Run the e2e subcommand:
+3. From an environment with kubeconfig pointed at the cluster, run the e2e subcommand:
    ```bash
    ./cilium.sh e2e-test
    ```
