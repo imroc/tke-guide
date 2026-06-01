@@ -9,15 +9,16 @@
 
 :::tip[如何选择]
 
-| 对比项               | Native Routing (VPC-CNI) ⭐ | Native Routing (GR)                | Overlay (VPC-CNI) ⭐                       | Overlay (GR)                                       |
-| -------------------- | --------------------------- | ---------------------------------- | ------------------------------------------ | -------------------------------------------------- |
-| 网络性能             | 最优                        | 较优（多一层网桥转发）             | 略有开销（vxlan 封装）                     | 略有开销（vxlan 封装）                             |
-| Pod IP 范围          | VPC IP                      | VPC 辅助网段 IP                    | 独立 CIDR，不占用 VPC IP                   | 独立 CIDR，不占用 VPC IP                           |
-| IP 容量扩容          | 给集群新增 VPC-CNI 子网     | 给集群新增 GR 网段（VPC 辅助网段） | 追加 CIDR 到 clusterPoolIPv4PodCIDRList    | 同左                                               |
-| 节点数量限制         | 无                          | 受 ClusterCIDR 限制                | 无                                         | 受 GR 集群的 ClusterCIDR 限制（GR 集群本身的限制） |
-| 集群外访问 Pod       | 可直接路由                  | VPC 内可路由                       | 不可直接路由，需通过 Service/Ingress       | 不可直接路由                                       |
-| L7/DNS NetworkPolicy | ✅ 完整支持                 | ⚠️ 不支持（cbr0 桥限制）           | ✅ 完整支持                                | ✅ 完整支持                                        |
-| 适用场景             | 常规场景（推荐）            | 已有 GR 集群的场景                 | IP 资源紧张、纳管 IDC、满血 cilium（推荐） | 同左，但已有 GR 集群                               |
+| 对比项               | Native Routing (VPC-CNI) ⭐ | Native Routing (GR)                   | Overlay (VPC-CNI) ⭐                       | Overlay (GR)                                       |
+| -------------------- | --------------------------- | ------------------------------------- | ------------------------------------------ | -------------------------------------------------- |
+| 网络性能             | 最优                        | 较优（多一层网桥转发）                | 略有开销（vxlan 封装）                     | 略有开销（vxlan 封装）                             |
+| Pod IP 范围          | VPC IP                      | VPC 辅助网段 IP                       | 独立 CIDR，不占用 VPC IP                   | 独立 CIDR，不占用 VPC IP                           |
+| IP 容量扩容          | 给集群新增 VPC-CNI 子网     | 给集群新增 GR 网段（VPC 辅助网段）    | 追加 CIDR 到 clusterPoolIPv4PodCIDRList    | 同左                                               |
+| 节点数量限制         | 无                          | 受 ClusterCIDR 限制                   | 无                                         | 受 GR 集群的 ClusterCIDR 限制（GR 集群本身的限制） |
+| 集群外访问 Pod       | 可直接路由                  | VPC 内可路由                          | 不可直接路由，需通过 Service/Ingress       | 不可直接路由                                       |
+| L7/DNS NetworkPolicy | ✅ 完整支持                 | ⚠️ 不支持（cbr0 桥限制）              | ✅ 完整支持                                | ✅ 完整支持                                        |
+| 节点池额外要求       | 无                          | ⚠️ 必须打 cilium agent-not-ready 污点 | 无                                         | 无                                                 |
+| 适用场景             | 常规场景（推荐）            | 已有 GR 集群的场景                    | IP 资源紧张、纳管 IDC、满血 cilium（推荐） | 同左，但已有 GR 集群                               |
 
 **关于 GR Native Routing 的 L7/DNS NetworkPolicy 限制**：GR 模式使用 [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) 与 tke-bridge 共存，Pod 流量经过 Linux bridge `cbr0`。该路径下，cilium 通过 BPF 给 DNS 流量打 mark 后依赖 iptables TPROXY 把包 dispatch 给 cilium DNS 代理 socket，但桥转发路径上的包不会真正进入 IP routing/socket lookup，DNS 代理收不到流量，被含 `toFQDNs` 或 `rules.dns` 的策略选中的 Pod 会出现 DNS 查询超时。VPC-CNI Native Routing 不走 cbr0（Pod 直接挂在弹性网卡上），不存在该问题。如果业务要求 GR 集群下也能用 toFQDNs，需选 Overlay 模式。详见 [NetworkPolicy 应用实践 - 模式兼容性](networkpolicy.md#模式兼容性)。
 

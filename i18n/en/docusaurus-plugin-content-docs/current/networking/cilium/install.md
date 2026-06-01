@@ -5,17 +5,20 @@ This article describes how to install Cilium in a TKE cluster, supporting the fo
 - **Native Routing**: Coexists with TKE CNI, Pods use IPs allocated by TKE, Cilium provides enhanced capabilities such as NetworkPolicy, observability, and kube-proxy replacement.
 - **Overlay (vxlan tunnel)**: Completely replaces all TKE CNIs, Pod IPs don't consume underlay IPs, suitable for scenarios where IP allocation is difficult, or to replace TKE's built-in CiliumOverlay network mode for full functionality.
 
+Each mode supports both VPC-CNI and GlobalRouter (GR) base clusters, for a total of 4 combinations. **VPC-CNI clusters are recommended**, offering better network performance and no node count limit:
+
 :::tip[How to Choose]
 
-| Comparison Item      | Native Routing (VPC-CNI) | Native Routing (GR)           | Overlay (vxlan)                                                   |
-| -------------------- | ------------------------ | ----------------------------- | ----------------------------------------------------------------- |
-| Network Performance  | Optimal (no extra encap) | Optimal (no extra encap)      | Slight overhead (vxlan encapsulation)                             |
-| Pod IP Range         | Uses VPC IPs             | Uses GR PodCIDR IPs           | Independent CIDR, doesn't consume VPC/GR IPs                      |
-| External Pod Access  | Directly routable        | Routable within VPC           | Not directly routable, requires Service/Ingress                   |
-| Node Count Limit     | None                     | Limited by ClusterCIDR        | GR limited, VPC-CNI unlimited                                     |
-| L7/DNS NetworkPolicy | ✅ Fully supported       | ⚠️ Not supported (cbr0 limit) | ✅ Fully supported                                                |
-| Use Cases            | General scenarios        | General scenarios             | IP resource shortage, managing IDC clusters, full-featured cilium |
-| Base Cluster         | VPC-CNI network mode     | GlobalRouter mode             | GlobalRouter or VPC-CNI mode                                      |
+| Comparison Item       | Native Routing (VPC-CNI) ⭐ | Native Routing (GR)                      | Overlay (VPC-CNI) ⭐                          | Overlay (GR)                               |
+| --------------------- | --------------------------- | ---------------------------------------- | --------------------------------------------- | ------------------------------------------ |
+| Network Performance   | Optimal                     | Good (extra bridge hop)                  | Slight overhead (vxlan encap)                 | Slight overhead (vxlan encap)              |
+| Pod IP Range          | VPC IP                      | VPC secondary CIDR IP                    | Independent CIDR, doesn't consume VPC IP      | Independent CIDR, doesn't consume VPC IP   |
+| IP Capacity Expansion | Add VPC-CNI subnet          | Add GR CIDR (VPC secondary CIDR)         | Append CIDR to clusterPoolIPv4PodCIDRList     | Same as left                               |
+| Node Count Limit      | None                        | Limited by ClusterCIDR                   | None                                          | Limited by GR ClusterCIDR (GR's own limit) |
+| External Pod Access   | Directly routable           | Routable within VPC                      | Not directly routable, via Service/Ingress    | Not directly routable                      |
+| L7/DNS NetworkPolicy  | ✅ Fully supported          | ⚠️ Not supported (cbr0 bridge limit)     | ✅ Fully supported                            | ✅ Fully supported                         |
+| Node Pool Requirement | None                        | ⚠️ Must add cilium agent-not-ready taint | None                                          | None                                       |
+| Use Cases             | General (recommended)       | Existing GR cluster                      | IP shortage, IDC, full-featured cilium (rec.) | Same as left, but existing GR cluster      |
 
 **About the L7/DNS NetworkPolicy limitation in GR Native Routing**: GR mode uses [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) coexisting with tke-bridge, and Pod traffic goes through the Linux bridge `cbr0`. On this path, cilium marks DNS traffic via BPF and relies on iptables TPROXY to dispatch packets to the cilium DNS proxy socket, but bridge-forwarded packets don't actually enter IP routing/socket lookup, so the DNS proxy receives no traffic. Pods selected by policies containing `toFQDNs` or `rules.dns` will experience DNS query timeouts. VPC-CNI Native Routing doesn't go through cbr0 (Pods are attached directly to ENIs), so this issue doesn't occur. If your business needs `toFQDNs` on a GR cluster, choose Overlay mode. See [NetworkPolicy Practice - Mode Compatibility](networkpolicy.md#mode-compatibility).
 
