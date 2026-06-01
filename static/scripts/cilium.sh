@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 ###############################################################################
@@ -13,7 +13,8 @@ set -euo pipefail
 #
 # Usage:
 #   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
-#   bash cilium.sh <command>
+#   chmod +x cilium.sh
+#   ./cilium.sh <command>
 #
 # Note: install-cilium is interactive (asks for routing mode etc.). Do NOT use
 # `curl ... | bash -s install-cilium` — bash's stdin gets consumed by curl's
@@ -271,8 +272,8 @@ show_help() {
   msg HELP_EXAMPLES
   echo "  ./$script_name install-cilium"
   echo "  ./$script_name install-localdns"
-  echo "  curl -sfL $url -o $script_name && bash $script_name install-cilium"
-  echo "  curl -sfL $url -o $script_name && bash $script_name install-localdns"
+  echo "  curl -sfL $url -o $script_name && chmod +x $script_name && ./$script_name install-cilium"
+  echo "  curl -sfL $url -o $script_name && chmod +x $script_name && ./$script_name install-localdns"
   echo ""
   if is_zh; then
     echo "提示:"

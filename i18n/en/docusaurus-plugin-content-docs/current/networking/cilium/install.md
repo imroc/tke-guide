@@ -135,14 +135,16 @@ The script auto-detects the cluster environment and guides you through installat
 
 ```bash
 curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
-bash cilium.sh install-cilium
+chmod +x cilium.sh
+./cilium.sh install-cilium
 ```
 
 If your network cannot reach GitHub, use the mirror site:
 
 ```bash
 curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
-bash cilium.sh install-cilium
+chmod +x cilium.sh
+./cilium.sh install-cilium
 ```
 
 The script auto-detects the cluster network mode, prompts you to select the installation plan and version, and then performs the install. During installation, you can also choose to enable [Egress Gateway](egress-gateway.md) and [Nodelocal DNSCache](with-node-local-dns.md). For manual installation, see the steps below.

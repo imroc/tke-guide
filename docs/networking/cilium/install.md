@@ -101,14 +101,16 @@ helm repo add cilium https://helm.cilium.io/
 
 ```bash
 curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
-bash cilium.sh install-cilium
+chmod +x cilium.sh
+./cilium.sh install-cilium
 ```
 
 如果网络环境无法连接 GitHub，可使用站点地址：
 
 ```bash
 curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
-bash cilium.sh install-cilium
+chmod +x cilium.sh
+./cilium.sh install-cilium
 ```
 
 脚本会自动检测集群网络模式、引导选择安装方案和版本，然后执行安装。安装过程中还可选择是否启用 [Egress Gateway](egress-gateway.md) 和 [Nodelocal DNSCache](with-node-local-dns.md)。如需手动安装，参考后续步骤。
@@ -889,14 +891,16 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
 
 ```bash
 curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
-bash cilium.sh e2e-test
+chmod +x cilium.sh
+./cilium.sh e2e-test
 ```
 
 如果网络环境无法连接 GitHub，可使用站点地址：
 
 ```bash
 curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
-bash cilium.sh e2e-test
+chmod +x cilium.sh
+./cilium.sh e2e-test
 ```
 
 ### 手动测试

@@ -24,14 +24,16 @@
 
 ```bash
 curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
-bash cilium.sh enable-egress-gateway
+chmod +x cilium.sh
+./cilium.sh enable-egress-gateway
 ```
 
 如果网络环境无法连接 GitHub，可使用站点地址：
 
 ```bash
 curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
-bash cilium.sh enable-egress-gateway
+chmod +x cilium.sh
+./cilium.sh enable-egress-gateway
 ```
 
 ### 手动启用

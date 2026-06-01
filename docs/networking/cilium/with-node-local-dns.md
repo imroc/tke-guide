@@ -22,14 +22,16 @@ Cilium 官方给出了通过配置 CiliumLocalRedirectPolicy 来实现与 Nodelo
 
 ```bash
 curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
-bash cilium.sh install-localdns
+chmod +x cilium.sh
+./cilium.sh install-localdns
 ```
 
 如果网络环境无法连接 GitHub，可使用站点地址：
 
 ```bash
 curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
-bash cilium.sh install-localdns
+chmod +x cilium.sh
+./cilium.sh install-localdns
 ```
 
 ### 手动安装
