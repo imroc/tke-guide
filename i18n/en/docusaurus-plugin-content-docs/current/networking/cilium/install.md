@@ -1135,7 +1135,12 @@ For OS versions not in the list above, a single-node smoke test is recommended f
 
 ### Why GR Native Routing does not support L7/DNS NetworkPolicy
 
-GR mode uses [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) coexisting with tke-bridge, and Pod traffic goes through the Linux bridge `cbr0`. On this path, cilium marks DNS traffic via BPF and relies on iptables TPROXY to dispatch packets to the cilium DNS proxy socket, but bridge-forwarded packets don't actually enter IP routing/socket lookup, so the DNS proxy receives no traffic. Pods selected by policies containing `toFQDNs` or `rules.dns` will experience DNS query timeouts.
+This is a **known limitation** of cilium when running in generic-veth chaining mode. The official cilium documentation explicitly lists "Layer 7 Policy" as one of the Limitations of this mode:
+
+- [Cilium Docs - Generic Veth Chaining § Limitations](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/#limitations)
+- Tracking issue: [cilium/cilium#12454 - Proxy redirect issue when running Cilium on top of Calico (CNI-Chaining)](https://github.com/cilium/cilium/issues/12454) (packet mark conflict that breaks proxy redirect — same root cause as our scenario)
+
+Specifically in TKE GR mode: when coexisting with tke-bridge, Pod traffic goes through the Linux bridge `cbr0`. On this path, cilium marks DNS traffic via BPF and relies on iptables TPROXY to dispatch packets to the cilium DNS proxy socket, but bridge-forwarded packets don't actually enter IP routing/socket lookup, so the DNS proxy receives no traffic. Pods selected by policies containing `toFQDNs` or `rules.dns` will experience DNS query timeouts.
 
 VPC-CNI Native Routing doesn't go through cbr0 (Pods are attached directly to ENIs), so this issue doesn't occur. If your business needs `toFQDNs` on a GR cluster, choose Overlay mode. See [NetworkPolicy Practice - Mode Compatibility](networkpolicy.md#mode-compatibility).
 

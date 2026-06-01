@@ -1208,7 +1208,12 @@ kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{.items[0].status.
 
 ### 为什么 GR Native Routing 不支持 L7/DNS NetworkPolicy
 
-GR 模式使用 [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) 与 tke-bridge 共存，Pod 流量经过 Linux bridge `cbr0`。该路径下，cilium 通过 BPF 给 DNS 流量打 mark 后依赖 iptables TPROXY 把包 dispatch 给 cilium DNS 代理 socket，但桥转发路径上的包不会真正进入 IP routing/socket lookup，DNS 代理收不到流量，被含 `toFQDNs` 或 `rules.dns` 的策略选中的 Pod 会出现 DNS 查询超时。
+这是 cilium 在 generic-veth chaining 模式下的**已知限制**，cilium 官方文档已明确列出 "Layer 7 Policy" 为该模式的 Limitations 之一，参考：
+
+- [Cilium Docs - Generic Veth Chaining § Limitations](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/#limitations)
+- 对应跟踪 issue: [cilium/cilium#12454 - Proxy redirect issue when running Cilium on top of Calico (CNI-Chaining)](https://github.com/cilium/cilium/issues/12454)（涉及 packet mark 冲突导致 proxy redirect 失败，与本文场景同源）
+
+具体到 TKE GR 模式：与 tke-bridge 共存时 Pod 流量经过 Linux bridge `cbr0`。cilium 通过 BPF 给 DNS 流量打 mark 后依赖 iptables TPROXY 把包 dispatch 给 cilium DNS 代理 socket，但桥转发路径上的包不会真正进入 IP routing/socket lookup，DNS 代理收不到流量，被含 `toFQDNs` 或 `rules.dns` 的策略选中的 Pod 会出现 DNS 查询超时。
 
 VPC-CNI Native Routing 不走 cbr0（Pod 直接挂在弹性网卡上），不存在该问题。如果业务要求 GR 集群下也能用 toFQDNs，需选 Overlay 模式。详见 [NetworkPolicy 应用实践 - 模式兼容性](networkpolicy.md#模式兼容性)。
 
