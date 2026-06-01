@@ -136,11 +136,44 @@ CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy differ primarily in scope
 - Use descriptive prefixes for cluster policies, like `default-deny-all`, `global-infrastructure`.
 - Use application-related names for namespace policies, like `frontend-to-backend`, `allow-external-api`.
 
+## Mode Compatibility
+
+Some capabilities below depend on cilium's **L7 DNS Proxy** (specifically `toFQDNs` and `toPorts.rules.dns` rules). The mechanism: cilium uses BPF + iptables TPROXY to redirect DNS queries from selected Pods to the cilium-agent's built-in DNS proxy, which resolves the query, records the response, and adds the IPs in the response to the toFQDNs allow list.
+
+**This path behaves differently across cilium network modes**:
+
+| Mode                     | toFQDNs / dns L7 Support | Reason                                                                                                                                                                                                                                 |
+| ------------------------ | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native Routing (VPC-CNI) | ✅ Fully supported       | Pods are attached directly to ENIs, traffic doesn't traverse the Linux bridge, DNS redirection works                                                                                                                                   |
+| Native Routing (GR)      | ❌ Not supported         | Coexists with tke-bridge via [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/); packets traversing the cbr0 bridge bypass socket dispatch, so the cilium DNS proxy receives no traffic |
+| Overlay (VPC-CNI / GR)   | ✅ Fully supported       | cilium fully owns the Pod datapath, DNS redirection works                                                                                                                                                                              |
+
+**Symptom**: In GR Native Routing mode, Pods selected by a CNP containing `rules.dns` or `toFQDNs` will have **all DNS queries time out** (no response — not NXDOMAIN/REFUSED), even cluster-internal names like `kubernetes.default.svc` cannot be resolved.
+
+**Recommendations**:
+
+- **VPC-CNI Native Routing / Overlay**: Use `toFQDNs` and `rules.dns` freely — all examples below apply directly
+- **GR Native Routing**: Avoid `rules.dns` and `toFQDNs`; instead:
+  - Use `toCIDR` / `toCIDRSet` to list target ranges (e.g., Tencent Cloud API CIDRs)
+  - Use `toEntities: [world]` to allow all external traffic (coarser granularity)
+  - Use `toEndpoints` with namespace/Pod labels for in-cluster access control
+  - If domain-based egress control is required, switch to Overlay mode
+
+Below, examples that use `rules.dns` or `toFQDNs` will be marked **Not available in GR Native Routing**.
+
 ## Usage Practices
 
 ### Security Baseline: Default Deny
 
 Cluster default denies egress traffic (except DNS resolution, and Pods in kube-system namespace), strictly controlling network access permissions for cluster Pods:
+
+:::warning[Not available in GR Native Routing]
+
+This policy contains `rules.dns`. In **GR Native Routing** mode, Pods selected by it will time out on DNS resolution. See [Mode Compatibility](#mode-compatibility). VPC-CNI Native Routing and Overlay modes are unaffected.
+
+For a "default-deny egress + allow DNS" baseline on GR clusters, drop the `rules: dns: ...` lines and keep only `port: "53" protocol: ANY` (L4 only), at the cost of losing toFQDNs.
+
+:::
 
 :::tip[Note]
 
@@ -178,6 +211,12 @@ spec:
 ### Unified Management of Infrastructure Network Policies
 
 A cluster may deploy many infrastructure-related applications scattered across multiple namespaces. We can use CiliumClusterwideNetworkPolicy and namespace labels to uniformly set network policies for these namespaces (assuming these namespaces have the `role=infrastructure` label):
+
+:::warning[Not available in GR Native Routing]
+
+This example uses `rules.dns` + `toFQDNs`, which is not available in **GR Native Routing** mode. On GR clusters, replace the `toFQDNs` part with `toCIDR` listing the relevant Tencent Cloud API ranges (e.g., `9.0.0.0/8`, `169.254.0.0/16`) and remove the DNS L7 rule. VPC-CNI Native Routing and Overlay modes work as-is. See [Mode Compatibility](#mode-compatibility).
+
+:::
 
 ```yaml
 apiVersion: cilium.io/v2
@@ -482,6 +521,12 @@ spec:
 ```
 
 #### A can only access services with specified domain names
+
+:::warning[Not available in GR Native Routing]
+
+This example uses `rules.dns` + `toFQDNs`. In **GR Native Routing** mode, selected Pods will time out on DNS resolution. On GR clusters, switch to `toCIDR` (listing target ranges) or use Overlay mode. VPC-CNI Native Routing and Overlay modes work as-is. See [Mode Compatibility](#mode-compatibility).
+
+:::
 
 ```yaml
 apiVersion: cilium.io/v2
