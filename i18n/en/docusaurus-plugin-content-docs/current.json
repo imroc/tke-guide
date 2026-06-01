@@ -94,5 +94,9 @@
   "sidebar.tkeSidebar.category.Cilium 问题排查": {
     "message": "Troubleshooting Cilium",
     "description": "The label for category Cilium 问题排查 in sidebar tkeSidebar"
+  },
+  "sidebar.tkeSidebar.category.Cilium 附录": {
+    "message": "Cilium Appendix",
+    "description": "The label for category Cilium 附录 in sidebar tkeSidebar"
   }
 }
