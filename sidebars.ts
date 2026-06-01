@@ -43,7 +43,6 @@ const sidebars: SidebarsConfig = {
                 slug: '/networking/cilium/appendix'
               },
               items: [
-                'networking/cilium/appendix/faq',
                 'networking/cilium/appendix/large-scale-tuning',
                 'networking/cilium/appendix/local-router-ipv4',
                 'networking/cilium/appendix/sysctlfix',
