@@ -852,7 +852,7 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
 }
 ```
 
-## FAQ
+## Appendix
 
 ### How to view all default installation configurations for Cilium?
 
@@ -1114,14 +1114,6 @@ sysctl net.ipv4.conf.lxc_health.rp_filter
 kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{.items[0].status.initContainerStatuses}'
 ```
 
-## References
-
-- [Installation using Helm](https://docs.cilium.io/en/stable/installation/k8s-install-helm/)
-- [Generic Veth Chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/)
-- [Kubernetes Without kube-proxy](https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/)
-
-## Appendix
-
 ### Verified Node Operating Systems
 
 The table below lists OS versions and kernels that have been hands-on verified across all 4 installation modes (VPC-CNI/GR × Native/Overlay) in this guide.
@@ -1157,3 +1149,9 @@ Native Routing (VPC-CNI) and Overlay modes **do NOT need** this taint:
 
 - Native Routing (VPC-CNI) uses `cni.customConf=true` with a unified CNI config (same ConfigMap shared by all nodes, not per-node generated) — no other CNI writes first.
 - Overlay mode has cilium fully manage the CNI — kubelet won't successfully create Pod sandboxes until cilium CNI is ready.
+
+## References
+
+- [Installation using Helm](https://docs.cilium.io/en/stable/installation/k8s-install-helm/)
+- [Generic Veth Chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/)
+- [Kubernetes Without kube-proxy](https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/)

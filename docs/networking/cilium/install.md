@@ -924,7 +924,7 @@ cilium connectivity test \
 
 :::
 
-## 常见问题
+## 附录
 
 ### 如何查看 Cilium 全部的默认安装配置？
 
@@ -1187,14 +1187,6 @@ sysctl net.ipv4.conf.lxc_health.rp_filter
 kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{.items[0].status.initContainerStatuses}'
 ```
 
-## 参考资料
-
-- [Installation using Helm](https://docs.cilium.io/en/stable/installation/k8s-install-helm/)
-- [Generic Veth Chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/)
-- [Kubernetes Without kube-proxy](https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/)
-
-## 附录
-
 ### 已验证的节点操作系统
 
 下表汇总本文 4 种安装模式（VPC-CNI/GR × Native/Overlay）均已实测通过的 OS 及内核。
@@ -1230,3 +1222,9 @@ Native Routing (VPC-CNI) 和 Overlay 模式**不需要**此 taint：
 
 - Native Routing (VPC-CNI) 通过 `cni.customConf=true` 使用统一的 CNI 配置（所有节点共用同一份 ConfigMap，不依赖 per-node 动态生成），不存在其他 CNI 先写入的时序问题。
 - Overlay 模式由 cilium 完全接管 CNI，kubelet 在 cilium CNI 就绪前不会成功创建 Pod sandbox。
+
+## 参考资料
+
+- [Installation using Helm](https://docs.cilium.io/en/stable/installation/k8s-install-helm/)
+- [Generic Veth Chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/)
+- [Kubernetes Without kube-proxy](https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/)
