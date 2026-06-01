@@ -12,7 +12,14 @@ set -euo pipefail
 #   English: https://imroc.cc/tke/en/networking/cilium/install
 #
 # Usage:
-#   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s <command>
+#   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
+#   bash cilium.sh <command>
+#
+# Note: install-cilium is interactive (asks for routing mode etc.). Do NOT use
+# `curl ... | bash -s install-cilium` — bash's stdin gets consumed by curl's
+# pipe output, so `read` returns EOF immediately and the script exits right
+# after printing the menu. Always download first, then run.
+# For non-interactive batch deployment, see the env var section at the bottom.
 #
 # Commands:
 #   install-cilium          Install Cilium (auto-detect network mode, interactive)
@@ -264,8 +271,19 @@ show_help() {
   msg HELP_EXAMPLES
   echo "  ./$script_name install-cilium"
   echo "  ./$script_name install-localdns"
-  echo "  curl -sfL $url | bash -s install-cilium"
-  echo "  curl -sfL $url | bash -s install-localdns"
+  echo "  curl -sfL $url -o $script_name && bash $script_name install-cilium"
+  echo "  curl -sfL $url -o $script_name && bash $script_name install-localdns"
+  echo ""
+  if is_zh; then
+    echo "提示:"
+    echo "  install-cilium 是交互式命令，请先下载脚本再执行（不要用 \`curl ... | bash\`，"
+    echo "  否则 bash 的 stdin 会被 curl 占用，read 立即收到 EOF，菜单弹出后脚本会自动退出）。"
+  else
+    echo "Note:"
+    echo "  install-cilium is interactive. Download the script first, then run it (do NOT use"
+    echo "  \`curl ... | bash\` — bash's stdin gets consumed by curl, read hits EOF immediately,"
+    echo "  and the script exits right after printing the menu)."
+  fi
   echo ""
   if is_zh; then
     echo "文档:"

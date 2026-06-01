@@ -97,19 +97,34 @@ helm repo add cilium https://helm.cilium.io/
 
 ### 一键安装脚本
 
-可使用脚本自动检测集群环境并引导安装：
+可使用脚本自动检测集群环境并引导安装。先下载脚本再执行：
 
 ```bash
-curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s install-cilium
+curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
+bash cilium.sh install-cilium
 ```
 
 如果网络环境无法连接 GitHub，可使用站点地址：
 
 ```bash
-curl -sfL https://imroc.cc/tke/scripts/cilium.sh | bash -s install-cilium
+curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
+bash cilium.sh install-cilium
 ```
 
 脚本会自动检测集群网络模式、引导选择安装方案和版本，然后执行安装。安装过程中还可选择是否启用 [Egress Gateway](egress-gateway.md) 和 [Nodelocal DNSCache](with-node-local-dns.md)。如需手动安装，参考后续步骤。
+
+:::tip[为什么不用 `curl ... | bash` 一行执行？]
+
+本脚本 `install-cilium` 子命令是交互式的（需要选择安装模式等）。如果用 `curl ... | bash`，bash 的标准输入会被 curl 的输出占用，导致脚本中的 `read` 读不到键盘输入而立即退出（弹出选项后自动结束）。所以本文统一使用「先下载再执行」的写法。
+
+如果你确实希望一行命令完成，可以通过环境变量预先指定参数跳过交互，此时不再需要 stdin（详见脚本注释中的非交互模式说明）：
+
+```bash
+ROUTING_MODE=native CILIUM_VERSION=1.19.4 \
+  curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s install-cilium
+```
+
+:::
 
 ### 卸载 TKE 组件
 
@@ -873,13 +888,15 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
 使用脚本运行 cilium connectivity test（自动跳过公网测试，使用 TKE 可拉取的镜像）：
 
 ```bash
-curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s e2e-test
+curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
+bash cilium.sh e2e-test
 ```
 
 如果网络环境无法连接 GitHub，可使用站点地址：
 
 ```bash
-curl -sfL https://imroc.cc/tke/scripts/cilium.sh | bash -s e2e-test
+curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
+bash cilium.sh e2e-test
 ```
 
 ### 手动测试

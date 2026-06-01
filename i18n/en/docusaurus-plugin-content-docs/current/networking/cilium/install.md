@@ -129,6 +129,37 @@ helm repo add cilium https://helm.cilium.io/
 
 ## Install Cilium
 
+### One-Click Install Script
+
+The script auto-detects the cluster environment and guides you through installation. Download the script first, then run it:
+
+```bash
+curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
+bash cilium.sh install-cilium
+```
+
+If your network cannot reach GitHub, use the mirror site:
+
+```bash
+curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
+bash cilium.sh install-cilium
+```
+
+The script auto-detects the cluster network mode, prompts you to select the installation plan and version, and then performs the install. During installation, you can also choose to enable [Egress Gateway](egress-gateway.md) and [Nodelocal DNSCache](with-node-local-dns.md). For manual installation, see the steps below.
+
+:::tip[Why not run with `curl ... | bash` directly?]
+
+The `install-cilium` subcommand is interactive (you need to choose the install mode, etc.). With `curl ... | bash`, bash's stdin is consumed by curl's output, so the script's `read` calls cannot read from your keyboard and exit immediately (the script appears to quit right after printing the menu). For this reason, this guide consistently uses the "download first, then run" pattern.
+
+If you really want a one-liner, you can pre-set environment variables to skip the interactive prompts — stdin is no longer needed in that case (see the non-interactive mode comments in the script source):
+
+```bash
+ROUTING_MODE=native CILIUM_VERSION=1.19.4 \
+  curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s install-cilium
+```
+
+:::
+
 ### Configure CNI (VPC-CNI Chaining Mode Only)
 
 :::info[Note]
