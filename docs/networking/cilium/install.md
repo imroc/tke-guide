@@ -20,7 +20,10 @@
 | 节点池额外要求       | 无                          | ⚠️ 必须打 cilium agent-not-ready 污点 | 无                                         | 无                                                 |
 | 适用场景             | 常规场景（推荐）            | 已有 GR 集群的场景                    | IP 资源紧张、纳管 IDC、满血 cilium（推荐） | 同左，但已有 GR 集群                               |
 
-**关于 GR Native Routing 的 L7/DNS NetworkPolicy 限制**：GR 模式使用 [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) 与 tke-bridge 共存，Pod 流量经过 Linux bridge `cbr0`。该路径下，cilium 通过 BPF 给 DNS 流量打 mark 后依赖 iptables TPROXY 把包 dispatch 给 cilium DNS 代理 socket，但桥转发路径上的包不会真正进入 IP routing/socket lookup，DNS 代理收不到流量，被含 `toFQDNs` 或 `rules.dns` 的策略选中的 Pod 会出现 DNS 查询超时。VPC-CNI Native Routing 不走 cbr0（Pod 直接挂在弹性网卡上），不存在该问题。如果业务要求 GR 集群下也能用 toFQDNs，需选 Overlay 模式。详见 [NetworkPolicy 应用实践 - 模式兼容性](networkpolicy.md#模式兼容性)。
+两点限制详见附录：
+
+- ⚠️ Native Routing (GR) 不支持 L7/DNS NetworkPolicy → [为什么 GR Native Routing 不支持 L7/DNS NetworkPolicy](#为什么-gr-native-routing-不支持-l7dns-networkpolicy)
+- ⚠️ Native Routing (GR) 节点池必须打 cilium agent-not-ready 污点 → [为什么 Native Routing (GR) 节点池必须打 cilium agent-not-ready 污点](#为什么-native-routing-gr-节点池必须打-cilium-agent-not-ready-污点)
 
 :::
 
@@ -725,20 +728,13 @@ Cilium 要求 Linux kernel >= 5.10。**推荐 OS**：Ubuntu 24.04 或 TencentOS 
 
 :::warning[Native Routing (GR) 模式节点池必须配置 cilium taint]
 
-使用 **Native Routing (GR)** 方案时，创建节点池**必须**给节点添加以下污点：
+使用 **Native Routing (GR)** 方案时，创建节点池**必须**给节点添加以下污点（控制台在**高级设置**中添加，terraform 参考下方代码片段）：
 
 ```
 node.cilium.io/agent-not-ready=true:NoSchedule
 ```
 
-**原因**：GR 模式下每个节点的 PodCIDR 不同，CNI 配置由 tke-bridge-agent 按节点动态生成（包含该节点专属的子网信息），cilium 无法像 VPC-CNI 或 Overlay 模式那样用一份统一的 CNI 配置接管所有节点，只能通过 `chainingTarget` 监视 tke-bridge 生成的配置并追加自己。这导致一个时序问题：节点加入集群时 tke-bridge-agent 先写好 CNI 配置，kubelet 认为 CNI 就绪后立即调度 Pod，但此时 cilium agent 尚未启动完成，Pod 使用的是原始 tke-bridge CNI 而非经过 cilium-cni 增强的链路，masquerade、NetworkPolicy 等功能缺失。此 taint 确保只有 cilium agent 就绪后才调度业务 Pod（cilium agent 启动完成后会自动移除该 taint）。
-
-Native Routing (VPC-CNI) 和 Overlay 模式**不需要**此 taint：
-
-- Native Routing (VPC-CNI) 通过 `cni.customConf=true` 使用统一的 CNI 配置（所有节点共用同一份 ConfigMap，不依赖 per-node 动态生成），不存在其他 CNI 先写入的时序问题。
-- Overlay 模式由 cilium 完全接管 CNI，kubelet 在 cilium CNI 就绪前不会成功创建 Pod sandbox。
-
-控制台创建节点池时在**高级设置**中添加此污点。terraform 参考下方代码片段。
+原因详见附录 [为什么 Native Routing (GR) 节点池必须打 cilium agent-not-ready 污点](#为什么-native-routing-gr-节点池必须打-cilium-agent-not-ready-污点)。
 
 :::
 
@@ -1217,3 +1213,20 @@ kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{.items[0].status.
 | RedHat 9.5           | `redhat9.5x86_64`       | 5.14.0   |
 
 未在此列表的 OS 如需使用，建议自行验证。
+
+### 为什么 GR Native Routing 不支持 L7/DNS NetworkPolicy
+
+GR 模式使用 [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) 与 tke-bridge 共存，Pod 流量经过 Linux bridge `cbr0`。该路径下，cilium 通过 BPF 给 DNS 流量打 mark 后依赖 iptables TPROXY 把包 dispatch 给 cilium DNS 代理 socket，但桥转发路径上的包不会真正进入 IP routing/socket lookup，DNS 代理收不到流量，被含 `toFQDNs` 或 `rules.dns` 的策略选中的 Pod 会出现 DNS 查询超时。
+
+VPC-CNI Native Routing 不走 cbr0（Pod 直接挂在弹性网卡上），不存在该问题。如果业务要求 GR 集群下也能用 toFQDNs，需选 Overlay 模式。详见 [NetworkPolicy 应用实践 - 模式兼容性](networkpolicy.md#模式兼容性)。
+
+### 为什么 Native Routing (GR) 节点池必须打 cilium agent-not-ready 污点
+
+GR 模式下每个节点的 PodCIDR 不同，CNI 配置由 tke-bridge-agent 按节点动态生成（包含该节点专属的子网信息），cilium 无法像 VPC-CNI 或 Overlay 模式那样用一份统一的 CNI 配置接管所有节点，只能通过 `chainingTarget` 监视 tke-bridge 生成的配置并追加自己。这导致一个时序问题：节点加入集群时 tke-bridge-agent 先写好 CNI 配置，kubelet 认为 CNI 就绪后立即调度 Pod，但此时 cilium agent 尚未启动完成，Pod 使用的是原始 tke-bridge CNI 而非经过 cilium-cni 增强的链路，masquerade、NetworkPolicy 等功能缺失。
+
+加上 `node.cilium.io/agent-not-ready=true:NoSchedule` 污点可确保只有 cilium agent 就绪后才调度业务 Pod（cilium agent 启动完成后会自动移除该 taint）。
+
+Native Routing (VPC-CNI) 和 Overlay 模式**不需要**此 taint：
+
+- Native Routing (VPC-CNI) 通过 `cni.customConf=true` 使用统一的 CNI 配置（所有节点共用同一份 ConfigMap，不依赖 per-node 动态生成），不存在其他 CNI 先写入的时序问题。
+- Overlay 模式由 cilium 完全接管 CNI，kubelet 在 cilium CNI 就绪前不会成功创建 Pod sandbox。

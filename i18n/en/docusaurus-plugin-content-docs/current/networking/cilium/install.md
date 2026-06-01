@@ -20,7 +20,10 @@ Each mode supports both VPC-CNI and GlobalRouter (GR) base clusters, for a total
 | Node Pool Requirement | None                        | ⚠️ Must add cilium agent-not-ready taint | None                                          | None                                       |
 | Use Cases             | General (recommended)       | Existing GR cluster                      | IP shortage, IDC, full-featured cilium (rec.) | Same as left, but existing GR cluster      |
 
-**About the L7/DNS NetworkPolicy limitation in GR Native Routing**: GR mode uses [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) coexisting with tke-bridge, and Pod traffic goes through the Linux bridge `cbr0`. On this path, cilium marks DNS traffic via BPF and relies on iptables TPROXY to dispatch packets to the cilium DNS proxy socket, but bridge-forwarded packets don't actually enter IP routing/socket lookup, so the DNS proxy receives no traffic. Pods selected by policies containing `toFQDNs` or `rules.dns` will experience DNS query timeouts. VPC-CNI Native Routing doesn't go through cbr0 (Pods are attached directly to ENIs), so this issue doesn't occur. If your business needs `toFQDNs` on a GR cluster, choose Overlay mode. See [NetworkPolicy Practice - Mode Compatibility](networkpolicy.md#mode-compatibility).
+The two limitations are detailed in the appendix:
+
+- ⚠️ Native Routing (GR) does not support L7/DNS NetworkPolicy → [Why GR Native Routing does not support L7/DNS NetworkPolicy](#why-gr-native-routing-does-not-support-l7dns-networkpolicy)
+- ⚠️ Native Routing (GR) node pools must add the cilium agent-not-ready taint → [Why Native Routing (GR) node pools must add the cilium agent-not-ready taint](#why-native-routing-gr-node-pools-must-add-the-cilium-agent-not-ready-taint)
 
 :::
 
@@ -696,20 +699,13 @@ For the **full list of verified OS versions**, see the [Verified Node Operating 
 
 :::warning[Native Routing (GR) node pools must have cilium taint]
 
-When using the **Native Routing (GR)** option, you **must** add the following taint to nodes when creating node pools:
+When using the **Native Routing (GR)** option, you **must** add the following taint to nodes when creating node pools (in the **Advanced Settings** via the console, or via the terraform snippet below):
 
 ```
 node.cilium.io/agent-not-ready=true:NoSchedule
 ```
 
-**Reason**: In GR mode, each node has a different PodCIDR, and the CNI config is dynamically generated per-node by tke-bridge-agent (containing that node's specific subnet info). Cilium cannot use a single unified CNI config to take over all nodes (unlike VPC-CNI or Overlay modes) — it can only watch tke-bridge's config via `chainingTarget` and append itself. This creates a timing issue: when a node joins, tke-bridge-agent writes the CNI config first, kubelet considers CNI ready and schedules Pods immediately, but cilium agent hasn't finished starting yet. Pods end up using the raw tke-bridge CNI without cilium-cni enhancement, missing masquerade, NetworkPolicy, and other features. This taint ensures business Pods are only scheduled after the cilium agent is ready (cilium agent automatically removes the taint once started).
-
-Native Routing (VPC-CNI) and Overlay modes **do NOT need** this taint:
-
-- Native Routing (VPC-CNI) uses `cni.customConf=true` with a unified CNI config (same ConfigMap shared by all nodes, not per-node generated) — no other CNI writes first.
-- Overlay mode has cilium fully manage the CNI — kubelet won't successfully create Pod sandboxes until cilium CNI is ready.
-
-Add this taint in the **Advanced Settings** when creating node pools via the console. For terraform, see the code snippet below.
+See the appendix [Why Native Routing (GR) node pools must add the cilium agent-not-ready taint](#why-native-routing-gr-node-pools-must-add-the-cilium-agent-not-ready-taint) for the reason.
 
 :::
 
@@ -1144,3 +1140,20 @@ The table below lists OS versions and kernels that have been hands-on verified a
 | RedHat 9.5           | `redhat9.5x86_64`       | 5.14.0  |
 
 For OS versions not in the list above, a single-node smoke test is recommended first.
+
+### Why GR Native Routing does not support L7/DNS NetworkPolicy
+
+GR mode uses [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) coexisting with tke-bridge, and Pod traffic goes through the Linux bridge `cbr0`. On this path, cilium marks DNS traffic via BPF and relies on iptables TPROXY to dispatch packets to the cilium DNS proxy socket, but bridge-forwarded packets don't actually enter IP routing/socket lookup, so the DNS proxy receives no traffic. Pods selected by policies containing `toFQDNs` or `rules.dns` will experience DNS query timeouts.
+
+VPC-CNI Native Routing doesn't go through cbr0 (Pods are attached directly to ENIs), so this issue doesn't occur. If your business needs `toFQDNs` on a GR cluster, choose Overlay mode. See [NetworkPolicy Practice - Mode Compatibility](networkpolicy.md#mode-compatibility).
+
+### Why Native Routing (GR) node pools must add the cilium agent-not-ready taint
+
+In GR mode, each node has a different PodCIDR, and the CNI config is dynamically generated per-node by tke-bridge-agent (containing that node's specific subnet info). Cilium cannot use a single unified CNI config to take over all nodes (unlike VPC-CNI or Overlay modes) — it can only watch tke-bridge's config via `chainingTarget` and append itself. This creates a timing issue: when a node joins, tke-bridge-agent writes the CNI config first, kubelet considers CNI ready and schedules Pods immediately, but cilium agent hasn't finished starting yet. Pods end up using the raw tke-bridge CNI without cilium-cni enhancement, missing masquerade, NetworkPolicy, and other features.
+
+Adding the `node.cilium.io/agent-not-ready=true:NoSchedule` taint ensures business Pods are only scheduled after the cilium agent is ready (cilium agent automatically removes the taint once started).
+
+Native Routing (VPC-CNI) and Overlay modes **do NOT need** this taint:
+
+- Native Routing (VPC-CNI) uses `cni.customConf=true` with a unified CNI config (same ConfigMap shared by all nodes, not per-node generated) — no other CNI writes first.
+- Overlay mode has cilium fully manage the CNI — kubelet won't successfully create Pod sandboxes until cilium CNI is ready.
