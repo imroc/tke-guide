@@ -1019,6 +1019,7 @@ For OS versions not in the list above, single-node validation is recommended fir
 Design rationale and FAQ have been split into standalone articles under the [Cilium Appendix](./appendix) directory:
 
 - [FAQ](./appendix/faq.md)
+- [Cilium Tuning for Large-Scale Clusters](./appendix/large-scale-tuning.md)
 - [Why Native Routing mode needs local-router-ipv4](./appendix/local-router-ipv4.md)
 - [Why Native Routing disables sysctlfix while Overlay enables it](./appendix/sysctlfix.md)
 - [Why GR Native Routing does not support L7/DNS NetworkPolicy](./appendix/gr-no-l7-dns.md)

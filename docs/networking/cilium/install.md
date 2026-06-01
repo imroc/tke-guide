@@ -1017,6 +1017,7 @@ kubectl -n kube-system rollout status ds/cilium
 设计原理与常见问题已拆分到独立文章，归入 [Cilium 附录](./appendix) 目录：
 
 - [常见问题](./appendix/faq.md)
+- [大规模集群 Cilium 调优指南](./appendix/large-scale-tuning.md)
 - [为什么 Native Routing 模式要加 local-router-ipv4 配置？](./appendix/local-router-ipv4.md)
 - [为什么 Native Routing 模式禁用 sysctlfix，Overlay 模式却启用？](./appendix/sysctlfix.md)
 - [为什么 GR Native Routing 不支持 L7/DNS NetworkPolicy？](./appendix/gr-no-l7-dns.md)

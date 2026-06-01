@@ -1,6 +1,6 @@
 # FAQ
 
-This page collects frequently asked "can-I / how-to / what-if-it-errors" questions about self-hosting Cilium on TKE. For "why is it designed this way" questions, see the other rationale articles in this Cilium appendix.
+This page collects frequently asked "can-I / how-to / what-if-it-errors" questions about self-hosting Cilium on TKE. For "why is it designed this way" questions, see the other rationale articles in this Cilium appendix; for large-cluster tuning, see [Cilium Tuning for Large-Scale Clusters](./large-scale-tuning.md).
 
 ## How to view all default installation configurations for Cilium?
 
@@ -30,79 +30,6 @@ Copy the archive to the machine running helm, then install using the local path:
 helm upgrade --install cilium ./cilium-1.19.4.tgz \
   --namespace kube-system \
   -f values.yaml
-```
-
-## How to optimize for large-scale scenarios?
-
-For large clusters (hundreds of nodes / tens of thousands of Pods), consider the following:
-
-### 1. Enable CiliumEndpointSlice (recommended)
-
-Aggregates multiple CiliumEndpoint resources into a single CiliumEndpointSlice, significantly reducing watch/list pressure on the apiserver:
-
-```yaml
-ciliumEndpointSlice:
-  enabled: true
-```
-
-This feature was introduced in 1.11 and remains Beta in 1.19 ([tracking Stable progress](https://github.com/cilium/cilium/issues/31904)).
-
-### 2. Tune K8s client rate limits
-
-cilium-agent defaults to QPS=10, Burst=20 — possibly a bottleneck at scale; cilium-operator defaults are QPS=100, Burst=200:
-
-```yaml
-k8sClientRateLimit:
-  qps: 20
-  burst: 40
-  operator:
-    qps: 200
-    burst: 400
-```
-
-### 3. Reduce identity count
-
-cilium assigns a Security Identity to each unique label combination. Too many identities increase memory and policy computation overhead. Exclude irrelevant labels to reduce identity bloat:
-
-```yaml
-# Exclude high-cardinality labels to reduce Identity bloat
-extraConfig:
-  labels: "!pod-template-hash !controller-revision-hash !job-name !batch.kubernetes.io/controller-uid"
-```
-
-### 4. Configure agent / operator resources
-
-Default resource configs are conservative — for large clusters, set explicit values:
-
-```yaml
-resources:
-  requests:
-    cpu: 500m
-    memory: 512Mi
-  limits:
-    cpu: 2000m
-    memory: 2Gi
-operator:
-  resources:
-    requests:
-      cpu: 200m
-      memory: 256Mi
-    limits:
-      cpu: 1000m
-      memory: 1Gi
-```
-
-### 5. Use API Priority and Fairness (APF)
-
-The install script in [Install Cilium](../install.md) creates cilium-specific APF FlowSchema and PriorityLevelConfiguration by default, preventing cilium's list requests from impacting other components. For manual installs, set this up the same way.
-
-### 6. Dynamic BPF map sizing
-
-By default, BPF map capacity is auto-calculated based on system memory. To adjust the ratio manually:
-
-```yaml
-bpf:
-  mapDynamicSizeRatio: 0.0025
 ```
 
 ## Can VPC-CNI be dynamically enabled on a GR cluster after installing cilium?
