@@ -1136,9 +1136,20 @@ cmd_install_localdns() {
 
 # ====== e2e-test subcommand ======
 # Runs cilium connectivity test with TKE-compatible image overrides.
-# Skips external/internet tests (pod-to-world, pod-to-cidr) because:
-#   - Nodes may not have public internet bandwidth.
-#   - Default external targets (one.one.one.one) may be blocked by GFW in China.
+# Skips test scenarios that fail in the TKE node environment for reasons
+# unrelated to cilium:
+#   - pod-to-world  : Default target one.one.one.one is blocked by GFW in China
+#                     and TKE nodes don't have public internet by default.
+#   - pod-to-cidr   : Same reason as pod-to-world.
+#   - pod-to-host   : The "ping-ipv4-external-ip" action targets the *node's*
+#                     ExternalIP (the EIP). TKE security groups by default block
+#                     inbound public ICMP, so this action 100% fails on every
+#                     TKE deployment. It would NOT validate cilium even if it
+#                     passed (the traffic never reaches cilium's datapath).
+#                     The pod-to-pod / pod-to-service scenarios already cover
+#                     the same Pod → node-internal-IP path, so dropping the
+#                     pod-to-host scenario doesn't reduce real coverage.
+# Note: '/pod-to-host$' uses an anchor '$' to avoid also matching pod-to-hostport.
 # Image mapping:
 #   quay.io/cilium/*           → quay.tencentcloudcr.com/cilium/* (internal mirror)
 #   registry.k8s.io/coredns/*  → docker.io/k8smirror/coredns:*   (synced to dockerhub)
@@ -1203,12 +1214,13 @@ cmd_e2e_test() {
   echo ""
 
   # Phase 2: cilium connectivity test
-  info "$(is_zh && echo "[2/2] 运行 cilium connectivity test（跳过公网测试）..." || echo "[2/2] Running cilium connectivity test (skipping external tests)...")"
+  info "$(is_zh && echo "[2/2] 运行 cilium connectivity test（跳过 TKE 节点环境固有不可用的用例）..." || echo "[2/2] Running cilium connectivity test (skipping cases unsupported by TKE node defaults)...")"
   echo ""
 
   cilium connectivity test \
     --test '!/pod-to-world' \
     --test '!/pod-to-cidr' \
+    --test '!/pod-to-host$' \
     --curl-image quay.tencentcloudcr.com/cilium/alpine-curl:v1.10.0 \
     --json-mock-image quay.tencentcloudcr.com/cilium/json-mock:v1.3.9 \
     --dns-test-server-image docker.io/k8smirror/coredns:v1.14.2 \

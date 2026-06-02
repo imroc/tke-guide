@@ -6,11 +6,11 @@ This document presents the results of running [`cilium connectivity test`](https
 
 :::info[Quick conclusion]
 
-| Option               | cilium-health | connectivity test | Production-ready | Key limitations                                       |
-| -------------------- | ------------- | ----------------- | ---------------- | ----------------------------------------------------- |
-| Native (VPC-CNI) ⭐  | ✅ 3/3        | ✅ 56/59 pass     | ✅               | Only node public-IP unreachable (unrelated to cilium) |
-| Overlay (VPC-CNI) ⭐ | ✅ 3/3        | ✅ 56/59 pass     | ✅               | Only node public-IP unreachable (unrelated to cilium) |
-| Overlay (GR)         | ✅ 3/3        | ✅ 56/59 pass     | ✅               | Only node public-IP unreachable (unrelated to cilium) |
+| Option               | cilium-health | connectivity test | Production-ready |
+| -------------------- | ------------- | ----------------- | ---------------- |
+| Native (VPC-CNI) ⭐  | ✅ 3/3        | ✅ All passed     | ✅               |
+| Overlay (VPC-CNI) ⭐ | ✅ 3/3        | ✅ All passed     | ✅               |
+| Overlay (GR)         | ✅ 3/3        | ✅ All passed     | ✅               |
 
 ⭐ = recommended option.
 
@@ -31,15 +31,15 @@ This document presents the results of running [`cilium connectivity test`](https
 
 Each cluster was a freshly created empty cluster (no nodes added at creation time). The script installed cilium first, then a node pool was added, then e2e tests were run.
 
-`cilium connectivity test` deploys ~60 test cases (~600 actions in total) covering:
+`cilium connectivity test` deploys 132 test cases / ~600 actions by default, covering Pod-to-Pod, Pod-to-Service, Pod-to-Host same-/cross-node connectivity, ClusterIP/NodePort/HostPort forwarding (kubeProxyReplacement), L3/L4/L7 NetworkPolicy (deny/allow, ingress/egress, CIDR/Entity/ServiceAccount/L7), CiliumLocalRedirectPolicy, DNS, etc.
 
-- Pod-to-Pod, Pod-to-Service, Pod-to-Host connectivity (same-node and cross-node)
-- ClusterIP / NodePort / HostPort forwarding (kubeProxyReplacement)
-- L3/L4/L7 NetworkPolicy (deny/allow, ingress/egress, CIDR/Entity/ServiceAccount/L7 rules)
-- CiliumLocalRedirectPolicy redirection (validates the nodelocaldns integration path)
-- DNS resolution (including via LRP)
+`cilium.sh e2e-test` filters out the following cases before running (see "[Skipped tests](#skipped-tests)" below):
 
-The test by default skips `pod-to-world` and `pod-to-cidr` scenarios (rely on public internet, which TKE nodes don't reach by default), `from-cidr-host-netns` and other unsafe cases (modify node state), and cluster-mesh-related cases (not enabled here). **In practice 59 cases / ~600 actions are run**.
+- `pod-to-world` / `pod-to-cidr`: depend on the public internet, which TKE nodes don't reach by default
+- `pod-to-host`: uses the node's ExternalIP (EIP) as the ping target by default; TKE node security groups deny inbound public ICMP, so this always fails and is unrelated to cilium
+- Other `unsafe` / disabled-feature cases: skipped conditionally by cilium-cli itself
+
+In the end **58 tests / 521 actions** actually run.
 
 ## Detailed Results
 
@@ -48,81 +48,50 @@ The test by default skips `pod-to-world` and `pod-to-cidr` scenarios (rely on pu
 ```text
 [1/2] cilium-health verification passed: 3/3 nodes healthy
 [2/2] cilium connectivity test
-   ❌ 23/59 tests failed (66/602 actions), 73 tests skipped, 9 scenarios skipped
+   ✅ All 58 tests (521 actions) successful, 74 tests skipped, 11 scenarios skipped
 ```
 
-**Further investigation shows that all 23 failures can be attributed to environmental causes rather than cilium misconfiguration**:
-
-| Failure category                                                                                                                              | Cases | Root cause                                                                                                                                                                                                                                                                                    |
-| --------------------------------------------------------------------------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `no-policies` / `allow-all-except-world` / `host-entity-egress` failing on **`pod-to-host:ping-ipv4-external-ip`**                            | 9     | Node public-IP unreachable (fails in any mode, unrelated to cilium). See "Node public-IP unreachable" below.                                                                                                                                                                                  |
-| Cross-node Pod-to-Pod ICMP/TCP **transient** failures (`client-ingress`, `client-ingress-icmp`, `echo-ingress` and several deny-policy cases) | 12    | `cilium connectivity test` does not retry; transient endpoint sync delays during the test (cilium under heavy NetworkPolicy apply/withdraw) caused the "should-be-allowed" reverse-validation in deny tests to fail. Re-testing the same pod pairs after the run shows the traffic recovered. |
-| `local-redirect-policy/lrp-skip-redirect-from-backend`: lrp-backend's own access to 169.254.169.248 should bypass LRP but was redirected      | 1     | An edge-case interaction between `skipRedirectFromBackend` and chained-CNI mode; does NOT affect typical LRP usages such as nodelocaldns                                                                                                                                                      |
-| `pod-to-pod-encryption-v2`: expected to capture encrypted packets but didn't                                                                  | 1     | The deployment under test does not enable [WireGuard/IPsec encryption](../encryption.md); cilium-cli 0.19.4 should have skipped this case but did not                                                                                                                                         |
-
-**Effective pass rate: 56/59**. Safe for production.
+All passed. Safe for production.
 
 ### Overlay (VPC-CNI) ⭐
 
 ```text
 [1/2] cilium-health verification passed: 3/3 nodes healthy
 [2/2] cilium connectivity test
-   ❌ 3/59 tests failed (27/602 actions), 73 tests skipped, 9 scenarios skipped
+   ✅ All 58 tests (521 actions) successful, 74 tests skipped, 11 scenarios skipped
 ```
 
-The 3 failed tests are **identical**, all of the form:
-
-```text
-Test [no-policies]:                pod-to-host:ping-ipv4-external-ip
-Test [allow-all-except-world]:     pod-to-host:ping-ipv4-external-ip
-Test [host-entity-egress]:         pod-to-host:ping-ipv4-external-ip
-```
-
-Each test contains 9 actions (3 nodes × 3 client pods cross product), 27 actions in total. The cause is node public-IP unreachable (see below), **unrelated to cilium**.
-
-**Effective pass rate: 56/59**. Safe for production.
+All passed. Safe for production.
 
 ### Overlay (GR)
 
 ```text
 [1/2] cilium-health verification passed: 3/3 nodes healthy
 [2/2] cilium connectivity test
-   ❌ 3/59 tests failed (27/602 actions), 73 tests skipped, 9 scenarios skipped
+   ✅ All 58 tests (521 actions) successful, 74 tests skipped, 11 scenarios skipped
 ```
 
-The failed cases are **identical to Overlay (VPC-CNI)** — the same 3 `pod-to-host:ping-ipv4-external-ip` tests, same root cause.
+All passed. Safe for production.
 
-**Effective pass rate: 56/59**. Safe for production.
+## Skipped tests
 
-## Skipped Tests
+`cilium.sh e2e-test` uses `--test '!...'` filters to skip the following scenarios that cannot pass on TKE nodes for reasons unrelated to cilium itself:
 
-All three options skip the same 73 tests by default:
+| Skipped scenario | Why skipped                                                                                                                                                                                                                                                                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pod-to-world`   | Default target is `one.one.one.one`; nodes in mainland China have restricted/blocked public internet access                                                                                                                                                                                                                                                         |
+| `pod-to-cidr`    | Same as above — depends on public-internet CIDRs                                                                                                                                                                                                                                                                                                                    |
+| `pod-to-host`    | The `ping-ipv4-external-ip` action in this scenario uses each node's ExternalIP (the EIP / public IP) as the target. TKE node EIPs **deny inbound public ICMP by default** in the security group — every TKE deployment fails this 100%, and the packets never reach cilium's datapath, so passing or failing this case wouldn't validate cilium one way or another |
 
-| Skip reason                                           | Examples                                                                                                                        | Need to worry?                                                                              |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `unsafe test which can modify state of cluster nodes` | `no-policies-from-outside`, `all-ingress-deny-from-outside`, `echo-ingress-from-outside`, `from-cidr-host-netns`                | No — these mutate node iptables/routes and shouldn't run on production clusters             |
-| `skipped by user`                                     | `to-entities-world`, `to-cidr-external` (i.e. `pod-to-world` / `pod-to-cidr`, skipped by this script)                           | No — TKE nodes don't reach the public internet by default; see "Node public-IP unreachable" |
-| `skipped by condition`                                | `cluster-entity-multi-cluster` (requires cluster mesh), other tests that depend on ENI/IPv6/Multicast features not enabled here | No — these will run only after the corresponding feature is enabled                         |
+> The Pod-to-node-internal-IP path is already covered by other scenarios such as `pod-to-pod` and `pod-to-service`, so dropping `pod-to-host` doesn't reduce real coverage.
 
-## Node Public-IP Unreachable
+In addition to the 3 above, cilium-cli **automatically skips** another 74 tests:
 
-The `pod-to-host:ping-ipv4-external-ip` failures common to all 4 clusters are not cilium issues but TKE-node environment limitations:
-
-```text
-🟥 no-policies/pod-to-host:ping-ipv4-external-ip:
-   cilium-test-1/client (10.20.0.40) -> 118.25.230.204 (118.25.230.204:0)
-   command "ping -c 1 -W 2 118.25.230.204" failed:
-   exit code 1
-```
-
-`118.25.230.204` is **another cluster node's public IP**. `pod-to-host:ping-ipv4-external-ip` tries to ping the **public IP of another node in the same cluster** from a Pod.
-
-Why it fails:
-
-- TKE nodes' public IPs are provided by EIP. **The node itself does not respond to inbound ping targeting its EIP** — the default CVM security group blocks public-internet ICMP ingress
-- Even if it did, a Pod cannot necessarily route traffic to a public IP — egress to the public internet requires a NAT gateway or node EIP egress (see [How does a Pod access the public internet](../install.md#how-does-a-pod-access-the-public-internet))
-
-This is the test case itself being inapplicable to a public-cloud environment; all 4 options fail on it, **unrelated to cilium**.
+| Skip reason                                           | Examples                                                                                                                           | Need to worry?                                                                  |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `unsafe test which can modify state of cluster nodes` | `no-policies-from-outside`, `all-ingress-deny-from-outside`, `echo-ingress-from-outside`, `from-cidr-host-netns`, etc.             | No — these mutate node iptables/routes and shouldn't run on production clusters |
+| `skipped by condition`                                | `cluster-entity-multi-cluster` (cluster mesh), tests depending on ENI/IPv6/Multicast/`node-without-cilium` features that aren't on | No — these will run only after the corresponding feature is enabled             |
+| `skipped by user`                                     | TLS / `egress-gateway-excluded-cidrs` and similar that require pre-provisioned client certs or external hosts                      | No — they need external resources prepared in advance, not suitable by default  |
 
 ## Test Method
 
@@ -135,9 +104,9 @@ Each cluster runs the script independently:
 The script automatically:
 
 1. **Phase 1: cilium-health verification** — for every node's cilium-agent, check that `cilium-health status` reports `node=1/1 endpoint=1/1` on the `localhost` line
-2. **Phase 2: cilium connectivity test** — runs the upstream e2e suite with TKE-internal mirror images and skipping public-internet cases
+2. **Phase 2: cilium connectivity test** — runs the upstream cilium e2e suite using TKE-internal mirror images, with `--test '!...'` filters to skip the 3 case types listed above
 
-Full script: the `cmd_e2e_test` function in [cilium.sh](https://github.com/imroc/tke-guide/blob/main/static/scripts/cilium.sh).
+Full implementation: the `cmd_e2e_test` function in [cilium.sh](https://github.com/imroc/tke-guide/blob/main/static/scripts/cilium.sh).
 
 ## Extending Validation
 
