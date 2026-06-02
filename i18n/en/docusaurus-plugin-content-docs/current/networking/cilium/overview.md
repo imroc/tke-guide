@@ -27,7 +27,7 @@ To install Cilium on a TKE cluster, the following prerequisites must be met:
 
 - Cluster Version: TKE 1.30 and above, refer to [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/).
 - Network Mode:
-  - Native Routing: VPC-CNI with shared ENI multiple IPs, or GlobalRouter (GR).
-  - Overlay: GlobalRouter (GR) or VPC-CNI.
+  - Native Routing: VPC-CNI with shared ENI multiple IPs.
+  - Overlay: VPC-CNI or GlobalRouter (GR).
 - Node Type: Regular nodes or native nodes.
 - Operating System: TencentOS 4 or Ubuntu>=22.04.

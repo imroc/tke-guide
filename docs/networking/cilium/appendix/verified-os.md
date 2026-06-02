@@ -2,13 +2,13 @@
 
 ## 适用范围
 
-本文列出 [安装 Cilium](../install.md) 涉及的 **4 种安装模式**（VPC-CNI/GR × Native Routing/Overlay）均已实测通过的节点 OS 镜像及内核版本，作为节点池 OS 选型的参考。
+本文列出 [安装 Cilium](../install.md) 涉及的 **3 种安装模式**（Native Routing (VPC-CNI)、Overlay (VPC-CNI)、Overlay (GR)）均已实测通过的节点 OS 镜像及内核版本，作为节点池 OS 选型的参考。
 
 如果你正在新建节点池，可优先从下表中挑选；如果业务必须使用未在本表中的 OS，建议先在测试集群单节点验证后再上量。
 
 ## 实测通过的 OS 列表
 
-下表中所有 OS 均已在 4 种安装模式下完整跑通 e2e 验证（cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache）。
+下表中所有 OS 均已在 3 种安装模式下完整跑通 e2e 验证（cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache）。
 
 | OS                   | OsName                  | 内核版本 |
 | -------------------- | ----------------------- | -------- |

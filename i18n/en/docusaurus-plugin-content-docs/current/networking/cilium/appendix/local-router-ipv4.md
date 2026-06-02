@@ -2,7 +2,7 @@
 
 ## Background
 
-When installing cilium on a TKE cluster, if you choose **Native Routing** (either VPC-CNI or GR base cluster), you must explicitly configure a `local-router-ipv4` for cilium:
+When installing cilium on a TKE cluster, if you choose **Native Routing (VPC-CNI)**, you must explicitly configure a `local-router-ipv4` for cilium:
 
 ```bash
 --set extraConfig.local-router-ipv4=169.254.32.16
@@ -30,12 +30,9 @@ On every node, cilium creates a pair of virtual interfaces:
                 └──────────────────────────────────────┘
 ```
 
-## The Native Routing situation
+## The Native Routing (VPC-CNI) situation
 
-In Native Routing mode, **cilium does not allocate Pod IPs** — TKE CNI does:
-
-- **Native Routing (VPC-CNI)**: Pods attach directly to ENIs; IPs come from VPC-CNI out of the VPC subnet. cilium has no Pod IP source information at all.
-- **Native Routing (GR)**: Pod IPs come from tke-bridge, allocated out of the node's PodCIDR, and each node's PodCIDR is different. Although tke-bridge's gateway IP (e.g. `<PodCIDR>.1`) is already used by the node route, cilium cannot reuse it (per-node calculation and conflict with the existing gateway).
+In Native Routing (VPC-CNI) mode, **cilium does not allocate Pod IPs**: Pods attach directly to ENIs; IPs come from VPC-CNI out of the VPC subnet. cilium has no Pod IP source information at all.
 
 Because cilium doesn't own IP allocation, it cannot automatically decide what IP to use for `cilium_host` — the user must explicitly pick a guaranteed-non-conflicting IP via `local-router-ipv4`.
 
@@ -43,7 +40,7 @@ Because cilium doesn't own IP allocation, it cannot automatically decide what IP
 
 `169.254.0.0/16` is the IPv4 link-local range (RFC 3927), with several useful properties:
 
-1. **Not routable**: never collides with VPC IPs, GR CIDRs, or Service CIDR.
+1. **Not routable**: never collides with VPC IPs or Service CIDR.
 2. **Uniform across nodes**: every node can use the same value, simplifying both config and troubleshooting.
 3. **Reserved on TKE**: the specific address `169.254.32.16` is verified not to clash with other components on TKE.
 
@@ -65,11 +62,12 @@ In Overlay mode, cilium manages Pod IP allocation itself (cluster-pool IPAM). It
 
 ## Summary
 
-| Mode                     | local-router-ipv4 | Reason                                                         |
-| ------------------------ | ----------------- | -------------------------------------------------------------- |
-| Native Routing (VPC-CNI) | ✅ Required       | cilium doesn't own Pod IP allocation                           |
-| Native Routing (GR)      | ✅ Required       | Same; plus each node has different PodCIDR, no uniform gateway |
-| Overlay (VPC-CNI / GR)   | ❌ Auto-assigned  | cilium manages IPAM itself                                     |
+| Mode                     | local-router-ipv4 | Reason                               |
+| ------------------------ | ----------------- | ------------------------------------ |
+| Native Routing (VPC-CNI) | ✅ Required       | cilium doesn't own Pod IP allocation |
+| Overlay (VPC-CNI / GR)   | ❌ Auto-assigned  | cilium manages IPAM itself           |
+
+GR clusters only support Overlay mode — see [Why this guide does not offer GR Native Routing](./gr-native-not-recommended.md).
 
 ## See also
 

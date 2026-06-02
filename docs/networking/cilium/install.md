@@ -5,25 +5,27 @@
 - **Native Routing（原生路由）**：与 TKE CNI 共存，Pod 使用 TKE 分配的 IP，cilium 提供 NetworkPolicy、可观测性、kube-proxy 替代等增强能力。
 - **Overlay（vxlan 隧道）**：完全替代 TKE 所有 CNI，Pod IP 不占用 underlay 的 IP，可用于 IP 申请困难的场景，也可用于替代 TKE 内置的 CiliumOverlay 网络模式以获得满血功能。
 
-每种模式都支持 VPC-CNI 和 GlobalRouter（GR）两种基础集群，共 4 种组合。**推荐使用 VPC-CNI 集群**，网络性能更好且无节点数量限制。
+VPC-CNI 集群两种模式都支持；GR 集群仅支持 Overlay 模式。**推荐使用 VPC-CNI 集群**，网络性能更好且无节点数量限制。
 
 :::note[如何选择]
 
-| 对比项               | Native Routing (VPC-CNI) ⭐ | Native Routing (GR)                   | Overlay (VPC-CNI) ⭐                       | Overlay (GR)                                       |
-| -------------------- | --------------------------- | ------------------------------------- | ------------------------------------------ | -------------------------------------------------- |
-| 网络性能             | 最优                        | 较优（多一层网桥转发）                | 略有开销（vxlan 封装）                     | 略有开销（vxlan 封装）                             |
-| Pod IP 范围          | VPC IP                      | VPC 辅助网段 IP                       | 独立 CIDR，不占用 VPC IP                   | 独立 CIDR，不占用 VPC IP                           |
-| IP 容量扩容          | 给集群新增 VPC-CNI 子网     | 给集群新增 GR 网段（VPC 辅助网段）    | 追加 CIDR 到 clusterPoolIPv4PodCIDRList    | 同左                                               |
-| 节点数量限制         | 无                          | 受 ClusterCIDR 限制                   | 无                                         | 受 GR 集群的 ClusterCIDR 限制（GR 集群本身的限制） |
-| 集群外访问 Pod       | 可直接路由                  | VPC 内可路由                          | 不可直接路由，需通过 Service/Ingress       | 不可直接路由                                       |
-| L7/DNS NetworkPolicy | ✅ 完整支持                 | ⚠️ 不支持（cbr0 桥限制）              | ✅ 完整支持                                | ✅ 完整支持                                        |
-| 节点池额外要求       | 无                          | ⚠️ 必须打 cilium agent-not-ready 污点 | 无                                         | 无                                                 |
-| 适用场景             | 常规场景（推荐）            | 已有 GR 集群的场景                    | IP 资源紧张、纳管 IDC、满血 cilium（推荐） | 同左，但已有 GR 集群                               |
+| 对比项               | Native Routing (VPC-CNI) ⭐ | Overlay (VPC-CNI) ⭐                       | Overlay (GR)                                       |
+| -------------------- | --------------------------- | ------------------------------------------ | -------------------------------------------------- |
+| 网络性能             | 最优                        | 略有开销（vxlan 封装）                     | 略有开销（vxlan 封装）                             |
+| Pod IP 范围          | VPC IP                      | 独立 CIDR，不占用 VPC IP                   | 独立 CIDR，不占用 VPC IP                           |
+| IP 容量扩容          | 给集群新增 VPC-CNI 子网     | 追加 CIDR 到 clusterPoolIPv4PodCIDRList    | 同左                                               |
+| 节点数量限制         | 无                          | 无                                         | 受 GR 集群的 ClusterCIDR 限制（GR 集群本身的限制） |
+| 集群外访问 Pod       | 可直接路由                  | 不可直接路由，需通过 Service/Ingress       | 不可直接路由                                       |
+| L7/DNS NetworkPolicy | ✅ 完整支持                 | ✅ 完整支持                                | ✅ 完整支持                                        |
+| 适用场景             | 常规场景（推荐）            | IP 资源紧张、纳管 IDC、满血 cilium（推荐） | 已有 GR 集群的场景                                 |
 
-两点限制详见附录：
+:::
 
-- ⚠️ Native Routing (GR) 不支持 L7/DNS NetworkPolicy → [为什么 GR Native Routing 不支持 L7/DNS NetworkPolicy？](./appendix/gr-no-l7-dns.md)
-- ⚠️ Native Routing (GR) 节点池必须打 cilium agent-not-ready 污点 → [为什么 Native Routing (GR) 节点池必须打 cilium agent-not-ready 污点？](./appendix/gr-agent-not-ready-taint.md)
+:::warning[GR 集群只用 Overlay，不要用 Native Routing]
+
+本系列教程**不再提供 GR + Native Routing** 部署方案。该模式下跨节点 Pod-to-Pod 流量不通、L7/DNS NetworkPolicy 不可用，组合后基本无法生产可用。完整试错记录与替代方案详见 [为什么不提供 GR Native Routing 部署方案？](./appendix/gr-native-not-recommended.md)。
+
+GR 集群希望使用 cilium，请只用 **Overlay 模式**；如需 **Native Routing**，请使用 **VPC-CNI 集群**。
 
 :::
 
@@ -44,7 +46,7 @@
 - Kubernetes 版本: 不低于 1.32，建议选择最新版（参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)）。
 - 操作系统：推荐 **TencentOS 4** 或 **Ubuntu 24.04**。最低要求 Linux kernel >= 5.10（参考 [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)）。完整已验证 OS 列表参考 [已验证的节点操作系统](./appendix/verified-os.md)。
 - 节点：安装前不要向集群添加任何普通节点或原生节点，避免残留相关规则和配置，等安装完成后再添加。
-- 基础组件：取消勾选 **TKE 自带的 ip-masq-agent** 组件，避免与 cilium 内置的 ipMasqAgent 冲突。Native Routing (GR) 模式后续会启用 cilium 内置的 ipMasqAgent（两者是不同组件，不要混淆）。
+- 基础组件：取消勾选 **TKE 自带的 ip-masq-agent** 组件，避免与 cilium 内置的 ipMasqAgent 冲突。
 - 增强组件：如果节点池希望使用 Karpenter 节点池，需勾选安装 Karpenter 组件，否则无需勾选（参考后文的节点池选型）。
 
 集群创建成功后，需开启集群访问来暴露集群的 apiserver 提供后续使用 helm 安装 cilium 时，helm 命令能正常操作 TKE 集群，参考 [开启集群访问的方法](https://cloud.tencent.com/document/product/457/32191#.E6.93.8D.E4.BD.9C.E6.AD.A5.E9.AA.A4)。
@@ -137,24 +139,18 @@ ROUTING_MODE=native CILIUM_VERSION=1.19.4 \
 
 ### 卸载 TKE 组件
 
-所有方案都需要卸载 kube-proxy（由 cilium 替代）：
+所有方案都需要卸载 kube-proxy（由 cilium 替代）和 tke-cni-agent（避免 CNI 配置冲突）：
 
 ```bash
 kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-```
-
-除 Native Routing (GR) 外，其余方案还需要卸载 tke-cni-agent（避免 CNI 配置冲突）：
-
-```bash
 kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 ```
 
 :::tip[说明]
 
 1. 通过加 nodeSelector 方式让 DaemonSet 不部署到任何节点，等同于卸载，同时也留个退路；当前 kube-proxy 也只能通过这种方式卸载，如果直接删除 kube-proxy，后续集群升级会被阻塞。
-2. Native Routing (GR) 模式需要保留 tke-cni-agent，因为它负责拷贝 bridge 等 CNI 二进制到节点。该模式下 cilium 通过 `cni.exclusive=true`（默认）自动将 multus 配置重命名为 `.cilium_bak` 使其失效，不会产生冲突。
-3. 前面提到过安装 cilium 之前不建议添加节点，如果因某些原因导致在安装 cilium 前添加了普通节点或原生节点，需重启下存量节点，避免残留相关规则和配置。
-4. 如果创建集群时忘记了取消勾选 ip-masq-agent，可以手动卸载下：
+2. 前面提到过安装 cilium 之前不建议添加节点，如果因某些原因导致在安装 cilium 前添加了普通节点或原生节点，需重启下存量节点，避免残留相关规则和配置。
+3. 如果创建集群时忘记了取消勾选 ip-masq-agent，可以手动卸载下：
    ```bash
    kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
    ```
@@ -203,39 +199,6 @@ data:
 ```bash
 kubectl apply -f cni-config.yaml
 ```
-
-</TabItem>
-<TabItem value="native-gr" label="Native Routing (GR)">
-
-需要对 tke-bridge-agent 做两处修改：
-
-1. **修改 CNI 配置输出目录**：从 multus 子目录改到 CNI 根目录，以便 cilium 能通过 `chainingTarget` 发现并追加到 bridge 配置。
-2. **禁用 portmap 插件**（`--port-mapping=false`）：cilium 的 `kubeProxyReplacement=true` 已包含 HostPort 转发能力，而 portmap 插件依赖已被卸载的 kube-proxy 创建的 `KUBE-MARK-MASQ` iptables chain，不禁用会导致创建 hostPort 的 Pod 报错（CNI 调用 portmap 失败）。
-
-```bash
-# 获取当前完整 args
-CURRENT_ARGS=$(kubectl -n kube-system get ds tke-bridge-agent -o jsonpath='{.spec.template.spec.containers[0].args}')
-# 1. 替换 CNI 配置目录路径
-PATCHED_ARGS=$(echo "$CURRENT_ARGS" | sed 's|/host/etc/cni/net.d/multus|/host/etc/cni/net.d|g')
-# 2. 追加 --port-mapping=false 禁用 portmap 插件（如已存在则跳过）
-if ! echo "$PATCHED_ARGS" | grep -q 'port-mapping=false'; then
-  PATCHED_ARGS=$(echo "$PATCHED_ARGS" | sed 's/\]$/,"--port-mapping=false"]/')
-fi
-kubectl -n kube-system patch ds tke-bridge-agent --type='json' \
-  -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args\",\"value\":${PATCHED_ARGS}}]"
-```
-
-等待 tke-bridge-agent 滚动重启完成：
-
-```bash
-kubectl -n kube-system rollout status ds/tke-bridge-agent --timeout=120s
-```
-
-:::tip[说明]
-
-安装 cilium 后，cilium 的 `cni.exclusive=true`（默认）会自动将 `00-multus.conf` 重命名为 `00-multus.conf.cilium_bak`，无需手动删除。
-
-:::
 
 </TabItem>
 <TabItem value="overlay-gr" label="Overlay (GR)">
@@ -303,97 +266,6 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002
 ```
-
-</TabItem>
-<TabItem value="native-gr" label="Native Routing (GR)">
-
-```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.4 \
-  --namespace kube-system \
-  --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
-  --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
-  --set operator.image.repository=quay.tencentcloudcr.com/cilium/operator \
-  --set certgen.image.repository=quay.tencentcloudcr.com/cilium/certgen \
-  --set hubble.relay.image.repository=quay.tencentcloudcr.com/cilium/hubble-relay \
-  --set hubble.ui.backend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui-backend \
-  --set hubble.ui.frontend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui \
-  --set nodeinit.image.repository=quay.tencentcloudcr.com/cilium/startup-script \
-  --set preflight.image.repository=quay.tencentcloudcr.com/cilium/cilium \
-  --set preflight.envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
-  --set clustermesh.apiserver.image.repository=quay.tencentcloudcr.com/cilium/clustermesh-apiserver \
-  --set authentication.mutual.spire.install.agent.image.repository=docker.io/k8smirror/spire-agent \
-  --set authentication.mutual.spire.install.server.image.repository=docker.io/k8smirror/spire-server \
-  --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
-  --set operator.tolerations[1].key="node.kubernetes.io/not-ready",operator.tolerations[1].operator="Exists" \
-  --set operator.tolerations[2].key="node.cloudprovider.kubernetes.io/uninitialized",operator.tolerations[2].operator="Exists" \
-  --set cni.chainingMode=generic-veth \
-  --set cni.chainingTarget=tke-bridge \
-  --set routingMode=native \
-  --set endpointRoutes.enabled=true \
-  --set ipam.mode=delegated-plugin \
-  --set enableIPv4Masquerade=true \
-  --set bpf.masquerade=true \
-  --set ipMasqAgent.enabled=true \
-  --set devices=eth+ \
-  --set cni.externalRouting=true \
-  --set extraConfig.local-router-ipv4=169.254.32.16 \
-  --set localRedirectPolicies.enabled=true \
-  --set sysctlfix.enabled=false \
-  --set kubeProxyReplacement=true \
-  --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
-  --set k8sServicePort=60002
-```
-
-安装完成后，还需创建 `ip-masq-agent` ConfigMap 配置哪些网段不做 SNAT。可参考 TKE 自动生成的 `ip-masq-agent-config` ConfigMap 中的 `NonMasqueradeCIDRs`（包含 VPC 网段及所有辅助网段）：
-
-```bash
-# 查看 TKE 自动生成的 NonMasqueradeCIDRs
-kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}'
-```
-
-将其中的网段填入 cilium 的 `ip-masq-agent` ConfigMap：
-
-```yaml title="ip-masq-agent.yaml"
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: ip-masq-agent
-  namespace: kube-system
-data:
-  config: |
-    nonMasqueradeCIDRs:
-    - <VPC CIDR>             # 如 10.0.0.0/16，Pod 访问 VPC 内地址保持源 IP
-    - <VPC 辅助 CIDR (GR 网段)> # 如 172.16.0.0/16，Pod 间互访保持源 IP
-    - 169.254.0.0/16         # TKE 元数据/apiserver VIP/COS/镜像仓库等保留段，必须保留源 IP
-    masqLinkLocal: false     # masqLinkLocal=false 才允许 169.254.0.0/16 走 nonMasq 规则
-```
-
-:::tip[关于 169.254.0.0/16]
-
-TKE 在该网段上承载了 apiserver VIP、元数据服务（如 csi-cbs 控制器要读 instance metadata）、COS、镜像仓库等关键能力，部分组件配置了 hostAlias 不经过 DNS 解析。Pod 访问这些地址若做了 SNAT 会丢失源 IP，可能导致部分服务（如有 IP 白名单的 COS bucket）异常。
-
-:::
-
-```bash
-kubectl apply -f ip-masq-agent.yaml
-```
-
-:::tip[与 VPC-CNI chaining 的差异]
-
-| 参数                                    | 说明                                                                             |
-| --------------------------------------- | -------------------------------------------------------------------------------- |
-| `cni.chainingTarget=tke-bridge`         | cilium 自动监视名为 `tke-bridge` 的 CNI 配置并追加自己，适配每节点不同的 PodCIDR |
-| 无需 `cni.customConf` / `cni.configMap` | 不需要手动创建 CNI ConfigMap                                                     |
-| `enableIPv4Masquerade=true`             | GR Pod IP 访问 CVM metadata 等公共服务需要 SNAT 为节点 IP                        |
-| 不禁用 `tke-cni-agent`                  | 需要保留以拷贝 bridge 等 CNI 二进制到节点                                        |
-
-:::
-
-:::warning[GR 集群安装 cilium 后不支持动态启用 VPC-CNI]
-
-GR 集群本身支持动态启用 VPC-CNI （GR 与 VPC-CNI 共存)，但**安装本文方案的 cilium 后此功能将不再可用**——cilium chaining 通过 multus 的 `defaultDelegates=tke-bridge` 接管所有 Pod 网络，即使创建带 `tke.cloud.tencent.com/networks: tke-route-eni` annotation 的 Pod，IP 也仍然来自 GR ClusterCIDR 而非 VPC-CNI 子网。如有 VPC-CNI 共存需求，请直接使用 VPC-CNI 集群。
-
-:::
 
 </TabItem>
 <TabItem value="overlay-gr" label="Overlay (GR)">
@@ -547,39 +419,6 @@ operator:
 ```
 
   </TabItem>
-  <TabItem value="native-gr" label="Native (GR)">
-
-Native Routing (GR) 模式专属参数：
-
-```yaml showLineNumbers title="native-gr-values.yaml"
-# 使用 native routing
-routingMode: "native"
-endpointRoutes:
-  enabled: true
-ipam:
-  # Pod IP 分配由 tke-bridge-agent 负责
-  mode: "delegated-plugin"
-# GR Pod IP 访问 CVM metadata 等公共服务需要 SNAT 为节点 IP
-enableIPv4Masquerade: true
-bpf:
-  masquerade: true
-ipMasqAgent:
-  enabled: true
-# 所有 eth 开头的网卡挂载 cilium ebpf 程序
-devices: eth+
-cni:
-  # 使用 generic-veth + chainingTarget 自动适配 tke-bridge 的 CNI 配置
-  chainingMode: generic-veth
-  chainingTarget: tke-bridge
-  externalRouting: true
-extraConfig:
-  local-router-ipv4: 169.254.32.16
-# 禁用 sysctlfix，详见 FAQ
-sysctlfix:
-  enabled: false
-```
-
-  </TabItem>
   <TabItem value="overlay" label="Overlay (VPC-CNI/GR)">
 
 Overlay (vxlan) 模式专属参数，VPC-CNI 和 GR 集群通用：
@@ -730,18 +569,6 @@ kubectl apply -f cilium-apf.yaml
 Cilium 要求 Linux kernel >= 5.10。**推荐 OS**：Ubuntu 24.04 或 TencentOS 4 最新版。
 
 **实测覆盖的 OS 列表**详见 [已验证的节点操作系统](./appendix/verified-os.md)。
-
-:::
-
-:::warning[Native Routing (GR) 模式节点池必须配置 cilium taint]
-
-使用 **Native Routing (GR)** 方案时，创建节点池**必须**给节点添加以下污点（控制台在**高级设置**中添加，terraform 参考下方代码片段）：
-
-```
-node.cilium.io/agent-not-ready=true:NoSchedule
-```
-
-原因详见 [为什么 Native Routing (GR) 节点池必须打 cilium agent-not-ready 污点？](./appendix/gr-agent-not-ready-taint.md)。
 
 :::
 
@@ -975,7 +802,7 @@ kubectl -n kube-system rollout status ds/cilium
 2. **卸载 cilium**：
    ```bash
    helm uninstall cilium -n kube-system
-   kubectl -n kube-system delete cm ip-masq-agent  # 如果用了 GR 模式
+   kubectl -n kube-system delete cm ip-masq-agent --ignore-not-found  # 仅旧版 GR Native 部署遗留
    ```
 3. **清理节点残留**：每个节点上手动清理 cilium 的 BPF 程序、CNI 配置与 iptables 规则：
    ```bash
@@ -1028,16 +855,6 @@ helm upgrade --install cilium ./cilium-1.19.4.tgz \
 ### 大规模场景如何优化？
 
 集群规模较大（数百节点 / 万级 Pod 以上）时，cilium 默认配置可能出现 apiserver 压力大、cilium-agent OOM、策略计算慢等问题，可从启用 CiliumEndpointSlice、APF 限速、调整 client QPS、精简 Identity 等多方面调优，详见 [大规模集群 Cilium 调优指南](./appendix/large-scale-tuning.md)。
-
-### GR 集群安装 cilium 后能否动态启用 VPC-CNI？
-
-不建议。GR 集群本身支持通过启用 VPC-CNI 网络能力实现 GR 与 VPC-CNI 共存，但**安装本文方案的 cilium 后此功能将不再实际可用**：
-
-- cilium chaining 通过 multus 配置（`defaultDelegates=tke-bridge`）接管所有 Pod 网络
-- 创建带 `tke.cloud.tencent.com/networks: tke-route-eni` annotation 的 Pod 后，IP 仍然来自 GR 的 ClusterCIDR 段（而不是 VPC-CNI 子网），实际并未走 VPC-CNI 路径
-- 操作上 `EnableVpcCniNetworkType` 接口可以调用成功，组件也会部署，但对 Pod 网络没有实际影响
-
-如果业务确有 VPC-CNI 需求，请直接使用 **VPC-CNI 集群 + Native Routing** 方案，不要选择 GR 集群。
 
 ### VPC-CNI 集群创建时能否勾选 DataPlaneV2？
 
@@ -1175,8 +992,7 @@ cilium-operator 使用 hostNetwork 并配置了就绪探针，在超级节点上
 - [Cilium E2E 测试结果](./appendix/e2e-test-report.md)
 - [为什么 Native Routing 模式要加 local-router-ipv4 配置？](./appendix/local-router-ipv4.md)
 - [为什么 Native Routing 模式禁用 sysctlfix，Overlay 模式却启用？](./appendix/sysctlfix.md)
-- [为什么 GR Native Routing 不支持 L7/DNS NetworkPolicy？](./appendix/gr-no-l7-dns.md)
-- [为什么 Native Routing (GR) 节点池必须打 cilium agent-not-ready 污点？](./appendix/gr-agent-not-ready-taint.md)
+- [为什么不提供 GR Native Routing 部署方案？](./appendix/gr-native-not-recommended.md)
 
 ## 参考资料
 

@@ -48,8 +48,7 @@ const sidebars: SidebarsConfig = {
                 'networking/cilium/appendix/e2e-test-report',
                 'networking/cilium/appendix/local-router-ipv4',
                 'networking/cilium/appendix/sysctlfix',
-                'networking/cilium/appendix/gr-no-l7-dns',
-                'networking/cilium/appendix/gr-agent-not-ready-taint',
+                'networking/cilium/appendix/gr-native-not-recommended',
                 {
                   type: 'category',
                   label: 'Cilium 问题排查',

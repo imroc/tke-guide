@@ -26,12 +26,6 @@ cilium adjusts lxc `rp_filter` so that host → same-node-Pod return traffic isn
   --set sysctlfix.enabled=false
   ```
 
-### Native Routing (GR): Uniformly disabled (to match VPC-CNI)
-
-- **Data path**: cilium chaining takes over all Pod networking; no lxc interface needs rp_filter adjustment.
-- **Empirical**: enabling sysctlfix itself doesn't break the network.
-- **Decision**: to keep configuration consistent with Native Routing (VPC-CNI) and avoid edge issues from OS sysctl default shifts, we **uniformly disable** sysctlfix here too.
-
 ### Overlay: Must enable (enabled by default)
 
 - **Data path**: Pod IPs come from cilium's own CIDR; cross-node traffic goes through vxlan tunnels; Pod IPs are never seen on eth0, so eth0 `rp_filter=1` is fine.
@@ -40,11 +34,12 @@ cilium adjusts lxc `rp_filter` so that host → same-node-Pod return traffic isn
 
 ## Decision summary
 
-| Mode                     | sysctlfix       | Key reason                                            |
-| ------------------------ | --------------- | ----------------------------------------------------- |
-| Native Routing (VPC-CNI) | ❌ Must disable | Restarting systemd-sysctl resets eth0 config          |
-| Native Routing (GR)      | ❌ Disabled     | Consistency with VPC-CNI, avoid potential edge issues |
-| Overlay (VPC-CNI / GR)   | ✅ Must enable  | host → Pod return needs lxc rp_filter=0               |
+| Mode                     | sysctlfix       | Key reason                                   |
+| ------------------------ | --------------- | -------------------------------------------- |
+| Native Routing (VPC-CNI) | ❌ Must disable | Restarting systemd-sysctl resets eth0 config |
+| Overlay (VPC-CNI / GR)   | ✅ Must enable  | host → Pod return needs lxc rp_filter=0      |
+
+GR clusters only support Overlay mode — see [Why this guide does not offer GR Native Routing](./gr-native-not-recommended.md).
 
 ## Troubleshooting
 

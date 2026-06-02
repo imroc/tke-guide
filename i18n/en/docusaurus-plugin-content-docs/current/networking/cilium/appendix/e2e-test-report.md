@@ -1,15 +1,16 @@
 # Cilium E2E Test Results
 
-This document presents the results of running [`cilium connectivity test`](https://docs.cilium.io/en/stable/contributing/testing/e2e/) once on each of the 4 [installation](../install.md) options. It serves both as a feature-completeness reference for each option and as an answer to the common question "Is L7/DNS the only limitation of GR Native Routing?".
+This document presents the results of running [`cilium connectivity test`](https://docs.cilium.io/en/stable/contributing/testing/e2e/) once on each of the 3 recommended [installation](../install.md) options.
+
+> The 4th combination — **Native Routing (GR)** — has severe compatibility issues (cross-node Pod-to-Pod traffic broken, L7/DNS NetworkPolicy unusable) and is no longer offered by this guide. See [Why this guide does not offer GR Native Routing](./gr-native-not-recommended.md).
 
 :::info[Quick conclusion]
 
-| Option               | cilium-health | connectivity test   | Production-ready | Key limitations                                                                                                     |
-| -------------------- | ------------- | ------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Native (VPC-CNI) ⭐  | ✅ 3/3        | ✅ 56/59 pass       | ✅               | Only node public-IP unreachable (unrelated to cilium)                                                               |
-| Native (GR)          | ✅ 3/3        | ❌ aborted at setup | ⚠️               | Cross-node Pod-to-Pod traffic broken; NetworkPolicy does not support L7/DNS (see [gr-no-l7-dns](./gr-no-l7-dns.md)) |
-| Overlay (VPC-CNI) ⭐ | ✅ 3/3        | ✅ 56/59 pass       | ✅               | Only node public-IP unreachable (unrelated to cilium)                                                               |
-| Overlay (GR)         | ✅ 3/3        | ✅ 56/59 pass       | ✅               | Only node public-IP unreachable (unrelated to cilium)                                                               |
+| Option               | cilium-health | connectivity test | Production-ready | Key limitations                                       |
+| -------------------- | ------------- | ----------------- | ---------------- | ----------------------------------------------------- |
+| Native (VPC-CNI) ⭐  | ✅ 3/3        | ✅ 56/59 pass     | ✅               | Only node public-IP unreachable (unrelated to cilium) |
+| Overlay (VPC-CNI) ⭐ | ✅ 3/3        | ✅ 56/59 pass     | ✅               | Only node public-IP unreachable (unrelated to cilium) |
+| Overlay (GR)         | ✅ 3/3        | ✅ 56/59 pass     | ✅               | Only node public-IP unreachable (unrelated to cilium) |
 
 ⭐ = recommended option.
 
@@ -61,60 +62,6 @@ The test by default skips `pod-to-world` and `pod-to-cidr` scenarios (rely on pu
 
 **Effective pass rate: 56/59**. Safe for production.
 
-### Native Routing (GR)
-
-```text
-[1/2] cilium-health verification passed: 3/3 nodes healthy
-[2/2] cilium connectivity test
-   ⌛ Waiting for pod cilium-test-1/client3 to reach DNS server on cilium-test-1/echo-same-node pod...
-   timeout reached waiting for lookup ... context deadline exceeded
-```
-
-**The test aborted at the setup stage**: the `client3` pod that `cilium connectivity test` deploys was unable to reach the CoreDNS service running on the `echo-same-node` pod across nodes; DNS resolution timed out.
-
-**Root cause**: under GR Native Routing + cilium chained CNI, **cross-node Pod-to-Pod traffic is broken**.
-
-Reproduction:
-
-```bash
-# A pod on node 105 trying to reach a pod on node 222
-$ kubectl -n cilium-test-1 exec deploy/client -- ping -c 2 -W 2 9.230.0.14
-2 packets transmitted, 0 received, 100% packet loss
-
-# But node 105 itself (host network) can reach the pod on node 222 just fine
-$ kubectl run nettest --rm -i --restart=Never --image=... \
-    --overrides='{"spec":{"hostNetwork":true,"nodeSelector":{...}}}' \
-    -- ping -c 3 -W 2 9.230.0.14
-3 packets transmitted, 3 received, 0% packet loss
-```
-
-A `cilium monitor` trace captures only the outbound packet entering the host stack:
-
-```text
--> stack flow 0x0, identity 24059->417, ifindex 0
-   9.230.0.208 -> 9.230.0.14 icmp EchoRequest
-```
-
-But **no return packet** — when the reply hits `eth0` on node 105, cilium's eBPF (`cil_from_netdev`) intercepts or drops it.
-
-**Combined with the [GR Native Routing does not support L7/DNS NetworkPolicy](./gr-no-l7-dns.md) limitation**, GR Native Routing under chained CNI mode has deeper compatibility issues with cilium's eBPF datapath.
-
-:::warning[GR Native Routing is not recommended for production]
-
-Summarizing the test results:
-
-- ✅ Same-node Pod-to-Pod traffic works
-- ✅ Pod-to-Host (local node) traffic works
-- ✅ kube-proxy replacement (ClusterIP/NodePort) works
-- ❌ **Cross-node Pod-to-Pod traffic broken** (a core scenario fails)
-- ❌ L7 / DNS / toFQDNs NetworkPolicy not supported
-
-Recommended only for: single-node demo / PoC / verifying cilium basics within a single node.
-
-For production, choose **Native Routing (VPC-CNI)** or **Overlay (any base cluster)** instead.
-
-:::
-
 ### Overlay (VPC-CNI) ⭐
 
 ```text
@@ -149,7 +96,7 @@ The failed cases are **identical to Overlay (VPC-CNI)** — the same 3 `pod-to-h
 
 ## Skipped Tests
 
-All four options skip the same 73 tests by default:
+All three options skip the same 73 tests by default:
 
 | Skip reason                                           | Examples                                                                                                                        | Need to worry?                                                                              |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -207,5 +154,5 @@ If you want to validate features not covered above:
 
 - [Install Cilium](../install.md)
 - [Verified Node Operating Systems](./verified-os.md)
-- [Why GR Native Routing does not support L7/DNS NetworkPolicy?](./gr-no-l7-dns.md)
+- [Why this guide does not offer GR Native Routing](./gr-native-not-recommended.md)
 - [Cilium E2E Connectivity Testing](https://docs.cilium.io/en/stable/contributing/testing/e2e/)

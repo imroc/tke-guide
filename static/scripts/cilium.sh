@@ -66,16 +66,15 @@ set -euo pipefail
 #    - ds/cilium exists (non-tkeimages)  → Already installed (not supported)
 #    - VPC-CNI + ds/cilium (tkeimages)   → DataPlaneV2 (not supported)
 #
-# 5. INSTALL MODES (4 combinations: NETWORK_MODE x ROUTING_MODE)
+# 5. INSTALL MODES (3 supported combinations)
 #    ┌──────────────────┬──────────────────────────────────────────────────┐
 #    │ VPC-CNI + native │ CNI chaining via ConfigMap (cni-config)         │
-#    │ GR + native      │ CNI chaining via chainingTarget=tke-bridge      │
-#    │                  │ + keep tke-cni-agent + enable masquerade        │
-#    │                  │ + disable portmap + create ip-masq-agent CM     │
 #    │ VPC-CNI + overlay│ Full cilium CNI (tunnel/vxlan, cluster-pool)    │
 #    │                  │ + delete mutatingwebhookconfiguration           │
 #    │ GR + overlay     │ Full cilium CNI (tunnel/vxlan, cluster-pool)    │
 #    └──────────────────┴──────────────────────────────────────────────────┘
+#    GR + native is NOT supported — see appendix/gr-native-not-recommended
+#    for the failure modes (cross-node Pod-to-Pod broken, no L7/DNS NP, etc).
 #
 # 6. CILIUM VERSION
 #    - DEFAULT_CILIUM_VERSION is the recommended version tested with this script.
@@ -207,13 +206,11 @@ MSG_EN_INPUT_OPTION="Enter option [1/2]: "
 MSG_ZH_INVALID_OPTION="无效选项，请输入 1 或 2"
 MSG_EN_INVALID_OPTION="Invalid option, enter 1 or 2"
 
-# GR Native Routing L7 DNS limitation warning
-MSG_ZH_GR_NATIVE_L7_WARN_TITLE="提醒：GR 集群 + Native Routing 模式不支持 toFQDNs / DNS L7 NetworkPolicy"
-MSG_EN_GR_NATIVE_L7_WARN_TITLE="Warning: GR cluster + Native Routing does not support toFQDNs / DNS L7 NetworkPolicy"
-MSG_ZH_GR_NATIVE_L7_WARN_BODY="原因：GR 模式下 Pod 流量过 tke-bridge 的 cbr0 网桥，cilium 的 DNS 代理依赖\n      iptables TPROXY 把 DNS 包 dispatch 到本机 socket，但桥转发的 frame\n      不会真正进入 IP routing/socket lookup，DNS 代理收不到流量，被含\n      \`rules.dns\` 或 \`toFQDNs\` 的 CiliumNetworkPolicy 选中的 Pod，所有\n      DNS 查询都会超时。\n\n影响：tke-guide 教程 NetworkPolicy 章节中所有用到 \`rules.dns\` 或\n      \`toFQDNs\` 的示例（默认拒绝、统一管控基础设施、A 只能访问指定域名等）\n      在 GR Native Routing 集群下都不可用。\n\n如有需求请二选一：\n  - 必须用域名级出向控制 → 选 Overlay 模式（输入 2）\n  - 可放弃域名级控制 → 继续 Native Routing，避免使用 \`rules.dns\` /\n    \`toFQDNs\`，改用 \`toCIDR\` 列网段或 \`toEntities: [world]\`\n\n详见: https://imroc.cc/tke/networking/cilium/networkpolicy#%E6%A8%A1%E5%BC%8F%E5%85%BC%E5%AE%B9%E6%80%A7"
-MSG_EN_GR_NATIVE_L7_WARN_BODY="Reason: In GR mode, Pod traffic traverses the tke-bridge cbr0 Linux bridge.\n        cilium's DNS proxy relies on iptables TPROXY to dispatch DNS\n        packets to a local socket, but bridge-forwarded frames don't\n        actually enter IP routing/socket lookup, so the DNS proxy receives\n        no traffic. Pods selected by a CiliumNetworkPolicy containing\n        \`rules.dns\` or \`toFQDNs\` will time out on every DNS query.\n\nImpact: All examples in the NetworkPolicy chapter that use \`rules.dns\` or\n        \`toFQDNs\` (default-deny, infrastructure baseline, FQDN egress, ...)\n        are NOT usable on GR Native Routing clusters.\n\nIf affected, choose one:\n  - Need FQDN-based egress control → choose Overlay mode (enter 2)\n  - Can give up FQDN-level control → keep Native Routing, avoid\n    \`rules.dns\` / \`toFQDNs\`; use \`toCIDR\` or \`toEntities: [world]\`\n\nMore: https://imroc.cc/tke/en/networking/cilium/networkpolicy#mode-compatibility"
-MSG_ZH_GR_NATIVE_L7_POST_WARN="提醒：当前模式不支持 toFQDNs / DNS L7 NetworkPolicy（GR + Native Routing 限制）。\n配置 NetworkPolicy 时请避免使用 \`rules.dns\` 和 \`toFQDNs\`，改用 \`toCIDR\` 列网段。\n详见: https://imroc.cc/tke/networking/cilium/networkpolicy#%E6%A8%A1%E5%BC%8F%E5%85%BC%E5%AE%B9%E6%80%A7"
-MSG_EN_GR_NATIVE_L7_POST_WARN="Reminder: This mode does NOT support toFQDNs / DNS L7 NetworkPolicy (GR + Native Routing limitation).\nWhen writing NetworkPolicies, avoid \`rules.dns\` and \`toFQDNs\`; use \`toCIDR\` instead.\nMore: https://imroc.cc/tke/en/networking/cilium/networkpolicy#mode-compatibility"
+# GR cluster + Native Routing not supported reason
+MSG_ZH_GR_NATIVE_NOT_SUPPORTED="GR 集群仅支持 Overlay 模式，已自动选择 Overlay (vxlan)。"
+MSG_EN_GR_NATIVE_NOT_SUPPORTED="GR clusters only support Overlay mode, automatically selecting Overlay (vxlan)."
+MSG_ZH_GR_NATIVE_NOT_SUPPORTED_DETAIL="GR + Native Routing 在 cilium chained CNI 模式下存在严重兼容性问题：\n  - 跨节点 Pod-to-Pod 流量不通\n  - L7 / DNS / toFQDNs NetworkPolicy 不支持\n  - 节点池必须额外打 cilium agent-not-ready 污点\n  - 与 VPC-CNI 共存能力被破坏\n\n本系列教程已不再提供该方案，详见:\nhttps://imroc.cc/tke/networking/cilium/appendix/gr-native-not-recommended\n\n如需 Native Routing 性能，请使用 VPC-CNI 集群。"
+MSG_EN_GR_NATIVE_NOT_SUPPORTED_DETAIL="GR + Native Routing has severe compatibility issues with cilium chained CNI:\n  - Cross-node Pod-to-Pod traffic broken\n  - L7 / DNS / toFQDNs NetworkPolicy not supported\n  - Node pools require an extra cilium agent-not-ready taint\n  - VPC-CNI co-existence breaks\n\nThis tutorial no longer offers that option, see:\nhttps://imroc.cc/tke/en/networking/cilium/appendix/gr-native-not-recommended\n\nFor Native Routing performance, please use a VPC-CNI cluster."
 
 MSG_ZH_INPUT_VERSION="请输入 Cilium 版本"
 MSG_EN_INPUT_VERSION="Enter Cilium version"
@@ -410,6 +407,22 @@ get_apiserver_ip() {
 # Skipped if ROUTING_MODE env var is already set.
 
 select_routing_mode() {
+  # GR cluster: Native Routing not supported (severe compatibility issues),
+  # automatically force Overlay mode and inform the user.
+  if [[ "${NETWORK_MODE:-}" == "GR" ]]; then
+    if [[ "${ROUTING_MODE:-}" == "native" ]]; then
+      error "$(msg GR_NATIVE_NOT_SUPPORTED)"
+      echo -e "$(msg GR_NATIVE_NOT_SUPPORTED_DETAIL)"
+      fatal "$(is_zh && echo "请取消设置 ROUTING_MODE=native 或在 VPC-CNI 集群上使用。" || echo "Please unset ROUTING_MODE=native or use a VPC-CNI cluster.")"
+    fi
+    info "$(msg GR_NATIVE_NOT_SUPPORTED)"
+    echo -e "$(msg GR_NATIVE_NOT_SUPPORTED_DETAIL)"
+    echo ""
+    ROUTING_MODE="overlay"
+    info "$(is_zh && echo "已选择:" || echo "Selected:") Overlay (vxlan)"
+    return
+  fi
+
   if [[ -n "${ROUTING_MODE:-}" ]]; then
     info "$(is_zh && echo "已选择:" || echo "Selected:") $([[ $ROUTING_MODE == "native" ]] && echo "Native Routing" || echo "Overlay (vxlan)")"
     return
@@ -419,13 +432,6 @@ select_routing_mode() {
   msg MODE_NATIVE
   msg MODE_OVERLAY
   echo ""
-  # GR clusters: warn about L7 DNS NetworkPolicy limitation in Native Routing
-  # (cbr0 bridge breaks TPROXY socket dispatch). VPC-CNI 不走 cbr0，无此限制。
-  if [[ "${NETWORK_MODE:-}" == "GR" ]]; then
-    warn "$(msg GR_NATIVE_L7_WARN_TITLE)"
-    echo -e "$(msg GR_NATIVE_L7_WARN_BODY)"
-    echo ""
-  fi
   while true; do
     read -rp "$(msg INPUT_OPTION)" choice
     case "$choice" in
@@ -563,10 +569,7 @@ confirm_enable_localdns() {
 uninstall_tke_components() {
   info "$(msg UNINSTALL_TKE)"
   kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}' 2>/dev/null || true
-  # GR + native routing 模式需要保留 tke-cni-agent（负责拷贝 CNI 二进制到节点）
-  if [[ "${NETWORK_MODE}_${ROUTING_MODE}" != "GR_native" ]]; then
-    kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}' 2>/dev/null || true
-  fi
+  kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}' 2>/dev/null || true
   kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}' 2>/dev/null || true
   info "$(msg UNINSTALL_TKE_OK)"
 }
@@ -604,68 +607,6 @@ data:
       ]
     }
 EOF
-}
-
-# setup_native_gr — Configures tke-bridge-agent for GR + cilium chaining.
-# Three changes are made to tke-bridge-agent DaemonSet args:
-#   1. --cni-conf-dir: /host/etc/cni/net.d/multus → /host/etc/cni/net.d
-#      (move bridge conflist to CNI root so cilium's chainingTarget can find it)
-#   2. --port-mapping=false: disable portmap plugin (cilium handles HostPort via
-#      kubeProxyReplacement; portmap depends on kube-proxy's KUBE-MARK-MASQ iptables chain)
-# Also creates ip-masq-agent ConfigMap for BPF masquerade:
-#   - Reads NonMasqueradeCIDRs from TKE's auto-generated ip-masq-agent-config
-#     (contains VPC CIDR + all auxiliary CIDRs including GR subnets)
-#   - GR Pod IPs need SNAT to node IP when accessing CVM metadata (169.254.x.x)
-setup_native_gr() {
-  info "$(is_zh && echo "配置 tke-bridge-agent..." || echo "Configuring tke-bridge-agent...")"
-  local current_args patched_args needs_patch=false
-  current_args=$(kubectl -n kube-system get ds tke-bridge-agent -o jsonpath='{.spec.template.spec.containers[0].args}')
-  patched_args="$current_args"
-  # 修改 CNI 配置输出到根目录
-  if echo "$patched_args" | grep -q '/host/etc/cni/net.d/multus'; then
-    patched_args=$(echo "$patched_args" | sed 's|/host/etc/cni/net.d/multus|/host/etc/cni/net.d|g')
-    needs_patch=true
-  fi
-  # 禁用 portmap（cilium 的 kubeProxyReplacement 已包含 HostPort 能力，portmap 依赖已被卸载的 kube-proxy 的 iptables chain）
-  if ! echo "$patched_args" | grep -q 'port-mapping=false'; then
-    patched_args=$(echo "$patched_args" | sed 's/\]$/,"--port-mapping=false"]/')
-    needs_patch=true
-  fi
-  if [[ "$needs_patch" == "true" ]]; then
-    kubectl -n kube-system patch ds tke-bridge-agent --type='json' \
-      -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args\",\"value\":${patched_args}}]"
-    info "$(is_zh && echo "等待 tke-bridge-agent 滚动重启..." || echo "Waiting for tke-bridge-agent rollout...")"
-    kubectl -n kube-system rollout status ds/tke-bridge-agent --timeout=120s
-  else
-    info "$(is_zh && echo "tke-bridge-agent 已配置完毕，跳过" || echo "tke-bridge-agent already configured, skipping")"
-  fi
-
-  # 配置 IP masquerade（GR Pod IP 访问 CVM metadata 等公共服务需要 SNAT 为节点 IP）
-  info "$(is_zh && echo "配置 IP masquerade..." || echo "Configuring IP masquerade...")"
-  local non_masq_cidrs=""
-  # 从 TKE 自动生成的 ip-masq-agent-config 中获取 NonMasqueradeCIDRs
-  local tke_cidrs
-  tke_cidrs=$(kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}' 2>/dev/null | grep -A100 'NonMasqueradeCIDRs:' | grep '^\s*-' | sed 's/.*- //' || true)
-  if [[ -n "$tke_cidrs" ]]; then
-    while IFS= read -r cidr; do
-      [[ -z "$cidr" ]] && continue
-      non_masq_cidrs="${non_masq_cidrs}    - ${cidr}\n"
-    done <<< "$tke_cidrs"
-  fi
-  # 创建 cilium 的 ip-masq-agent ConfigMap
-  kubectl apply -f - <<EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: ip-masq-agent
-  namespace: kube-system
-data:
-  config: |
-    nonMasqueradeCIDRs:
-$(echo -e "$non_masq_cidrs" | sed '/^$/d')
-    masqLinkLocal: true
-EOF
-  info "$(is_zh && echo "ip-masq-agent ConfigMap 已创建" || echo "ip-masq-agent ConfigMap created")"
 }
 
 # setup_overlay_vpccni — Deletes webhook that auto-injects ENI IP resource requests.
@@ -731,9 +672,6 @@ helm_install_cilium() {
     toleration_args+=(--set 'operator.tolerations[5].key=tke.cloud.tencent.com/eni-ip-unavailable,operator.tolerations[5].operator=Exists')
     mode_args=(--set sysctlfix.enabled=false --set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=false --set devices=eth+ --set cni.chainingMode=generic-veth --set cni.customConf=true --set cni.configMap=cni-config --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
     ;;
-  GR_native)
-    mode_args=(--set sysctlfix.enabled=false --set cni.chainingMode=generic-veth --set cni.chainingTarget=tke-bridge --set routingMode=native --set endpointRoutes.enabled=true --set ipam.mode=delegated-plugin --set enableIPv4Masquerade=true --set bpf.masquerade=true --set ipMasqAgent.enabled=true --set devices=eth+ --set cni.externalRouting=true --set extraConfig.local-router-ipv4=169.254.32.16)
-    ;;
   VPC-CNI_overlay)
     toleration_args+=(--set 'operator.tolerations[5].key=tke.cloud.tencent.com/eni-ip-unavailable,operator.tolerations[5].operator=Exists')
     mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=cluster-pool --set "ipam.operator.clusterPoolIPv4PodCIDRList={${POD_CIDR}}" --set ipam.operator.clusterPoolIPv4MaskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true)
@@ -749,10 +687,7 @@ helm_install_cilium() {
   local -a egress_args=()
   if [[ "${ENABLE_EGRESS:-false}" == "true" ]]; then
     egress_args+=(--set egressGateway.enabled=true)
-    # masquerade params - only add if not already in mode_args (GR_native already has them)
-    if [[ "${NETWORK_MODE}_${ROUTING_MODE}" != "GR_native" ]]; then
-      egress_args+=(--set enableIPv4Masquerade=true --set bpf.masquerade=true --set ipMasqAgent.enabled=true --set ipMasqAgent.config.masqLinkLocal=true)
-    fi
+    egress_args+=(--set enableIPv4Masquerade=true --set bpf.masquerade=true --set ipMasqAgent.enabled=true --set ipMasqAgent.config.masqLinkLocal=true)
   fi
 
   info "$(msg HELM_INSTALL) (${ROUTING_MODE} (${NETWORK_MODE}), cilium ${CILIUM_VERSION})"
@@ -930,7 +865,6 @@ cmd_install_cilium() {
   uninstall_tke_components
   case "${NETWORK_MODE}_${ROUTING_MODE}" in
   VPC-CNI_native) setup_native_vpccni ;;
-  GR_native) setup_native_gr ;;
   VPC-CNI_overlay) setup_overlay_vpccni ;;
   GR_overlay) ;;
   esac
@@ -949,22 +883,6 @@ cmd_install_cilium() {
   info "  kubectl -n kube-system get pod -l app.kubernetes.io/part-of=cilium"
   info "  kubectl -n kube-system exec ds/cilium -- cilium status --brief"
   info "============================================"
-
-  # GR native: remind user to add taint to node pools
-  if [[ "${NETWORK_MODE}_${ROUTING_MODE}" == "GR_native" ]]; then
-    echo ""
-    if is_zh; then
-      warn "Native Routing (GR) 模式下，节点池必须配置以下污点，避免 Pod 在 cilium 就绪前被调度:"
-      echo "    node.cilium.io/agent-not-ready=true:NoSchedule"
-      info "cilium agent 启动完成后会自动移除此污点，不影响后续 Pod 调度。"
-    else
-      warn "Native Routing (GR) requires the following taint on node pools to prevent Pods from being scheduled before cilium is ready:"
-      echo "    node.cilium.io/agent-not-ready=true:NoSchedule"
-      info "Cilium agent will automatically remove this taint once ready. Normal Pod scheduling is not affected."
-    fi
-    echo ""
-    warn "$(msg GR_NATIVE_L7_POST_WARN)"
-  fi
 
   # Export installed values as YAML for user reference
   print_installed_values

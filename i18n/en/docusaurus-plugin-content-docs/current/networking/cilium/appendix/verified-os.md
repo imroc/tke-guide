@@ -2,13 +2,13 @@
 
 ## Scope
 
-This page lists node OS images and kernel versions that have been hands-on verified across all **4 installation modes** covered in [Installing Cilium](../install.md) (VPC-CNI/GR × Native Routing/Overlay). Use it as a reference when choosing the OS for your cilium node pools.
+This page lists node OS images and kernel versions that have been hands-on verified across the **3 installation modes** covered in [Installing Cilium](../install.md) (Native Routing (VPC-CNI), Overlay (VPC-CNI), Overlay (GR)). Use it as a reference when choosing the OS for your cilium node pools.
 
 When creating a new node pool, prefer something from the table below. If your business requires an OS not listed here, validate on a single-node test cluster first before rolling out broadly.
 
 ## Verified OS List
 
-All entries below have passed the full e2e suite (cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache) under all 4 installation modes.
+All entries below have passed the full e2e suite (cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache) under all 3 installation modes.
 
 | OS                   | OsName                  | Kernel  |
 | -------------------- | ----------------------- | ------- |

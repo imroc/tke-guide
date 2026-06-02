@@ -5,25 +5,27 @@ This article describes how to install cilium in a TKE cluster, with support for 
 - **Native Routing**: Coexists with TKE CNI. Pods use IPs allocated by TKE; cilium provides NetworkPolicy, observability, kube-proxy replacement, and other enhancements.
 - **Overlay (vxlan tunnel)**: Completely replaces all TKE CNIs. Pod IPs do not consume underlay IPs, suitable for scenarios where IP allocation is difficult, or as a replacement for TKE's built-in CiliumOverlay mode to get full cilium functionality.
 
-Each mode supports both VPC-CNI and GlobalRouter (GR) base clusters, for a total of 4 combinations. **VPC-CNI clusters are recommended** — better network performance and no node count limit.
+VPC-CNI clusters support both modes; GR clusters only support Overlay mode. **VPC-CNI clusters are recommended** — better network performance and no node count limit.
 
 :::note[How to Choose]
 
-| Comparison Item       | Native Routing (VPC-CNI) ⭐ | Native Routing (GR)                      | Overlay (VPC-CNI) ⭐                          | Overlay (GR)                                       |
-| --------------------- | --------------------------- | ---------------------------------------- | --------------------------------------------- | -------------------------------------------------- |
-| Network Performance   | Optimal                     | Good (extra bridge hop)                  | Slight overhead (vxlan encap)                 | Slight overhead (vxlan encap)                      |
-| Pod IP Range          | VPC IP                      | VPC secondary CIDR IP                    | Independent CIDR, doesn't consume VPC IP      | Independent CIDR, doesn't consume VPC IP           |
-| IP Capacity Expansion | Add a VPC-CNI subnet        | Add a GR CIDR (VPC secondary CIDR)       | Append CIDR to `clusterPoolIPv4PodCIDRList`   | Same as left                                       |
-| Node Count Limit      | None                        | Limited by ClusterCIDR                   | None                                          | Limited by GR ClusterCIDR (GR cluster's own limit) |
-| External Pod Access   | Directly routable           | Routable within VPC                      | Not directly routable, via Service/Ingress    | Not directly routable                              |
-| L7/DNS NetworkPolicy  | ✅ Fully supported          | ⚠️ Not supported (cbr0 bridge limit)     | ✅ Fully supported                            | ✅ Fully supported                                 |
-| Node Pool Requirement | None                        | ⚠️ Must add cilium agent-not-ready taint | None                                          | None                                               |
-| Use Cases             | General (recommended)       | Existing GR cluster                      | IP shortage, IDC, full-featured cilium (rec.) | Same as left, but existing GR cluster              |
+| Comparison Item       | Native Routing (VPC-CNI) ⭐ | Overlay (VPC-CNI) ⭐                          | Overlay (GR)                                       |
+| --------------------- | --------------------------- | --------------------------------------------- | -------------------------------------------------- |
+| Network Performance   | Optimal                     | Slight overhead (vxlan encap)                 | Slight overhead (vxlan encap)                      |
+| Pod IP Range          | VPC IP                      | Independent CIDR, doesn't consume VPC IP      | Independent CIDR, doesn't consume VPC IP           |
+| IP Capacity Expansion | Add a VPC-CNI subnet        | Append CIDR to `clusterPoolIPv4PodCIDRList`   | Same as left                                       |
+| Node Count Limit      | None                        | None                                          | Limited by GR ClusterCIDR (GR cluster's own limit) |
+| External Pod Access   | Directly routable           | Not directly routable, via Service/Ingress    | Not directly routable                              |
+| L7/DNS NetworkPolicy  | ✅ Fully supported          | ✅ Fully supported                            | ✅ Fully supported                                 |
+| Use Cases             | General (recommended)       | IP shortage, IDC, full-featured cilium (rec.) | Existing GR cluster                                |
 
-Details on the two GR limitations:
+:::
 
-- ⚠️ Native Routing (GR) does not support L7/DNS NetworkPolicy → [Why GR Native Routing does not support L7/DNS NetworkPolicy](./appendix/gr-no-l7-dns.md)
-- ⚠️ Native Routing (GR) node pools must add the cilium agent-not-ready taint → [Why Native Routing (GR) node pools must add the cilium agent-not-ready taint](./appendix/gr-agent-not-ready-taint.md)
+:::warning[GR clusters: only use Overlay, not Native Routing]
+
+This guide **no longer offers GR + Native Routing** as a deployment option. That combination has cross-node Pod-to-Pod traffic broken and L7/DNS NetworkPolicy unusable, making it impractical for production. Full failure write-up and alternatives: [Why this guide does not offer GR Native Routing](./appendix/gr-native-not-recommended.md).
+
+For GR clusters, use **Overlay mode** only; if you need **Native Routing**, use a **VPC-CNI cluster**.
 
 :::
 
@@ -44,7 +46,7 @@ In the [TKE Console](https://console.cloud.tencent.com/tke2/cluster), create a T
 - Kubernetes version: 1.32 or later, latest is recommended (see [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)).
 - Operating system: recommend **TencentOS 4** or **Ubuntu 24.04**. Minimum: Linux kernel >= 5.10 (see [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)). For the full verified OS list, see [Verified Node Operating Systems](./appendix/verified-os.md).
 - Nodes: do not add any regular or native nodes before installation, to avoid leftover rules and configuration. Add them after installation completes.
-- Base addons: uncheck the **TKE built-in ip-masq-agent** component to avoid conflict with cilium's built-in ipMasqAgent. Native Routing (GR) mode will enable cilium's built-in ipMasqAgent later (different components — do not confuse them).
+- Base addons: uncheck the **TKE built-in ip-masq-agent** component to avoid conflict with cilium's built-in ipMasqAgent.
 - Extension addons: if you plan to use Karpenter node pools, enable the Karpenter addon; otherwise skip (see node pool selection below).
 
 After the cluster is created, enable cluster access so helm can talk to the apiserver during installation. See [Enabling Cluster Access](https://www.tencentcloud.com/document/product/457/30638).
@@ -138,24 +140,18 @@ ROUTING_MODE=native CILIUM_VERSION=1.19.4 \
 
 ### Uninstall TKE Components
 
-All modes need kube-proxy uninstalled (cilium replaces it):
+All modes need kube-proxy uninstalled (cilium replaces it) and tke-cni-agent uninstalled (to avoid CNI config conflicts):
 
 ```bash
 kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-```
-
-For all modes **except Native Routing (GR)**, also uninstall tke-cni-agent (to avoid CNI config conflicts):
-
-```bash
 kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 ```
 
 :::tip[Notes]
 
 1. Using a non-matching nodeSelector to keep the DaemonSet off all nodes is equivalent to uninstalling, and leaves a fallback path. For kube-proxy this is currently the only safe way — directly deleting kube-proxy will block future cluster upgrades.
-2. Native Routing (GR) mode must keep tke-cni-agent, because it's responsible for copying the bridge and other CNI binaries to nodes. In this mode cilium's default `cni.exclusive=true` automatically renames the multus config to `.cilium_bak` to disable it, so there is no conflict.
-3. As noted above, don't add nodes before installing cilium. If for some reason regular or native nodes were added before installation, restart those existing nodes to clear any leftover rules and configuration.
-4. If you forgot to uncheck ip-masq-agent during cluster creation, uninstall it manually:
+2. As noted above, don't add nodes before installing cilium. If for some reason regular or native nodes were added before installation, restart those existing nodes to clear any leftover rules and configuration.
+3. If you forgot to uncheck ip-masq-agent during cluster creation, uninstall it manually:
    ```bash
    kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
    ```
@@ -204,39 +200,6 @@ data:
 ```bash
 kubectl apply -f cni-config.yaml
 ```
-
-</TabItem>
-<TabItem value="native-gr" label="Native Routing (GR)">
-
-Two changes are required for tke-bridge-agent:
-
-1. **Change the CNI config output directory** — from the multus subdirectory to the CNI root directory, so cilium can discover and append to the bridge config via `chainingTarget`.
-2. **Disable the portmap plugin** (`--port-mapping=false`) — cilium's `kubeProxyReplacement=true` already includes HostPort forwarding, while the portmap plugin depends on the `KUBE-MARK-MASQ` iptables chain created by the (now uninstalled) kube-proxy. If you don't disable it, Pods with hostPort will fail to be created (CNI portmap call fails).
-
-```bash
-# Get current full args
-CURRENT_ARGS=$(kubectl -n kube-system get ds tke-bridge-agent -o jsonpath='{.spec.template.spec.containers[0].args}')
-# 1. Replace the CNI config directory path
-PATCHED_ARGS=$(echo "$CURRENT_ARGS" | sed 's|/host/etc/cni/net.d/multus|/host/etc/cni/net.d|g')
-# 2. Append --port-mapping=false to disable the portmap plugin (skip if already present)
-if ! echo "$PATCHED_ARGS" | grep -q 'port-mapping=false'; then
-  PATCHED_ARGS=$(echo "$PATCHED_ARGS" | sed 's/\]$/,"--port-mapping=false"]/')
-fi
-kubectl -n kube-system patch ds tke-bridge-agent --type='json' \
-  -p="[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/args\",\"value\":${PATCHED_ARGS}}]"
-```
-
-Wait for the tke-bridge-agent rolling restart to finish:
-
-```bash
-kubectl -n kube-system rollout status ds/tke-bridge-agent --timeout=120s
-```
-
-:::tip[Note]
-
-After cilium is installed, `cni.exclusive=true` (default) will automatically rename `00-multus.conf` to `00-multus.conf.cilium_bak` — no manual deletion needed.
-
-:::
 
 </TabItem>
 <TabItem value="overlay-gr" label="Overlay (GR)">
@@ -304,97 +267,6 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
   --set k8sServicePort=60002
 ```
-
-</TabItem>
-<TabItem value="native-gr" label="Native Routing (GR)">
-
-```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.4 \
-  --namespace kube-system \
-  --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
-  --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
-  --set operator.image.repository=quay.tencentcloudcr.com/cilium/operator \
-  --set certgen.image.repository=quay.tencentcloudcr.com/cilium/certgen \
-  --set hubble.relay.image.repository=quay.tencentcloudcr.com/cilium/hubble-relay \
-  --set hubble.ui.backend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui-backend \
-  --set hubble.ui.frontend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui \
-  --set nodeinit.image.repository=quay.tencentcloudcr.com/cilium/startup-script \
-  --set preflight.image.repository=quay.tencentcloudcr.com/cilium/cilium \
-  --set preflight.envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
-  --set clustermesh.apiserver.image.repository=quay.tencentcloudcr.com/cilium/clustermesh-apiserver \
-  --set authentication.mutual.spire.install.agent.image.repository=docker.io/k8smirror/spire-agent \
-  --set authentication.mutual.spire.install.server.image.repository=docker.io/k8smirror/spire-server \
-  --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
-  --set operator.tolerations[1].key="node.kubernetes.io/not-ready",operator.tolerations[1].operator="Exists" \
-  --set operator.tolerations[2].key="node.cloudprovider.kubernetes.io/uninitialized",operator.tolerations[2].operator="Exists" \
-  --set cni.chainingMode=generic-veth \
-  --set cni.chainingTarget=tke-bridge \
-  --set routingMode=native \
-  --set endpointRoutes.enabled=true \
-  --set ipam.mode=delegated-plugin \
-  --set enableIPv4Masquerade=true \
-  --set bpf.masquerade=true \
-  --set ipMasqAgent.enabled=true \
-  --set devices=eth+ \
-  --set cni.externalRouting=true \
-  --set extraConfig.local-router-ipv4=169.254.32.16 \
-  --set localRedirectPolicies.enabled=true \
-  --set sysctlfix.enabled=false \
-  --set kubeProxyReplacement=true \
-  --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
-  --set k8sServicePort=60002
-```
-
-After installation, also create the `ip-masq-agent` ConfigMap to specify which CIDRs should be excluded from SNAT. You can refer to the auto-generated `ip-masq-agent-config` ConfigMap from TKE (which contains the VPC CIDR plus all secondary CIDRs) for the `NonMasqueradeCIDRs` values:
-
-```bash
-# View the NonMasqueradeCIDRs that TKE auto-generates
-kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}'
-```
-
-Fill those CIDRs into cilium's `ip-masq-agent` ConfigMap:
-
-```yaml title="ip-masq-agent.yaml"
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: ip-masq-agent
-  namespace: kube-system
-data:
-  config: |
-    nonMasqueradeCIDRs:
-    - <VPC CIDR>                  # e.g. 10.0.0.0/16 — Pod traffic to VPC keeps source IP
-    - <VPC secondary CIDR (GR)>   # e.g. 172.16.0.0/16 — Pod-to-Pod traffic keeps source IP
-    - 169.254.0.0/16              # TKE metadata / apiserver VIP / COS / image registry — MUST preserve source IP
-    masqLinkLocal: false          # Required so 169.254.0.0/16 hits the nonMasq rule
-```
-
-:::tip[About 169.254.0.0/16]
-
-TKE places several critical services on this range: apiserver VIP, instance metadata service (e.g. csi-cbs controller reads instance metadata), COS, image registry, etc. Some of these components use hostAlias and bypass DNS resolution. If Pod traffic to these addresses is SNATed, the source IP is lost — and some services (e.g. a COS bucket with an IP allowlist) may break.
-
-:::
-
-```bash
-kubectl apply -f ip-masq-agent.yaml
-```
-
-:::tip[Differences vs. VPC-CNI chaining]
-
-| Parameter                                    | Description                                                                                                       |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `cni.chainingTarget=tke-bridge`              | cilium auto-watches the CNI config named `tke-bridge` and appends itself — adapts to per-node PodCIDR differences |
-| No `cni.customConf` / `cni.configMap` needed | No manual CNI ConfigMap                                                                                           |
-| `enableIPv4Masquerade=true`                  | GR Pod IPs need SNAT to node IP for things like CVM metadata access                                               |
-| Do **not** uninstall `tke-cni-agent`         | Required to copy the bridge and other CNI binaries to nodes                                                       |
-
-:::
-
-:::warning[GR clusters can no longer dynamically enable VPC-CNI after installing cilium]
-
-GR clusters natively support dynamically enabling VPC-CNI (GR + VPC-CNI coexistence), but **once you install cilium with this guide's setup, that feature is no longer usable**. cilium chaining takes over all Pod networking via multus's `defaultDelegates=tke-bridge`. Even if you create Pods with the `tke.cloud.tencent.com/networks: tke-route-eni` annotation, the IP still comes from the GR ClusterCIDR — not the VPC-CNI subnet. If you need VPC-CNI coexistence, use a VPC-CNI cluster directly.
-
-:::
 
 </TabItem>
 <TabItem value="overlay-gr" label="Overlay (GR)">
@@ -548,39 +420,6 @@ operator:
 ```
 
   </TabItem>
-  <TabItem value="native-gr" label="Native (GR)">
-
-Native Routing (GR) mode-specific parameters:
-
-```yaml showLineNumbers title="native-gr-values.yaml"
-# Use native routing
-routingMode: "native"
-endpointRoutes:
-  enabled: true
-ipam:
-  # Pod IP allocation handled by tke-bridge-agent
-  mode: "delegated-plugin"
-# GR Pod IPs need SNAT to node IP for things like CVM metadata access
-enableIPv4Masquerade: true
-bpf:
-  masquerade: true
-ipMasqAgent:
-  enabled: true
-# Attach cilium eBPF programs to all eth* interfaces
-devices: eth+
-cni:
-  # Use generic-veth + chainingTarget to auto-adapt to tke-bridge's CNI config
-  chainingMode: generic-veth
-  chainingTarget: tke-bridge
-  externalRouting: true
-extraConfig:
-  local-router-ipv4: 169.254.32.16
-# Disable sysctlfix. See FAQ.
-sysctlfix:
-  enabled: false
-```
-
-  </TabItem>
   <TabItem value="overlay" label="Overlay (VPC-CNI/GR)">
 
 Overlay (vxlan) mode-specific parameters — applies to both VPC-CNI and GR base clusters:
@@ -731,18 +570,6 @@ kubectl apply -f cilium-apf.yaml
 Cilium requires Linux kernel >= 5.10. **Recommended OS**: Ubuntu 24.04 or the latest TencentOS 4.
 
 For the **full list of verified OS images**, see [Verified Node Operating Systems](./appendix/verified-os.md).
-
-:::
-
-:::warning[Native Routing (GR) node pools MUST add the cilium taint]
-
-When using **Native Routing (GR)**, you **must** add the following taint to nodes when creating node pools (in **Advanced Settings** in the console, or via the terraform snippet below):
-
-```
-node.cilium.io/agent-not-ready=true:NoSchedule
-```
-
-See [Why Native Routing (GR) node pools must add the cilium agent-not-ready taint](./appendix/gr-agent-not-ready-taint.md) for the reason.
 
 :::
 
@@ -977,7 +804,7 @@ Rolling back from cilium to TKE's native CNI (VPC-CNI or GR) inevitably disrupts
 2. **Uninstall cilium**:
    ```bash
    helm uninstall cilium -n kube-system
-   kubectl -n kube-system delete cm ip-masq-agent  # If GR mode was used
+   kubectl -n kube-system delete cm ip-masq-agent --ignore-not-found  # Only legacy GR Native deployments leave this behind
    ```
 3. **Clean up node residue**: on each node, manually clear cilium's BPF programs, CNI config, and iptables rules:
    ```bash
@@ -1030,16 +857,6 @@ helm upgrade --install cilium ./cilium-1.19.4.tgz \
 ### How to optimize for large-scale scenarios?
 
 For large clusters (hundreds of nodes / tens of thousands of Pods), cilium defaults may show apiserver pressure, cilium-agent OOMs, and slow policy compilation. Tuning options include enabling CiliumEndpointSlice, APF rate limiting, raising client QPS, and trimming Security Identities — see [Cilium Tuning for Large-Scale Clusters](./appendix/large-scale-tuning.md) for the full guide.
-
-### Can VPC-CNI be dynamically enabled on a GR cluster after installing cilium?
-
-Not recommended. GR clusters natively support enabling VPC-CNI for coexistence, but **with this guide's cilium setup installed, this feature is no longer actually usable**:
-
-- cilium chaining takes over all Pod networking via multus config (`defaultDelegates=tke-bridge`).
-- Even when you create Pods with the `tke.cloud.tencent.com/networks: tke-route-eni` annotation, IPs still come from the GR ClusterCIDR (not the VPC-CNI subnet) — the VPC-CNI path is never actually used.
-- The `EnableVpcCniNetworkType` API call succeeds and the components deploy, but it has no real effect on Pod networking.
-
-If your business truly needs VPC-CNI, use a **VPC-CNI cluster with Native Routing** directly — don't pick a GR cluster.
 
 ### Can DataPlaneV2 be selected when creating a VPC-CNI cluster?
 
@@ -1177,8 +994,7 @@ Design rationale and operational guides have been split into standalone articles
 - [Cilium E2E Test Results](./appendix/e2e-test-report.md)
 - [Why Native Routing mode needs local-router-ipv4](./appendix/local-router-ipv4.md)
 - [Why Native Routing disables sysctlfix while Overlay enables it](./appendix/sysctlfix.md)
-- [Why GR Native Routing does not support L7/DNS NetworkPolicy](./appendix/gr-no-l7-dns.md)
-- [Why Native Routing (GR) node pools must add the cilium agent-not-ready taint](./appendix/gr-agent-not-ready-taint.md)
+- [Why this guide does not offer GR Native Routing](./appendix/gr-native-not-recommended.md)
 
 ## External References
 
