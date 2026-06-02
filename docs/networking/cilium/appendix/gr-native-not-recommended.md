@@ -1,6 +1,6 @@
 # 为什么不提供 GR Native Routing 部署方案？
 
-本系列教程**不再提供 GR 集群 + Native Routing** 的部署方案。本文整理在该模式上踩过的所有坑、技术原理与替代方案，给希望理解原因或已经部署该方案的读者提供完整参考。
+本系列教程**不再提供 GR 集群 + Native Routing** 的部署方案。本文整理在该模式上验证发现的所有问题、技术原理与替代方案。
 
 :::warning[结论]
 
@@ -13,13 +13,9 @@ GR + Native Routing 同时撞上以下 4 类问题，组合后基本无法生产
 3. ⚠️ **节点池必须额外打 `node.cilium.io/agent-not-ready` 污点**（其它三种模式不需要）
 4. ⚠️ **GR 与 VPC-CNI 共存能力被破坏**
 
+我们对该方案做过完整 [e2e 验证](./e2e-test-report.md)：在 cilium 的 [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) 模式 + tke-bridge 的 `cbr0` 桥之上，cilium 的 eBPF datapath 与 Linux 桥转发路径互不兼容，基础连通性都过不去。下文逐一列出失败点。
+
 :::
-
-## 为什么我们做过这个方案
-
-GR 集群在国内 TKE 用户中存量很大；最初我们希望"GR 集群也能用上完整的 Native Routing 高性能能力"，所以一开始把 GR + Native Routing 作为推荐方案之一加入了文档。
-
-实际跑完 [4 种部署方案的 e2e 测试](./e2e-test-report.md) 后才发现：在 cilium 的 [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) 模式 + tke-bridge 的 `cbr0` 桥之上，cilium 的 eBPF datapath 与 Linux 桥转发路径互不兼容，导致基础连通性都过不去。本文详细列出每一个失败点。
 
 ## 1. 跨节点 Pod-to-Pod 流量不通
 
@@ -146,35 +142,6 @@ GR 集群本身支持通过 [启用 VPC-CNI 网络能力](https://cloud.tencent.
 三个推荐方案均已通过 [完整 e2e 测试](./e2e-test-report.md)（56/59 用例通过，余下 3 个为节点公网 IP 不可达，与 cilium 无关）。
 
 如果你已经在生产用 GR 集群但**还没装 cilium**，建议改用 Overlay 模式装 cilium，对业务的影响仅限于 Pod IP 不再来自 GR 网段（独立 CIDR），其他能力完整。
-
-如果你已经按本教程**早期版本**部署了 GR Native Routing 方案：
-
-- 同节点业务可能没有问题，但**任何跨节点 Pod-to-Pod 通信、跨节点 Service 访问都不可靠**
-- 建议尽快迁移到 GR Overlay 或 VPC-CNI 集群
-- 迁移路径：通常需要 [回滚到 TKE 内置 CNI](../install.md#回滚到-tke-内置-cni)，再按 Overlay 模式重新安装；建议在维护窗口操作
-
-## 历史方案残留 cleanup
-
-如果你希望从 GR Native Routing 状态彻底清理，把集群恢复到可装 Overlay 的状态：
-
-```bash
-# 1. 卸载 cilium（含创建的 ip-masq-agent ConfigMap）
-helm uninstall cilium -n kube-system
-kubectl -n kube-system delete cm ip-masq-agent
-
-# 2. 还原 tke-bridge-agent 配置
-#    （安装 GR Native 时改了 --cni-conf-dir 与 --port-mapping=false）
-kubectl -n kube-system edit ds tke-bridge-agent
-# 把 args 中的 --cni-conf-dir 路径改回 /host/etc/cni/net.d/multus
-# 移除 --port-mapping=false
-kubectl -n kube-system rollout status ds/tke-bridge-agent
-
-# 3. 节点池移除 node.cilium.io/agent-not-ready taint（如果有）
-
-# 4. 重启或重建节点（推荐重建，避免残留 ebpf 程序与 iptables）
-```
-
-之后按 Overlay 流程重新装即可。
 
 ## 相关链接
 

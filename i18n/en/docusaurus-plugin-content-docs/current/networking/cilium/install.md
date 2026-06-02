@@ -804,7 +804,6 @@ Rolling back from cilium to TKE's native CNI (VPC-CNI or GR) inevitably disrupts
 2. **Uninstall cilium**:
    ```bash
    helm uninstall cilium -n kube-system
-   kubectl -n kube-system delete cm ip-masq-agent --ignore-not-found  # Only legacy GR Native deployments leave this behind
    ```
 3. **Clean up node residue**: on each node, manually clear cilium's BPF programs, CNI config, and iptables rules:
    ```bash

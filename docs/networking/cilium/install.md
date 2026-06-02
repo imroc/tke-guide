@@ -802,7 +802,6 @@ kubectl -n kube-system rollout status ds/cilium
 2. **卸载 cilium**：
    ```bash
    helm uninstall cilium -n kube-system
-   kubectl -n kube-system delete cm ip-masq-agent --ignore-not-found  # 仅旧版 GR Native 部署遗留
    ```
 3. **清理节点残留**：每个节点上手动清理 cilium 的 BPF 程序、CNI 配置与 iptables 规则：
    ```bash

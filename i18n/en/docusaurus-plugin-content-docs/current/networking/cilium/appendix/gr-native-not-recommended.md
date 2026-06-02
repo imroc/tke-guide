@@ -1,6 +1,6 @@
 # Why this guide does not offer GR Native Routing
 
-This guide **no longer offers** the **GR cluster + Native Routing** deployment option. This document collects every issue we ran into on that combination, the technical rationale behind each, and the alternatives — for readers who want to understand why, or who already deployed it.
+This guide **no longer offers** the **GR cluster + Native Routing** deployment option. This document collects the issues found on that combination, the technical rationale, and the alternatives.
 
 :::warning[Bottom line]
 
@@ -13,13 +13,9 @@ GR + Native Routing hits all four problems below at once, which combined make it
 3. ⚠️ **Node pools must add an extra `node.cilium.io/agent-not-ready` taint** (none of the other 3 modes need this)
 4. ⚠️ **GR + VPC-CNI coexistence is broken**
 
+We ran the full [e2e validation](./e2e-test-report.md) on this combination: on top of cilium's [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) + tke-bridge's `cbr0`, cilium's eBPF datapath and the Linux bridge forwarding path are mutually incompatible — even basic connectivity doesn't pass. The failure points are detailed below.
+
 :::
-
-## Why we tried this in the first place
-
-GR clusters have a large existing footprint among TKE users in China; we initially wanted "GR clusters can also benefit from full Native Routing performance", so we shipped GR + Native Routing as one of the recommended options.
-
-Only after running [the full 4-option e2e test suite](./e2e-test-report.md) did it become clear that, on top of cilium's [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) + tke-bridge's `cbr0`, cilium's eBPF datapath and the Linux bridge forwarding path are mutually incompatible — basic connectivity itself doesn't pass. This document lists each failure point.
 
 ## 1. Cross-node Pod-to-Pod traffic is broken
 
@@ -148,35 +144,6 @@ Pick from this table based on your actual need:
 All three recommended options have passed [the full e2e test](./e2e-test-report.md) (56/59 cases, the remaining 3 being node public-IP unreachable, unrelated to cilium).
 
 If you're already on a GR cluster in production but **haven't installed cilium yet**, install cilium in Overlay mode. The only impact on workloads is that Pod IPs no longer come from the GR CIDR (they come from an independent CIDR); all other capabilities are intact.
-
-If you already deployed GR Native Routing per **an early version of this guide**:
-
-- Same-node workloads may be fine, but **any cross-node Pod-to-Pod or cross-node Service access is unreliable**
-- Migrate to GR Overlay or VPC-CNI clusters as soon as practical
-- Migration path: typically [roll back to TKE built-in CNI](../install.md#rolling-back-to-tkes-built-in-cni), then re-install cilium in Overlay mode; do this during a maintenance window
-
-## Cleaning up legacy GR Native Routing residue
-
-If you want to fully clean up GR Native Routing state and bring the cluster to a state where Overlay can be installed:
-
-```bash
-# 1. Uninstall cilium (and the ip-masq-agent ConfigMap it created)
-helm uninstall cilium -n kube-system
-kubectl -n kube-system delete cm ip-masq-agent
-
-# 2. Restore tke-bridge-agent settings
-#    (GR Native installation modified --cni-conf-dir and added --port-mapping=false)
-kubectl -n kube-system edit ds tke-bridge-agent
-# Change the --cni-conf-dir path back to /host/etc/cni/net.d/multus
-# Remove --port-mapping=false
-kubectl -n kube-system rollout status ds/tke-bridge-agent
-
-# 3. Remove the node.cilium.io/agent-not-ready taint from node pools (if present)
-
-# 4. Restart or recreate nodes (recreate is safer — avoids residual eBPF programs and iptables rules)
-```
-
-Then install per the Overlay flow.
 
 ## See also
 
