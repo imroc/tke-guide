@@ -13,7 +13,7 @@ GR + Native Routing 同时撞上以下 4 类问题，组合后基本无法生产
 3. ⚠️ **节点池必须额外打 `node.cilium.io/agent-not-ready` 污点**（其它三种模式不需要）
 4. ⚠️ **GR 与 VPC-CNI 共存能力被破坏**
 
-我们对该方案做过完整 [e2e 验证](./e2e-test-report.md)：在 cilium 的 [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) 模式 + tke-bridge 的 `cbr0` 桥之上，cilium 的 eBPF datapath 与 Linux 桥转发路径互不兼容，基础连通性都过不去。下文逐一列出失败点。
+我们对该方案做过完整 [e2e 验证](./connectivity-test.md)：在 cilium 的 [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) 模式 + tke-bridge 的 `cbr0` 桥之上，cilium 的 eBPF datapath 与 Linux 桥转发路径互不兼容，基础连通性都过不去。下文逐一列出失败点。
 
 :::
 
@@ -139,13 +139,14 @@ GR 集群本身支持通过 [启用 VPC-CNI 网络能力](https://cloud.tencent.
 | 新建集群、性能优先、Pod 直接路由                 | **Native Routing (VPC-CNI)** —— 推荐                  |
 | 新建集群、IP 资源紧张或希望 Pod CIDR 与 VPC 解耦 | **Overlay (VPC-CNI)** —— 推荐                         |
 
-三个推荐方案均已通过 [完整 e2e 测试](./e2e-test-report.md)（56/59 用例通过，余下 3 个为节点公网 IP 不可达，与 cilium 无关）。
+三个推荐方案均已通过 [完整 e2e 测试](./connectivity-test.md)（结果见该文章"测试结果"小节）。
 
 如果你已经在生产用 GR 集群但**还没装 cilium**，建议改用 Overlay 模式装 cilium，对业务的影响仅限于 Pod IP 不再来自 GR 网段（独立 CIDR），其他能力完整。
 
 ## 相关链接
 
 - [安装 Cilium](../install.md)
-- [Cilium E2E 测试结果](./e2e-test-report.md)
+- [Cilium 功能测试](./connectivity-test.md)
+- [Cilium 性能测试](./performance-test.md)
 - [Cilium Docs - Generic Veth Chaining § Limitations](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/#limitations)
 - [cilium/cilium#12454](https://github.com/cilium/cilium/issues/12454)

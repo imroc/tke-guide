@@ -1,5 +1,15 @@
 # 使用 Cilium 增强可观测性
 
+## 一键启用 Hubble
+
+如果安装 cilium 时未启用 Hubble Relay 和 Hubble UI，可使用一键脚本快速启用：
+
+```bash
+./cilium.sh enable-hubble
+```
+
+脚本会执行 `helm upgrade --reuse-values --set hubble.relay.enabled=true --set hubble.ui.enabled=true`，并重启 cilium-agent / operator。下列章节是不使用脚本时手工启用各个组件的命令，按需查阅。
+
 ## 启用 Hubble Relay
 
 Hubble 包括 Hubble Server 和 Hubble Relay，其中 Hubble Server 已内置到每个节点的 cilium-agent 中并默认开启，Hubble Relay 是一个需要单独部署的组件，用于聚合集群所有节点 Hubble Server 的数据，提供统一的 API 入口。

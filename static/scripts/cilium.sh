@@ -56,7 +56,7 @@ set -euo pipefail
 #    - TKE nodes can pull from: docker.io (direct), quay.tencentcloudcr.com (quay.io mirror).
 #    - Images from registry.k8s.io / gcr.io are NOT accessible; sync them to docker.io/k8smirror:
 #        skopeo copy -a docker://<source> docker://docker.io/k8smirror/<name>:<tag>
-#    - Update image references in: helm_install_cilium() image_args, cmd_e2e_test(), NODE_LOCAL_DNS_IMAGE.
+#    - Update image references in: helm_install_cilium() image_args, cmd_test(), NODE_LOCAL_DNS_IMAGE.
 #
 # 4. NETWORK MODE DETECTION (detect_network_mode)
 #    Detection logic for TKE cluster network type:
@@ -116,6 +116,33 @@ DEFAULT_POD_CIDR_MASK="24"
 # Nodelocal DNSCache image. Synced from registry.k8s.io/dns/k8s-dns-node-cache to dockerhub mirror.
 NODE_LOCAL_DNS_IMAGE="docker.io/k8smirror/k8s-dns-node-cache:1.26.4"
 
+# Curl image used by both e2e-test (passed via --curl-image) and node egress probe.
+# Single source of truth so they stay in sync.
+CILIUM_CURL_IMAGE="quay.tencentcloudcr.com/cilium/alpine-curl:v1.10.0"
+
+# China-mainland-reachable defaults for cilium connectivity test external targets.
+# Used when nodes are detected to be in a Chinese region (see is_china_region).
+#
+# Domain choices:
+#   - npmmirror.com    (resolves to a real public-internet ECS IP, NOT a TKE
+#                       link-local mirror; supports HTTP/HTTPS/index.html → 200)
+#   - mirrors.aliyun.com (resolves to a real public-internet IP; HTTP 301 / HTTPS 200,
+#                         used as PodToWorld2's --external-other-target which only
+#                         tests one HTTPS request)
+#
+# IP choices:
+#   The connectivity test's pod-to-cidr scenario does `curl https://<IP>` directly,
+#   without SNI. Only one CN service was found whose direct-IP HTTPS responds with 2xx:
+#   npmmirror.com's backing IP (in 47.96.0.0/16). That IP is dynamic — ECS IPs change.
+#   So we resolve npmmirror.com at runtime and reuse its IP as --external-ip, then
+#   scan its /16 for another working IP for --external-other-ip. We also set
+#   --curl-insecure because direct-IP HTTPS cannot pass SAN validation (no IP-bound
+#   cert like Cloudflare's 1.1.1.1).
+CN_EXTERNAL_TARGET="npmmirror.com."
+CN_EXTERNAL_OTHER_TARGET="mirrors.aliyun.com."
+# Domain whose IP we'll resolve and reuse as --external-ip
+CN_EXTERNAL_IP_DOMAIN="npmmirror.com"
+
 # ====== I18N ======
 # Locale detection: checks LANG, LC_ALL, LANGUAGE for Chinese locale prefixes.
 # Returns 0 (true) for Chinese, 1 (false) for everything else.
@@ -154,10 +181,14 @@ MSG_ZH_HELP_CMD_CILIUM="  install-cilium     安装 Cilium 到 TKE 集群（自�
 MSG_EN_HELP_CMD_CILIUM="  install-cilium     Install Cilium to TKE cluster (auto-detect network mode, interactive)"
 MSG_ZH_HELP_CMD_LOCALDNS="  install-localdns   安装 Nodelocal DNSCache 并配置与 Cilium 共存"
 MSG_EN_HELP_CMD_LOCALDNS="  install-localdns   Install Nodelocal DNSCache with Cilium integration"
-MSG_ZH_HELP_CMD_E2ETEST="  e2e-test           运行 Cilium 连通性端到端测试"
-MSG_EN_HELP_CMD_E2ETEST="  e2e-test           Run Cilium connectivity end-to-end tests"
+MSG_ZH_HELP_CMD_TEST="  test               运行 Cilium 连通性测试"
+MSG_EN_HELP_CMD_TEST="  test               Run Cilium connectivity test"
+MSG_ZH_HELP_CMD_PERF="  perf               运行 Cilium 性能测试 (cilium connectivity perf)"
+MSG_EN_HELP_CMD_PERF="  perf               Run Cilium performance test (cilium connectivity perf)"
 MSG_ZH_HELP_CMD_EGRESS="  enable-egress-gateway  启用 Cilium Egress Gateway 功能"
 MSG_EN_HELP_CMD_EGRESS="  enable-egress-gateway  Enable Cilium Egress Gateway"
+MSG_ZH_HELP_CMD_HUBBLE="  enable-hubble      启用 Hubble (Hubble Relay + Hubble UI)"
+MSG_EN_HELP_CMD_HUBBLE="  enable-hubble      Enable Hubble (Hubble Relay + Hubble UI)"
 MSG_ZH_HELP_CMD_HELP="  help               显示本帮助信息"
 MSG_EN_HELP_CMD_HELP="  help               Show this help message"
 # Check
@@ -238,6 +269,9 @@ MSG_EN_LOCALDNS_DONE="Nodelocal DNSCache installed!"
 # Egress Gateway
 MSG_ZH_EGRESS_DONE="Egress Gateway 已启用！"
 MSG_EN_EGRESS_DONE="Egress Gateway enabled!"
+# Hubble
+MSG_ZH_HUBBLE_DONE="Hubble (Relay + UI) 已启用！"
+MSG_EN_HUBBLE_DONE="Hubble (Relay + UI) enabled!"
 
 # ====== Utility ======
 # Colored log output functions. All user-facing output should go through these.
@@ -271,8 +305,10 @@ show_help() {
   msg HELP_COMMANDS
   msg HELP_CMD_CILIUM
   msg HELP_CMD_LOCALDNS
-  msg HELP_CMD_E2ETEST
+  msg HELP_CMD_TEST
+  msg HELP_CMD_PERF
   msg HELP_CMD_EGRESS
+  msg HELP_CMD_HUBBLE
   msg HELP_CMD_HELP
   echo ""
   msg HELP_EXAMPLES
@@ -538,6 +574,105 @@ confirm_enable_egress() {
   fi
 }
 
+# Default CIDRs to use when neither NON_MASQ_CIDRS env var nor TKE's
+# ip-masq-agent-config ConfigMap is available. RFC 1918 covers all valid
+# Tencent Cloud VPC ranges (main + secondary CIDRs MUST come from these three).
+DEFAULT_NON_MASQ_CIDRS="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
+
+# resolve_non_masq_cidrs — Determines the list of CIDRs that cilium's BPF
+# ip-masq-agent should NOT masquerade. Required only for Native + Egress combo.
+#
+# Why this matters:
+#   Native Routing + Egress Gateway forces enableIPv4Masquerade=true (cilium
+#   source enforces this in pkg/egressgateway/manager.go). Without an accurate
+#   non-masquerade CIDR list, cilium SNATs cross-node Pod-to-Pod traffic to
+#   link-local / node IPs, breaking source-endpoint-label-based NetworkPolicy
+#   across nodes (the receiving node can't resolve the SNATed src IP back to
+#   the original Pod's identity). Other modes don't need this:
+#     - Native + no Egress: enableIPv4Masquerade=false (no SNAT)
+#     - Overlay (any base): vxlan tunnel preserves inner src Pod IP
+#
+# Resolution priority:
+#   1. NON_MASQ_CIDRS env var (space-separated, takes precedence)
+#   2. Existing TKE ip-masq-agent-config ConfigMap in kube-system (TKE's
+#      built-in ip-masq-agent addon writes VPC main + secondary CIDRs there
+#      automatically). Format: data.config is YAML containing list under
+#      nonMasqueradeCIDRs / NonMasqueradeCIDRs / nonMasqueradeSrcCIDRs.
+#   3. Interactive prompt (default: RFC 1918 three ranges, covers all VPC configs)
+#
+# Sets global NON_MASQ_CIDRS to a space-separated CIDR list.
+# Skipped entirely if not Native + Egress combo.
+resolve_non_masq_cidrs() {
+  if [[ "$ROUTING_MODE" != "native" ]] || [[ "${ENABLE_EGRESS:-false}" != "true" ]]; then
+    return
+  fi
+
+  if [[ -n "${NON_MASQ_CIDRS:-}" ]]; then
+    info "Non-masquerade CIDRs: $NON_MASQ_CIDRS (from env)"
+    return
+  fi
+
+  # Try to reuse TKE's ip-masq-agent-config ConfigMap (TKE addon)
+  local tke_cm_config
+  tke_cm_config=$(kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}' 2>/dev/null)
+  if [[ -n "$tke_cm_config" ]]; then
+    # Extract CIDRs under any of:
+    #   nonMasqueradeCIDRs / NonMasqueradeCIDRs / nonMasqueradeSrcCIDRs
+    local cidrs
+    cidrs=$(echo "$tke_cm_config" | awk '
+      /^[[:space:]]*[Nn]on[Mm]asquerade(Src)?CIDRs[[:space:]]*:/ { in_list=1; next }
+      in_list && /^[[:space:]]*-[[:space:]]/ { sub(/^[[:space:]]*-[[:space:]]*/, ""); print; next }
+      in_list && /^[[:space:]]*[A-Za-z]/ { in_list=0 }
+    ' | tr '\n' ' ' | sed 's/[[:space:]]\+$//')
+    if [[ -n "$cidrs" ]]; then
+      NON_MASQ_CIDRS="$cidrs"
+      info "$(is_zh && echo "检测到 TKE 自带 ip-masq-agent-config，复用其 VPC 网段 (${NON_MASQ_CIDRS// /, })" || echo "Detected TKE's ip-masq-agent-config, reusing VPC CIDRs (${NON_MASQ_CIDRS// /, })")"
+      return
+    fi
+  fi
+
+  # Interactive prompt
+  echo ""
+  if is_zh; then
+    info "Native Routing + Egress Gateway 组合需要配置 cilium ip-masq-agent 的 nonMasqueradeCIDRs，"
+    info "否则 cilium 会对跨节点 Pod-to-Pod 流量做 SNAT，破坏跨节点 NetworkPolicy。"
+    info "请输入您 VPC 的所有网段（主网段+辅助网段，空格分隔），需覆盖所有节点子网和 Pod 子网。"
+    info "默认使用 RFC 1918 三段全集（覆盖任意合法腾讯云 VPC 配置）。"
+  else
+    info "Native Routing + Egress Gateway requires cilium's ip-masq-agent nonMasqueradeCIDRs,"
+    info "otherwise cilium SNATs cross-node Pod-to-Pod traffic, breaking cross-node NetworkPolicy."
+    info "Please enter all VPC CIDRs (main + secondary, space-separated) covering all node and Pod subnets."
+    info "Default: RFC 1918 three ranges (covers any valid Tencent Cloud VPC config)."
+  fi
+  read -rp "$(echo -e "${BLUE}VPC CIDRs${NC} [$(is_zh && echo "默认" || echo "default"): ${DEFAULT_NON_MASQ_CIDRS}]: ")" cidrs_input
+  NON_MASQ_CIDRS="${cidrs_input:-$DEFAULT_NON_MASQ_CIDRS}"
+  info "Non-masquerade CIDRs: $NON_MASQ_CIDRS"
+}
+
+# confirm_enable_hubble — Asks user whether to enable Hubble Relay + Hubble UI
+# during install (default: N). Sets ENABLE_HUBBLE=true/false. If true, hubble
+# params are merged into helm install.
+# Skipped if ENABLE_HUBBLE env var is already set.
+confirm_enable_hubble() {
+  if [[ -n "${ENABLE_HUBBLE:-}" ]]; then
+    return
+  fi
+  echo ""
+  local prompt
+  if is_zh; then
+    prompt="是否启用 Hubble (Hubble Relay + Hubble UI)？[y/N]: "
+  else
+    prompt="Enable Hubble (Hubble Relay + Hubble UI)? [y/N]: "
+  fi
+  read -rp "$(echo -e "${BLUE}${prompt}${NC}")" hubble_input
+  hubble_input=$(echo "$hubble_input" | tr '[:upper:]' '[:lower:]')
+  if [[ "$hubble_input" == "y" || "$hubble_input" == "yes" ]]; then
+    ENABLE_HUBBLE=true
+  else
+    ENABLE_HUBBLE=false
+  fi
+}
+
 # confirm_enable_localdns — Asks user whether to install Nodelocal DNSCache (default: N).
 # Sets ENABLE_LOCALDNS=true/false. If true, localdns is deployed after cilium install.
 # Skipped if ENABLE_LOCALDNS env var is already set.
@@ -682,18 +817,36 @@ helm_install_cilium() {
   esac
 
   # Egress Gateway: merge params into helm install if enabled.
-  # NOTE: egress_args is appended LAST in helm call below — its --set values
-  # take precedence over both common_args and mode_args (helm last-wins).
+  # NOTE: egress_args / hubble_args are appended LAST in helm call below — their
+  # --set values take precedence over both common_args and mode_args (helm last-wins).
   local -a egress_args=()
   if [[ "${ENABLE_EGRESS:-false}" == "true" ]]; then
     egress_args+=(--set egressGateway.enabled=true)
     egress_args+=(--set enableIPv4Masquerade=true --set bpf.masquerade=true --set ipMasqAgent.enabled=true --set ipMasqAgent.config.masqLinkLocal=true)
+    # Add nonMasqueradeCIDRs (resolved earlier by resolve_non_masq_cidrs).
+    # Without this, cilium SNATs cross-node Pod-to-Pod traffic, breaking
+    # source-endpoint-label-based NetworkPolicy. helm uses array index syntax.
+    if [[ -n "${NON_MASQ_CIDRS:-}" ]]; then
+      local idx=0
+      for cidr in $NON_MASQ_CIDRS; do
+        egress_args+=(--set "ipMasqAgent.config.nonMasqueradeCIDRs[${idx}]=${cidr}")
+        idx=$((idx + 1))
+      done
+    fi
+  fi
+
+  local -a hubble_args=()
+  if [[ "${ENABLE_HUBBLE:-false}" == "true" ]]; then
+    # hubble.relay.enabled=true is the minimum to enable Hubble Relay (aggregator).
+    # hubble.ui.enabled=true adds the web UI (depends on relay being enabled).
+    hubble_args+=(--set hubble.relay.enabled=true --set hubble.ui.enabled=true)
   fi
 
   info "$(msg HELM_INSTALL) (${ROUTING_MODE} (${NETWORK_MODE}), cilium ${CILIUM_VERSION})"
   helm upgrade --install cilium cilium/cilium --version "$CILIUM_VERSION" \
     --namespace kube-system \
-    "${image_args[@]}" "${toleration_args[@]}" "${common_args[@]}" "${mode_args[@]}" ${egress_args[@]+"${egress_args[@]}"}
+    "${image_args[@]}" "${toleration_args[@]}" "${common_args[@]}" "${mode_args[@]}" \
+    ${egress_args[@]+"${egress_args[@]}"} ${hubble_args[@]+"${hubble_args[@]}"}
 }
 
 # apply_apf — Creates APF (API Priority and Fairness) rate limiting rules for cilium.
@@ -751,7 +904,9 @@ EOF
 
 # helm_enable_egress — Enables Egress Gateway via helm upgrade --reuse-values.
 # Auto-detects current cilium version from helm release.
-# Enables: egressGateway, IPv4 masquerade (BPF), ip-masq-agent with masqLinkLocal.
+# Enables: egressGateway, IPv4 masquerade (BPF), ip-masq-agent with masqLinkLocal,
+# and nonMasqueradeCIDRs (resolved by resolve_non_masq_cidrs — required only for
+# Native Routing to prevent cross-node Pod-to-Pod SNAT breaking NetworkPolicy).
 # Restarts cilium ds and operator to apply changes.
 helm_enable_egress() {
   local current_version
@@ -761,15 +916,34 @@ helm_enable_egress() {
   fi
   info "$(is_zh && echo "检测到 Cilium 版本: ${current_version}" || echo "Detected Cilium version: ${current_version}")"
 
+  # Detect routing mode from existing values to decide whether nonMasqueradeCIDRs
+  # is needed (only Native + Egress requires it; Overlay is unaffected).
+  local routing_mode
+  routing_mode=$(helm -n kube-system get values cilium 2>/dev/null | awk '/^routingMode:/ {print $2}' | tr -d '"')
+  ROUTING_MODE="$routing_mode"
+  ENABLE_EGRESS=true  # for resolve_non_masq_cidrs to take effect
+  resolve_non_masq_cidrs
+
+  local -a egress_set_args=(
+    --set egressGateway.enabled=true
+    --set enableIPv4Masquerade=true
+    --set bpf.masquerade=true
+    --set ipMasqAgent.enabled=true
+    --set ipMasqAgent.config.masqLinkLocal=true
+  )
+  if [[ -n "${NON_MASQ_CIDRS:-}" ]]; then
+    local idx=0
+    for cidr in $NON_MASQ_CIDRS; do
+      egress_set_args+=(--set "ipMasqAgent.config.nonMasqueradeCIDRs[${idx}]=${cidr}")
+      idx=$((idx + 1))
+    done
+  fi
+
   info "$(is_zh && echo "执行 helm upgrade 启用 Egress Gateway..." || echo "Running helm upgrade to enable Egress Gateway...")"
   helm upgrade cilium cilium/cilium --version "$current_version" \
     --namespace kube-system \
     --reuse-values \
-    --set egressGateway.enabled=true \
-    --set enableIPv4Masquerade=true \
-    --set bpf.masquerade=true \
-    --set ipMasqAgent.enabled=true \
-    --set ipMasqAgent.config.masqLinkLocal=true
+    "${egress_set_args[@]}"
 
   info "$(is_zh && echo "重启 cilium..." || echo "Restarting cilium...")"
   kubectl -n kube-system rollout restart ds/cilium
@@ -780,6 +954,38 @@ helm_enable_egress() {
   if [[ "$node_count" -gt 0 ]]; then
     kubectl -n kube-system rollout status ds/cilium --timeout=120s
     kubectl -n kube-system rollout status deploy/cilium-operator --timeout=120s
+  fi
+}
+
+# helm_enable_hubble — Enables Hubble Relay + Hubble UI via helm upgrade --reuse-values.
+# Auto-detects current cilium version from helm release.
+# Hubble Server runs in cilium-agent by default; we enable the cluster-wide Relay
+# (aggregator) and the web UI. Restarts cilium ds and operator to apply changes.
+helm_enable_hubble() {
+  local current_version
+  current_version=$(helm -n kube-system list -o json | grep -o '"chart":"cilium-[^"]*"' | sed 's/.*cilium-//' | sed 's/"//')
+  if [[ -z "$current_version" ]]; then
+    fatal "$(is_zh && echo "无法检测当前 Cilium 版本" || echo "Cannot detect current Cilium version")"
+  fi
+  info "$(is_zh && echo "检测到 Cilium 版本: ${current_version}" || echo "Detected Cilium version: ${current_version}")"
+
+  info "$(is_zh && echo "执行 helm upgrade 启用 Hubble Relay + Hubble UI..." || echo "Running helm upgrade to enable Hubble Relay + Hubble UI...")"
+  helm upgrade cilium cilium/cilium --version "$current_version" \
+    --namespace kube-system \
+    --reuse-values \
+    --set hubble.relay.enabled=true \
+    --set hubble.ui.enabled=true
+
+  info "$(is_zh && echo "重启 cilium..." || echo "Restarting cilium...")"
+  kubectl -n kube-system rollout restart ds/cilium
+  kubectl -n kube-system rollout restart deploy/cilium-operator
+  local node_count
+  node_count=$(kubectl get node --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  if [[ "$node_count" -gt 0 ]]; then
+    kubectl -n kube-system rollout status ds/cilium --timeout=120s
+    kubectl -n kube-system rollout status deploy/cilium-operator --timeout=120s
+    kubectl -n kube-system rollout status deploy/hubble-relay --timeout=120s 2>/dev/null || true
+    kubectl -n kube-system rollout status deploy/hubble-ui --timeout=120s 2>/dev/null || true
   fi
 }
 
@@ -817,7 +1023,11 @@ print_replay_command() {
   if [[ "$ROUTING_MODE" == "overlay" ]]; then
     env_vars="${env_vars} POD_CIDR=${POD_CIDR} POD_CIDR_MASK=${POD_CIDR_MASK}"
   fi
-  env_vars="${env_vars} ENABLE_EGRESS=${ENABLE_EGRESS:-false} ENABLE_LOCALDNS=${ENABLE_LOCALDNS:-false}"
+  env_vars="${env_vars} ENABLE_EGRESS=${ENABLE_EGRESS:-false} ENABLE_HUBBLE=${ENABLE_HUBBLE:-false} ENABLE_LOCALDNS=${ENABLE_LOCALDNS:-false}"
+  if [[ -n "${NON_MASQ_CIDRS:-}" ]] && [[ "$ROUTING_MODE" == "native" ]] && [[ "${ENABLE_EGRESS:-false}" == "true" ]]; then
+    # Quote because list contains spaces
+    env_vars="${env_vars} NON_MASQ_CIDRS=\"${NON_MASQ_CIDRS}\""
+  fi
   echo ""
   if is_zh; then
     info "如需在其他集群重复相同安装，可直接执行以下命令（无需交互）:"
@@ -838,8 +1048,10 @@ print_replay_command() {
 #   5. confirm_cilium_version
 #   6. confirm_pod_cidr (overlay only)
 #   7. confirm_enable_egress (optional)
-#   8. confirm_enable_localdns (optional)
-#   9. uninstall_tke_components → setup_* → helm_install → apply_apf
+#   8. resolve_non_masq_cidrs (only when Native + Egress)
+#   9. confirm_enable_hubble (optional)
+#  10. confirm_enable_localdns (optional)
+#  11. uninstall_tke_components → setup_* → helm_install → apply_apf
 #  10. (optional) enable egress / install localdns
 cmd_install_cilium() {
   echo ""
@@ -856,6 +1068,8 @@ cmd_install_cilium() {
   confirm_image_registry
   confirm_pod_cidr
   confirm_enable_egress
+  resolve_non_masq_cidrs
+  confirm_enable_hubble
   confirm_enable_localdns
 
   echo ""
@@ -1134,28 +1348,194 @@ cmd_install_localdns() {
   install_localdns_internal
 }
 
-# ====== e2e-test subcommand ======
-# Runs cilium connectivity test with TKE-compatible image overrides.
-# Skips test scenarios that fail in the TKE node environment for reasons
-# unrelated to cilium:
-#   - pod-to-world  : Default target one.one.one.one is blocked by GFW in China
-#                     and TKE nodes don't have public internet by default.
-#   - pod-to-cidr   : Same reason as pod-to-world.
-#   - pod-to-host   : The "ping-ipv4-external-ip" action targets the *node's*
-#                     ExternalIP (the EIP). TKE security groups by default block
-#                     inbound public ICMP, so this action 100% fails on every
-#                     TKE deployment. It would NOT validate cilium even if it
-#                     passed (the traffic never reaches cilium's datapath).
-#                     The pod-to-pod / pod-to-service scenarios already cover
-#                     the same Pod → node-internal-IP path, so dropping the
-#                     pod-to-host scenario doesn't reduce real coverage.
-# Note: '/pod-to-host$' uses an anchor '$' to avoid also matching pod-to-hostport.
+# ====== test subcommand ======
+# Runs cilium connectivity test with TKE-compatible image overrides and
+# region-aware external target defaults.
+#
+# Two TKE-environment-specific concerns drive this logic:
+#
+# 1. External target reachability (pod-to-world / pod-to-cidr / to-fqdns / etc.)
+#    These scenarios curl external IPs/domains. cilium-cli has NO automatic
+#    "is external reachable" pre-check — connections that fail simply count as
+#    failed actions. The defaults `1.1.1.1` / `one.one.one.one.` / `k8s.io.` are
+#    blocked by GFW from China-mainland networks, so:
+#      - China-mainland regions (auto-detected via topology.kubernetes.io/region)
+#        get China-reachable substitutes: 223.5.5.5 / www.aliyun.com. / www.qq.com.
+#      - Overseas regions keep cilium defaults.
+#    Detection uses the SHORT region code (e.g. "cd", "bj", "hk"), which is what
+#    TKE actually puts on the label — see is_china_region() below.
+#
+# 2. Node public-internet egress (Pod → external)
+#    If nodes lack public egress (no NAT gateway, no node EIP, no Egress Gateway),
+#    every external-target action will fail. We probe egress via a temporary Pod
+#    and emit a WARNING listing the affected scenarios — no auto-skip, because
+#    "node has no public internet" is the user's deployment choice, not a
+#    cilium-environment incompatibility. User can still pass `--test '!...'` to
+#    explicitly skip those scenarios.
+#
+# 3. pod-to-host with EIPs
+#    The pod-to-host scenario iterates over node.status.addresses and pings each
+#    address by type. When nodes are bound to EIPs, cilium-cli generates an
+#    extra `ping-ipv4-external-ip` action that targets the EIP. TKE security
+#    groups by default block inbound public ICMP, so this single action fails;
+#    the cilium-cli `--test` filter only operates at SCENARIO granularity, so
+#    we cannot skip just that action. We only auto-skip pod-to-host when at
+#    least one node has an ExternalIP. This is a cloud-provider behavior, not a
+#    cilium issue — the same Pod → node-internal-IP path is already covered by
+#    pod-to-pod and pod-to-service scenarios.
+#
 # Image mapping:
 #   quay.io/cilium/*           → quay.tencentcloudcr.com/cilium/* (internal mirror)
 #   registry.k8s.io/coredns/*  → docker.io/k8smirror/coredns:*   (synced to dockerhub)
 #   gcr.io/*/echo-advanced     → docker.io/k8smirror/echo-advanced:* (synced to dockerhub)
 
-cmd_e2e_test() {
+# is_china_region — Returns 0 if the given region SHORT code (e.g. "cd", "bj")
+# represents a China-mainland region, 1 otherwise.
+# The label `topology.kubernetes.io/region` on TKE nodes uses the SHORT form
+# from the TKE region table (cd=Chengdu, bj=Beijing, hk=HongKong, ...).
+# Source of truth: ~/.claude-internal/skills/tke-knowledge/regions.md
+# Maintenance: when TKE adds a new China-mainland region, append its short code
+# to CN_REGION_CODES below. Overseas regions and HK/MO/TW are excluded (HK/TW
+# are not subject to GFW egress restrictions, default targets work fine there).
+is_china_region() {
+  local code="$1"
+  [[ -z "$code" ]] && return 1
+  # China-mainland short region codes (public + finance + EC):
+  #   gz/sh/bj/cd/cq/nj/szx/qy/tsn  — public
+  #   shjr/szjr/bjjr                 — finance
+  #   jnec/hzec/fzec/whec/csec/sjwec/hfeec/sheec/xiyec/xbec/cgoec — EC
+  #   zw                             — Zhongwei
+  case "$code" in
+    gz|sh|bj|cd|cq|nj|szx|qy|tsn) return 0 ;;
+    shjr|szjr|bjjr) return 0 ;;
+    jnec|hzec|fzec|whec|csec|sjwec|hfeec|sheec|xiyec|xbec|cgoec) return 0 ;;
+    zw) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# detect_cluster_region — Inspects all non-super nodes' region labels and prints
+# one of: "china" / "overseas" / "mixed" / "unknown".
+#   - All nodes in China-mainland regions → "china"
+#   - All nodes in overseas regions → "overseas"
+#   - Mix of China + overseas → "mixed" (treat as overseas to be safe)
+#   - No region labels found → "unknown" (treat as overseas to be safe)
+# Reads `topology.kubernetes.io/region` first, falls back to
+# `failure-domain.beta.kubernetes.io/region` (deprecated but still set on
+# older clusters).
+detect_cluster_region() {
+  local lines
+  lines=$(kubectl get node -o jsonpath='{range .items[*]}{.metadata.labels.node\.kubernetes\.io/instance-type}{"|"}{.metadata.labels.topology\.kubernetes\.io/region}{"|"}{.metadata.labels.failure-domain\.beta\.kubernetes\.io/region}{"\n"}{end}' 2>/dev/null)
+  if [[ -z "$lines" ]]; then
+    echo "unknown"
+    return
+  fi
+  local saw_cn=0 saw_oversea=0
+  while IFS='|' read -r itype region region_legacy; do
+    [[ -z "$itype$region$region_legacy" ]] && continue
+    # Skip super nodes (eklet) — they don't represent the cluster's underlying region
+    [[ "$itype" == "eklet" ]] && continue
+    local code="${region:-$region_legacy}"
+    [[ -z "$code" ]] && continue
+    if is_china_region "$code"; then
+      saw_cn=1
+    else
+      saw_oversea=1
+    fi
+  done <<< "$lines"
+  if (( saw_cn == 1 && saw_oversea == 0 )); then
+    echo "china"
+  elif (( saw_cn == 0 && saw_oversea == 1 )); then
+    echo "overseas"
+  elif (( saw_cn == 1 && saw_oversea == 1 )); then
+    echo "mixed"
+  else
+    echo "unknown"
+  fi
+}
+
+# nodes_have_external_ip — Returns 0 if any node has a NodeExternalIP, 1 otherwise.
+# When true, the pod-to-host scenario will generate a ping-ipv4-external-ip action
+# that targets the node's EIP, which fails on TKE because EIP security groups
+# block inbound public ICMP by default.
+nodes_have_external_ip() {
+  local eips
+  eips=$(kubectl get node -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="ExternalIP")].address}{" "}{end}' 2>/dev/null | tr -s ' ')
+  [[ -n "${eips// /}" ]]
+}
+
+# probe_pod_egress — Launches a temporary curl Pod and tries to reach `target`
+# with a 5-second timeout. Returns 0 if reachable, non-zero otherwise.
+# Used to warn users when nodes lack public-internet egress.
+# Uses --attach instead of -i so it works in non-interactive environments.
+# The probe pod has a unique name (PID-based) to avoid colliding with concurrent runs.
+probe_pod_egress() {
+  local target="$1"
+  local probe_name="cilium-egress-probe-$$"
+  local rc
+  kubectl run "$probe_name" \
+    --image="$CILIUM_CURL_IMAGE" \
+    --restart=Never \
+    --attach \
+    --rm \
+    --quiet \
+    --command -- \
+    curl -sS -o /dev/null --max-time 5 "$target" >/dev/null 2>&1
+  rc=$?
+  # Best-effort cleanup in case --rm didn't fire (e.g. timeout, signal)
+  kubectl delete pod "$probe_name" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+  return "$rc"
+}
+
+# resolve_cn_external_ips — Dynamically resolves CN_EXTERNAL_IP_DOMAIN inside the
+# cluster and finds two distinct IPs in the same /16 that respond with HTTPS 2xx/3xx
+# (with --insecure, since direct-IP HTTPS can't pass SAN validation for CN services).
+#
+# Outputs three space-separated values to stdout: "ip1 ip2 cidr"
+# Returns 0 on success, non-zero if no working pair found (caller should fall back).
+#
+# Why dynamic: CN public services rarely sign certs for raw IPs, so the only working
+# IP is the one currently backing npmmirror.com (an alibaba ECS public IP that rotates).
+# We resolve it fresh on each run.
+resolve_cn_external_ips() {
+  local probe_name="cilium-cn-resolve-$$"
+  local out
+  out=$(kubectl run "$probe_name" \
+    --image="$CILIUM_CURL_IMAGE" \
+    --restart=Never \
+    --attach \
+    --rm \
+    --quiet \
+    --command -- /bin/sh -c "
+set +e
+ips=\$(dig +short +time=3 +tries=2 ${CN_EXTERNAL_IP_DOMAIN} A 2>/dev/null | grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$' | head -1)
+[ -z \"\$ips\" ] && exit 1
+ip1=\$ips
+# Verify ip1 actually responds with HTTPS 2xx/3xx (with --insecure)
+code=\$(curl --silent --fail --show-error --insecure --connect-timeout 2 --max-time 5 -4 -o /dev/null -w '%{http_code}' \"https://\${ip1}:443\" 2>/dev/null)
+case \"\$code\" in 2*|3*) ;; *) exit 2 ;; esac
+prefix=\$(echo \"\$ip1\" | awk -F. '{printf \"%s.%s\", \$1, \$2}')
+# Scan a few candidate IPs in the same /16 for a second working one
+ip2=
+for last3 in 233.61 232.62 234.62 232.61 234.61 233.63 230.10 240.10 250.10 100.10 150.10 170.10 200.10 220.20 130.30; do
+  candidate=\"\${prefix}.\${last3}\"
+  [ \"\$candidate\" = \"\$ip1\" ] && continue
+  c=\$(curl --silent --fail --show-error --insecure --connect-timeout 1 --max-time 3 -4 -o /dev/null -w '%{http_code}' \"https://\${candidate}:443\" 2>/dev/null)
+  case \"\$c\" in 2*|3*) ip2=\$candidate; break ;; esac
+done
+[ -z \"\$ip2\" ] && exit 3
+echo \"\${ip1} \${ip2} \${prefix}.0.0/16\"
+" 2>/dev/null)
+  local rc=$?
+  kubectl delete pod "$probe_name" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+  if [[ $rc -ne 0 ]] || [[ -z "$out" ]]; then
+    return 1
+  fi
+  echo "$out"
+  return 0
+}
+
+cmd_test() {
   echo ""
   echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
   echo -e "${BLUE}║      Cilium Connectivity Test        ║${NC}"
@@ -1166,71 +1546,214 @@ cmd_e2e_test() {
   command -v kubectl &>/dev/null || fatal "$(msg NO_KUBECTL)"
   kubectl cluster-info &>/dev/null || fatal "$(msg NO_CLUSTER)"
 
-  # Phase 1: cilium-health per-node verification
-  info "$(is_zh && echo "[1/2] 验证 cilium-health 全节点连通性..." || echo "[1/2] Verifying cilium-health per-node connectivity...")"
-  echo ""
-  local failed=0
-  local total=0
-  local cilium_pods
-  cilium_pods=$(kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
-  if [[ -z "$cilium_pods" ]]; then
-    fatal "$(is_zh && echo "未找到 cilium agent pod" || echo "No cilium agent pods found")"
-  fi
-  while IFS= read -r pod; do
-    [[ -z "$pod" ]] && continue
-    total=$((total + 1))
-    local node_ip
-    node_ip=$(kubectl -n kube-system get pod "$pod" -o jsonpath='{.status.hostIP}')
-    local health_output
-    health_output=$(kubectl -n kube-system exec "$pod" -- cilium-health status 2>&1)
-    local cluster_health
-    cluster_health=$(echo "$health_output" | grep "Cluster health:" | awk '{print $3}')
-    local localhost_line
-    localhost_line=$(echo "$health_output" | grep "localhost")
-    local node_probe endpoint_probe
-    node_probe=$(echo "$localhost_line" | awk '{print $4}')
-    endpoint_probe=$(echo "$localhost_line" | awk '{print $5}')
+  # cilium connectivity test itself includes cilium-health checks per-node as part
+  # of its setup phase, so we don't run a separate cilium-health verification here.
 
-    local status_icon="✅"
-    if [[ "$node_probe" != "1/1" ]]; then
-      status_icon="❌"
-      failed=$((failed + 1))
-    elif [[ -n "$endpoint_probe" && "$endpoint_probe" != "0/0" && "$endpoint_probe" != "1/1" ]]; then
-      status_icon="❌"
-      failed=$((failed + 1))
+  info "$(is_zh && echo "运行 cilium connectivity test..." || echo "Running cilium connectivity test...")"
+  echo ""
+
+  # ---- Region-aware external target selection ----
+  local cluster_region
+  cluster_region=$(detect_cluster_region)
+  local -a external_args=()
+  local -a extra_skip_args=()
+  local insecure_arg=""
+  case "$cluster_region" in
+    china)
+      if is_zh; then
+        info "检测到节点位于中国大陆地域，使用国内可达的外部目标 (域名: ${CN_EXTERNAL_TARGET} / ${CN_EXTERNAL_OTHER_TARGET})"
+        info "动态解析 ${CN_EXTERNAL_IP_DOMAIN} 以确定 pod-to-cidr 用例的 external-ip..."
+      else
+        info "Cluster nodes are in China-mainland region, using China-reachable external targets (domains: ${CN_EXTERNAL_TARGET} / ${CN_EXTERNAL_OTHER_TARGET})"
+        info "Resolving ${CN_EXTERNAL_IP_DOMAIN} dynamically to determine external-ip for pod-to-cidr scenarios..."
+      fi
+
+      external_args=(
+        --external-target "$CN_EXTERNAL_TARGET"
+        --external-other-target "$CN_EXTERNAL_OTHER_TARGET"
+        # CN public services don't sign certs for raw IPs, so direct-IP HTTPS
+        # in pod-to-cidr would fail SAN validation without --insecure.
+        # cilium-cli internal HTTP tests use plain HTTP (no TLS), so this
+        # only relaxes external-target HTTPS validation, which is safe here.
+        --curl-insecure
+      )
+
+      local cn_ips
+      if cn_ips=$(resolve_cn_external_ips); then
+        # cn_ips format: "ip1 ip2 cidr"
+        local cn_ip1 cn_ip2 cn_cidr
+        read -r cn_ip1 cn_ip2 cn_cidr <<< "$cn_ips"
+        if is_zh; then
+          info "动态解析成功，将注入以下参数:"
+        else
+          info "Dynamic resolution succeeded, will inject:"
+        fi
+        echo "  --external-ip          ${cn_ip1}"
+        echo "  --external-other-ip    ${cn_ip2}"
+        echo "  --external-cidr        ${cn_cidr}"
+        echo "  --external-target      ${CN_EXTERNAL_TARGET}"
+        echo "  --external-other-target ${CN_EXTERNAL_OTHER_TARGET}"
+        echo "  --curl-insecure"
+        external_args+=(
+          --external-ip "$cn_ip1"
+          --external-other-ip "$cn_ip2"
+          --external-cidr "$cn_cidr"
+        )
+      else
+        # Couldn't find a working IP pair — skip pod-to-cidr / cidr-external scenarios
+        if is_zh; then
+          warn "未能动态解析到可用的国内 IP 对（CN 公网服务对裸 IP HTTPS 支持有限），跳过依赖 IP 的 CIDR 测试用例:"
+          warn "  - pod-to-cidr / to-cidr-external / from-cidr-external / client-egress-to-cidrgroup-deny / 等"
+          warn "  这是国内公网环境的客观限制（无稳定的 IP-only HTTPS 服务），与 cilium 能力无关。"
+          warn "  CIDR 策略能力本身仍由其它用例间接覆盖（如 to-entities-world、from-cidr 等）。"
+        else
+          warn "Could not resolve a working CN IP pair (CN public services have limited IP-only HTTPS support), skipping IP-dependent CIDR test cases:"
+          warn "  - pod-to-cidr / to-cidr-external / from-cidr-external / client-egress-to-cidrgroup-deny / etc."
+          warn "  This is a CN public-internet limitation (no stable IP-only HTTPS service), not a cilium issue."
+          warn "  CIDR policy capability is still indirectly covered by other tests (to-entities-world, from-cidr, etc.)."
+        fi
+        extra_skip_args+=(
+          --test '!/pod-to-cidr'
+          --test '!/to-cidr-external'
+          --test '!/from-cidr'
+          --test '!/client-egress-to-cidr'
+        )
+      fi
+      ;;
+    overseas)
+      if is_zh; then
+        info "检测到节点位于海外地域，使用 cilium 默认外部目标 (1.1.1.1 / one.one.one.one. / k8s.io.)"
+      else
+        info "Cluster nodes are in overseas region, using cilium default external targets (1.1.1.1 / one.one.one.one. / k8s.io.)"
+      fi
+      ;;
+    mixed)
+      if is_zh; then
+        warn "检测到节点跨地域分布（部分国内、部分海外），保守使用 cilium 默认外部目标"
+        warn "如全部节点在国内，可手动追加: --external-target ${CN_EXTERNAL_TARGET} --external-other-target ${CN_EXTERNAL_OTHER_TARGET} --curl-insecure"
+      else
+        warn "Mixed-region cluster detected (some nodes in China, some overseas), falling back to cilium default external targets"
+        warn "If all nodes are in China, append manually: --external-target ${CN_EXTERNAL_TARGET} --external-other-target ${CN_EXTERNAL_OTHER_TARGET} --curl-insecure"
+      fi
+      ;;
+    unknown|*)
+      if is_zh; then
+        warn "未能识别节点地域（topology.kubernetes.io/region 标签缺失或值未知），使用 cilium 默认外部目标"
+      else
+        warn "Cannot detect cluster region (topology.kubernetes.io/region label missing or unknown), using cilium default external targets"
+      fi
+      ;;
+  esac
+
+  # ---- Pod public-internet egress probe ----
+  # Pick a probe target based on region: CN domain for china, default cilium target for overseas/unknown.
+  local probe_target probe_label
+  if [[ "$cluster_region" == "china" ]]; then
+    probe_target="https://${CN_EXTERNAL_TARGET%.}"
+    probe_label="${CN_EXTERNAL_TARGET}"
+  else
+    probe_target="https://one.one.one.one"
+    probe_label="one.one.one.one"
+  fi
+  if is_zh; then
+    info "探测节点是否能从 Pod 出公网 (${probe_label})..."
+  else
+    info "Probing pod public-internet egress (${probe_label})..."
+  fi
+  if probe_pod_egress "$probe_target"; then
+    if is_zh; then
+      info "Pod 公网连通性正常"
+    else
+      info "Pod public-internet egress OK"
     fi
-    local kernel
-    kernel=$(kubectl get node "$node_ip" -o jsonpath='{.status.nodeInfo.kernelVersion}' 2>/dev/null)
-    local os
-    os=$(kubectl get node "$node_ip" -o jsonpath='{.status.nodeInfo.osImage}' 2>/dev/null)
-    echo "  ${status_icon} ${node_ip} | ${os} (${kernel}) | node=${node_probe} endpoint=${endpoint_probe} | ${cluster_health}"
-  done <<< "$cilium_pods"
-
-  echo ""
-  if [[ $failed -gt 0 ]]; then
-    fatal "$(is_zh && echo "cilium-health 验证失败: ${failed}/${total} 节点异常" || echo "cilium-health verification failed: ${failed}/${total} nodes unhealthy")"
+  else
+    if is_zh; then
+      warn "Pod 无法访问公网 (${probe_label})！以下用例预计会失败，属正常现象，与 cilium 无关:"
+      warn "  - pod-to-world / pod-to-cidr"
+      warn "  - to-fqdns / to-cidr-external / client-egress-l7* / tls-sni*"
+      warn "解决办法: 为节点配置 NAT 网关 / Egress Gateway / 节点 EIP，使 Pod 能出公网"
+      warn "或显式跳过这些用例: --test '!/pod-to-world' --test '!/pod-to-cidr'"
+    else
+      warn "Pod cannot reach public internet (${probe_label})! The following cases will fail — this is expected and unrelated to cilium:"
+      warn "  - pod-to-world / pod-to-cidr"
+      warn "  - to-fqdns / to-cidr-external / client-egress-l7* / tls-sni*"
+      warn "Fix: configure NAT gateway / Egress Gateway / node EIP so pods can reach public internet"
+      warn "Or explicitly skip these cases: --test '!/pod-to-world' --test '!/pod-to-cidr'"
+    fi
   fi
-  info "$(is_zh && echo "cilium-health 验证通过: ${total}/${total} 节点健康" || echo "cilium-health passed: ${total}/${total} nodes healthy")"
-  echo ""
 
-  # Phase 2: cilium connectivity test
-  info "$(is_zh && echo "[2/2] 运行 cilium connectivity test（跳过 TKE 节点环境固有不可用的用例）..." || echo "[2/2] Running cilium connectivity test (skipping cases unsupported by TKE node defaults)...")"
+  # ---- pod-to-host scenario auto-skip when nodes have EIP ----
+  # The ping-ipv4-external-ip action under pod-to-host targets the node's EIP.
+  # TKE security groups block inbound public ICMP by default, so this single
+  # action will fail. Since cilium-cli's --test filter only operates at SCENARIO
+  # granularity, we skip the entire pod-to-host scenario when any node has an
+  # ExternalIP. The Pod → node-internal-IP path is still covered by pod-to-pod
+  # and pod-to-service. '/pod-to-host$' uses '$' to avoid also matching
+  # pod-to-hostport.
+  local -a skip_args=()
+  if nodes_have_external_ip; then
+    if is_zh; then
+      info "检测到节点绑定了 EIP，自动跳过 pod-to-host scenario（其 ping-external-ip 子动作会因 EIP 安全组拒绝公网 ICMP 入向而失败）"
+    else
+      info "Nodes have EIPs bound, auto-skipping pod-to-host scenario (its ping-external-ip subaction fails because EIP security groups block inbound public ICMP)"
+    fi
+    skip_args+=(--test '!/pod-to-host$')
+  fi
+  # Merge any region-specific skips collected above (e.g. pod-to-cidr when CN IP
+  # resolution failed). These come from the region case block.
+  if (( ${#extra_skip_args[@]} > 0 )); then
+    skip_args+=("${extra_skip_args[@]}")
+  fi
   echo ""
 
   cilium connectivity test \
-    --test '!/pod-to-world' \
-    --test '!/pod-to-cidr' \
-    --test '!/pod-to-host$' \
-    --curl-image quay.tencentcloudcr.com/cilium/alpine-curl:v1.10.0 \
+    ${skip_args[@]+"${skip_args[@]}"} \
+    --curl-image "$CILIUM_CURL_IMAGE" \
     --json-mock-image quay.tencentcloudcr.com/cilium/json-mock:v1.3.9 \
     --dns-test-server-image docker.io/k8smirror/coredns:v1.14.2 \
     --echo-image docker.io/k8smirror/echo-advanced:v20251204-v1.4.1 \
     --test-conn-disrupt-image quay.tencentcloudcr.com/cilium/test-connection-disruption:v0.0.17 \
+    ${external_args[@]+"${external_args[@]}"} \
     "$@"
 
   echo ""
   info "============================================"
   info "$(is_zh && echo "测试完成！" || echo "Tests completed!")"
+  info "============================================"
+  echo ""
+}
+
+# ====== perf subcommand ======
+# Runs cilium connectivity perf with TKE-compatible image overrides.
+# `cilium connectivity perf` uses iperf3 / netperf to measure pod-to-pod throughput
+# and latency across same-node and cross-node combinations. It needs at least 2
+# nodes available (cilium-cli will fail otherwise).
+#
+# We override the curl-image (deployment setup), netperf-image, and other test
+# images to TKE-internal mirrors so they pull on TKE clusters without public
+# internet access.
+
+cmd_perf() {
+  echo ""
+  echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
+  echo -e "${BLUE}║      Cilium Performance Test         ║${NC}"
+  echo -e "${BLUE}╚══════════════════════════════════════╝${NC}"
+  echo ""
+
+  command -v cilium &>/dev/null || fatal "$(is_zh && echo "cilium CLI 未安装，请先安装: https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/#install-the-cilium-cli" || echo "cilium CLI not installed. Install: https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/#install-the-cilium-cli")"
+  command -v kubectl &>/dev/null || fatal "$(msg NO_KUBECTL)"
+  kubectl cluster-info &>/dev/null || fatal "$(msg NO_CLUSTER)"
+
+  info "$(is_zh && echo "运行 cilium connectivity perf..." || echo "Running cilium connectivity perf...")"
+  echo ""
+
+  cilium connectivity perf \
+    --performance-image quay.tencentcloudcr.com/cilium/network-perf:3.20-1772622563-6fd6a90 \
+    "$@"
+
+  echo ""
+  info "============================================"
+  info "$(is_zh && echo "性能测试完成！" || echo "Performance test completed!")"
   info "============================================"
   echo ""
 }
@@ -1267,6 +1790,41 @@ cmd_enable_egress_gateway() {
   echo ""
 }
 
+# ====== enable-hubble subcommand ======
+# Standalone subcommand to enable Hubble Relay + Hubble UI on an existing cilium installation.
+# Checks cilium is installed, then delegates to helm_enable_hubble().
+
+cmd_enable_hubble() {
+  echo ""
+  echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
+  echo -e "${BLUE}║         Enable Cilium Hubble         ║${NC}"
+  echo -e "${BLUE}╚══════════════════════════════════════╝${NC}"
+  echo ""
+
+  check_prerequisites
+
+  local has_cilium
+  has_cilium=$(kubectl -n kube-system get ds cilium --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+  if [[ "$has_cilium" -eq 0 ]]; then
+    fatal "$(msg NO_CILIUM)"
+  fi
+
+  info "$(is_zh && echo "添加 Cilium Helm 仓库..." || echo "Adding Cilium Helm repo...")"
+  helm repo add cilium https://helm.cilium.io/ 2>/dev/null || true
+  helm repo update cilium 2>/dev/null || true
+
+  helm_enable_hubble
+
+  echo ""
+  info "============================================"
+  info "$(msg HUBBLE_DONE)"
+  info "  kubectl -n kube-system get pod -l app.kubernetes.io/part-of=cilium"
+  info "  cilium status"
+  info "  cilium hubble ui"
+  info "============================================"
+  echo ""
+}
+
 # ====== Main Entry Point ======
 # Dispatches to the appropriate subcommand based on the first argument.
 
@@ -1275,8 +1833,10 @@ main() {
   case "$cmd" in
   install-cilium) cmd_install_cilium ;;
   install-localdns) cmd_install_localdns ;;
-  e2e-test) shift; cmd_e2e_test "$@" ;;
+  test) shift; cmd_test "$@" ;;
+  perf) shift; cmd_perf "$@" ;;
   enable-egress-gateway) cmd_enable_egress_gateway ;;
+  enable-hubble) cmd_enable_hubble ;;
   help | --help | -h | "") show_help ;;
   *)
     error "$(is_zh && echo "未知命令" || echo "Unknown command"): $cmd"

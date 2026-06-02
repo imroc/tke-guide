@@ -728,7 +728,7 @@ Use the script to run cilium connectivity test (skips public-network tests autom
 ```bash
 curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
 chmod +x cilium.sh
-./cilium.sh e2e-test
+./cilium.sh test
 ```
 
 If GitHub is unreachable, use the site mirror:
@@ -736,7 +736,7 @@ If GitHub is unreachable, use the site mirror:
 ```bash
 curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
 chmod +x cilium.sh
-./cilium.sh e2e-test
+./cilium.sh test
 ```
 
 ### Manual Test
@@ -785,7 +785,7 @@ helm upgrade cilium cilium/cilium \
 kubectl -n kube-system rollout status ds/cilium
 
 # 5. Verify
-./cilium.sh e2e-test
+./cilium.sh test
 ```
 
 :::warning[Upgrade Cautions]
@@ -990,7 +990,8 @@ Design rationale and operational guides have been split into standalone articles
 
 - [Cilium Tuning for Large-Scale Clusters](./appendix/large-scale-tuning.md)
 - [Verified Node Operating Systems](./appendix/verified-os.md)
-- [Cilium E2E Test Results](./appendix/e2e-test-report.md)
+- [Cilium Connectivity Test](./appendix/connectivity-test.md)
+- [Cilium Performance Test](./appendix/performance-test.md)
 - [Why Native Routing mode needs local-router-ipv4](./appendix/local-router-ipv4.md)
 - [Why Native Routing disables sysctlfix while Overlay enables it](./appendix/sysctlfix.md)
 - [Why this guide does not offer GR Native Routing](./appendix/gr-native-not-recommended.md)

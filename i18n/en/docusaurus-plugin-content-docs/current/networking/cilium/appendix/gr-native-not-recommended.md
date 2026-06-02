@@ -13,7 +13,7 @@ GR + Native Routing hits all four problems below at once, which combined make it
 3. ⚠️ **Node pools must add an extra `node.cilium.io/agent-not-ready` taint** (none of the other 3 modes need this)
 4. ⚠️ **GR + VPC-CNI coexistence is broken**
 
-We ran the full [e2e validation](./e2e-test-report.md) on this combination: on top of cilium's [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) + tke-bridge's `cbr0`, cilium's eBPF datapath and the Linux bridge forwarding path are mutually incompatible — even basic connectivity doesn't pass. The failure points are detailed below.
+We ran the full [e2e validation](./connectivity-test.md) on this combination: on top of cilium's [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) + tke-bridge's `cbr0`, cilium's eBPF datapath and the Linux bridge forwarding path are mutually incompatible — even basic connectivity doesn't pass. The failure points are detailed below.
 
 :::
 
@@ -141,13 +141,14 @@ Pick from this table based on your actual need:
 | New cluster, performance-first, Pod IP routable directly     | **Native Routing (VPC-CNI)** — recommended                        |
 | New cluster, IP scarcity or want Pod CIDR decoupled from VPC | **Overlay (VPC-CNI)** — recommended                               |
 
-All three recommended options have passed [the full e2e test](./e2e-test-report.md) (56/59 cases, the remaining 3 being node public-IP unreachable, unrelated to cilium).
+All three recommended options have passed [the full e2e test](./connectivity-test.md) (see the "Test Results" section in that doc).
 
 If you're already on a GR cluster in production but **haven't installed cilium yet**, install cilium in Overlay mode. The only impact on workloads is that Pod IPs no longer come from the GR CIDR (they come from an independent CIDR); all other capabilities are intact.
 
 ## See also
 
 - [Installing Cilium](../install.md)
-- [Cilium E2E Test Results](./e2e-test-report.md)
+- [Cilium Connectivity Test](./connectivity-test.md)
+- [Cilium Performance Test](./performance-test.md)
 - [Cilium Docs - Generic Veth Chaining § Limitations](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/#limitations)
 - [cilium/cilium#12454](https://github.com/cilium/cilium/issues/12454)

@@ -45,7 +45,8 @@ const sidebars: SidebarsConfig = {
               items: [
                 'networking/cilium/appendix/large-scale-tuning',
                 'networking/cilium/appendix/verified-os',
-                'networking/cilium/appendix/e2e-test-report',
+                'networking/cilium/appendix/connectivity-test',
+                'networking/cilium/appendix/performance-test',
                 'networking/cilium/appendix/local-router-ipv4',
                 'networking/cilium/appendix/sysctlfix',
                 'networking/cilium/appendix/gr-native-not-recommended',

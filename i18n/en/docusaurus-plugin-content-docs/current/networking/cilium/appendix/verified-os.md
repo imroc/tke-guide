@@ -33,7 +33,7 @@ The list above is produced as follows:
 2. Use the [one-click install script](../install.md#one-click-install-script) to install cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache.
 3. From an environment with kubeconfig pointed at the cluster, run the e2e subcommand:
    ```bash
-   ./cilium.sh e2e-test
+   ./cilium.sh test
    ```
 4. Verify all of the following pass:
    - `cilium-health status` reports all nodes reachable (covers host↔Pod and Pod↔Pod cross-node connectivity)
@@ -47,7 +47,7 @@ If you need an OS not in the list (e.g. a custom image, or another CVM public im
 
 1. **Kernel pre-check**: confirm the OS kernel is ≥ 5.10 (see cilium [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)).
 2. **Create a test cluster**: use the target OS, with just 1-2 nodes; install cilium.
-3. **Run the e2e suite**: `./cilium.sh e2e-test`. Watch for:
+3. **Run the e2e suite**: `./cilium.sh test`. Watch for:
    - `cilium-health status` — all nodes reachable
    - DNS resolution (both in-cluster service names and external domains) works
    - `cilium connectivity test` passes
