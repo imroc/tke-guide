@@ -1172,6 +1172,7 @@ cilium-operator 使用 hostNetwork 并配置了就绪探针，在超级节点上
 
 - [大规模集群 Cilium 调优指南](./appendix/large-scale-tuning.md)
 - [已验证的节点操作系统](./appendix/verified-os.md)
+- [Cilium E2E 测试结果](./appendix/e2e-test-report.md)
 - [为什么 Native Routing 模式要加 local-router-ipv4 配置？](./appendix/local-router-ipv4.md)
 - [为什么 Native Routing 模式禁用 sysctlfix，Overlay 模式却启用？](./appendix/sysctlfix.md)
 - [为什么 GR Native Routing 不支持 L7/DNS NetworkPolicy？](./appendix/gr-no-l7-dns.md)

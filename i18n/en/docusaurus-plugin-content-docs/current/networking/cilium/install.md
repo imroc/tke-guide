@@ -1174,6 +1174,7 @@ Design rationale and operational guides have been split into standalone articles
 
 - [Cilium Tuning for Large-Scale Clusters](./appendix/large-scale-tuning.md)
 - [Verified Node Operating Systems](./appendix/verified-os.md)
+- [Cilium E2E Test Results](./appendix/e2e-test-report.md)
 - [Why Native Routing mode needs local-router-ipv4](./appendix/local-router-ipv4.md)
 - [Why Native Routing disables sysctlfix while Overlay enables it](./appendix/sysctlfix.md)
 - [Why GR Native Routing does not support L7/DNS NetworkPolicy](./appendix/gr-no-l7-dns.md)
