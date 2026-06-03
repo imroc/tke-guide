@@ -17,6 +17,15 @@
 
 1. 启用 cilium 替代 kube-proxy。
 2. 启用 ip masquerade，且使用 bpf 的实现进行 masquerade 而非默认的 iptables 实现。
+3. **仅 VPC-CNI Native Routing 模式额外要求**：必须配置 `ipMasqAgent.config.nonMasqueradeCIDRs` 覆盖 VPC 全部网段（主网段+全部辅助网段），否则跨节点 Pod-to-Pod 流量会被 BPF masquerade 错误 SNAT 成节点 IP 或 link-local 地址，对端节点无法把 SNAT 后的源 IP 还原回原始 Pod 的 cilium identity，**跨节点 NetworkPolicy 失效**。
+
+:::tip[Overlay 模式不受此约束]
+
+Overlay 模式（VPC-CNI / GR）的跨节点 Pod-to-Pod 流量走 vxlan 封装，外层是节点 IP，内层 Pod IP 原样保留。BPF masquerade 只对**最外层、出节点物理网卡**的流量生效，看不到内层 Pod IP，所以不需要配 `nonMasqueradeCIDRs`。
+
+下文 **`nonMasqueradeCIDRs` 相关的全部内容（脚本交互、helm 参数、选型说明）只适用于 Native Routing 场景**。
+
+:::
 
 ### 一键启用
 
@@ -36,9 +45,26 @@ chmod +x cilium.sh
 ./cilium.sh enable-egress-gateway
 ```
 
+:::tip[Native Routing 集群上脚本会自动处理 nonMasqueradeCIDRs]
+
+在 VPC-CNI Native Routing 集群上执行 `enable-egress-gateway` 时，脚本按以下优先级自动确定 `nonMasqueradeCIDRs`：
+
+1. 环境变量 `NON_MASQ_CIDRS="10.0.0.0/8 172.16.0.0/12 ..."`（空格分隔）—— 适合非交互场景（CI / Terraform）
+2. 自动复用 TKE 集群自带的 `kube-system/ip-masq-agent-config` ConfigMap（TKE 安装该插件时会把 VPC 主网段+辅助网段写入其中）
+3. 交互提示输入（默认填 RFC 1918 三段全集 `10.0.0.0/8 172.16.0.0/12 192.168.0.0/16`，可覆盖任意合法腾讯云 VPC 配置）
+
+Overlay 集群上脚本不会问也不会注入这个配置。
+
+:::
+
 ### 手动启用
 
-启用 Egress Gateway 的 cilium 安装方法：
+根据当前 cilium 安装的路由模式选择对应方案：
+
+<Tabs>
+  <TabItem value="native" label="Native Routing (VPC-CNI)" default>
+
+启用 Egress Gateway 的 cilium 安装方法（高亮部分为相对默认安装方案的新增/修改项）：
 
 ```bash showLineNumbers
 helm upgrade --install cilium cilium/cilium --version 1.19.4 \
@@ -81,7 +107,10 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set enableIPv4Masquerade=true \
   --set bpf.masquerade=true \
   --set ipMasqAgent.enabled=true \
-  --set ipMasqAgent.config.masqLinkLocal=true
+  --set ipMasqAgent.config.masqLinkLocal=true \
+  --set ipMasqAgent.config.nonMasqueradeCIDRs[0]=10.0.0.0/8 \
+  --set ipMasqAgent.config.nonMasqueradeCIDRs[1]=172.16.0.0/12 \
+  --set ipMasqAgent.config.nonMasqueradeCIDRs[2]=192.168.0.0/16
   # highlight-add-end
 ```
 
@@ -92,7 +121,19 @@ kubectl rollout restart ds cilium -n kube-system
 kubectl rollout restart deploy cilium-operator -n kube-system
 ```
 
-:::tip[备注]
+:::tip[关于 nonMasqueradeCIDRs 的取值]
+
+`ipMasqAgent.config.nonMasqueradeCIDRs` 必须**覆盖 VPC 全部网段**（主网段+全部辅助网段，包含节点子网和 VPC-CNI Pod 子网），上面示例直接用 [RFC 1918](https://datatracker.ietf.org/doc/html/rfc1918) 三段全集兜底，可覆盖任意合法腾讯云 VPC 配置，是最省心的做法。
+
+如果你想精确填写，可以从 TKE 集群自带的 `kube-system/ip-masq-agent-config` ConfigMap 里直接取（TKE 安装 ip-masq-agent 插件时会自动把 VPC 主+辅助网段写进去）：
+
+```bash
+kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}'
+```
+
+:::
+
+:::tip[已使用默认安装方案，简化命令]
 
 如果你已经使用了 [安装cilium](install.md) 中 **使用 helm 安装 cilium** 给的安装方法进行了安装，启用 Egress Gateway 的命令可以简化成这样：
 
@@ -104,10 +145,51 @@ helm upgrade cilium cilium/cilium --version 1.19.4 \
   --set enableIPv4Masquerade=true \
   --set bpf.masquerade=true \
   --set ipMasqAgent.enabled=true \
-  --set ipMasqAgent.config.masqLinkLocal=true
+  --set ipMasqAgent.config.masqLinkLocal=true \
+  --set ipMasqAgent.config.nonMasqueradeCIDRs[0]=10.0.0.0/8 \
+  --set ipMasqAgent.config.nonMasqueradeCIDRs[1]=172.16.0.0/12 \
+  --set ipMasqAgent.config.nonMasqueradeCIDRs[2]=192.168.0.0/16
 ```
 
 :::
+
+:::tip[为什么用 ipMasqAgent.config.nonMasqueradeCIDRs，而不是 ipv4NativeRoutingCIDR？]
+
+cilium 提供两种方式告诉 BPF masquerade 哪些流量不要 SNAT：
+
+| 配置项                                  | 类型      | 是否够用                                                                                               |
+| --------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------ |
+| `ipv4NativeRoutingCIDR`                 | 单个 CIDR | ❌ 不够。腾讯云 VPC 支持「主网段 + 多个辅助网段」，VPC-CNI Pod 可从任意一段分配 IP，单值 CIDR 无法表达 |
+| `ipMasqAgent.config.nonMasqueradeCIDRs` | CIDR 列表 | ✅ 可列出 VPC 全部网段，TKE 自带 ip-masq-agent 插件也用同名字段，配置可直接复用                        |
+
+所以 Native Routing + Egress Gateway 必须用 `nonMasqueradeCIDRs`，本指南所有 Native + Egress 场景统一以此为准。
+
+:::
+
+  </TabItem>
+  <TabItem value="overlay" label="Overlay (VPC-CNI / GR)">
+
+Overlay 模式下 cilium 已默认 `enableIPv4Masquerade=true`，且跨节点 Pod-to-Pod 走 vxlan 封装不受 BPF masquerade 影响，因此**不需要也不要配置** `nonMasqueradeCIDRs`。在已用本指南默认方案安装好的 Overlay 集群上，启用 Egress Gateway 命令简化为：
+
+```bash
+helm upgrade cilium cilium/cilium --version 1.19.4 \
+  --namespace kube-system \
+  --reuse-values \
+  --set egressGateway.enabled=true \
+  --set bpf.masquerade=true \
+  --set ipMasqAgent.enabled=true \
+  --set ipMasqAgent.config.masqLinkLocal=true
+```
+
+然后重启 cilium 组件生效：
+
+```bash
+kubectl rollout restart ds cilium -n kube-system
+kubectl rollout restart deploy cilium-operator -n kube-system
+```
+
+  </TabItem>
+</Tabs>
 
 ## 创建 Egress 节点
 

@@ -17,8 +17,54 @@ To enable Egress Gateway, the following conditions must be met:
 
 1. Enable cilium to replace kube-proxy.
 2. Enable IP masquerade using BPF implementation instead of the default iptables implementation.
+3. **VPC-CNI Native Routing only**: you MUST also configure `ipMasqAgent.config.nonMasqueradeCIDRs` to cover ALL VPC CIDRs (main + every secondary CIDR). Otherwise BPF masquerade will incorrectly SNAT cross-node Pod-to-Pod traffic to the node IP or a link-local address; the receiving node then can't resolve the SNATed src IP back to the original Pod's cilium identity, and **cross-node NetworkPolicy breaks**.
 
-Method to enable Egress Gateway during cilium installation:
+:::tip[Overlay mode is exempt]
+
+In Overlay mode (VPC-CNI / GR), cross-node Pod-to-Pod traffic is wrapped in vxlan: the outer header is the node IP and the inner Pod IP is preserved. BPF masquerade only acts on the **outer**, egressing-the-physical-NIC traffic — it never sees the inner Pod IP — so `nonMasqueradeCIDRs` is neither needed nor desired.
+
+Everything below about `nonMasqueradeCIDRs` (script behavior, helm flags, rationale) applies **only to Native Routing**.
+
+:::
+
+### One-Click Enable
+
+Use the script to enable Egress Gateway in one shot (handles helm upgrade and component restart automatically):
+
+```bash
+curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
+chmod +x cilium.sh
+./cilium.sh enable-egress-gateway
+```
+
+If your network can't reach GitHub, use the site mirror:
+
+```bash
+curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
+chmod +x cilium.sh
+./cilium.sh enable-egress-gateway
+```
+
+:::tip[On Native Routing the script handles nonMasqueradeCIDRs automatically]
+
+When `enable-egress-gateway` runs against a VPC-CNI Native Routing cluster, the script resolves `nonMasqueradeCIDRs` in this order:
+
+1. The `NON_MASQ_CIDRS="10.0.0.0/8 172.16.0.0/12 ..."` environment variable (space-separated) — for non-interactive use (CI / Terraform).
+2. Auto-reuse of the cluster's existing `kube-system/ip-masq-agent-config` ConfigMap (TKE's ip-masq-agent addon writes the VPC main + secondary CIDRs there).
+3. Interactive prompt (default: RFC 1918 three ranges `10.0.0.0/8 172.16.0.0/12 192.168.0.0/16` — covers any valid Tencent Cloud VPC config).
+
+On Overlay clusters the script neither asks nor injects this setting.
+
+:::
+
+### Manual Enable
+
+Pick the tab matching your cilium routing mode:
+
+<Tabs>
+  <TabItem value="native" label="Native Routing (VPC-CNI)" default>
+
+Method to enable Egress Gateway during cilium installation (highlighted lines are added/changed relative to the default install):
 
 ```bash showLineNumbers
 helm upgrade --install cilium cilium/cilium --version 1.19.4 \
@@ -61,7 +107,10 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set enableIPv4Masquerade=true \
   --set bpf.masquerade=true \
   --set ipMasqAgent.enabled=true \
-  --set ipMasqAgent.config.masqLinkLocal=true
+  --set ipMasqAgent.config.masqLinkLocal=true \
+  --set ipMasqAgent.config.nonMasqueradeCIDRs[0]=10.0.0.0/8 \
+  --set ipMasqAgent.config.nonMasqueradeCIDRs[1]=172.16.0.0/12 \
+  --set ipMasqAgent.config.nonMasqueradeCIDRs[2]=192.168.0.0/16
   # highlight-add-end
 ```
 
@@ -72,7 +121,19 @@ kubectl rollout restart ds cilium -n kube-system
 kubectl rollout restart deploy cilium-operator -n kube-system
 ```
 
-:::tip[Note]
+:::tip[Picking values for nonMasqueradeCIDRs]
+
+`ipMasqAgent.config.nonMasqueradeCIDRs` must **cover every VPC CIDR** (main + all secondary CIDRs, including both node subnets and VPC-CNI Pod subnets). The example above just uses the [RFC 1918](https://datatracker.ietf.org/doc/html/rfc1918) three ranges as a catch-all — works for any valid Tencent Cloud VPC config and is the lowest-effort option.
+
+If you'd rather be precise, pull the values straight from the cluster's built-in `kube-system/ip-masq-agent-config` ConfigMap (TKE's ip-masq-agent addon writes the VPC main + secondary CIDRs there automatically):
+
+```bash
+kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}'
+```
+
+:::
+
+:::tip[Already installed via this guide — short form]
 
 If you already installed cilium using the **Install cilium using helm** provided in [Installing Cilium](install.md), the command to enable Egress Gateway can be simplified to:
 
@@ -84,10 +145,51 @@ helm upgrade cilium cilium/cilium --version 1.19.4 \
   --set enableIPv4Masquerade=true \
   --set bpf.masquerade=true \
   --set ipMasqAgent.enabled=true \
-  --set ipMasqAgent.config.masqLinkLocal=true
+  --set ipMasqAgent.config.masqLinkLocal=true \
+  --set ipMasqAgent.config.nonMasqueradeCIDRs[0]=10.0.0.0/8 \
+  --set ipMasqAgent.config.nonMasqueradeCIDRs[1]=172.16.0.0/12 \
+  --set ipMasqAgent.config.nonMasqueradeCIDRs[2]=192.168.0.0/16
 ```
 
 :::
+
+:::tip[Why ipMasqAgent.config.nonMasqueradeCIDRs and not ipv4NativeRoutingCIDR?]
+
+cilium offers two ways to tell BPF masquerade which traffic NOT to SNAT:
+
+| Option                                  | Type        | Sufficient?                                                                                                                                                          |
+| --------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ipv4NativeRoutingCIDR`                 | Single CIDR | ❌ No. A Tencent Cloud VPC supports a "main CIDR + multiple secondary CIDRs", and VPC-CNI Pods can be allocated from any of them — a single CIDR can't express that. |
+| `ipMasqAgent.config.nonMasqueradeCIDRs` | CIDR list   | ✅ Lists every VPC CIDR. TKE's built-in ip-masq-agent addon uses the same field name, so its config is reusable as-is.                                               |
+
+So Native Routing + Egress Gateway must use `nonMasqueradeCIDRs`. This guide standardizes on it everywhere Native + Egress is involved.
+
+:::
+
+  </TabItem>
+  <TabItem value="overlay" label="Overlay (VPC-CNI / GR)">
+
+In Overlay mode cilium already has `enableIPv4Masquerade=true` by default, and cross-node Pod-to-Pod traffic rides vxlan so it's unaffected by BPF masquerade — so `nonMasqueradeCIDRs` is **neither needed nor desired**. On an Overlay cluster installed via this guide's default plan, the enable-Egress-Gateway command simplifies to:
+
+```bash
+helm upgrade cilium cilium/cilium --version 1.19.4 \
+  --namespace kube-system \
+  --reuse-values \
+  --set egressGateway.enabled=true \
+  --set bpf.masquerade=true \
+  --set ipMasqAgent.enabled=true \
+  --set ipMasqAgent.config.masqLinkLocal=true
+```
+
+Then restart cilium components to take effect:
+
+```bash
+kubectl rollout restart ds cilium -n kube-system
+kubectl rollout restart deploy cilium-operator -n kube-system
+```
+
+  </TabItem>
+</Tabs>
 
 ## Creating Egress Nodes
 
