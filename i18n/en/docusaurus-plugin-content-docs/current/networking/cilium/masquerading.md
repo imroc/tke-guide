@@ -13,9 +13,32 @@ Therefore, in most scenarios, we don't need to enable IP masquerading. The defau
 ## When is IP Masquerading Needed?
 
 You can enable Cilium's IP masquerading function in the following scenarios:
+
 1. Want Pods to utilize the node's public bandwidth to access the public internet.
 2. Pods need to call certain Tencent Cloud interfaces that authenticate based on node IP, such as [CVM metadata interface](https://cloud.tencent.com/document/product/213/4934).
 3. When interconnecting across VPCs or across clouds, the network segments overlap, but Node IPs can communicate with each other.
+
+:::caution[VPC-CNI Native Mode: IP Masquerading is Required for Pods to Reach the Public Internet]
+
+In VPC-CNI Native mode, Pod IPs are valid VPC IPs allocated from the IP pool of the node's **secondary ENI**, while the node's EIP (public IP) is bound only to the **primary ENI**. So when a Pod tries to reach the public internet:
+
+1. Source IP of the packet = Pod IP (a VPC IP on a secondary ENI);
+2. The kernel routes the packet out through the corresponding secondary ENI (NOT the primary ENI);
+3. The secondary ENI has no EIP, so once the packet hits the VPC boundary, there's no return path from the public internet;
+4. Result: **Even if the node has an EIP bound, Pods CANNOT reach the public internet**.
+
+To make Pods in Native mode reach the public internet, one of the following must be true:
+
+- A NAT gateway is configured in the VPC (recommended for most cases — cleanest);
+- [Cilium Egress Gateway](./egress-gateway.md) is enabled (suitable when you need a fixed egress IP per namespace/Pod);
+- The ip-masq-agent described in this doc is enabled, which SNATs Pod traffic leaving the VPC to the node IP so it egresses via the primary ENI + node EIP (a self-managed equivalent of TKE's built-in ip-masq-agent).
+
+GR and VPC-CNI Overlay modes don't have this issue:
+
+- **GR / Overlay**: Pod IPs are NOT valid VPC IPs, so cilium enables IP masquerading by default (`enableIPv4Masquerade=true`); when a Pod's traffic leaves the node it has already been SNAT'd to the node IP, and the node's existing public-internet capability (NAT gateway / EIP) carries it through.
+- **Native**: Pod IPs are valid VPC IPs, so cilium disables IP masquerading by default (`enableIPv4Masquerade=false`) — which is the source of the limitation above.
+
+:::
 
 ## Cilium's IP Masquerading Function Introduction
 
@@ -24,9 +47,11 @@ Cilium enables IP masquerading by default, and requires explicit configuration t
 The default behavior is that as long as the destination IP is not on the local machine, it will be SNATed to the node IP. Typically, Pod IPs are routable within the cluster. If all Pod IPs are within a fixed network segment, you can configure `ipv4NativeRoutingCIDR` to only masquerade IP communications outside that segment.
 
 ## eBPF vs iptables
+
 Cilium supports both eBPF and iptables implementations for IP masquerading. In TKE environments, you need to use the eBPF implementation.
 
 The eBPF implementation also has two usage methods:
+
 1. Configure `ipv4NativeRoutingCIDR` to avoid SNAT for a single CIDR.
 2. Enable the eBPF version of ipMasqAgent implementation, which can be configured to avoid SNAT for multiple CIDRs.
 

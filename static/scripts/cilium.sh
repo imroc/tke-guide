@@ -87,6 +87,15 @@ set -euo pipefail
 #      POD_CIDR         e.g. "10.244.0.0/16" (only for overlay mode)
 #      POD_CIDR_MASK    e.g. "24" (only for overlay mode)
 #      ENABLE_EGRESS    "true" or "false" (optional, default false)
+#      ENABLE_IP_MASQ   "true" or "false" (optional, only meaningful for Native;
+#                       default true when Egress=false, forced true when Egress=true.
+#                       When true, cilium SNATs Pod traffic destined OUTSIDE
+#                       NON_MASQ_CIDRS to node IP — required for Native Pods to
+#                       reach public internet via node EIP without NAT gateway.)
+#      NON_MASQ_CIDRS   space-separated, e.g. "10.0.0.0/8 172.16.0.0/12"
+#                       (only used when Native + ip-masq-agent enabled; if unset,
+#                       reads TKE's ip-masq-agent-config CM, then prompts user)
+#      ENABLE_HUBBLE    "true" or "false" (optional, default false)
 #      ENABLE_LOCALDNS  "true" or "false" (optional, default false)
 #    NETWORK_MODE is always auto-detected and cannot be overridden.
 #    When adding a new interactive prompt, follow the pattern:
@@ -574,23 +583,97 @@ confirm_enable_egress() {
   fi
 }
 
+# confirm_enable_ip_masq — Asks user whether to enable cilium's BPF ip-masq-agent
+# in the Native + no-Egress combo (default: Y, just press Enter to accept).
+#
+# Why this prompt exists:
+#   In TKE VPC-CNI Native mode, Pod IPs are valid VPC IPs (allocated from a
+#   secondary ENI's IP pool), so cilium does NOT SNAT Pod traffic by default
+#   (enableIPv4Masquerade=false). This is fine for east-west traffic. But for
+#   Pod → public internet:
+#     - Pod's source IP is the secondary-ENI IP (no EIP attached to that ENI)
+#     - Without SNAT, the packet leaves the node with the secondary-ENI IP
+#       as source — there's no return path
+#     - Result: Pod cannot reach public internet, even if the node has an EIP
+#       on its primary ENI (the EIP only covers the host netns, not Pod IPs)
+#   Three ways to fix it:
+#     1. Configure a NAT gateway in the VPC for outbound traffic
+#     2. Enable Cilium Egress Gateway (sends Pod traffic via a chosen gateway)
+#     3. Enable cilium's BPF ip-masq-agent: SNAT Pod traffic destined OUTSIDE
+#        NON_MASQ_CIDRS to the node IP (which has the EIP) — this is what TKE's
+#        own ip-masq-agent addon does, and what we re-create with cilium here.
+#
+# This function only triggers for VPC-CNI Native + ENABLE_EGRESS=false. When
+# ENABLE_EGRESS=true, ip-masq-agent is forced on by helm_install_cilium and
+# this prompt is skipped.
+#
+# Sets ENABLE_IP_MASQ=true/false. Skipped if ENABLE_IP_MASQ env var is already set.
+confirm_enable_ip_masq() {
+  if [[ "$ROUTING_MODE" != "native" ]] || [[ "${ENABLE_EGRESS:-false}" == "true" ]]; then
+    return
+  fi
+  if [[ -n "${ENABLE_IP_MASQ:-}" ]]; then
+    return
+  fi
+  echo ""
+  if is_zh; then
+    info "Native Routing 模式下 Pod IP 是 VPC 内合法 IP，默认不做 SNAT，但这意味着:"
+    info "  - 即使节点绑定了 EIP，Pod 也无法访问公网（EIP 只对节点主网卡生效，"
+    info "    Pod IP 在辅助网卡的 IP 池里，出公网时不会经过节点 EIP）"
+    info "  - 必须满足下列任一条件 Pod 才能出公网:"
+    info "      a) VPC 配置 NAT 网关；"
+    info "      b) 启用 Cilium Egress Gateway；"
+    info "      c) 启用 cilium 的 ip-masq-agent，将 Pod 出 VPC 的流量 SNAT 成节点 IP"
+    info "         （走节点主网卡 + 节点 EIP 出公网，相当于自建版 TKE ip-masq-agent）"
+  else
+    info "In Native Routing mode, Pod IPs are valid VPC IPs and SNAT is off by default."
+    info "However this means:"
+    info "  - Pods CANNOT reach public internet even if the node has an EIP."
+    info "    The EIP only covers the node's primary ENI; Pod IPs live on secondary"
+    info "    ENIs and their egress packets do NOT pass through the node EIP."
+    info "  - To enable Pod → public internet, you need ONE of:"
+    info "      a) A NAT gateway in the VPC; or"
+    info "      b) Cilium Egress Gateway; or"
+    info "      c) cilium's ip-masq-agent: SNAT Pod traffic leaving the VPC to the"
+    info "         node IP (so it goes out via the node's primary ENI + EIP — the"
+    info "         self-managed equivalent of TKE's built-in ip-masq-agent)."
+  fi
+  echo ""
+  local prompt
+  if is_zh; then
+    prompt="是否启用 ip-masq-agent (推荐)？[Y/n]: "
+  else
+    prompt="Enable ip-masq-agent (recommended)? [Y/n]: "
+  fi
+  read -rp "$(echo -e "${BLUE}${prompt}${NC}")" masq_input
+  masq_input=$(echo "$masq_input" | tr '[:upper:]' '[:lower:]')
+  if [[ -z "$masq_input" || "$masq_input" == "y" || "$masq_input" == "yes" ]]; then
+    ENABLE_IP_MASQ=true
+  else
+    ENABLE_IP_MASQ=false
+  fi
+}
+
 # Default CIDRs to use when neither NON_MASQ_CIDRS env var nor TKE's
 # ip-masq-agent-config ConfigMap is available. RFC 1918 covers all valid
 # Tencent Cloud VPC ranges (main + secondary CIDRs MUST come from these three).
 DEFAULT_NON_MASQ_CIDRS="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
 
 # resolve_non_masq_cidrs — Determines the list of CIDRs that cilium's BPF
-# ip-masq-agent should NOT masquerade. Required only for Native + Egress combo.
+# ip-masq-agent should NOT masquerade. Required whenever ip-masq-agent is enabled
+# in Native Routing mode.
 #
-# Why this matters:
-#   Native Routing + Egress Gateway forces enableIPv4Masquerade=true (cilium
-#   source enforces this in pkg/egressgateway/manager.go). Without an accurate
-#   non-masquerade CIDR list, cilium SNATs cross-node Pod-to-Pod traffic to
-#   link-local / node IPs, breaking source-endpoint-label-based NetworkPolicy
-#   across nodes (the receiving node can't resolve the SNATed src IP back to
-#   the original Pod's identity). Other modes don't need this:
-#     - Native + no Egress: enableIPv4Masquerade=false (no SNAT)
-#     - Overlay (any base): vxlan tunnel preserves inner src Pod IP
+# When this triggers (Native Routing + ip-masq-agent enabled):
+#   1. Native + Egress Gateway:
+#      cilium source forces enableIPv4Masquerade=true. Without an accurate
+#      non-masquerade CIDR list, cilium SNATs cross-node Pod-to-Pod traffic to
+#      link-local / node IPs, breaking source-endpoint-label-based NetworkPolicy
+#      across nodes.
+#   2. Native + ENABLE_IP_MASQ=true (no Egress):
+#      We turn ip-masq-agent on so that Pod → public internet egress goes
+#      through node EIP via SNAT. nonMasqueradeCIDRs ensures Pod-to-Pod and
+#      Pod-to-VPC traffic keeps the original Pod IP (preserves NetworkPolicy
+#      source identity) and only public-internet-bound traffic gets SNAT'd.
 #
 # Resolution priority:
 #   1. NON_MASQ_CIDRS env var (space-separated, takes precedence)
@@ -601,9 +684,12 @@ DEFAULT_NON_MASQ_CIDRS="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
 #   3. Interactive prompt (default: RFC 1918 three ranges, covers all VPC configs)
 #
 # Sets global NON_MASQ_CIDRS to a space-separated CIDR list.
-# Skipped entirely if not Native + Egress combo.
+# Skipped entirely if not Native or ip-masq-agent disabled.
 resolve_non_masq_cidrs() {
-  if [[ "$ROUTING_MODE" != "native" ]] || [[ "${ENABLE_EGRESS:-false}" != "true" ]]; then
+  if [[ "$ROUTING_MODE" != "native" ]]; then
+    return
+  fi
+  if [[ "${ENABLE_EGRESS:-false}" != "true" ]] && [[ "${ENABLE_IP_MASQ:-false}" != "true" ]]; then
     return
   fi
 
@@ -634,19 +720,45 @@ resolve_non_masq_cidrs() {
   # Interactive prompt
   echo ""
   if is_zh; then
-    info "Native Routing + Egress Gateway 组合需要配置 cilium ip-masq-agent 的 nonMasqueradeCIDRs，"
-    info "否则 cilium 会对跨节点 Pod-to-Pod 流量做 SNAT，破坏跨节点 NetworkPolicy。"
-    info "请输入您 VPC 的所有网段（主网段+辅助网段，空格分隔），需覆盖所有节点子网和 Pod 子网。"
+    info "需要配置 cilium ip-masq-agent 的 nonMasqueradeCIDRs（保留 Pod 原始 IP，不做 SNAT 的网段）。"
+    info "请输入您 VPC 的所有网段（主网段+辅助网段，空格分隔），需覆盖所有节点子网和 Pod 子网，"
+    info "确保 Pod-to-Pod / Pod-to-VPC 流量保留原始 Pod IP（NetworkPolicy 才能基于源标签生效）。"
     info "默认使用 RFC 1918 三段全集（覆盖任意合法腾讯云 VPC 配置）。"
   else
-    info "Native Routing + Egress Gateway requires cilium's ip-masq-agent nonMasqueradeCIDRs,"
-    info "otherwise cilium SNATs cross-node Pod-to-Pod traffic, breaking cross-node NetworkPolicy."
-    info "Please enter all VPC CIDRs (main + secondary, space-separated) covering all node and Pod subnets."
+    info "Configuring cilium ip-masq-agent's nonMasqueradeCIDRs (CIDRs that keep the original Pod IP, no SNAT)."
+    info "Please enter all VPC CIDRs (main + secondary, space-separated) covering all node and Pod subnets,"
+    info "so Pod-to-Pod and Pod-to-VPC traffic keeps the original Pod IP (required for source-label NetworkPolicy)."
     info "Default: RFC 1918 three ranges (covers any valid Tencent Cloud VPC config)."
   fi
   read -rp "$(echo -e "${BLUE}VPC CIDRs${NC} [$(is_zh && echo "默认" || echo "default"): ${DEFAULT_NON_MASQ_CIDRS}]: ")" cidrs_input
   NON_MASQ_CIDRS="${cidrs_input:-$DEFAULT_NON_MASQ_CIDRS}"
   info "Non-masquerade CIDRs: $NON_MASQ_CIDRS"
+}
+
+# print_ip_masq_summary — Prints a concise summary of what ip-masq-agent will do.
+# Shown right before helm install runs whenever ip-masq-agent is enabled (either
+# via ENABLE_IP_MASQ=true or implicitly via ENABLE_EGRESS=true).
+# Helps the user confirm which CIDRs keep original Pod IP (no SNAT) vs which
+# get SNAT'd to node IP (Pod → public internet path).
+print_ip_masq_summary() {
+  echo ""
+  if is_zh; then
+    info "ip-masq-agent SNAT 规则总览:"
+    info "  ┌─ 不做 SNAT（保留 Pod IP）的网段:"
+    for cidr in $NON_MASQ_CIDRS; do
+      info "  │    - ${cidr}"
+    done
+    info "  └─ 其它所有目的（公网）→ SNAT 成节点 IP，走节点主网卡 + 节点 EIP 出公网"
+    info "  注意: link-local (169.254.0.0/16) 也会被 SNAT (masqLinkLocal=true)"
+  else
+    info "ip-masq-agent SNAT rules:"
+    info "  ┌─ Keep original Pod IP (no SNAT) for:"
+    for cidr in $NON_MASQ_CIDRS; do
+      info "  │    - ${cidr}"
+    done
+    info "  └─ All other destinations (public internet) → SNAT to node IP, egress via primary ENI + node EIP"
+    info "  Note: link-local (169.254.0.0/16) is also SNAT'd (masqLinkLocal=true)"
+  fi
 }
 
 # confirm_enable_hubble — Asks user whether to enable Hubble Relay + Hubble UI
@@ -817,19 +929,35 @@ helm_install_cilium() {
   esac
 
   # Egress Gateway: merge params into helm install if enabled.
-  # NOTE: egress_args / hubble_args are appended LAST in helm call below — their
+  # NOTE: egress_args / ip_masq_args / hubble_args are appended LAST in helm call below — their
   # --set values take precedence over both common_args and mode_args (helm last-wins).
+  # ENABLE_EGRESS=true implicitly forces ip-masq-agent on (cilium source requires
+  # enableIPv4Masquerade=true when egressGateway.enabled=true), so we treat the
+  # combo as "ip-masq-agent enabled" for shared config below.
+  local ip_masq_effective="false"
+  if [[ "${ENABLE_EGRESS:-false}" == "true" ]] || [[ "${ENABLE_IP_MASQ:-false}" == "true" ]]; then
+    ip_masq_effective="true"
+  fi
+
   local -a egress_args=()
   if [[ "${ENABLE_EGRESS:-false}" == "true" ]]; then
     egress_args+=(--set egressGateway.enabled=true)
-    egress_args+=(--set enableIPv4Masquerade=true --set bpf.masquerade=true --set ipMasqAgent.enabled=true --set ipMasqAgent.config.masqLinkLocal=true)
+  fi
+
+  # ip-masq-agent: enabled when ENABLE_IP_MASQ=true OR ENABLE_EGRESS=true.
+  # Required for Native Routing Pod → public internet via node EIP (without
+  # NAT gateway). Skipped for Overlay because Overlay already SNATs Pod traffic
+  # at the tunnel boundary anyway.
+  local -a ip_masq_args=()
+  if [[ "$ip_masq_effective" == "true" ]] && [[ "$ROUTING_MODE" == "native" ]]; then
+    ip_masq_args+=(--set enableIPv4Masquerade=true --set bpf.masquerade=true --set ipMasqAgent.enabled=true --set ipMasqAgent.config.masqLinkLocal=true)
     # Add nonMasqueradeCIDRs (resolved earlier by resolve_non_masq_cidrs).
     # Without this, cilium SNATs cross-node Pod-to-Pod traffic, breaking
     # source-endpoint-label-based NetworkPolicy. helm uses array index syntax.
     if [[ -n "${NON_MASQ_CIDRS:-}" ]]; then
       local idx=0
       for cidr in $NON_MASQ_CIDRS; do
-        egress_args+=(--set "ipMasqAgent.config.nonMasqueradeCIDRs[${idx}]=${cidr}")
+        ip_masq_args+=(--set "ipMasqAgent.config.nonMasqueradeCIDRs[${idx}]=${cidr}")
         idx=$((idx + 1))
       done
     fi
@@ -846,7 +974,7 @@ helm_install_cilium() {
   helm upgrade --install cilium cilium/cilium --version "$CILIUM_VERSION" \
     --namespace kube-system \
     "${image_args[@]}" "${toleration_args[@]}" "${common_args[@]}" "${mode_args[@]}" \
-    ${egress_args[@]+"${egress_args[@]}"} ${hubble_args[@]+"${hubble_args[@]}"}
+    ${egress_args[@]+"${egress_args[@]}"} ${ip_masq_args[@]+"${ip_masq_args[@]}"} ${hubble_args[@]+"${hubble_args[@]}"}
 }
 
 # apply_apf — Creates APF (API Priority and Fairness) rate limiting rules for cilium.
@@ -937,6 +1065,11 @@ helm_enable_egress() {
       egress_set_args+=(--set "ipMasqAgent.config.nonMasqueradeCIDRs[${idx}]=${cidr}")
       idx=$((idx + 1))
     done
+    # Egress Gateway forces ip-masq-agent on, so always show the summary so
+    # users know which CIDRs keep original Pod IP vs which get SNAT'd.
+    if [[ "$ROUTING_MODE" == "native" ]]; then
+      print_ip_masq_summary
+    fi
   fi
 
   info "$(is_zh && echo "执行 helm upgrade 启用 Egress Gateway..." || echo "Running helm upgrade to enable Egress Gateway...")"
@@ -1024,7 +1157,12 @@ print_replay_command() {
     env_vars="${env_vars} POD_CIDR=${POD_CIDR} POD_CIDR_MASK=${POD_CIDR_MASK}"
   fi
   env_vars="${env_vars} ENABLE_EGRESS=${ENABLE_EGRESS:-false} ENABLE_HUBBLE=${ENABLE_HUBBLE:-false} ENABLE_LOCALDNS=${ENABLE_LOCALDNS:-false}"
-  if [[ -n "${NON_MASQ_CIDRS:-}" ]] && [[ "$ROUTING_MODE" == "native" ]] && [[ "${ENABLE_EGRESS:-false}" == "true" ]]; then
+  # ENABLE_IP_MASQ is only meaningful for Native + no-Egress (Egress forces it on)
+  if [[ "$ROUTING_MODE" == "native" ]] && [[ "${ENABLE_EGRESS:-false}" != "true" ]] && [[ -n "${ENABLE_IP_MASQ:-}" ]]; then
+    env_vars="${env_vars} ENABLE_IP_MASQ=${ENABLE_IP_MASQ}"
+  fi
+  if [[ -n "${NON_MASQ_CIDRS:-}" ]] && [[ "$ROUTING_MODE" == "native" ]] \
+     && { [[ "${ENABLE_EGRESS:-false}" == "true" ]] || [[ "${ENABLE_IP_MASQ:-false}" == "true" ]]; }; then
     # Quote because list contains spaces
     env_vars="${env_vars} NON_MASQ_CIDRS=\"${NON_MASQ_CIDRS}\""
   fi
@@ -1048,11 +1186,12 @@ print_replay_command() {
 #   5. confirm_cilium_version
 #   6. confirm_pod_cidr (overlay only)
 #   7. confirm_enable_egress (optional)
-#   8. resolve_non_masq_cidrs (only when Native + Egress)
-#   9. confirm_enable_hubble (optional)
-#  10. confirm_enable_localdns (optional)
-#  11. uninstall_tke_components → setup_* → helm_install → apply_apf
-#  10. (optional) enable egress / install localdns
+#   8. confirm_enable_ip_masq (only Native + no Egress)
+#   9. resolve_non_masq_cidrs (Native + Egress, OR Native + ip-masq-agent)
+#  10. confirm_enable_hubble (optional)
+#  11. confirm_enable_localdns (optional)
+#  12. uninstall_tke_components → setup_* → helm_install → apply_apf
+#  13. (optional) install localdns
 cmd_install_cilium() {
   echo ""
   echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
@@ -1068,12 +1207,20 @@ cmd_install_cilium() {
   confirm_image_registry
   confirm_pod_cidr
   confirm_enable_egress
+  confirm_enable_ip_masq
   resolve_non_masq_cidrs
   confirm_enable_hubble
   confirm_enable_localdns
 
   echo ""
   info "$(is_zh && echo "安装方案" || echo "Plan"): ${ROUTING_MODE} (${NETWORK_MODE}), Cilium ${CILIUM_VERSION}"
+
+  # Show ip-masq SNAT rules summary right before install whenever ip-masq-agent
+  # will be enabled (either explicit ENABLE_IP_MASQ=true or implicit via Egress).
+  if [[ "$ROUTING_MODE" == "native" ]] \
+     && { [[ "${ENABLE_IP_MASQ:-false}" == "true" ]] || [[ "${ENABLE_EGRESS:-false}" == "true" ]]; }; then
+    print_ip_masq_summary
+  fi
   echo ""
 
   uninstall_tke_components

@@ -869,11 +869,15 @@ If selected, it deploys cilium components to the cluster (replacing kube-proxy).
 
 ### How can Pods access the public network?
 
-Create a public-network NAT gateway, then add a route in the cluster's VPC route table forwarding outbound traffic to the NAT gateway, and make sure the route table is associated with the subnets used by the cluster. See [Accessing the Internet via NAT Gateway](https://www.tencentcloud.com/document/product/457/35427).
+Pod public-internet egress behaves differently per network mode — case-by-case below.
 
-If your nodes themselves have public bandwidth and you want Pods to use the node's public access, enable cilium's IP Masquerade. See [Configure IP Masquerading](./masquerading.md).
+**GR and VPC-CNI Overlay modes**: cilium enables IP masquerading by default (`enableIPv4Masquerade=true`), so Pod traffic leaving the node has already been SNAT'd to the node IP. As long as the node has public-internet capability (NAT gateway / node EIP / Egress Gateway), Pods can reach the public internet.
 
-For more advanced egress needs (e.g. routing certain Pods through a specific public IP), see [Egress Gateway Practice](./egress-gateway.md).
+**VPC-CNI Native mode**: cilium **disables** IP masquerading by default (`enableIPv4Masquerade=false`), since Pod IPs are valid VPC IPs and east-west traffic just needs to be routed. But this means when a Pod tries to reach the public internet, the source IP is the Pod IP (allocated from the node's secondary ENI IP pool), and the secondary ENI has no EIP — so **even if the node has an EIP bound (an EIP only sits on the primary ENI), Pods cannot reach the public internet**. One of the following must be true:
+
+1. **Configure a NAT gateway in the VPC** (cleanest, applies to all node subnets): add a route in the cluster's VPC route table forwarding outbound traffic to the NAT gateway, and make sure the route table is associated with the subnets used by the cluster. See [Accessing the Internet via NAT Gateway](https://www.tencentcloud.com/document/product/457/35427).
+2. **Enable cilium's ip-masq-agent**: SNAT Pod traffic destined outside the VPC to the node IP so it egresses via the primary ENI + node EIP (a self-managed equivalent of TKE's built-in ip-masq-agent). Suitable when "the node already has an EIP and we want Pods to share its public bandwidth". See [Configure IP Masquerading](./masquerading.md).
+3. **Enable Cilium Egress Gateway**: suitable for advanced cases like "route specific Pods through a specific public IP". See [Egress Gateway Practice](./egress-gateway.md).
 
 ### Image pull failure?
 
