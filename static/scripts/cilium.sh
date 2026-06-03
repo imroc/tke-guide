@@ -698,9 +698,11 @@ resolve_non_masq_cidrs() {
     return
   fi
 
-  # Try to reuse TKE's ip-masq-agent-config ConfigMap (TKE addon)
+  # Try to reuse TKE's ip-masq-agent-config ConfigMap (TKE addon).
+  # `|| true` guards against `set -e` exiting on missing cm (the recommended
+  # install path uninstalls TKE's ip-masq-agent addon, so the cm often doesn't exist).
   local tke_cm_config
-  tke_cm_config=$(kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}' 2>/dev/null)
+  tke_cm_config=$(kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}' 2>/dev/null || true)
   if [[ -n "$tke_cm_config" ]]; then
     # Extract CIDRs under any of:
     #   nonMasqueradeCIDRs / NonMasqueradeCIDRs / nonMasqueradeSrcCIDRs
