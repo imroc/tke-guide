@@ -49,11 +49,11 @@ In the [TKE Console](https://console.cloud.tencent.com/tke2/cluster), create a T
 - Cluster type: Standard cluster.
 - Kubernetes version: 1.32 or later, latest is recommended (see [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)).
 - Operating system: recommend **TencentOS 4** or **Ubuntu 24.04**. Minimum: Linux kernel >= 5.10 (see [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)). For the full verified OS list, see [Verified Node Operating Systems](./appendix/verified-os.md).
-- Nodes: **the cluster MUST have no regular or native nodes before cilium is installed** — super nodes (eklet) are fine. See the danger block below.
+- Nodes: **the cluster MUST have no regular or native nodes before cilium is installed** — super nodes (eklet) are fine. See the warning block below.
 - Base addons: **keep ip-masq-agent checked** (the default). The cilium install script will disable TKE's built-in ip-masq-agent (to avoid conflict with cilium's built-in ipMasqAgent), but it will **reuse** the `ip-masq-agent-config` ConfigMap that TKE auto-populates with the VPC's primary + all secondary CIDRs. The [one-click install script](#one-click-install-script) reads this cm and uses it as cilium ipMasqAgent's `nonMasqueradeCIDRs`, so you don't have to manually look up VPC CIDRs in the console.
 - Extension addons: if you plan to use Karpenter node pools, enable the Karpenter addon; otherwise skip (see node pool selection below).
 
-:::danger[Do NOT add regular or native nodes to the cluster before installing cilium]
+:::warning[Do NOT add regular or native nodes to the cluster before installing cilium]
 
 Cilium must be installed on an **empty cluster** (no nodes / super nodes only). If regular or native nodes already exist:
 

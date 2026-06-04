@@ -53,7 +53,7 @@ GR 集群有两个**与 cilium 不太搭**的硬限制：
 - 基础组件：**保持勾选 ip-masq-agent**（默认勾选）。安装 cilium 时脚本会卸载 TKE 自带的 ip-masq-agent（避免和 cilium 内置 ipMasqAgent 冲突），但会**复用** TKE 安装它时自动写入的 `ip-masq-agent-config` ConfigMap——这份配置里已经按集群所在 VPC 自动列出了主网段 + 所有辅助网段，[一键安装脚本](#一键安装脚本) 会读取它作为 cilium ipMasqAgent 的 `nonMasqueradeCIDRs`，省去用户去控制台手动确认 VPC 网段的步骤。
 - 增强组件：如果节点池希望使用 Karpenter 节点池，需勾选安装 Karpenter 组件，否则无需勾选（参考后文的节点池选型）。
 
-:::danger[安装前不要向集群添加普通节点或原生节点]
+:::warning[安装前不要向集群添加普通节点或原生节点]
 
 cilium 必须在**空集群**（无节点 / 仅有超级节点）上安装。如果集群中已存在普通节点或原生节点：
 
