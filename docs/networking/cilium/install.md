@@ -752,8 +752,7 @@ bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- test
 - 节点地域识别结果（国内/海外/混合/未知）
 - 实际使用的外部目标（国内地域会动态解析 `npmmirror.com` 拿到当前公网 IP，并扫描其 `/16` 找到第二个可用 IP）
 - 节点出公网探测结果（不通时打印警告，不强制跳过）
-- 是否自动跳过 `pod-to-host`（节点绑 EIP 时跳过，与 EIP 安全组拒绝公网 ICMP 入向有关）
-- 是否自动跳过 `pod-to-cidr` 系列（动态解析 CN IP 失败时跳过）
+- `pod-to-cidr` 系列动态 IP 解析失败时的警告（不强制跳过）
 
 详细行为参考 [Cilium 功能测试](./appendix/connectivity-test.md) 的"运行环境前提"小节。
 

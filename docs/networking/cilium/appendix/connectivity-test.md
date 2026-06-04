@@ -8,7 +8,7 @@ cilium 官方提供了 [`cilium connectivity test`](https://docs.cilium.io/en/st
 
 ### 一键脚本
 
-[一键安装脚本](../install.md#一键安装脚本) `cilium.sh` 提供了 `test` 子命令，会自动按节点地域选择外部目标、动态解析国内可用 IP，并使用 TKE 内网可拉取的 mirror 镜像。环境性失败的用例（如节点没公网、节点 EIP 安全组未放开 ICMP）只打 WARN 提示用户，不自动跳过：
+[一键安装脚本](../install.md#一键安装脚本) `cilium.sh` 提供了 `test` 子命令，会自动按节点地域选择外部目标、动态解析国内可用 IP，并使用 TKE 内网可拉取的 mirror 镜像。环境性失败的用例（如节点没公网）只打 WARN 提示用户，不自动跳过：
 
 ```bash
 bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- test
@@ -25,8 +25,7 @@ bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- test
 - 节点地域识别结果（国内/海外/混合/未知）
 - 实际使用的外部目标（国内地域会动态解析 `npmmirror.com` 拿到当前公网 IP，并扫描其 `/16` 找到第二个可用 IP）
 - 节点出公网探测结果（不通时打印警告，不强制跳过）
-- 是否自动跳过 `pod-to-host`（节点绑 EIP 时跳过，与 EIP 安全组拒绝公网 ICMP 入向有关）
-- 是否自动跳过 `pod-to-cidr` 系列（动态解析 CN IP 失败时跳过）
+- `pod-to-cidr` 系列动态 IP 解析失败时的警告（不强制跳过）
 
 ### 手动测试
 
@@ -80,7 +79,7 @@ cilium connectivity test \
 
 :::tip[补丁参数说明]
 
-- **节点绑了 EIP？** pod-to-host 中的 `ping-ipv4-external-ip` 子动作会从 Pod ping 节点 EIP，若 EIP 安全组未放行公网 ICMP 入向（TKE 默认拒绝），该用例必失败；可放行 ICMP 或追加 `--test '!/pod-to-host$'` 跳过（`$` 用于精确匹配，避免误伤 `pod-to-hostport`）。一键脚本会检测并打 WARN，但不自动跳过——是否跳由用户决定。
+- **节点绑了 EIP？** pod-to-host 中的 `ping-ipv4-external-ip` 子动作会从 Pod ping 节点 EIP，若 EIP 安全组未放行公网 ICMP 入向（TKE 默认拒绝），该用例必失败；可放行 ICMP 或追加 `--test '!/pod-to-host$'` 跳过（`$` 用于精确匹配，避免误伤 `pod-to-hostport`）。
 - **节点没有公网？** 追加 `--test '!/pod-to-world' --test '!/pod-to-cidr'` 跳过依赖公网的用例。
 - 镜像地址替换为 TKE 环境可内网拉取的地址（`quay.io` → `quay.tencentcloudcr.com`，`registry.k8s.io` / `gcr.io` → `docker.io/k8smirror`）。
 
@@ -88,12 +87,13 @@ cilium connectivity test \
 
 ## 运行环境前提
 
-`cilium.sh test` **默认不禁用任何 cilium 测试用例**——脚本只在以下两种环境性场景下打 WARN，由用户根据自己的环境决定是否手动跳过：
+`cilium.sh test` **默认不禁用任何 cilium 测试用例**——脚本只在下列环境性场景下打 WARN，由用户根据自己的环境决定是否手动跳过：
 
-| 警告场景                            | 触发条件                    | 受影响 scenario                                                             | 说明                                                                                                                                                                                                                                                         |
-| ----------------------------------- | --------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 节点绑了 EIP                        | 至少一个节点有 `ExternalIP` | `pod-to-host`                                                               | scenario 中的 `ping-ipv4-external-ip` 动作把节点 EIP 当作 ping 目标。若 EIP 安全组放行了公网 ICMP 入向则正常通过；TKE 默认拒绝时必失败。可手动跳过：`--test '!/pod-to-host$'`。`Pod → 节点内网 IP` 的覆盖度已由 `pod-to-pod`、`pod-to-service` 提供          |
-| 国内地域 + 找不到可用 IP-only HTTPS | 动态解析 CN IP 失败         | `pod-to-cidr` / `to-cidr-external` / `from-cidr` / `client-egress-to-cidr*` | 国内公网无稳定的"纯 IP 直连 HTTPS"服务可用（无 SAN 含 IP 的证书）。可手动跳过：`--test '!/pod-to-cidr' --test '!/to-cidr-external' --test '!/from-cidr' --test '!/client-egress-to-cidr'`；CIDR 策略本身仍由 `to-entities-world`、`from-cidr` 等用例间接验证 |
+| 警告场景                            | 触发条件            | 受影响 scenario                                                             | 说明                                                                                                                                                                                                                                                         |
+| ----------------------------------- | ------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 国内地域 + 找不到可用 IP-only HTTPS | 动态解析 CN IP 失败 | `pod-to-cidr` / `to-cidr-external` / `from-cidr` / `client-egress-to-cidr*` | 国内公网无稳定的"纯 IP 直连 HTTPS"服务可用（无 SAN 含 IP 的证书）。可手动跳过：`--test '!/pod-to-cidr' --test '!/to-cidr-external' --test '!/from-cidr' --test '!/client-egress-to-cidr'`；CIDR 策略本身仍由 `to-entities-world`、`from-cidr` 等用例间接验证 |
+
+另一种容易遇到的失败：节点绑了 EIP 时，cilium-cli 会在 `pod-to-host` scenario 里生成一个 `ping-ipv4-external-ip` 子动作（从 Pod ping 节点 EIP）。EIP 安全组放行了公网 ICMP 入向则通过，TKE 默认拒绝时该子动作必失败。`pod-to-host` 与 cilium 数据通路本身无关（`Pod → 节点内网 IP` 的覆盖度已由 `pod-to-pod`、`pod-to-service` 提供），脚本不再为此打 WARN——若 EIP 安全组未放开 ICMP，可手动 `--test '!/pod-to-host$'` 跳过。
 
 cilium-cli 的 `--test` 过滤器只支持 scenario 级别匹配（`/pod-to-host$` 用 `$` 锚点避免误伤 `pod-to-hostport`）；无法只禁用 scenario 内的单个 action。
 
@@ -113,17 +113,17 @@ cilium-cli 的 `--test` 过滤器只支持 scenario 级别匹配（`/pod-to-host
 
 ## 测试环境
 
-| 项              | 值                                                                    |
-| --------------- | --------------------------------------------------------------------- |
-| 地域            | 成都 ap-chengdu                                                       |
-| Kubernetes 版本 | v1.34.1（containerd 1.7.28）                                          |
-| Cilium 版本     | v1.19.4                                                               |
-| Cilium CLI 版本 | v0.19.4                                                               |
-| 节点 OS         | TencentOS Server 4 (kernel 6.6.117-45.7.3.tl4.x86_64)                 |
-| 节点机型        | S5.MEDIUM4（2C4G）                                                    |
-| 节点数量        | 每个集群 3 个节点，全部位于 ap-chengdu-1                              |
-| 节点公网        | 节点绑 EIP（脚本会自动跳过 pod-to-host 用例）                         |
-| 安装方式        | [一键安装脚本](../install.md#一键安装脚本) `cilium.sh install-cilium` |
+| 项              | 值                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| 地域            | 成都 ap-chengdu                                                                             |
+| Kubernetes 版本 | v1.34.1（containerd 1.7.28）                                                                |
+| Cilium 版本     | v1.19.4                                                                                     |
+| Cilium CLI 版本 | v0.19.4                                                                                     |
+| 节点 OS         | TencentOS Server 4 (kernel 6.6.117-45.7.3.tl4.x86_64)                                       |
+| 节点机型        | S5.MEDIUM4（2C4G）                                                                          |
+| 节点数量        | 每个集群 3 个节点，全部位于 ap-chengdu-1                                                    |
+| 节点公网        | 节点绑 EIP，安全组放行公网 ICMP 入向（让 `pod-to-host/ping-ipv4-external-ip` 子动作可通过） |
+| 安装方式        | [一键安装脚本](../install.md#一键安装脚本) `cilium.sh install-cilium`                       |
 
 ## 测试结果
 

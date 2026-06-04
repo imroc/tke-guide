@@ -1507,7 +1507,7 @@ cmd_install_localdns() {
 # Runs cilium connectivity test with TKE-compatible image overrides and
 # region-aware external target defaults.
 #
-# Three TKE-environment-specific concerns drive this logic:
+# Two TKE-environment-specific concerns drive this logic:
 #
 # 1. External target reachability (pod-to-world / pod-to-cidr / to-fqdns / etc.)
 #    These scenarios curl external IPs/domains. cilium-cli has NO automatic
@@ -1527,16 +1527,6 @@ cmd_install_localdns() {
 #    "node has no public internet" is the user's deployment choice, not a
 #    cilium-environment incompatibility. User can still pass `--test '!...'` to
 #    explicitly skip those scenarios.
-#
-# 3. pod-to-host with EIPs
-#    The pod-to-host scenario iterates over node.status.addresses and pings each
-#    address by type. When nodes are bound to EIPs that are synced into
-#    .status.addresses, cilium-cli generates an extra `ping-ipv4-external-ip`
-#    action that targets the EIP. TKE security groups by default block inbound
-#    public ICMP, so this subaction would fail unless the user has explicitly
-#    opened ICMP on the EIP's security group. Since the SG is user-configurable
-#    we DO NOT auto-skip; we only WARN. User can manually skip the scenario via
-#    `--test '!/pod-to-host$'` (the `$` avoids matching pod-to-hostport).
 #
 # Image mapping:
 #   quay.io/cilium/*           → quay.tencentcloudcr.com/cilium/* (internal mirror)
@@ -1608,15 +1598,7 @@ detect_cluster_region() {
   fi
 }
 
-# nodes_have_external_ip — Returns 0 if any node has a NodeExternalIP, 1 otherwise.
-# When true, the pod-to-host scenario will generate a ping-ipv4-external-ip action
-# that targets the node's EIP, which fails on TKE because EIP security groups
-# block inbound public ICMP by default.
-nodes_have_external_ip() {
-  local eips
-  eips=$(kubectl get node -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="ExternalIP")].address}{" "}{end}' 2>/dev/null | tr -s ' ')
-  [[ -n "${eips// /}" ]]
-}
+
 
 # probe_pod_egress — Launches a temporary curl Pod and tries to reach `target`
 # with a 5-second timeout. Returns 0 if reachable, non-zero otherwise.
@@ -1830,21 +1812,6 @@ cmd_test() {
     fi
   fi
 
-  # ---- pod-to-host scenario WARN when nodes have EIP ----
-  # The ping-ipv4-external-ip action under pod-to-host targets the node's EIP.
-  # TKE EIP security groups block inbound public ICMP by default, but this is
-  # user-configurable, so we only WARN — user decides whether to skip.
-  if nodes_have_external_ip; then
-    if is_zh; then
-      warn "检测到节点绑定了 EIP，pod-to-host scenario 包含 ping-external-ip 子动作，会从 Pod ping 节点 EIP："
-      warn "  - 若 EIP 安全组放行了公网 ICMP 入向，该用例可正常通过"
-      warn "  - 若 EIP 安全组拒绝公网 ICMP 入向（TKE 默认），该用例会失败，可显式跳过：--test '!/pod-to-host\$'"
-    else
-      warn "Nodes have EIPs bound. The pod-to-host scenario contains a ping-external-ip subaction that pings the node's EIP from a Pod:"
-      warn "  - If the EIP security group allows inbound public ICMP, this case will pass"
-      warn "  - If the EIP security group blocks inbound public ICMP (TKE default), this case will fail; skip explicitly with: --test '!/pod-to-host\$'"
-    fi
-  fi
   echo ""
 
   cilium connectivity test \
