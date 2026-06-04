@@ -296,6 +296,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set ipam.operator.clusterPoolIPv4PodCIDRList="{10.244.0.0/16}" \
   --set ipam.operator.clusterPoolIPv4MaskSize=24 \
   --set enableIPv4Masquerade=true \
+  --set bpf.masquerade=true \
   --set localRedirectPolicies.enabled=true \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
@@ -333,6 +334,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set ipam.operator.clusterPoolIPv4PodCIDRList="{10.244.0.0/16}" \
   --set ipam.operator.clusterPoolIPv4MaskSize=24 \
   --set enableIPv4Masquerade=true \
+  --set bpf.masquerade=true \
   --set localRedirectPolicies.enabled=true \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
@@ -438,6 +440,11 @@ ipam:
     clusterPoolIPv4MaskSize: "24"
 # Overlay mode needs IP masquerade so Pod IPs are SNATed to node IP when leaving the cluster
 enableIPv4Masquerade: true
+bpf:
+  # Must enable BPF masquerade. Without it cilium falls back to iptables masquerade,
+  # which forces host routing back to legacy (BPF host routing won't be active).
+  # See appendix "Cilium Host Routing: Legacy vs BPF" for details.
+  masquerade: true
 # Don't set sysctlfix (leave the default true) — ensures lxc interface rp_filter=0
 ```
 

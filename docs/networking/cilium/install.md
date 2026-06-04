@@ -295,6 +295,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set ipam.operator.clusterPoolIPv4PodCIDRList="{10.244.0.0/16}" \
   --set ipam.operator.clusterPoolIPv4MaskSize=24 \
   --set enableIPv4Masquerade=true \
+  --set bpf.masquerade=true \
   --set localRedirectPolicies.enabled=true \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
@@ -332,6 +333,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set ipam.operator.clusterPoolIPv4PodCIDRList="{10.244.0.0/16}" \
   --set ipam.operator.clusterPoolIPv4MaskSize=24 \
   --set enableIPv4Masquerade=true \
+  --set bpf.masquerade=true \
   --set localRedirectPolicies.enabled=true \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \
@@ -437,6 +439,11 @@ ipam:
     clusterPoolIPv4MaskSize: "24"
 # Overlay 模式需要 IP 伪装，Pod IP 访问集群外需 SNAT 为节点 IP
 enableIPv4Masquerade: true
+bpf:
+  # 必须启用 BPF 实现的 masquerade，否则 cilium 默认走 iptables 实现，会让 host
+  # routing 强制 fallback 到 legacy（无法启用 BPF host routing）。
+  # 详见附录《Cilium Host Routing：legacy vs BPF》
+  masquerade: true
 # 不设置 sysctlfix（保持默认 true），确保 lxc 接口 rp_filter=0
 ```
 

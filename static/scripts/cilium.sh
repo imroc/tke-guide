@@ -948,10 +948,15 @@ helm_install_cilium() {
     ;;
   VPC-CNI_overlay)
     toleration_args+=(--set 'operator.tolerations[5].key=tke.cloud.tencent.com/eni-ip-unavailable,operator.tolerations[5].operator=Exists')
-    mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=cluster-pool --set "ipam.operator.clusterPoolIPv4PodCIDRList={${POD_CIDR}}" --set ipam.operator.clusterPoolIPv4MaskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true)
+    # bpf.masquerade=true is required to unlock BPF host routing — cilium falls
+    # back to legacy host routing whenever masquerading goes through iptables
+    # (see pkg/kpr/initializer/kube_proxy_replacement.go: "BPF host routing
+    # requires enable-bpf-masquerade").
+    mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=cluster-pool --set "ipam.operator.clusterPoolIPv4PodCIDRList={${POD_CIDR}}" --set ipam.operator.clusterPoolIPv4MaskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true --set bpf.masquerade=true)
     ;;
   GR_overlay)
-    mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=cluster-pool --set "ipam.operator.clusterPoolIPv4PodCIDRList={${POD_CIDR}}" --set ipam.operator.clusterPoolIPv4MaskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true)
+    # See VPC-CNI_overlay note above for why bpf.masquerade=true is needed.
+    mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=cluster-pool --set "ipam.operator.clusterPoolIPv4PodCIDRList={${POD_CIDR}}" --set ipam.operator.clusterPoolIPv4MaskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true --set bpf.masquerade=true)
     ;;
   esac
 

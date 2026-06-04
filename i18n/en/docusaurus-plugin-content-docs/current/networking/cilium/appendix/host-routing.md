@@ -5,7 +5,7 @@
 Host Routing refers to **how packets are forwarded once they enter the node's host network namespace** — i.e. how the next-hop and target device are decided. Cilium provides two implementations:
 
 - **Legacy Host Routing**: the default implementation. Packets traverse the full Linux network stack — netfilter (iptables) hooks, conntrack, and the kernel routing table — before being forwarded to the target device (another Pod's lxc, the node's eth0, a tunnel, etc.). Maximum compatibility, but every hop adds overhead.
-- **BPF Host Routing**: introduced in cilium 1.9+. A tc-bpf program performs endpoint lookup, service backend lookup, dst MAC rewrite, and redirect to the target device — all at the NIC ingress, **completely bypassing netfilter / kernel routing**. Higher performance, especially for small-packet latency and throughput.
+- **BPF Host Routing**: introduced in cilium 1.9+. A tc-bpf program performs endpoint lookup, service backend lookup, dst MAC rewrite, and redirect to the target device — all at the `cilium_host` device ingress, **completely bypassing netfilter / kernel routing**. Higher performance, especially for small-packet latency and throughput.
 
 ```
               ┌──────────────────────────────────────────────────────┐
@@ -20,57 +20,72 @@ routing       │       → veth/eth → out  (skips netfilter / routing)  │
               └──────────────────────────────────────────────────────┘
 ```
 
-## Host Routing per TKE Deployment Mode
+## BPF Host Routing Has Two Independent Requirements
 
-| Deployment Mode      | Host Routing           | Switchable to BPF?                                                                       |
-| -------------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
-| GR + Overlay (vxlan) | ✅ BPF (default)       | Already BPF                                                                              |
-| VPC-CNI + Overlay    | ✅ BPF (default)       | Already BPF                                                                              |
-| VPC-CNI + Native     | ❌ Legacy (**forced**) | **No** — under `endpointRoutes.enabled=true`, the BPF host routing path is never reached |
+Whether cilium actually uses BPF host routing at runtime is gated by **two independent conditions**, both must hold:
 
-In VPC-CNI Native mode, setting `bpf.hostRouting=true` in helm values has no effect — this is determined by the data path of endpointRoutes mode itself, not an active fallback by cilium.
+### Condition 1: configuration layer doesn't get force-fallback'd
 
-## Why VPC-CNI Native Mode Cannot Use BPF Host Routing
+When cilium-agent starts (`pkg/kpr/initializer/kube_proxy_replacement.go`):
 
-Causal chain:
-
-1. **In TKE Native mode, Pod IPs must be valid VPC IPs, and each Pod has its own kernel routing entry on the node**
-   - Pod IPs are allocated by `tke-eni-ipamd` from the node's secondary ENI IP pool — cilium does not own IPAM
-   - Cross-node connectivity relies on the VPC route table (ARP within a subnet, VPC routing across subnets) — cilium does not own routing
-   - This data path requires `endpointRoutes.enabled=true` in helm values — a per-Pod kernel route pointing directly to its lxc device
-
-2. **The essence of `endpointRoutes` mode: host RX bypasses `cilium_host` and goes directly via kernel routing to lxc**
-   - In default (non-endpointRoutes) mode, all packets entering the host netns first hit the `cilium_host` device, where its tc-bpf program dispatches them — this is exactly where BPF Host Routing operates
-   - In endpointRoutes mode, each Pod has an independent kernel route (`ip route` pointing straight at lxc); packets **do not pass through** `cilium_host` at all
-   - In cilium's BPF source, the `ENABLE_HOST_ROUTING` branch in `bpf_host.c` only takes effect on the `cilium_host` path; under endpointRoutes mode this code is never executed
-
-3. **Result: under endpointRoutes mode, packets must traverse the full kernel network stack (netfilter / conntrack / FIB)**
-   - Cilium still attaches BPF programs to lxc ingress/egress hooks for NetworkPolicy / Service / Hubble observability
-   - But **forwarding inside the host** can only rely on the kernel — that is the very definition of legacy host routing
-
-So Native mode (Pod IP = VPC IP) → must `endpointRoutes.enabled=true` → host RX skips `cilium_host` → BPF host routing is never triggered.
-
-## Cross-cloud comparison: AWS EKS with Cilium ENI IPAM has the same limitation
-
-The official cilium helm chart **automatically writes** `enable-endpoint-routes: "true"` whenever `eni.enabled=true` (cilium's own AWS ENI IPAM):
-
-```yaml
-# install/kubernetes/cilium/templates/cilium-configmap.yaml (v1.19.4)
-{{- if .Values.eni.enabled }}
-  {{- if not .Values.endpointRoutes.enabled }}
-  enable-endpoint-routes: "true"
-  {{- end }}
+```go
+case option.Config.IptablesMasqueradingEnabled():
+    // BPF host routing requires BPF masquerade. Falling back to legacy.
+case !r.kprCfg.KubeProxyReplacement:
+    // BPF host routing requires KPR=true. Falling back to legacy.
 ```
 
-The reason is identical to TKE Native: AWS ENI IPs are also valid VPC IPs ("directly routable in the AWS VPC"), so cilium has no reason — and no need — to funnel traffic through `cilium_host` for redirect; instead each Pod gets its own kernel route via endpointRoutes. But this also means BPF host routing is not triggered in this mode either.
+In other words:
 
-| Solution                                   | IPAM          | endpointRoutes    | Host Routing |
-| ------------------------------------------ | ------------- | ----------------- | ------------ |
-| TKE VPC-CNI + Native (chained CNI)         | tke-eni-ipamd | required (manual) | Legacy       |
-| AWS EKS with cilium ENI IPAM (not chained) | cilium eni    | automatic (chart) | Legacy       |
-| AWS EKS chained aws-cni                    | aws-vpc-cni   | required (manual) | Legacy       |
+- **`enableIPv4Masquerade=true` without `bpf.masquerade=true`** → uses iptables masquerade → forced fallback to legacy
+- **`kubeProxyReplacement=false`** → forced fallback to legacy
 
-The pattern is clear: **whenever Pod IPs are valid VPC IPs, cilium uses endpointRoutes and BPF host routing is unavailable**. This is the common cost of cloud-native "Native" routing solutions, not a TKE-specific implementation choice.
+To get BPF host routing, you must explicitly set:
+
+```yaml
+kubeProxyReplacement: true
+enableIPv4Masquerade: true # or false
+bpf:
+  masquerade: true # the critical switch
+```
+
+### Condition 2: packets must actually pass through `cilium_host`
+
+The BPF host routing code (the `ENABLE_HOST_ROUTING` branch in `bpf/bpf_host.c`) only fires inside the tc-bpf program attached to the `cilium_host` device. If packets never traverse `cilium_host`, that code is never executed — even if the configuration layer is fully unlocked, runtime still won't use BPF host routing.
+
+**`endpointRoutes.enabled=true` mode is exactly this case**: each Pod gets its own kernel route on the node (`ip route` pointing straight at lxc), so packets bypass `cilium_host` entirely. This is the root reason VPC-CNI Native mode (which mandates endpointRoutes) cannot use BPF host routing — **it has nothing to do with the agent's startup fallback check**.
+
+## Host Routing per TKE Deployment Mode
+
+| Deployment Mode            | Key helm values                                    | Limit hit                                          | Effective Host Routing        |
+| -------------------------- | -------------------------------------------------- | -------------------------------------------------- | ----------------------------- |
+| GR + Overlay (vxlan)       | `bpf.masquerade=true` + endpointRoutes off         | None                                               | ✅ BPF                        |
+| VPC-CNI + Overlay          | `bpf.masquerade=true` + endpointRoutes off         | None                                               | ✅ BPF                        |
+| VPC-CNI + Native (no SNAT) | `enableIPv4Masquerade=false` + endpointRoutes=true | endpointRoutes routes packets around `cilium_host` | ❌ Legacy (Condition 2 fails) |
+| VPC-CNI + Native + ip-masq | `bpf.masquerade=true` + endpointRoutes=true        | endpointRoutes routes packets around `cilium_host` | ❌ Legacy (Condition 2 fails) |
+| VPC-CNI + Native + Egress  | `bpf.masquerade=true` + endpointRoutes=true        | endpointRoutes routes packets around `cilium_host` | ❌ Legacy (Condition 2 fails) |
+
+The one-click installer `cilium.sh` **explicitly sets `bpf.masquerade=true`** for both GR Overlay and VPC-CNI Overlay paths, so a fresh Overlay install lands directly on BPF host routing.
+
+> Historical pitfall: cilium's default masquerade is the iptables variant. If the helm values only set `enableIPv4Masquerade=true` and forget `bpf.masquerade=true`, cilium-agent logs `BPF host routing requires enable-bpf-masquerade. Falling back to legacy host routing.` at startup, and `cilium status` shows `Host: Legacy` / `Masquerading: IPTables`. The intuition that "Overlay is BPF by default" is wrong here.
+
+## How to Verify
+
+```bash
+# Inspect cilium status — Routing & Masquerading lines
+kubectl -n kube-system exec ds/cilium -- cilium status | grep -E 'Routing:|Masquerading:'
+# Expected (BPF path):
+#   Routing:                 Network: Tunnel [vxlan]   Host: BPF
+#   Masquerading:            BPF
+# Degraded (legacy path):
+#   Routing:                 Network: Tunnel [vxlan]   Host: Legacy
+#   Masquerading:            IPTables ...
+
+# Confirm fallback reason from agent logs (when stuck on Legacy)
+kubectl -n kube-system logs ds/cilium | grep -iE 'host.legacy|bpf host routing|falling back'
+# e.g.:
+#   BPF host routing requires enable-bpf-masquerade. Falling back to legacy host routing.
+```
 
 ## Performance Impact
 
@@ -80,7 +95,7 @@ Extra overhead of legacy host routing compared to BPF host routing:
 - Conntrack table lookup and update (the connection tracking state machine runs even without iptables rules)
 - Kernel routing table (FIB) lookup
 
-In our benchmarks (4C8G S5, TencentOS 4, kernel 6.6), small-packet TCP_RR in Native mode is ~10-15% lower than in Overlay mode (which uses BPF host routing). Single-stream TCP_STREAM throughput shows little difference (capped by NIC bandwidth). Full numbers in [Cilium Performance Tests](./performance-test.md).
+In our benchmarks (4C8G S5, TencentOS 4, kernel 6.6), small-packet TCP_RR in Native mode (Legacy) is ~10-15% lower than in Overlay mode (BPF, assuming `bpf.masquerade=true` is set explicitly). Single-stream TCP_STREAM throughput shows little difference (capped by NIC bandwidth). Full numbers in [Cilium Performance Tests](./performance-test.md).
 
 ## Should You Switch to BPF Host Routing?
 
@@ -95,9 +110,31 @@ In our benchmarks (4C8G S5, TencentOS 4, kernel 6.6), small-packet TCP_RR in Nat
 - High-PPS small-packet workloads (RPC, KV stores, MQ brokers) chase ultra-low RTT
 - Node PPS is high and netfilter / conntrack is the bottleneck (check via `nf_conntrack_count` approaching `nf_conntrack_max`)
 
+## Cross-cloud comparison: AWS EKS with Cilium ENI IPAM has the same limitation
+
+The official cilium helm chart **automatically writes** `enable-endpoint-routes: "true"` whenever `eni.enabled=true` (cilium's own AWS ENI IPAM):
+
+```yaml
+# install/kubernetes/cilium/templates/cilium-configmap.yaml (v1.19.4)
+{{- if .Values.eni.enabled }}
+  {{- if not .Values.endpointRoutes.enabled }}
+  enable-endpoint-routes: "true"
+  {{- end }}
+```
+
+The reason is identical to TKE Native: AWS ENI IPs are also valid VPC IPs ("directly routable in the AWS VPC"), so cilium has no reason — and no need — to funnel traffic through `cilium_host` for redirect; instead each Pod gets its own kernel route via endpointRoutes. But this also means BPF host routing is not triggered in this mode either (Condition 2 fails).
+
+| Solution                                   | IPAM          | endpointRoutes    | Host Routing |
+| ------------------------------------------ | ------------- | ----------------- | ------------ |
+| TKE VPC-CNI + Native (chained CNI)         | tke-eni-ipamd | required (manual) | Legacy       |
+| AWS EKS with cilium ENI IPAM (not chained) | cilium eni    | automatic (chart) | Legacy       |
+| AWS EKS chained aws-cni                    | aws-vpc-cni   | required (manual) | Legacy       |
+
+The pattern is clear: **whenever Pod IPs are valid VPC IPs, cilium uses endpointRoutes and BPF host routing is unavailable** — a common cost of cloud-native "Native" routing solutions.
+
 ## Capabilities Unaffected
 
-Even with legacy host routing, the following cilium core capabilities work **fully** in VPC-CNI Native mode:
+Even with legacy host routing, the following cilium core capabilities work **fully** in all deployment modes:
 
 - **L3/L4/L7 NetworkPolicy**: BPF programs are attached to lxc ingress/egress hooks (decoupled from host routing)
 - **Hubble Observability**: same as above — flow capture happens on lxc BPF programs
