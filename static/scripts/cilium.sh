@@ -114,6 +114,25 @@ set -euo pipefail
 #    - Default answers for optional features (egress, localdns): N (no).
 #    - set -euo pipefail is on; use `|| true` or `; exit 0` to suppress errors in pipes.
 #
+# 9. KEEP COMMENTS & DOCS IN SYNC
+#    Whenever you change behavior or rename anything, also scan and update:
+#    a) This file:
+#       - Header "Commands:" list, show_help() output, print_replay_command()
+#       - Function docstrings that count things ("Assembles N arrays",
+#         "Two concerns drive this", "all M install modes") — easy to miss
+#       - Old subcommand-name references (history: e2e-test → test/perf was
+#         missed for months)
+#       - Helper functions left dead after a feature removal (e.g. when
+#         removing an auto-detection branch, also remove the helper it called)
+#    b) Sibling docs that reference this script (sync zh + en together):
+#       - docs/networking/cilium/{install,with-node-local-dns,observability,
+#         egress-gateway}.md
+#       - docs/networking/cilium/appendix/{connectivity-test,performance-test,
+#         verified-os,host-routing,...}.md
+#       - i18n/en/.../same files
+#    Mismatched comments/docs are worse than missing ones — they actively
+#    mislead the next contributor.
+#
 ###############################################################################
 
 # ====== Defaults ======
