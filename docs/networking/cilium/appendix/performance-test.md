@@ -11,17 +11,13 @@ cilium 官方提供了 [`cilium connectivity perf`](https://docs.cilium.io/en/st
 [一键安装脚本](../install.md#一键安装脚本) `cilium.sh` 提供了 `perf` 子命令，会用 TKE 内网可拉取的镜像跑 `cilium connectivity perf`：
 
 ```bash
-curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
-chmod +x cilium.sh
-./cilium.sh perf
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- perf
 ```
 
 国内网络无法连接 GitHub 时改用站点镜像：
 
 ```bash
-curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
-chmod +x cilium.sh
-./cilium.sh perf
+bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- perf
 ```
 
 性能测试默认跑约 1 分钟，每个测试持续 10 秒（可通过 `--duration` 调整），最后输出汇总表格。
@@ -155,13 +151,13 @@ S5.MEDIUM4 是入门机型（2C4G），跨节点带宽受限较明显（典型 1
 
 ### Overlay (VPC-CNI) ⭐
 
-> 待补充：在 Overlay (VPC-CNI) 集群上跑 `./cilium.sh perf`，把输出结果填充到此处。
+> 待补充：在 Overlay (VPC-CNI) 集群上跑 `cilium.sh perf`，把输出结果填充到此处。
 >
 > 预期相比 Native：跨节点 pod-to-pod 因 vxlan 封装会有少量开销（吞吐略降、延迟略增）。
 
 ### Overlay (GR)
 
-> 待补充：在 Overlay (GR) 集群上跑 `./cilium.sh perf`，把输出结果填充到此处。
+> 待补充：在 Overlay (GR) 集群上跑 `cilium.sh perf`，把输出结果填充到此处。
 
 ## 相关链接
 

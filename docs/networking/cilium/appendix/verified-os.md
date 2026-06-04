@@ -33,7 +33,7 @@
 2. 用 [安装脚本](../install.md#一键安装脚本) 在集群上安装 cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache。
 3. 在已连接集群的环境（kubeconfig 已配置好）执行脚本的 e2e 测试子命令：
    ```bash
-   ./cilium.sh test
+   bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- test
    ```
 4. 验证以下指标全部通过：
    - `cilium-health status` 所有节点 reachable（覆盖 host↔Pod、Pod↔Pod 跨节点连通性）
@@ -47,7 +47,7 @@
 
 1. **内核版本预检查**：确认 OS 内核 ≥ 5.10（参考 cilium [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)）。
 2. **创建测试集群**：使用目标 OS 创建只有 1-2 个节点的测试集群，安装 cilium。
-3. **运行 e2e 测试**：执行 `./cilium.sh test`，关注：
+3. **运行 e2e 测试**：执行 `cilium.sh test`（详见上文一键命令），关注：
    - `cilium-health status` 是否所有节点 reachable
    - DNS 解析（含集群内 svc 名和外部域名）是否正常
    - `cilium connectivity test` 是否全部通过

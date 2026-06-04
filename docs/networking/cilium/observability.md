@@ -5,7 +5,7 @@
 如果安装 cilium 时未启用 Hubble Relay 和 Hubble UI，可使用一键脚本快速启用：
 
 ```bash
-./cilium.sh enable-hubble
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- enable-hubble
 ```
 
 脚本会执行 `helm upgrade --reuse-values --set hubble.relay.enabled=true --set hubble.ui.enabled=true`，并重启 cilium-agent / operator。下列章节是不使用脚本时手工启用各个组件的命令，按需查阅。

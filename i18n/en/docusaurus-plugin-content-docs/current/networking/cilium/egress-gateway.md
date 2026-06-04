@@ -32,17 +32,13 @@ Everything below about `nonMasqueradeCIDRs` (script behavior, helm flags, ration
 Use the script to enable Egress Gateway in one shot (handles helm upgrade and component restart automatically):
 
 ```bash
-curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
-chmod +x cilium.sh
-./cilium.sh enable-egress-gateway
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- enable-egress-gateway
 ```
 
 If your network can't reach GitHub, use the site mirror:
 
 ```bash
-curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
-chmod +x cilium.sh
-./cilium.sh enable-egress-gateway
+bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- enable-egress-gateway
 ```
 
 :::tip[On Native Routing the script handles nonMasqueradeCIDRs automatically]

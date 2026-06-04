@@ -12,14 +12,16 @@ set -euo pipefail
 #   English: https://imroc.cc/tke/en/networking/cilium/install
 #
 # Usage:
-#   curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
-#   chmod +x cilium.sh
-#   ./cilium.sh <command>
+#   bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- <command>
 #
-# Note: install-cilium is interactive (asks for routing mode etc.). Do NOT use
-# `curl ... | bash -s install-cilium` — bash's stdin gets consumed by curl's
-# pipe output, so `read` returns EOF immediately and the script exits right
-# after printing the menu. Always download first, then run.
+# Why `bash -c "$(curl ...)"` and not `curl ... | bash`:
+#   The interactive subcommands (install-cilium etc.) call `read` to ask the
+#   user. With `curl ... | bash`, bash's stdin is consumed by curl's pipe
+#   output, so `read` returns EOF immediately and the script exits right after
+#   printing the menu. With `bash -c "$(curl ...)"`, bash receives the script
+#   as a string argument and stdin remains attached to the terminal — `read`
+#   works normally. This pattern works for both interactive and non-interactive
+#   subcommands, so all docs should use it.
 # For non-interactive batch deployment, see the env var section at the bottom.
 #
 # Commands:
@@ -311,7 +313,7 @@ show_help() {
   msg HELP_TITLE
   echo ""
   msg HELP_USAGE
-  echo "  $script_name <command>"
+  echo "  bash -c \"\$(curl -sfL $url)\" -- <command>"
   echo ""
   msg HELP_COMMANDS
   msg HELP_CMD_CILIUM
@@ -323,20 +325,18 @@ show_help() {
   msg HELP_CMD_HELP
   echo ""
   msg HELP_EXAMPLES
-  echo "  ./$script_name install-cilium"
-  echo "  ./$script_name install-localdns"
-  echo "  curl -sfL $url -o $script_name && chmod +x $script_name && ./$script_name install-cilium"
-  echo "  curl -sfL $url -o $script_name && chmod +x $script_name && ./$script_name install-localdns"
+  echo "  bash -c \"\$(curl -sfL $url)\" -- install-cilium"
+  echo "  bash -c \"\$(curl -sfL $url)\" -- install-localdns"
+  echo "  bash -c \"\$(curl -sfL $url)\" -- test"
   echo ""
   if is_zh; then
     echo "提示:"
-    echo "  install-cilium 是交互式命令，请先下载脚本再执行（不要用 \`curl ... | bash\`，"
-    echo "  否则 bash 的 stdin 会被 curl 占用，read 立即收到 EOF，菜单弹出后脚本会自动退出）。"
+    echo "  推荐使用 bash -c \"\$(curl ...)\" -- 一行执行的写法（兼容所有交互/非交互子命令）。"
+    echo "  不要用 curl ... | bash，否则 bash 的 stdin 会被 curl 占用，交互式 read 立即收到 EOF。"
   else
     echo "Note:"
-    echo "  install-cilium is interactive. Download the script first, then run it (do NOT use"
-    echo "  \`curl ... | bash\` — bash's stdin gets consumed by curl, read hits EOF immediately,"
-    echo "  and the script exits right after printing the menu)."
+    echo "  Use bash -c \"\$(curl ...)\" -- <command> (works for both interactive and non-interactive subcommands)."
+    echo "  Do NOT use curl ... | bash — bash's stdin gets consumed by curl, breaking interactive prompts."
   fi
   echo ""
   if is_zh; then
@@ -1182,7 +1182,7 @@ print_replay_command() {
   fi
   echo ""
   echo "  ${env_vars} \\"
-  echo "    curl -sfL ${script_url} | bash -s install-cilium"
+  echo "    bash -c \"\$(curl -sfL ${script_url})\" -- install-cilium"
   echo ""
 }
 

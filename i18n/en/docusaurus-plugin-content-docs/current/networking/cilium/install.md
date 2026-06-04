@@ -107,33 +107,31 @@ helm repo add cilium https://helm.cilium.io/
 
 ### One-Click Install Script
 
-You can use a script that auto-detects the cluster environment and guides the installation. Download first, then run:
+You can use a script that auto-detects the cluster environment and guides the installation. One-liner that works in any shell — no separate download needed:
 
 ```bash
-curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
-chmod +x cilium.sh
-./cilium.sh install-cilium
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install-cilium
 ```
 
 If the GitHub URL is not reachable, use the site mirror:
 
 ```bash
-curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
-chmod +x cilium.sh
-./cilium.sh install-cilium
+bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install-cilium
 ```
 
 The script auto-detects the cluster's network mode, guides you through choosing a mode and version, then performs the installation. During installation you can optionally enable [Egress Gateway](egress-gateway.md) and [Nodelocal DNSCache](with-node-local-dns.md). For manual installation, follow the steps below.
 
-:::tip[Why not `curl ... | bash`?]
+:::tip[Why `bash -c "$(curl ...)"` and not `curl ... \| bash`?]
 
-The `install-cilium` subcommand is interactive (you have to choose the installation mode). With `curl ... | bash`, bash's stdin is consumed by curl's output, so the script's `read` cannot receive keyboard input and the script exits immediately (the menu prints, then the script ends). That's why this guide always uses "download then execute".
+The `install-cilium` subcommand is interactive (it calls `read` to ask for choices). With `curl ... | bash`, bash's stdin is consumed by curl's pipe output, so `read` returns EOF immediately and the script exits.
 
-If you really want a one-liner, you can preset parameters via environment variables to skip interaction (no stdin needed — see the non-interactive mode notes in the script comments):
+With `bash -c "$(curl ...)"`, bash receives the script as a string argument and stdin remains attached to the terminal — `read` works normally. This pattern works for both interactive and non-interactive subcommands.
+
+If you want a fully non-interactive one-liner, set the parameters via environment variables (`bash -c` inherits them from the parent shell):
 
 ```bash
 ROUTING_MODE=native CILIUM_VERSION=1.19.4 \
-  curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s install-cilium
+  bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install-cilium
 ```
 
 :::
@@ -728,17 +726,13 @@ After installation completes and nodes are added, verify cilium functionality:
 Use the script to run cilium connectivity test (skips public-network tests automatically and uses TKE-reachable images):
 
 ```bash
-curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
-chmod +x cilium.sh
-./cilium.sh test
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- test
 ```
 
 If GitHub is unreachable, use the site mirror:
 
 ```bash
-curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
-chmod +x cilium.sh
-./cilium.sh test
+bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- test
 ```
 
 ### Manual Test
@@ -787,7 +781,7 @@ helm upgrade cilium cilium/cilium \
 kubectl -n kube-system rollout status ds/cilium
 
 # 5. Verify
-./cilium.sh test
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- test
 ```
 
 :::warning[Upgrade Cautions]

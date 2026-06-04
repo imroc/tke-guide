@@ -106,33 +106,31 @@ helm repo add cilium https://helm.cilium.io/
 
 ### 一键安装脚本
 
-可使用脚本自动检测集群环境并引导安装。先下载脚本再执行：
+可使用脚本自动检测集群环境并引导安装。一行命令直接执行（适用所有 shell，无需先下载）：
 
 ```bash
-curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
-chmod +x cilium.sh
-./cilium.sh install-cilium
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install-cilium
 ```
 
 如果网络环境无法连接 GitHub，可使用站点地址：
 
 ```bash
-curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
-chmod +x cilium.sh
-./cilium.sh install-cilium
+bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install-cilium
 ```
 
 脚本会自动检测集群网络模式、引导选择安装方案和版本，然后执行安装。安装过程中还可选择是否启用 [Egress Gateway](egress-gateway.md) 和 [Nodelocal DNSCache](with-node-local-dns.md)。如需手动安装，参考后续步骤。
 
-:::tip[为什么不用 `curl ... | bash` 一行执行？]
+:::tip[为什么用 `bash -c "$(curl ...)"` 而不是 `curl ... \| bash`？]
 
-本脚本 `install-cilium` 子命令是交互式的（需要选择安装模式等）。如果用 `curl ... | bash`，bash 的标准输入会被 curl 的输出占用，导致脚本中的 `read` 读不到键盘输入而立即退出（弹出选项后自动结束）。所以本文统一使用「先下载再执行」的写法。
+`install-cilium` 子命令是交互式的（需要选择安装模式等）。如果用 `curl ... | bash`，bash 的 stdin 会被 curl 的输出占用，导致脚本中的 `read` 立即收到 EOF 而退出。
 
-如果你确实希望一行命令完成，可以通过环境变量预先指定参数跳过交互，此时不再需要 stdin（详见脚本注释中的非交互模式说明）：
+而 `bash -c "$(curl ...)"` 把脚本以**字符串**形式传给 bash，stdin 仍然是终端，`read` 可以正常读取键盘输入。该写法对交互/非交互子命令都适用。
+
+如果想完全无交互，通过环境变量预先指定参数即可（`bash -c` 会继承当前 shell 环境变量）：
 
 ```bash
 ROUTING_MODE=native CILIUM_VERSION=1.19.4 \
-  curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh | bash -s install-cilium
+  bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install-cilium
 ```
 
 :::
@@ -740,17 +738,13 @@ cilium connectivity test 中的 `pod-to-world` / `pod-to-cidr` / `to-fqdns` / `t
 使用脚本运行 cilium connectivity test，会自动判断节点地域并选用合适的外部目标、动态解析国内可用 IP、跳过环境固有失败的用例，使用 TKE 可拉取的镜像：
 
 ```bash
-curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh -o cilium.sh
-chmod +x cilium.sh
-./cilium.sh test
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- test
 ```
 
 如果网络环境无法连接 GitHub，可使用站点地址：
 
 ```bash
-curl -sfL https://imroc.cc/tke/scripts/cilium.sh -o cilium.sh
-chmod +x cilium.sh
-./cilium.sh test
+bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- test
 ```
 
 脚本启动时会输出：
@@ -826,7 +820,7 @@ cilium connectivity test \
 需要测节点间网络性能（吞吐、延迟）时，可用 `perf` 命令跑 `cilium connectivity perf`：
 
 ```bash
-./cilium.sh perf
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- perf
 ```
 
 完整测试方法和各方案实测数据参考 [Cilium 性能测试](./appendix/performance-test.md)。
@@ -856,7 +850,7 @@ helm upgrade cilium cilium/cilium \
 kubectl -n kube-system rollout status ds/cilium
 
 # 5. 验证
-./cilium.sh test
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- test
 ```
 
 :::warning[升级注意事项]
