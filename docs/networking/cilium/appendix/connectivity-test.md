@@ -176,18 +176,18 @@ NAT 网关 / Egress Gateway 同理无效——它们只决定"已经决定 SNAT 
 
 ### 测试环境
 
-| 项              | 值                                                                                          |
-| --------------- | ------------------------------------------------------------------------------------------- |
-| Kubernetes 版本 | v1.34.1（containerd 1.7.28）                                                                |
-| Cilium 版本     | v1.19.4                                                                                     |
-| Cilium CLI 版本 | v0.19.4                                                                                     |
-| 节点 OS         | TencentOS Server 4 (kernel 6.6.117-45.7.3.tl4.x86_64)                                       |
-| 节点机型        | S5.LARGE8（4C8G）                                                                           |
-| 节点数量        | 3 个节点                                                                                    |
-| 节点公网        | 节点绑 EIP，VPC 配置了 NAT 网关（详见 [常见问题](#常见问题) 中的"为什么节点要配 NAT 网关"） |
-| 安装方式        | [一键安装脚本](../install.md#一键安装脚本) `cilium.sh install`，启用 Egress Gateway         |
+| 项              | 值                                                                                                   |
+| --------------- | ---------------------------------------------------------------------------------------------------- |
+| Kubernetes 版本 | v1.34.1（containerd 1.7.28）                                                                         |
+| Cilium 版本     | v1.19.4                                                                                              |
+| Cilium CLI 版本 | v0.19.4                                                                                              |
+| 节点 OS         | TencentOS Server 4 (kernel 6.6.117-45.7.3.tl4.x86_64)                                                |
+| 节点机型        | S5.LARGE8（4C8G）                                                                                    |
+| 节点数量        | 3 个节点                                                                                             |
+| 节点公网        | 节点绑 EIP，VPC 配置了 NAT 网关（详见 [常见问题](#常见问题) 中的"为什么节点要配 NAT 网关"）          |
+| 安装方式        | [一键安装脚本](../install.md#一键安装脚本) `cilium.sh install`，启用 Egress Gateway 与 ip-masq-agent |
 
-> 启用 Egress Gateway 时，脚本会自动设置 `ipMasqAgent.config.nonMasqueradeCIDRs` 覆盖 RFC 1918 三段，避免跨节点 Pod-to-Pod 被 SNAT 破坏 NetworkPolicy；详见 [Native + Egress Gateway 兼容性说明](#native--egress-gateway-兼容性说明)。
+> 启用 Egress Gateway 或 ip-masq-agent 都会让 cilium 开启 BPF masquerade，脚本会自动设置 `ipMasqAgent.config.nonMasqueradeCIDRs` 覆盖 RFC 1918 三段，避免跨节点 Pod-to-Pod 被 SNAT 破坏 NetworkPolicy；详见 [Native + ip-masq-agent / Egress Gateway 兼容性说明](#native--ip-masq-agent--egress-gateway-兼容性说明)。
 
 ### 测试结果
 
@@ -507,11 +507,20 @@ F. 云网络层 DNAT 把目的 EIP 改写成节点 VPC IP，包到达节点主 E
 
 如果不配 NAT 网关、节点也没其它公网出口，运行 `cilium.sh test` 时这条用例必失败，可加 `--test '!/pod-to-host$'` 跳过。
 
-## Native + Egress Gateway 兼容性说明
+## Native + ip-masq-agent / Egress Gateway 兼容性说明
 
-Egress Gateway 启用时，cilium 源码强制要求 `enableIPv4Masquerade=true` + `bpf.masquerade=true`（[`pkg/egressgateway/manager.go`](https://github.com/cilium/cilium/blob/main/pkg/egressgateway/manager.go)）。在 Native Routing 模式下，如果不配置 `ipMasqAgent.config.nonMasqueradeCIDRs`，cilium 会把跨节点 Pod-to-Pod 流量当成"出 VPC"做 SNAT，源 Pod IP 被替换成 link-local（`169.254.x.x`）或节点 IP，接收端 cilium-agent 无法解析为正确的 endpoint identity，导致**所有"基于源 endpoint label 的 NetworkPolicy"在跨节点场景下失效**。
+VPC-CNI Native 默认 `enableIPv4Masquerade=false`（Pod IP 即 VPC IP，东西向无需 SNAT），cilium 此时不开启任何 masquerade 路径，跨节点 Pod-to-Pod 始终保留原始 Pod IP，NetworkPolicy 的源 endpoint label 匹配正常工作。
 
-`cilium.sh install` 在检测到 `Native + Egress` 组合时，会按以下优先级解析 `nonMasqueradeCIDRs` 并自动注入 helm 安装：
+但启用下面任一能力时，cilium 都会**强制开启 BPF masquerade**：
+
+- **Egress Gateway**：cilium 源码强制要求 `enableIPv4Masquerade=true` + `bpf.masquerade=true`（[`pkg/egressgateway/manager.go`](https://github.com/cilium/cilium/blob/main/pkg/egressgateway/manager.go)）
+- **ip-masq-agent**（让 Native Pod 借节点主 ENI EIP 出公网，参考 [配置 IP 伪装](../masquerading.md)）：脚本同样会同时设置 `enableIPv4Masquerade=true` + `bpf.masquerade=true` + `ipMasqAgent.enabled=true`
+
+masquerade 一旦开启，**默认行为是把所有出 cluster CIDR 的流量做 SNAT**——在 Native 模式下，这意味着跨节点 Pod-to-Pod 也会被 SNAT（源 Pod IP 被替换成 link-local `169.254.x.x` 或节点 IP），接收端 cilium-agent 无法解析为正确的 endpoint identity，导致**所有"基于源 endpoint label 的 NetworkPolicy"在跨节点场景下失效**。
+
+解决办法是配置 `ipMasqAgent.config.nonMasqueradeCIDRs` 把 VPC 网段加进白名单，让 Pod-to-Pod / Pod-to-VPC 流量保留原始 Pod IP，只对真正"出 VPC"（如公网）的流量做 SNAT。
+
+`cilium.sh install` 在检测到 Native + 启用了 ip-masq-agent 或 Egress Gateway 时，会按以下优先级解析 `nonMasqueradeCIDRs` 并自动注入 helm 安装：
 
 1. 环境变量 `NON_MASQ_CIDRS`（空格分隔的 CIDR 列表）
 2. 集群中已存在的 TKE `ip-masq-agent-config` ConfigMap（TKE 自带 ip-masq-agent 组件会写入 VPC 主网段 + 辅助网段）
