@@ -25,8 +25,10 @@ set -euo pipefail
 # Commands:
 #   install-cilium          Install Cilium (auto-detect network mode, interactive)
 #   install-localdns        Install Nodelocal DNSCache with Cilium integration
-#   e2e-test                Run Cilium connectivity end-to-end tests
+#   test                    Run Cilium connectivity test (cilium connectivity test)
+#   perf                    Run Cilium performance test (cilium connectivity perf)
 #   enable-egress-gateway   Enable Cilium Egress Gateway
+#   enable-hubble           Enable Hubble (Hubble Relay + Hubble UI)
 #   help                    Show help message
 #
 ###############################################################################
@@ -78,7 +80,7 @@ set -euo pipefail
 #
 # 6. CILIUM VERSION
 #    - DEFAULT_CILIUM_VERSION is the recommended version tested with this script.
-#    - When upgrading, test all 4 install modes before updating the default.
+#    - When upgrading, test all 3 supported install modes before updating the default.
 #
 # 7. NON-INTERACTIVE MODE (environment variables)
 #    All interactive prompts in install-cilium can be skipped by setting env vars:
@@ -125,7 +127,7 @@ DEFAULT_POD_CIDR_MASK="24"
 # Nodelocal DNSCache image. Synced from registry.k8s.io/dns/k8s-dns-node-cache to dockerhub mirror.
 NODE_LOCAL_DNS_IMAGE="docker.io/k8smirror/k8s-dns-node-cache:1.26.4"
 
-# Curl image used by both e2e-test (passed via --curl-image) and node egress probe.
+# Curl image used by both `test` (passed via --curl-image) and node egress probe.
 # Single source of truth so they stay in sync.
 CILIUM_CURL_IMAGE="quay.tencentcloudcr.com/cilium/alpine-curl:v1.10.0"
 
@@ -866,12 +868,16 @@ setup_overlay_vpccni() {
 }
 
 # helm_install_cilium — Runs helm upgrade --install with mode-specific parameters.
-# Assembles 4 argument arrays:
-#   - image_args: TKE-accessible mirror image repos (quay.tencentcloudcr.com, k8smirror)
-#   - common_args: shared params (kubeProxyReplacement, APF, etc.)
-#   - toleration_args: operator tolerations for TKE-specific taints
-#   - mode_args: routing/IPAM/CNI params specific to NETWORK_MODE x ROUTING_MODE
-# If ENABLE_EGRESS=true, egress gateway params are merged into the install.
+# Assembles the following helm --set argument arrays and concatenates them
+# (helm last-wins, so later arrays override earlier ones):
+#   - image_args:       TKE-accessible mirror image repos (quay.tencentcloudcr.com, k8smirror)
+#   - common_args:      shared params (kubeProxyReplacement, APF, etc.)
+#   - toleration_args:  operator tolerations for TKE-specific taints
+#   - mode_args:        routing/IPAM/CNI params specific to NETWORK_MODE x ROUTING_MODE
+#   - egress_args:      Egress Gateway params (only when ENABLE_EGRESS=true)
+#   - ip_masq_args:     ip-masq-agent params (Native only; when ENABLE_IP_MASQ=true
+#                       OR ENABLE_EGRESS=true — Egress forces ip-masq-agent on)
+#   - hubble_args:      Hubble Relay + UI (only when ENABLE_HUBBLE=true)
 helm_install_cilium() {
   info "$(is_zh && echo "添加 Cilium Helm 仓库..." || echo "Adding Cilium Helm repo...")"
   helm repo add cilium https://helm.cilium.io/ 2>/dev/null || true
@@ -1501,7 +1507,7 @@ cmd_install_localdns() {
 # Runs cilium connectivity test with TKE-compatible image overrides and
 # region-aware external target defaults.
 #
-# Two TKE-environment-specific concerns drive this logic:
+# Three TKE-environment-specific concerns drive this logic:
 #
 # 1. External target reachability (pod-to-world / pod-to-cidr / to-fqdns / etc.)
 #    These scenarios curl external IPs/domains. cilium-cli has NO automatic
@@ -1859,13 +1865,12 @@ cmd_test() {
 
 # ====== perf subcommand ======
 # Runs cilium connectivity perf with TKE-compatible image overrides.
-# `cilium connectivity perf` uses iperf3 / netperf to measure pod-to-pod throughput
+# `cilium connectivity perf` uses netperf to measure pod-to-pod throughput
 # and latency across same-node and cross-node combinations. It needs at least 2
 # nodes available (cilium-cli will fail otherwise).
 #
-# We override the curl-image (deployment setup), netperf-image, and other test
-# images to TKE-internal mirrors so they pull on TKE clusters without public
-# internet access.
+# We override --performance-image to a TKE-internal mirror (quay.tencentcloudcr.com)
+# so the netperf image pulls on TKE clusters without public internet access.
 
 cmd_perf() {
   echo ""
