@@ -745,45 +745,6 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
 }
 ```
 
-## Verify Cilium
-
-After installation completes and nodes are added, verify cilium functionality:
-
-### Quick Test
-
-Use the script to run cilium connectivity test (skips public-network tests automatically and uses TKE-reachable images):
-
-```bash
-bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- test
-```
-
-If GitHub is unreachable, use the site mirror:
-
-```bash
-bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- test
-```
-
-### Manual Test
-
-You need [cilium CLI](https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/#install-the-cilium-cli) installed first, then run:
-
-```bash
-cilium connectivity test \
-  --test '!/pod-to-world' \
-  --test '!/pod-to-cidr' \
-  --curl-image quay.tencentcloudcr.com/cilium/alpine-curl:v1.10.0 \
-  --json-mock-image quay.tencentcloudcr.com/cilium/json-mock:v1.3.9 \
-  --dns-test-server-image docker.io/k8smirror/coredns:v1.14.2 \
-  --echo-image docker.io/k8smirror/echo-advanced:v20251204-v1.4.1
-```
-
-:::tip[Notes]
-
-- `--test '!/pod-to-world'` and `--test '!/pod-to-cidr'` skip public-network connectivity tests (nodes may not have internet bandwidth, and default public targets may be blocked in some regions).
-- Image addresses are replaced with TKE-reachable mirrors (`quay.io` → `quay.tencentcloudcr.com`, `registry.k8s.io` / `gcr.io` → `docker.io/k8smirror`).
-
-:::
-
 ## Upgrade and Rollback
 
 ### Upgrade Cilium Version
@@ -854,6 +815,24 @@ Rollback is a high-risk operation. **Strongly recommend recreating nodes** inste
 :::
 
 ## FAQ
+
+### How do I verify the cilium installation works?
+
+Cilium provides two verification suites:
+
+- **Connectivity tests** (~35 minutes, covers NetworkPolicy / Hubble / KPR / DNS / FQDN, 130+ scenarios):
+
+  ```bash
+  bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- test
+  ```
+
+- **Performance tests** (~3 minutes, runs TCP_RR / TCP_STREAM via netperf):
+
+  ```bash
+  bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- perf
+  ```
+
+Full methodology, environment prerequisites, and per-mode benchmark results: [Cilium Connectivity Test](./appendix/connectivity-test.md) and [Cilium Performance Test](./appendix/performance-test.md).
 
 ### How to view all default installation configurations for Cilium?
 

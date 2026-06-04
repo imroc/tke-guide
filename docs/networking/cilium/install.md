@@ -741,115 +741,6 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
 }
 ```
 
-## 验证 Cilium 功能
-
-安装完成并添加节点后，可通过以下方式验证 cilium 功能是否正常。
-
-:::warning[运行前提]
-
-cilium connectivity test 中的 `pod-to-world` / `pod-to-cidr` / `to-fqdns` / `to-cidr-external` 等用例需要 **Pod 能从节点出公网**。请确保以下任一条件满足：
-
-- 节点本身有公网带宽（节点购买时勾选公网，绑了 EIP）
-- 集群所在 VPC 配置了 NAT 网关，路由表已关联节点子网（参考 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)）
-- 配置了 [Egress Gateway](egress-gateway.md)
-
-如果节点没有公网，相关用例会失败——这是预期行为，与 cilium 无关。可在测试命令上追加 `--test '!/pod-to-world' --test '!/pod-to-cidr'` 显式跳过。
-
-另外，cilium 默认的外部目标是 `1.1.1.1` / `one.one.one.one.` / `k8s.io.`，**国内地域因 GFW 限制无法访问**。一键脚本会自动按节点地域选用国内可达的目标（成都/北京/上海等）；手动跑测试时请按下方"手动测试"小节配置。
-
-:::
-
-### 一键测试
-
-使用脚本运行 cilium connectivity test，会自动判断节点地域并选用合适的外部目标、动态解析国内可用 IP、跳过环境固有失败的用例，使用 TKE 可拉取的镜像：
-
-```bash
-bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- test
-```
-
-如果网络环境无法连接 GitHub，可使用站点地址：
-
-```bash
-bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- test
-```
-
-脚本启动时会输出：
-
-- 节点地域识别结果（国内/海外/混合/未知）
-- 实际使用的外部目标（国内地域会动态解析 `npmmirror.com` 拿到当前公网 IP，并扫描其 `/16` 找到第二个可用 IP）
-- 节点出公网探测结果（不通时打印警告，不强制跳过）
-- `pod-to-cidr` 系列动态 IP 解析失败时的警告（不强制跳过）
-
-详细行为参考 [Cilium 功能测试](./appendix/connectivity-test.md) 的"运行环境前提"小节。
-
-### 手动测试
-
-需先安装 [cilium CLI](https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/#install-the-cilium-cli)。命令分两种情况：
-
-<Tabs>
-<TabItem value="cn" label="国内地域（推荐）" default>
-
-成都/北京/上海/深圳等国内地域，默认公网目标 `1.1.1.1` / `one.one.one.one.` / `k8s.io.` 受 GFW 限制不可达，需替换为国内可达地址。先在集群里临时起一个 Pod 解析 `npmmirror.com` 拿到当前公网 IP（IP 会随阿里云 ECS 后端变动），再传给 cilium：
-
-```bash
-# 1. 动态解析 npmmirror.com 当前的公网 IP
-EXT_IP=$(kubectl run cn-resolve-tmp --image=quay.tencentcloudcr.com/cilium/alpine-curl:v1.10.0 \
-  --restart=Never --attach --rm --quiet --command -- \
-  /bin/sh -c 'dig +short npmmirror.com A | head -1')
-EXT_OTHER_IP=$(echo "$EXT_IP" | awk -F. '{printf "%s.%s.%s.%d", $1, $2, $3, ($4 + 1)}')
-EXT_CIDR=$(echo "$EXT_IP" | awk -F. '{printf "%s.%s.0.0/16", $1, $2}')
-echo "EXT_IP=$EXT_IP, EXT_OTHER_IP=$EXT_OTHER_IP, EXT_CIDR=$EXT_CIDR"
-
-# 2. 跑 connectivity test，注意 --curl-insecure 是必须的（CN 公网 HTTPS 无 IP 绑定证书）
-cilium connectivity test \
-  --external-ip "$EXT_IP" \
-  --external-other-ip "$EXT_OTHER_IP" \
-  --external-cidr "$EXT_CIDR" \
-  --external-target npmmirror.com. \
-  --external-other-target mirrors.aliyun.com. \
-  --curl-insecure \
-  --curl-image quay.tencentcloudcr.com/cilium/alpine-curl:v1.10.0 \
-  --json-mock-image quay.tencentcloudcr.com/cilium/json-mock:v1.3.9 \
-  --dns-test-server-image docker.io/k8smirror/coredns:v1.14.2 \
-  --echo-image docker.io/k8smirror/echo-advanced:v20251204-v1.4.1
-```
-
-如果第二个 IP（`EXT_OTHER_IP`）实际不可达（443 不返回 2xx/3xx），`pod-to-cidr` 会失败。可加 `--test '!/pod-to-cidr' --test '!/to-cidr-external' --test '!/from-cidr'` 跳过 IP 类 CIDR 用例——更省心的做法是用一键脚本，它会自动扫 `/16` 范围找到能用的第二个 IP。
-
-</TabItem>
-<TabItem value="oversea" label="海外地域">
-
-香港/新加坡/硅谷/东京等海外地域，可使用 cilium 默认的外部目标：
-
-```bash
-cilium connectivity test \
-  --curl-image quay.tencentcloudcr.com/cilium/alpine-curl:v1.10.0 \
-  --json-mock-image quay.tencentcloudcr.com/cilium/json-mock:v1.3.9 \
-  --dns-test-server-image docker.io/k8smirror/coredns:v1.14.2 \
-  --echo-image docker.io/k8smirror/echo-advanced:v20251204-v1.4.1
-```
-
-</TabItem>
-</Tabs>
-
-:::tip[说明]
-
-- **节点绑了 EIP？** pod-to-host 中的 `ping-ipv4-external-ip` 子动作会因 TKE 节点 EIP 的安全组默认拒绝公网 ICMP 入向而失败，此时需追加 `--test '!/pod-to-host$'` 跳过该用例（`$` 用于精确匹配，避免误伤 `pod-to-hostport`）。一键脚本会自动检测并跳过。
-- **节点没有公网？** 追加 `--test '!/pod-to-world' --test '!/pod-to-cidr'` 跳过依赖公网的用例。
-- 镜像地址替换为 TKE 环境可内网拉取的地址（`quay.io` → `quay.tencentcloudcr.com`，`registry.k8s.io` / `gcr.io` → `docker.io/k8smirror`）。
-
-:::
-
-### 性能测试
-
-需要测节点间网络性能（吞吐、延迟）时，可用 `perf` 命令跑 `cilium connectivity perf`：
-
-```bash
-bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- perf
-```
-
-完整测试方法和各方案实测数据参考 [Cilium 性能测试](./appendix/performance-test.md)。
-
 ## 升级与回滚
 
 ### 升级 cilium 版本
@@ -920,6 +811,24 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 :::
 
 ## 常见问题
+
+### 如何验证 cilium 安装是否正常？
+
+cilium 提供两类验证方式：
+
+- **功能测试**（约 35 分钟，覆盖 NetworkPolicy / Hubble / KPR / DNS / FQDN 等 130+ 用例）：
+
+  ```bash
+  bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- test
+  ```
+
+- **性能测试**（约 3 分钟，跑 TCP_RR / TCP_STREAM 等 netperf 测试）：
+
+  ```bash
+  bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- perf
+  ```
+
+完整测试方法、运行环境前提、各方案实测结果参考 [Cilium 功能测试](./appendix/connectivity-test.md) 和 [Cilium 性能测试](./appendix/performance-test.md)。
 
 ### 如何查看 Cilium 全部的默认安装配置？
 
