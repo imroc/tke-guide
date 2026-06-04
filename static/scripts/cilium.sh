@@ -2301,6 +2301,12 @@ cmd_test() {
 
   echo ""
 
+  # Pre-clean leftover test namespaces from any previous run (cilium-cli
+  # leaves them behind on failure; on TKE the gatekeeper webhook blocks ns
+  # deletion while Pods exist, so cilium connectivity test's own setup can
+  # also stumble on stale state).
+  cleanup_cilium_test_namespaces
+
   local start_ts=$SECONDS
   local rc=0
   cilium connectivity test \
@@ -2349,6 +2355,87 @@ cmd_test() {
 # We override --performance-image to a TKE-internal mirror (quay.tencentcloudcr.com)
 # so the netperf image pulls on TKE clusters without public internet access.
 
+# cleanup_cilium_test_namespaces — Tear down lingering cilium-test-* namespaces
+# left behind by a previous run.
+#
+# Why this exists:
+#   When `cilium connectivity test` finishes with failures, cilium-cli leaves
+#   the test namespaces / Deployments / Pods around so users can inspect them.
+#   When `cilium connectivity perf` then starts, its first step is `kubectl
+#   delete ns cilium-test-1` — but TKE clusters have a gatekeeper webhook
+#   `baseline.gatekeeper.sh / block-namespace-deletion-rule` that REFUSES to
+#   delete a namespace while it still contains Pods. So perf gets stuck on
+#   "Waiting for namespace cilium-test-1 to disappear" indefinitely.
+#
+# Strategy: tear down workloads first (they hold the Pods), wait for Pods to
+# go away, then delete the namespace. This satisfies the gatekeeper rule.
+#
+# Called by both cmd_test (pre-run, in case previous run left junk) and
+# cmd_perf (pre-run, MUST happen before cilium connectivity perf starts).
+cleanup_cilium_test_namespaces() {
+  local namespaces=("cilium-test-1" "cilium-test-ccnp1" "cilium-test-ccnp2")
+  local found=0
+  for ns in "${namespaces[@]}"; do
+    if kubectl get ns "$ns" >/dev/null 2>&1; then
+      found=1
+      break
+    fi
+  done
+  if [[ "$found" -eq 0 ]]; then
+    return 0
+  fi
+
+  info "$(is_zh && echo "检测到上次测试残留的 namespace，先清理..." || echo "Detected leftover test namespaces, cleaning up first...")"
+
+  # Step 1: delete all workloads holding Pods. --wait=false to fan out quickly.
+  for ns in "${namespaces[@]}"; do
+    if kubectl get ns "$ns" >/dev/null 2>&1; then
+      kubectl -n "$ns" delete deployment,daemonset,statefulset,replicaset,job,cronjob --all --wait=false --ignore-not-found >/dev/null 2>&1 || true
+    fi
+  done
+
+  # Step 2: wait for Pods to actually disappear (gatekeeper blocks ns delete
+  # while any pod exists). 60s should be plenty; if not, fall back to force.
+  for ns in "${namespaces[@]}"; do
+    if ! kubectl get ns "$ns" >/dev/null 2>&1; then
+      continue
+    fi
+    local i pod_count
+    for i in $(seq 1 30); do
+      pod_count=$(kubectl -n "$ns" get pod --no-headers 2>/dev/null | wc -l | tr -d ' ')
+      if [[ "$pod_count" -eq 0 ]]; then
+        break
+      fi
+      sleep 2
+    done
+    # Force-delete any stragglers with grace period 0
+    if [[ "$pod_count" -gt 0 ]]; then
+      kubectl -n "$ns" delete pod --all --grace-period=0 --force --wait=false >/dev/null 2>&1 || true
+      sleep 3
+    fi
+  done
+
+  # Step 3: delete the namespaces themselves
+  for ns in "${namespaces[@]}"; do
+    kubectl delete ns "$ns" --wait=false --ignore-not-found >/dev/null 2>&1 || true
+  done
+
+  # Step 4: wait for namespaces to be gone (best-effort, ~30s)
+  local i
+  for i in $(seq 1 15); do
+    local still_there=0
+    for ns in "${namespaces[@]}"; do
+      kubectl get ns "$ns" >/dev/null 2>&1 && still_there=1
+    done
+    if [[ "$still_there" -eq 0 ]]; then
+      info "$(is_zh && echo "残留 namespace 已清理" || echo "Leftover namespaces cleaned up")"
+      return 0
+    fi
+    sleep 2
+  done
+  warn "$(is_zh && echo "namespace 清理超时，可能导致后续测试卡住；可手动 kubectl delete ns cilium-test-{1,ccnp1,ccnp2}" || echo "Namespace cleanup timed out; may cause subsequent tests to hang. Manual: kubectl delete ns cilium-test-{1,ccnp1,ccnp2}")"
+}
+
 cmd_perf() {
   echo ""
   echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
@@ -2362,6 +2449,13 @@ cmd_perf() {
 
   info "$(is_zh && echo "运行 cilium connectivity perf..." || echo "Running cilium connectivity perf...")"
   echo ""
+
+  # Pre-clean leftover test namespaces. cilium connectivity perf will try to
+  # `kubectl delete ns cilium-test-1` as its first step; on TKE the gatekeeper
+  # webhook block-namespace-deletion-rule rejects ns deletion while Pods still
+  # exist, so without pre-cleanup perf hangs on "Waiting for namespace ... to
+  # disappear" indefinitely.
+  cleanup_cilium_test_namespaces
 
   local start_ts=$SECONDS
   local rc=0
