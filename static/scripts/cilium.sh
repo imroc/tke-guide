@@ -375,12 +375,10 @@ show_help() {
   echo ""
   if is_zh; then
     echo "文档:"
-    echo "  安装 cilium:   https://imroc.cc/tke/networking/cilium/install"
-    echo "  安装 localdns: https://imroc.cc/tke/networking/cilium/with-node-local-dns"
+    echo "  https://imroc.cc/tke/networking/cilium/install"
   else
     echo "Docs:"
-    echo "  Install cilium:   https://imroc.cc/tke/en/networking/cilium/install"
-    echo "  Install localdns: https://imroc.cc/tke/en/networking/cilium/with-node-local-dns"
+    echo "  https://imroc.cc/tke/en/networking/cilium/install"
   fi
   echo ""
 }
