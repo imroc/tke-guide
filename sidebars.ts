@@ -49,6 +49,7 @@ const sidebars: SidebarsConfig = {
                 'networking/cilium/appendix/performance-test',
                 'networking/cilium/appendix/local-router-ipv4',
                 'networking/cilium/appendix/sysctlfix',
+                'networking/cilium/appendix/host-routing',
                 'networking/cilium/appendix/gr-native-not-recommended',
                 {
                   type: 'category',

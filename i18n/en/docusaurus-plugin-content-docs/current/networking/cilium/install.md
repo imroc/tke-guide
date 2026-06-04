@@ -388,7 +388,9 @@ Native Routing (VPC-CNI) mode-specific parameters:
 # Use native routing — Pods use VPC IPs directly, no overlay
 routingMode: "native"
 endpointRoutes:
-  # Must be true for native routing — routes Pod traffic directly via veth device
+  # Must be true for native routing — routes Pod traffic directly via veth device.
+  # Note: this also forces cilium onto legacy host routing rather than BPF host routing,
+  # see [Cilium Host Routing: Legacy vs BPF](./appendix/host-routing.md)
   enabled: true
 ipam:
   # Pod IP allocation handled by tke-eni-ipamd, not by cilium
@@ -998,6 +1000,7 @@ Design rationale and operational guides have been split into standalone articles
 - [Cilium Performance Test](./appendix/performance-test.md)
 - [Why Native Routing mode needs local-router-ipv4](./appendix/local-router-ipv4.md)
 - [Why Native Routing disables sysctlfix while Overlay enables it](./appendix/sysctlfix.md)
+- [Cilium Host Routing: Legacy vs BPF](./appendix/host-routing.md)
 - [Why this guide does not offer GR Native Routing](./appendix/gr-native-not-recommended.md)
 
 ## External References

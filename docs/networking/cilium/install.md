@@ -388,6 +388,8 @@ Native Routing (VPC-CNI) 模式专属参数：
 routingMode: "native"
 endpointRoutes:
   # native routing 必须置为 true，转发 Pod 流量直接路由到 veth 设备
+  # 注意：这同时意味着 cilium 走 legacy host routing 而非 BPF host routing，
+  # 详见 [Cilium Host Routing：legacy vs BPF](./appendix/host-routing.md)
   enabled: true
 ipam:
   # Pod IP 分配由 tke-eni-ipamd 负责，cilium 无需负责
@@ -1067,6 +1069,7 @@ cilium-operator 使用 hostNetwork 并配置了就绪探针，在超级节点上
 - [Cilium 性能测试](./appendix/performance-test.md)
 - [为什么 Native Routing 模式要加 local-router-ipv4 配置？](./appendix/local-router-ipv4.md)
 - [为什么 Native Routing 模式禁用 sysctlfix，Overlay 模式却启用？](./appendix/sysctlfix.md)
+- [Cilium Host Routing：legacy vs BPF](./appendix/host-routing.md)
 - [为什么不提供 GR Native Routing 部署方案？](./appendix/gr-native-not-recommended.md)
 
 ## 参考资料
