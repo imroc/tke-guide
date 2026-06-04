@@ -43,17 +43,17 @@ cilium connectivity perf \
 
 ## 测试环境
 
-| 项              | 值                                                                    |
-| --------------- | --------------------------------------------------------------------- |
-| 地域            | 成都 ap-chengdu                                                       |
-| Kubernetes 版本 | v1.34.1（containerd 1.7.28）                                          |
-| Cilium 版本     | v1.19.4                                                               |
-| Cilium CLI 版本 | v0.19.4                                                               |
-| 节点 OS         | TencentOS Server 4 (kernel 6.6.117-45.7.3.tl4.x86_64)                 |
-| 节点机型        | S5.MEDIUM4（2C4G）                                                    |
-| 节点数量        | 每个集群 3 个节点，全部位于 ap-chengdu-1                              |
-| 节点公网        | 节点绑 EIP（性能测试不依赖公网）                                      |
-| 安装方式        | [一键安装脚本](../install.md#一键安装脚本) `cilium.sh install-cilium` |
+| 项              | 值                                                             |
+| --------------- | -------------------------------------------------------------- |
+| 地域            | 成都 ap-chengdu                                                |
+| Kubernetes 版本 | v1.34.1（containerd 1.7.28）                                   |
+| Cilium 版本     | v1.19.4                                                        |
+| Cilium CLI 版本 | v0.19.4                                                        |
+| 节点 OS         | TencentOS Server 4 (kernel 6.6.117-45.7.3.tl4.x86_64)          |
+| 节点机型        | S5.MEDIUM4（2C4G）                                             |
+| 节点数量        | 每个集群 3 个节点，全部位于 ap-chengdu-1                       |
+| 节点公网        | 节点绑 EIP（性能测试不依赖公网）                               |
+| 安装方式        | [一键安装脚本](../install.md#一键安装脚本) `cilium.sh install` |
 
 :::tip[结果解读]
 

@@ -15,7 +15,7 @@ set -euo pipefail
 #   bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- <command>
 #
 # Why `bash -c "$(curl ...)"` and not `curl ... | bash`:
-#   The interactive subcommands (install-cilium etc.) call `read` to ask the
+#   The interactive subcommands (install etc.) call `read` to ask the
 #   user. With `curl ... | bash`, bash's stdin is consumed by curl's pipe
 #   output, so `read` returns EOF immediately and the script exits right after
 #   printing the menu. With `bash -c "$(curl ...)"`, bash receives the script
@@ -25,7 +25,8 @@ set -euo pipefail
 # For non-interactive batch deployment, see the env var section at the bottom.
 #
 # Commands:
-#   install-cilium          Install Cilium (auto-detect network mode, interactive)
+#   install                 Install Cilium (auto-detect network mode, interactive)
+#   uninstall               Uninstall Cilium and restore TKE built-in CNI components
 #   install-localdns        Install Nodelocal DNSCache with Cilium integration
 #   test                    Run Cilium connectivity test (cilium connectivity test)
 #   perf                    Run Cilium performance test (cilium connectivity perf)
@@ -52,7 +53,7 @@ set -euo pipefail
 #    - Add MSG_ZH/EN_HELP_CMD_<NAME> for help text.
 #    - Add `msg HELP_CMD_<NAME>` in show_help() between the last command and HELP_CMD_HELP.
 #    - Add a case branch in main(): <name>) cmd_<name> ;;
-#    - If the command should be optionally triggered from install-cilium,
+#    - If the command should be optionally triggered from install,
 #      extract core logic into a separate function (like install_localdns_internal)
 #      and add an interactive confirm_enable_<name>() + call it from cmd_install_cilium.
 #
@@ -85,7 +86,7 @@ set -euo pipefail
 #    - When upgrading, test all 3 supported install modes before updating the default.
 #
 # 7. NON-INTERACTIVE MODE (environment variables)
-#    All interactive prompts in install-cilium can be skipped by setting env vars:
+#    All interactive prompts in install can be skipped by setting env vars:
 #      ROUTING_MODE     "native" or "overlay" (required)
 #      CILIUM_VERSION   e.g. "1.19.4" (optional, defaults to DEFAULT_CILIUM_VERSION)
 #      POD_CIDR         e.g. "10.244.0.0/16" (only for overlay mode)
@@ -99,7 +100,9 @@ set -euo pipefail
 #      NON_MASQ_CIDRS   space-separated, e.g. "10.0.0.0/8 172.16.0.0/12"
 #                       (only used when Native + ip-masq-agent enabled; if unset,
 #                       reads TKE's ip-masq-agent-config CM, then prompts user)
-#      ENABLE_HUBBLE    "true" or "false" (optional, default false)
+#      ENABLE_HUBBLE    "true" or "false" (optional, default true — pressing Enter
+#                       in the interactive prompt enables hubble; set "false" to
+#                       skip Hubble Relay + Hubble UI)
 #      ENABLE_LOCALDNS  "true" or "false" (optional, default false)
 #      RUN_TEST_AFTER   "true" or "false" (optional, default false; when true,
 #                       cmd_test runs after install — but only after
@@ -218,8 +221,10 @@ MSG_ZH_HELP_COMMANDS="命令:"
 MSG_EN_HELP_COMMANDS="Commands:"
 MSG_ZH_HELP_EXAMPLES="示例:"
 MSG_EN_HELP_EXAMPLES="Examples:"
-MSG_ZH_HELP_CMD_CILIUM="  install-cilium     安装 Cilium 到 TKE 集群（自动检测网络模式，交互选择方案）"
-MSG_EN_HELP_CMD_CILIUM="  install-cilium     Install Cilium to TKE cluster (auto-detect network mode, interactive)"
+MSG_ZH_HELP_CMD_CILIUM="  install            安装 Cilium 到 TKE 集群（自动检测网络模式，交互选择方案）"
+MSG_EN_HELP_CMD_CILIUM="  install            Install Cilium to TKE cluster (auto-detect network mode, interactive)"
+MSG_ZH_HELP_CMD_UNINSTALL="  uninstall          卸载 Cilium 并恢复 TKE 内置网络组件"
+MSG_EN_HELP_CMD_UNINSTALL="  uninstall          Uninstall Cilium and restore TKE built-in network components"
 MSG_ZH_HELP_CMD_LOCALDNS="  install-localdns   安装 Nodelocal DNSCache 并配置与 Cilium 共存"
 MSG_EN_HELP_CMD_LOCALDNS="  install-localdns   Install Nodelocal DNSCache with Cilium integration"
 MSG_ZH_HELP_CMD_TEST="  test               运行 Cilium 连通性测试"
@@ -301,8 +306,8 @@ MSG_EN_HELM_INSTALL="Running helm install..."
 MSG_ZH_CILIUM_DONE="Cilium 安装完成！请添加节点后验证:"
 MSG_EN_CILIUM_DONE="Cilium installed! Add nodes and verify:"
 # Localdns
-MSG_ZH_NO_CILIUM="未检测到 cilium，请先安装 cilium (install-cilium) 再安装 localdns。"
-MSG_EN_NO_CILIUM="Cilium not detected. Run install-cilium first."
+MSG_ZH_NO_CILIUM="未检测到 cilium，请先安装 cilium (install) 再安装 localdns。"
+MSG_EN_NO_CILIUM="Cilium not detected. Run install first."
 MSG_ZH_NO_CLRP_CRD="CiliumLocalRedirectPolicy CRD 不存在，请确保安装 cilium 时启用了 localRedirectPolicies.enabled=true"
 MSG_EN_NO_CLRP_CRD="CiliumLocalRedirectPolicy CRD not found. Ensure localRedirectPolicies.enabled=true in cilium install."
 MSG_ZH_LOCALDNS_DONE="Nodelocal DNSCache 安装完成！"
@@ -345,6 +350,7 @@ show_help() {
   echo ""
   msg HELP_COMMANDS
   msg HELP_CMD_CILIUM
+  msg HELP_CMD_UNINSTALL
   msg HELP_CMD_LOCALDNS
   msg HELP_CMD_TEST
   msg HELP_CMD_PERF
@@ -353,7 +359,7 @@ show_help() {
   msg HELP_CMD_HELP
   echo ""
   msg HELP_EXAMPLES
-  echo "  bash -c \"\$(curl -sfL $url)\" -- install-cilium"
+  echo "  bash -c \"\$(curl -sfL $url)\" -- install"
   echo "  bash -c \"\$(curl -sfL $url)\" -- install-localdns"
   echo "  bash -c \"\$(curl -sfL $url)\" -- test"
   echo ""
@@ -474,7 +480,7 @@ get_apiserver_ip() {
   done
 }
 
-# ====== install-cilium subcommand ======
+# ====== install subcommand ======
 # Interactive functions for gathering user input during cilium installation.
 
 # select_routing_mode — Prompts user to choose Native Routing or Overlay.
@@ -794,8 +800,8 @@ print_ip_masq_summary() {
 }
 
 # confirm_enable_hubble — Asks user whether to enable Hubble Relay + Hubble UI
-# during install (default: N). Sets ENABLE_HUBBLE=true/false. If true, hubble
-# params are merged into helm install.
+# during install (default: Y, just press Enter). Sets ENABLE_HUBBLE=true/false.
+# If true, hubble params are merged into helm install.
 # Skipped if ENABLE_HUBBLE env var is already set.
 confirm_enable_hubble() {
   if [[ -n "${ENABLE_HUBBLE:-}" ]]; then
@@ -804,13 +810,14 @@ confirm_enable_hubble() {
   echo ""
   local prompt
   if is_zh; then
-    prompt="是否启用 Hubble (Hubble Relay + Hubble UI)？[y/N]: "
+    prompt="是否启用 Hubble (Hubble Relay + Hubble UI)？[Y/n]: "
   else
-    prompt="Enable Hubble (Hubble Relay + Hubble UI)? [y/N]: "
+    prompt="Enable Hubble (Hubble Relay + Hubble UI)? [Y/n]: "
   fi
   read -rp "$(echo -e "${BLUE}${prompt}${NC}")" hubble_input
   hubble_input=$(echo "$hubble_input" | tr '[:upper:]' '[:lower:]')
-  if [[ "$hubble_input" == "y" || "$hubble_input" == "yes" ]]; then
+  # Default Y: empty input or y/yes → enable.
+  if [[ -z "$hubble_input" || "$hubble_input" == "y" || "$hubble_input" == "yes" ]]; then
     ENABLE_HUBBLE=true
   else
     ENABLE_HUBBLE=false
@@ -1389,7 +1396,7 @@ print_replay_command() {
   fi
   echo ""
   echo "  ${env_vars} \\"
-  echo "    bash -c \"\$(curl -sfL ${script_url})\" -- install-cilium"
+  echo "    bash -c \"\$(curl -sfL ${script_url})\" -- install"
   echo ""
 }
 
@@ -1490,6 +1497,137 @@ cmd_install_cilium() {
     cmd_perf || true
   fi
 
+  echo ""
+}
+
+# ====== uninstall subcommand ======
+# Removes cilium and restores TKE built-in network components by reversing what
+# cmd_install_cilium and uninstall_tke_components did. Best-effort — every step
+# uses `|| true` so partial states don't abort the rollback.
+#
+# What this does:
+#   1. helm uninstall cilium (removes DaemonSet / Deployment / CRDs created by chart)
+#   2. Delete cni-config ConfigMap (only set up for VPC-CNI Native)
+#   3. Delete cilium APF FlowSchema + PriorityLevelConfiguration
+#   4. Restore TKE DaemonSets by clearing the nodeSelector patch
+#      (kube-proxy / tke-cni-agent / tke-eni-agent / ip-masq-agent — only those
+#      that exist; the patch sets nodeSelector to a never-matching label)
+#   5. Print follow-up actions the script CANNOT do automatically:
+#        - Reboot or recreate every node — cilium leaves BPF programs, lxc
+#          interfaces, and (depending on chart version) iptables rules that
+#          aren't fully cleaned by helm uninstall
+#        - Re-enable the ip-masq-agent addon in the TKE console if originally
+#          unchecked at cluster creation
+#        - Manually remove leftover /etc/cni/net.d/05-cilium.conf* on each node
+#          if not rebooting
+
+cmd_uninstall_cilium() {
+  echo ""
+  echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
+  echo -e "${BLUE}║      TKE Cilium Uninstall Wizard     ║${NC}"
+  echo -e "${BLUE}╚══════════════════════════════════════╝${NC}"
+  echo ""
+
+  check_prerequisites
+
+  # Confirm — uninstall is destructive (will disrupt cluster networking until
+  # nodes are rebuilt or TKE addons fully take over). Skip the prompt if
+  # CILIUM_UNINSTALL_YES=true (for non-interactive / CI use).
+  if [[ "${CILIUM_UNINSTALL_YES:-false}" != "true" ]]; then
+    if is_zh; then
+      warn "本操作将卸载 cilium 并恢复 TKE 内置网络组件。"
+      warn "  - 集群网络在此过程中会**中断**，直到 TKE 内置 CNI 完全接管"
+      warn "  - 强烈建议在 **维护窗口** 执行，并对每个节点 **重启或重建**（cilium"
+      warn "    会留下 BPF 程序、lxc 接口、iptables 规则等，helm uninstall 清不干净）"
+      warn "  - 控制台手动卸载的 ip-masq-agent 等组件，需在控制台手动重新勾选"
+      echo ""
+      read -rp "$(echo -e "${BLUE}确认要卸载 cilium？输入 yes 继续，其它取消: ${NC}")" confirm
+    else
+      warn "This will uninstall cilium and restore TKE built-in network components."
+      warn "  - Cluster networking will be DISRUPTED until TKE CNI fully takes over"
+      warn "  - Strongly recommend running in a **maintenance window** and"
+      warn "    **rebooting or recreating every node** afterwards (cilium leaves"
+      warn "    BPF programs, lxc interfaces, and iptables rules that helm"
+      warn "    uninstall does NOT fully clean up)"
+      warn "  - Components manually unchecked in the TKE console (e.g. ip-masq-agent)"
+      warn "    need to be re-enabled in the console"
+      echo ""
+      read -rp "$(echo -e "${BLUE}Confirm uninstall? Type yes to continue, anything else to cancel: ${NC}")" confirm
+    fi
+    if [[ "$confirm" != "yes" ]]; then
+      info "$(is_zh && echo "已取消" || echo "Cancelled")"
+      return
+    fi
+  fi
+
+  # 1. helm uninstall
+  info "$(is_zh && echo "卸载 cilium helm release..." || echo "Uninstalling cilium helm release...")"
+  helm uninstall cilium -n kube-system 2>/dev/null || true
+
+  # 2. Clean up cni-config (Native VPC-CNI chaining mode)
+  info "$(is_zh && echo "清理 cni-config ConfigMap..." || echo "Cleaning up cni-config ConfigMap...")"
+  kubectl -n kube-system delete configmap cni-config 2>/dev/null || true
+
+  # 3. Remove cilium APF rules
+  info "$(is_zh && echo "清理 cilium APF 限速规则..." || echo "Removing cilium APF rate limiting rules...")"
+  kubectl delete flowschema cilium 2>/dev/null || true
+  kubectl delete prioritylevelconfiguration cilium 2>/dev/null || true
+
+  # 4. Restore TKE network DaemonSets by removing the nodeSelector patch.
+  # cmd_install_cilium added nodeSelector={label-not-exist:node-not-exist} to
+  # prevent scheduling. Setting nodeSelector to {} restores normal scheduling.
+  # Use kubectl patch with strategic merge: setting a field to null removes it.
+  info "$(is_zh && echo "恢复 TKE 内置网络组件..." || echo "Restoring TKE built-in network components...")"
+  for ds in kube-proxy tke-cni-agent tke-eni-agent ip-masq-agent; do
+    if kubectl -n kube-system get ds "$ds" >/dev/null 2>&1; then
+      # Patch: set spec.template.spec.nodeSelector to null removes the disable patch.
+      # Use JSON patch with `replace` op replacing nodeSelector with empty object,
+      # which clears the never-matching label set during install.
+      kubectl -n kube-system patch daemonset "$ds" \
+        --type=json \
+        -p='[{"op":"remove","path":"/spec/template/spec/nodeSelector/label-not-exist"}]' \
+        2>/dev/null || \
+      kubectl -n kube-system patch daemonset "$ds" \
+        -p='{"spec":{"template":{"spec":{"nodeSelector":null}}}}' 2>/dev/null || true
+      info "  - ${ds}: $(is_zh && echo "已恢复调度" || echo "scheduling restored")"
+    fi
+  done
+
+  # 5. Optional: nudge users to delete add-pod-eni-ip-limit-webhook restoration
+  # is NOT done here — that webhook was deleted during install (Overlay VPC-CNI
+  # only) and there's no idempotent way to recreate it from the script. Tell
+  # the user it'll come back automatically when TKE re-syncs the addon.
+
+  echo ""
+  info "============================================"
+  info "$(is_zh && echo "Cilium 已卸载。后续手工动作（重要）:" || echo "Cilium uninstalled. Required follow-up actions:")"
+  info "============================================"
+  if is_zh; then
+    info "1. 重启 / 重建每个节点 — cilium 留下的 BPF 程序、lxc 接口、iptables 规则"
+    info "   helm uninstall 清不干净，最稳妥是直接重建节点"
+    info "2. 控制台检查并重新启用 ip-masq-agent 组件（如果创建集群时取消勾选过）"
+    info "3. (Overlay VPC-CNI) add-pod-eni-ip-limit-webhook 会在 TKE 重新下发组件"
+    info "   时自动恢复，无需手工干预"
+    info "4. 如果不打算重建节点，每个节点上手工清理:"
+    info "   sudo rm -f /etc/cni/net.d/05-cilium.conf /etc/cni/net.d/05-cilium.conflist"
+    info "   sudo iptables-save | grep -i cilium  # 检查残留规则"
+    info ""
+    info "完整回滚指南: https://imroc.cc/tke/networking/cilium/install#回滚到-tke-内置-cni"
+  else
+    info "1. Reboot or recreate every node — cilium leaves BPF programs, lxc"
+    info "   interfaces, and iptables rules that helm uninstall does NOT fully"
+    info "   clean. Recreating nodes is the most reliable cleanup."
+    info "2. In the TKE console, re-enable the ip-masq-agent addon if you"
+    info "   unchecked it at cluster creation."
+    info "3. (Overlay VPC-CNI) add-pod-eni-ip-limit-webhook is auto-restored"
+    info "   when TKE re-applies its addon manifests; no manual action needed."
+    info "4. If NOT recreating nodes, manually clean up on each node:"
+    info "   sudo rm -f /etc/cni/net.d/05-cilium.conf /etc/cni/net.d/05-cilium.conflist"
+    info "   sudo iptables-save | grep -i cilium  # check for leftover rules"
+    info ""
+    info "Full rollback guide: https://imroc.cc/tke/en/networking/cilium/install#rollback-to-tke-built-in-cni"
+  fi
+  info "============================================"
   echo ""
 }
 
@@ -2304,7 +2442,8 @@ cmd_enable_hubble() {
 main() {
   local cmd="${1:-}"
   case "$cmd" in
-  install-cilium) cmd_install_cilium ;;
+  install) cmd_install_cilium ;;
+  uninstall) cmd_uninstall_cilium ;;
   install-localdns) cmd_install_localdns ;;
   test) shift; cmd_test "$@" ;;
   perf) shift; cmd_perf "$@" ;;

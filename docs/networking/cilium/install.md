@@ -113,20 +113,20 @@ helm repo add cilium https://helm.cilium.io/
 可使用脚本自动检测集群环境并引导安装。一行命令直接执行（适用所有 shell，无需先下载）：
 
 ```bash
-bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install-cilium
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install
 ```
 
 如果网络环境无法连接 GitHub，可使用站点地址：
 
 ```bash
-bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install-cilium
+bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install
 ```
 
 脚本会自动检测集群网络模式、引导选择安装方案和版本，然后执行安装。安装过程中还可选择是否启用 [Egress Gateway](egress-gateway.md) 和 [Nodelocal DNSCache](with-node-local-dns.md)。如需手动安装，参考后续步骤。
 
 :::tip[为什么用 `bash -c "$(curl ...)"` 而不是 `curl ... \| bash`？]
 
-`install-cilium` 子命令是交互式的（需要选择安装模式等）。如果用 `curl ... | bash`，bash 的 stdin 会被 curl 的输出占用，导致脚本中的 `read` 立即收到 EOF 而退出。
+`install` 子命令是交互式的（需要选择安装模式等）。如果用 `curl ... | bash`，bash 的 stdin 会被 curl 的输出占用，导致脚本中的 `read` 立即收到 EOF 而退出。
 
 而 `bash -c "$(curl ...)"` 把脚本以**字符串**形式传给 bash，stdin 仍然是终端，`read` 可以正常读取键盘输入。该写法对交互/非交互子命令都适用。
 
@@ -134,7 +134,7 @@ bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install-cilium
 
 ```bash
 ROUTING_MODE=native CILIUM_VERSION=1.19.4 \
-  bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install-cilium
+  bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install
 ```
 
 :::
@@ -873,7 +873,15 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 
 ### 回滚到 TKE 内置 CNI
 
-如需从 cilium 回退到 TKE 原生 CNI（VPC-CNI 或 GR），操作不可避免地会中断业务，建议在维护窗口执行：
+如需从 cilium 回退到 TKE 原生 CNI（VPC-CNI 或 GR），操作不可避免地会中断业务，建议在维护窗口执行。
+
+**一键卸载脚本**（推荐，自动完成下列前 4 步）：
+
+```bash
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- uninstall
+```
+
+脚本会卸载 cilium helm release、删除 cni-config / APF 限速规则、恢复 TKE 网络组件 DaemonSet 调度，最后打印剩余的手工动作。如需手动操作，按下列步骤执行：
 
 1. **删除新的业务调度**：节点池打 cordon，避免回滚过程中有 Pod 新建。
 2. **卸载 cilium**：
@@ -888,7 +896,7 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
    sudo iptables-save | grep -i cilium | wc -l  # 检查残留规则，必要时手动 -D
    ```
 4. **重新启用 TKE 组件**：控制台勾选回 `tke-cni-agent`、`kube-proxy`、`ip-masq-agent` 等被卸载的组件。
-5. **重启或重建节点**：最稳妥的方式是直接重建所有节点，确保 datapath 干净。
+5. **重启或重建节点**：最稳妥的方式是直接重建所有节点，确保 datapath 干净（**这步无论用不用一键脚本都需要手工做**）。
 
 :::warning
 

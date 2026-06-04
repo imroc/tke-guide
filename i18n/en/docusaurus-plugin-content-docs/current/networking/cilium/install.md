@@ -114,20 +114,20 @@ helm repo add cilium https://helm.cilium.io/
 You can use a script that auto-detects the cluster environment and guides the installation. One-liner that works in any shell — no separate download needed:
 
 ```bash
-bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install-cilium
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install
 ```
 
 If the GitHub URL is not reachable, use the site mirror:
 
 ```bash
-bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install-cilium
+bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install
 ```
 
 The script auto-detects the cluster's network mode, guides you through choosing a mode and version, then performs the installation. During installation you can optionally enable [Egress Gateway](egress-gateway.md) and [Nodelocal DNSCache](with-node-local-dns.md). For manual installation, follow the steps below.
 
 :::tip[Why `bash -c "$(curl ...)"` and not `curl ... \| bash`?]
 
-The `install-cilium` subcommand is interactive (it calls `read` to ask for choices). With `curl ... | bash`, bash's stdin is consumed by curl's pipe output, so `read` returns EOF immediately and the script exits.
+The `install` subcommand is interactive (it calls `read` to ask for choices). With `curl ... | bash`, bash's stdin is consumed by curl's pipe output, so `read` returns EOF immediately and the script exits.
 
 With `bash -c "$(curl ...)"`, bash receives the script as a string argument and stdin remains attached to the terminal — `read` works normally. This pattern works for both interactive and non-interactive subcommands.
 
@@ -135,7 +135,7 @@ If you want a fully non-interactive one-liner, set the parameters via environmen
 
 ```bash
 ROUTING_MODE=native CILIUM_VERSION=1.19.4 \
-  bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install-cilium
+  bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install
 ```
 
 :::
@@ -805,7 +805,15 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 
 ### Rollback to TKE Built-in CNI
 
-Rolling back from cilium to TKE's native CNI (VPC-CNI or GR) inevitably disrupts traffic. Schedule a maintenance window:
+Rolling back from cilium to TKE's native CNI (VPC-CNI or GR) inevitably disrupts traffic. Schedule a maintenance window.
+
+**One-click uninstall script** (recommended — automates the first 4 steps):
+
+```bash
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- uninstall
+```
+
+The script uninstalls the cilium helm release, deletes cni-config / APF rules, restores TKE network DaemonSet scheduling, and prints the remaining manual steps. To do it manually:
 
 1. **Stop new scheduling**: cordon all node pools so no new Pods are placed during the rollback.
 2. **Uninstall cilium**:
@@ -820,7 +828,7 @@ Rolling back from cilium to TKE's native CNI (VPC-CNI or GR) inevitably disrupts
    sudo iptables-save | grep -i cilium | wc -l  # Check leftover rules; manually -D if needed
    ```
 4. **Re-enable TKE components**: in the console, re-enable `tke-cni-agent`, `kube-proxy`, `ip-masq-agent`, and any other addons you uninstalled.
-5. **Reboot or recreate nodes**: the safest approach is to recreate all nodes to ensure a clean datapath.
+5. **Reboot or recreate nodes**: the safest approach is to recreate all nodes to ensure a clean datapath (**this step still requires manual action regardless of whether you used the one-click script**).
 
 :::warning
 
