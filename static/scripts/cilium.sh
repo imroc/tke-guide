@@ -101,6 +101,10 @@ set -euo pipefail
 #                       reads TKE's ip-masq-agent-config CM, then prompts user)
 #      ENABLE_HUBBLE    "true" or "false" (optional, default false)
 #      ENABLE_LOCALDNS  "true" or "false" (optional, default false)
+#      RUN_TEST_AFTER   "true" or "false" (optional, default false; when true,
+#                       cmd_test runs at the end of install-cilium with timing)
+#      RUN_PERF_AFTER   "true" or "false" (optional, default false; when true,
+#                       cmd_perf runs at the end of install-cilium with timing)
 #    NETWORK_MODE is always auto-detected and cannot be overridden.
 #    When adding a new interactive prompt, follow the pattern:
 #      - Check if the env var is already set → if yes, skip the prompt.
@@ -831,6 +835,73 @@ confirm_enable_localdns() {
   fi
 }
 
+# confirm_run_test_perf — Asks user whether to run cilium connectivity test
+# and/or cilium connectivity perf at the end of install-cilium (default: N for
+# both — adds significant time, especially perf which spins up netperf pods on
+# at least 2 nodes).
+# Sets RUN_TEST_AFTER and RUN_PERF_AFTER (true/false).
+# Each variable is skipped individually if its env var is already set.
+confirm_run_test_perf() {
+  if [[ -z "${RUN_TEST_AFTER:-}" ]]; then
+    echo ""
+    local prompt
+    if is_zh; then
+      prompt="安装完成后是否运行连通性测试 (cilium connectivity test)？[y/N]: "
+    else
+      prompt="Run connectivity test (cilium connectivity test) after install? [y/N]: "
+    fi
+    read -rp "$(echo -e "${BLUE}${prompt}${NC}")" test_input
+    test_input=$(echo "$test_input" | tr '[:upper:]' '[:lower:]')
+    if [[ "$test_input" == "y" || "$test_input" == "yes" ]]; then
+      RUN_TEST_AFTER=true
+    else
+      RUN_TEST_AFTER=false
+    fi
+  fi
+  if [[ -z "${RUN_PERF_AFTER:-}" ]]; then
+    local prompt
+    if is_zh; then
+      prompt="安装完成后是否运行性能测试 (cilium connectivity perf)？[y/N]: "
+    else
+      prompt="Run performance test (cilium connectivity perf) after install? [y/N]: "
+    fi
+    read -rp "$(echo -e "${BLUE}${prompt}${NC}")" perf_input
+    perf_input=$(echo "$perf_input" | tr '[:upper:]' '[:lower:]')
+    if [[ "$perf_input" == "y" || "$perf_input" == "yes" ]]; then
+      RUN_PERF_AFTER=true
+    else
+      RUN_PERF_AFTER=false
+    fi
+  fi
+}
+
+# format_duration — Pretty-prints SECONDS-style elapsed seconds. Outputs e.g.
+# "5m 23s" or "1h 2m 5s" depending on locale (zh suffixes 时/分/秒, en uses h/m/s).
+# Used by cmd_test / cmd_perf to report wall-clock duration.
+format_duration() {
+  local total=$1
+  local h=$((total / 3600))
+  local m=$(((total % 3600) / 60))
+  local s=$((total % 60))
+  if is_zh; then
+    if (( h > 0 )); then
+      printf '%d时%d分%d秒' "$h" "$m" "$s"
+    elif (( m > 0 )); then
+      printf '%d分%d秒' "$m" "$s"
+    else
+      printf '%d秒' "$s"
+    fi
+  else
+    if (( h > 0 )); then
+      printf '%dh %dm %ds' "$h" "$m" "$s"
+    elif (( m > 0 )); then
+      printf '%dm %ds' "$m" "$s"
+    else
+      printf '%ds' "$s"
+    fi
+  fi
+}
+
 # uninstall_tke_components — Disables TKE built-in networking components.
 # - kube-proxy: always disabled (cilium replaces it via kubeProxyReplacement).
 # - tke-cni-agent: disabled EXCEPT for GR+native (needed to copy CNI binaries like bridge).
@@ -1198,6 +1269,14 @@ print_replay_command() {
     # Quote because list contains spaces
     env_vars="${env_vars} NON_MASQ_CIDRS=\"${NON_MASQ_CIDRS}\""
   fi
+  # Only include RUN_TEST_AFTER / RUN_PERF_AFTER when explicitly enabled, to keep
+  # the replay command short (default false adds nothing useful).
+  if [[ "${RUN_TEST_AFTER:-false}" == "true" ]]; then
+    env_vars="${env_vars} RUN_TEST_AFTER=true"
+  fi
+  if [[ "${RUN_PERF_AFTER:-false}" == "true" ]]; then
+    env_vars="${env_vars} RUN_PERF_AFTER=true"
+  fi
   echo ""
   if is_zh; then
     info "如需在其他集群重复相同安装，可直接执行以下命令（无需交互）:"
@@ -1222,8 +1301,10 @@ print_replay_command() {
 #   9. resolve_non_masq_cidrs (Native + Egress, OR Native + ip-masq-agent)
 #  10. confirm_enable_hubble (optional)
 #  11. confirm_enable_localdns (optional)
-#  12. uninstall_tke_components → setup_* → helm_install → apply_apf
-#  13. (optional) install localdns
+#  12. confirm_run_test_perf (optional, run cilium connectivity test/perf at end)
+#  13. uninstall_tke_components → setup_* → helm_install → apply_apf
+#  14. (optional) install localdns
+#  15. (optional) cmd_test, then (optional) cmd_perf — both report duration + docs link
 cmd_install_cilium() {
   echo ""
   echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
@@ -1243,6 +1324,7 @@ cmd_install_cilium() {
   resolve_non_masq_cidrs
   confirm_enable_hubble
   confirm_enable_localdns
+  confirm_run_test_perf
 
   echo ""
   info "$(is_zh && echo "安装方案" || echo "Plan"): ${ROUTING_MODE} (${NETWORK_MODE}), Cilium ${CILIUM_VERSION}"
@@ -1282,6 +1364,20 @@ cmd_install_cilium() {
 
   # Print non-interactive replay command for batch deployment
   print_replay_command
+
+  # Optional: run cilium connectivity test / perf at the end of install
+  # (default off — both add significant time, especially perf which spins up
+  # netperf pods on at least 2 nodes). When set via the interactive prompt or
+  # RUN_TEST_AFTER / RUN_PERF_AFTER env vars, we delegate to cmd_test / cmd_perf
+  # which already report duration + docs link.
+  # Use `|| true` to avoid `set -e` aborting after a non-zero cilium exit code
+  # (failed tests are a normal outcome, not a script error).
+  if [[ "${RUN_TEST_AFTER:-false}" == "true" ]]; then
+    cmd_test || true
+  fi
+  if [[ "${RUN_PERF_AFTER:-false}" == "true" ]]; then
+    cmd_perf || true
+  fi
 
   echo ""
 }
@@ -1624,6 +1720,27 @@ detect_cluster_region() {
 
 
 
+# detect_cilium_routing_mode — Reads the cilium helm release values to determine
+# whether this install is Native Routing or Overlay. Returns "native", "overlay",
+# or "unknown" on stdout. Used by cmd_test to print mode-specific warnings.
+detect_cilium_routing_mode() {
+  local mode
+  mode=$(helm -n kube-system get values cilium 2>/dev/null | awk '/^routingMode:/ {print $2}' | tr -d '"' | head -1)
+  case "$mode" in
+    native) echo "native" ;;
+    tunnel) echo "overlay" ;;  # cilium uses routingMode=tunnel for vxlan/geneve
+    *) echo "unknown" ;;
+  esac
+}
+
+# nodes_with_external_ip_count — Counts non-super nodes that have an
+# .status.addresses[type=ExternalIP] (i.e. an EIP attached). Used to decide
+# whether to print the Native + EIP pod-to-host warning.
+nodes_with_external_ip_count() {
+  kubectl get node -o jsonpath='{range .items[*]}{.metadata.labels.node\.kubernetes\.io/instance-type}{"|"}{.status.addresses[?(@.type=="ExternalIP")].address}{"\n"}{end}' 2>/dev/null \
+    | awk -F'|' '$1 != "eklet" && $2 != "" {n++} END {print n+0}'
+}
+
 # probe_pod_egress — Launches a temporary curl Pod and tries to reach `target`
 # with a 5-second timeout. Returns 0 if reachable, non-zero otherwise.
 # Used to warn users when nodes lack public-internet egress.
@@ -1836,8 +1953,60 @@ cmd_test() {
     fi
   fi
 
+  # ---- Native + node EIP warning ----
+  # In Native Routing mode, cilium-cli's pod-to-host scenario contains a
+  # ping-ipv4-external-ip sub-action that pings every node's ExternalIP from a
+  # Pod. This ALWAYS fails on TKE Native — root cause:
+  #   1. cilium-operator registers all node ExternalIPs with identity=remote-node
+  #      (cluster-internal identity).
+  #   2. cilium's BPF masquerade has an early-exit "skip SNAT when destination
+  #      identity is cluster-internal" — fires BEFORE the ipMasqAgent
+  #      nonMasqueradeCIDRs check, so ip-masq-agent cannot rescue this case.
+  #   3. The packet leaves the source node with src=Pod-IP (a private VPC IP)
+  #      and dst=node-EIP (a public IP). Tencent Cloud underlay does not route
+  #      this combination — the EIP is a NAT egress, not a node-routable
+  #      address; private-source + public-EIP-dest has no DNAT rule.
+  # Overlay mode is unaffected: Pod IP comes from an independent CIDR (not VPC),
+  # cilium SNATs egress to node IP by default, so packets reach EIP with the
+  # node's VPC IP as source — a normal "private → public" flow underlay accepts.
+  # See appendix/connectivity-test.md "Why Pod ping node EIP never works on
+  # Native Routing" for full details + tcpdump evidence.
+  local routing_mode eip_count
+  routing_mode=$(detect_cilium_routing_mode)
+  if [[ "$routing_mode" == "native" ]]; then
+    eip_count=$(nodes_with_external_ip_count)
+    if [[ "$eip_count" -gt 0 ]]; then
+      echo ""
+      if is_zh; then
+        warn "检测到 Native Routing + ${eip_count} 个节点绑了 EIP"
+        warn "  pod-to-host scenario 中的 ping-ipv4-external-ip 子动作会从 Pod ping 节点 EIP，"
+        warn "  在 TKE Native Routing 下**必定失败**。原因（与安全组/ICMP 无关）:"
+        warn "    - cilium 把节点 EIP 视为 remote-node identity"
+        warn "    - cilium BPF masquerade 对 remote-node 目标早退出，不做 SNAT"
+        warn "    - 包以 Pod IP（VPC 私网）出节点，目的是公网 EIP，TKE underlay 不接受这种组合"
+        warn "  生产业务不会出现此访问模式，可放心跳过该 scenario:"
+        warn "    --test '!/pod-to-host\$'"
+        warn "  详细分析与抓包证据: https://imroc.cc/tke/networking/cilium/appendix/connectivity-test"
+      else
+        warn "Detected Native Routing + ${eip_count} node(s) with EIP attached"
+        warn "  pod-to-host scenario contains a ping-ipv4-external-ip sub-action that pings"
+        warn "  node EIPs from a Pod — this **always fails** on TKE Native Routing. Why"
+        warn "  (NOT a security-group / ICMP issue):"
+        warn "    - cilium registers node EIPs with identity=remote-node"
+        warn "    - cilium BPF masquerade early-exits on remote-node destinations (no SNAT)"
+        warn "    - Packet leaves the node with src=Pod-IP (private VPC IP) and dst=EIP"
+        warn "      (public). TKE underlay rejects 'private-source → public-EIP-dest'."
+        warn "  This access pattern doesn't occur in real workloads. Safe to skip:"
+        warn "    --test '!/pod-to-host\$'"
+        warn "  Full analysis + tcpdump evidence: https://imroc.cc/tke/en/networking/cilium/appendix/connectivity-test"
+      fi
+    fi
+  fi
+
   echo ""
 
+  local start_ts=$SECONDS
+  local rc=0
   cilium connectivity test \
     --curl-image "$CILIUM_CURL_IMAGE" \
     --json-mock-image quay.tencentcloudcr.com/cilium/json-mock:v1.3.9 \
@@ -1845,13 +2014,34 @@ cmd_test() {
     --echo-image docker.io/k8smirror/echo-advanced:v20251204-v1.4.1 \
     --test-conn-disrupt-image quay.tencentcloudcr.com/cilium/test-connection-disruption:v0.0.17 \
     ${external_args[@]+"${external_args[@]}"} \
-    "$@"
+    "$@" || rc=$?
+  local elapsed=$((SECONDS - start_ts))
+  local pretty
+  pretty=$(format_duration "$elapsed")
 
   echo ""
   info "============================================"
-  info "$(is_zh && echo "测试完成！" || echo "Tests completed!")"
+  if (( rc == 0 )); then
+    if is_zh; then
+      info "测试完成！耗时 ${pretty}"
+    else
+      info "Tests completed! Elapsed: ${pretty}"
+    fi
+  else
+    if is_zh; then
+      warn "测试结束（部分用例失败，cilium 退出码 ${rc}）。耗时 ${pretty}"
+    else
+      warn "Tests finished with failures (cilium exit code ${rc}). Elapsed: ${pretty}"
+    fi
+  fi
+  if is_zh; then
+    info "更多说明参考: https://imroc.cc/tke/networking/cilium/appendix/connectivity-test"
+  else
+    info "More details: https://imroc.cc/tke/en/networking/cilium/appendix/connectivity-test"
+  fi
   info "============================================"
   echo ""
+  return "$rc"
 }
 
 # ====== perf subcommand ======
@@ -1877,15 +2067,38 @@ cmd_perf() {
   info "$(is_zh && echo "运行 cilium connectivity perf..." || echo "Running cilium connectivity perf...")"
   echo ""
 
+  local start_ts=$SECONDS
+  local rc=0
   cilium connectivity perf \
     --performance-image quay.tencentcloudcr.com/cilium/network-perf:3.20-1772622563-6fd6a90 \
-    "$@"
+    "$@" || rc=$?
+  local elapsed=$((SECONDS - start_ts))
+  local pretty
+  pretty=$(format_duration "$elapsed")
 
   echo ""
   info "============================================"
-  info "$(is_zh && echo "性能测试完成！" || echo "Performance test completed!")"
+  if (( rc == 0 )); then
+    if is_zh; then
+      info "性能测试完成！耗时 ${pretty}"
+    else
+      info "Performance test completed! Elapsed: ${pretty}"
+    fi
+  else
+    if is_zh; then
+      warn "性能测试结束（cilium 退出码 ${rc}）。耗时 ${pretty}"
+    else
+      warn "Performance test finished with errors (cilium exit code ${rc}). Elapsed: ${pretty}"
+    fi
+  fi
+  if is_zh; then
+    info "更多说明与各方案实测数据参考: https://imroc.cc/tke/networking/cilium/appendix/performance-test"
+  else
+    info "More details and benchmark data: https://imroc.cc/tke/en/networking/cilium/appendix/performance-test"
+  fi
   info "============================================"
   echo ""
+  return "$rc"
 }
 
 # ====== enable-egress-gateway subcommand ======

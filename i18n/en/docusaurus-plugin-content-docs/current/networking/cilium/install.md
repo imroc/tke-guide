@@ -5,27 +5,31 @@ This article describes how to install cilium in a TKE cluster, with support for 
 - **Native Routing**: Coexists with TKE CNI. Pods use IPs allocated by TKE; cilium provides NetworkPolicy, observability, kube-proxy replacement, and other enhancements.
 - **Overlay (vxlan tunnel)**: Completely replaces all TKE CNIs. Pod IPs do not consume underlay IPs, suitable for scenarios where IP allocation is difficult, or as a replacement for TKE's built-in CiliumOverlay mode to get full cilium functionality.
 
-VPC-CNI clusters support both modes; GR clusters only support Overlay mode. **VPC-CNI clusters are recommended** — better network performance and no node count limit.
+VPC-CNI clusters support both modes; GR clusters only support Overlay mode. **VPC-CNI clusters are recommended** — better network performance, no node count limit, and they don't waste a VPC secondary CIDR like GR does (see FAQ [Why aren't GR clusters recommended?](#why-arent-gr-clusters-recommended)).
 
 :::note[How to Choose]
 
-| Comparison Item       | Native Routing (VPC-CNI) ⭐ | Overlay (VPC-CNI) ⭐                          | Overlay (GR)                                       |
-| --------------------- | --------------------------- | --------------------------------------------- | -------------------------------------------------- |
-| Network Performance   | Optimal                     | Slight overhead (vxlan encap)                 | Slight overhead (vxlan encap)                      |
-| Pod IP Range          | VPC IP                      | Independent CIDR, doesn't consume VPC IP      | Independent CIDR, doesn't consume VPC IP           |
-| IP Capacity Expansion | Add a VPC-CNI subnet        | Append CIDR to `clusterPoolIPv4PodCIDRList`   | Same as left                                       |
-| Node Count Limit      | None                        | None                                          | Limited by GR ClusterCIDR (GR cluster's own limit) |
-| External Pod Access   | Directly routable           | Not directly routable, via Service/Ingress    | Not directly routable                              |
-| L7/DNS NetworkPolicy  | ✅ Fully supported          | ✅ Fully supported                            | ✅ Fully supported                                 |
-| Use Cases             | General (recommended)       | IP shortage, IDC, full-featured cilium (rec.) | Existing GR cluster                                |
+| Comparison Item           | Native Routing (VPC-CNI) ⭐ | Overlay (VPC-CNI) ⭐                          | Overlay (GR)                                                                                                                                                                                                                                                                                      |
+| ------------------------- | --------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Network Performance       | Optimal                     | Slight overhead (vxlan encap)                 | Slight overhead (vxlan encap)                                                                                                                                                                                                                                                                     |
+| Pod IP Range              | VPC IP                      | Independent CIDR, doesn't consume VPC IP      | Independent CIDR, doesn't consume VPC IP                                                                                                                                                                                                                                                          |
+| VPC Secondary CIDR Burned | ❌ None                     | ❌ None                                       | ⚠️ A GR cluster **mandates a VPC secondary CIDR be carved out as its ClusterCIDR** at creation. Even when Overlay assigns Pod IPs from an independent CIDR and that ClusterCIDR is never used by any Pod, the secondary CIDR remains permanently held by the GR cluster (a GR cluster limitation) |
+| IP Capacity Expansion     | Add a VPC-CNI subnet        | Append CIDR to `clusterPoolIPv4PodCIDRList`   | Same as left                                                                                                                                                                                                                                                                                      |
+| Node Count Limit          | None                        | None                                          | Limited by GR ClusterCIDR (GR cluster's own limit)                                                                                                                                                                                                                                                |
+| External Pod Access       | Directly routable           | Not directly routable, via Service/Ingress    | Not directly routable                                                                                                                                                                                                                                                                             |
+| L7/DNS NetworkPolicy      | ✅ Fully supported          | ✅ Fully supported                            | ✅ Fully supported                                                                                                                                                                                                                                                                                |
+| Use Cases                 | General (recommended)       | IP shortage, IDC, full-featured cilium (rec.) | Only recommended if you already have a GR cluster — do NOT create a new GR cluster just to install cilium                                                                                                                                                                                         |
 
 :::
 
-:::warning[GR clusters: only use Overlay, not Native Routing]
+:::warning[GR clusters: Overlay only, and don't create a new GR cluster just for cilium]
 
-This guide **no longer offers GR + Native Routing** as a deployment option. That combination has cross-node Pod-to-Pod traffic broken and L7/DNS NetworkPolicy unusable, making it impractical for production. Full failure write-up and alternatives: [Why this guide does not offer GR Native Routing](./appendix/gr-native-not-recommended.md).
+GR clusters have two hard limitations that don't pair well with cilium:
 
-For GR clusters, use **Overlay mode** only; if you need **Native Routing**, use a **VPC-CNI cluster**.
+1. **GR + Native Routing on cilium chained CNI is not production-viable**: cross-node Pod-to-Pod traffic is broken, and L7 / DNS NetworkPolicy is unsupported. This guide no longer offers that combination. Full write-up: [Why this guide does not offer GR Native Routing](./appendix/gr-native-not-recommended.md).
+2. **GR clusters mandate a ClusterCIDR at creation** — that CIDR is carved out of the VPC's secondary CIDR list and pinned to the cluster. Even after installing cilium Overlay, when Pod IPs come entirely from an independent CIDR and not a single IP in ClusterCIDR is ever used, that CIDR is still held by the GR cluster and cannot be reused by any other resource in the same VPC. See FAQ [Why aren't GR clusters recommended?](#why-arent-gr-clusters-recommended) below.
+
+If you already have a GR cluster, follow the **Overlay (GR)** path in this guide. For new clusters, choose **VPC-CNI** instead.
 
 :::
 
@@ -859,6 +863,29 @@ helm upgrade --install cilium ./cilium-1.19.4.tgz \
 ### How to optimize for large-scale scenarios?
 
 For large clusters (hundreds of nodes / tens of thousands of Pods), cilium defaults may show apiserver pressure, cilium-agent OOMs, and slow policy compilation. Tuning options include enabling CiliumEndpointSlice, APF rate limiting, raising client QPS, and trimming Security Identities — see [Cilium Tuning for Large-Scale Clusters](./appendix/large-scale-tuning.md) for the full guide.
+
+### Why aren't GR clusters recommended?
+
+GR (GlobalRouter) clusters carry a few constraints that don't pair well with cilium. **If you already have a GR cluster, going with the Overlay (GR) install is fine**, but **don't create a new GR cluster just to install cilium**:
+
+1. **GR clusters mandate a ClusterCIDR at creation, and that CIDR is carved out of a VPC secondary CIDR**
+
+   Every GR cluster requires a ClusterCIDR at creation time. That range is taken from the VPC's secondary CIDR list and pinned to the cluster.
+   - If you choose Overlay (GR), Pod IPs come entirely from cilium's independent pool (e.g. `10.244.0.0/16`); **not a single IP from that ClusterCIDR is ever used by a Pod**
+   - But the ClusterCIDR is still held by the GR cluster — **no other resource in the same VPC (CVMs, other clusters, CLBs, etc.) can use that range**. It's a permanently-burned secondary CIDR
+
+2. **Node count is capped by ClusterCIDR**
+
+   Every GR node carves a per-node subnet (default /24, 254 IPs) from the ClusterCIDR. Maximum nodes = `ClusterCIDR total IPs / per-node subnet size`, and ClusterCIDR is hard to expand later. VPC-CNI clusters have no such cap (node count tracks the VPC subnet capacity and you can attach more subnets).
+
+3. **GR + Native Routing has severe compatibility issues with cilium chained CNI**
+
+   Cross-node Pod-to-Pod broken, no L7 / DNS / toFQDNs NetworkPolicy support. Not offered in this guide. Details: [Why this guide does not offer GR Native Routing](./appendix/gr-native-not-recommended.md).
+
+The takeaway: **for new cilium deployments, always pick a VPC-CNI cluster**:
+
+- Want Pod IP == VPC IP (recognized natively by VPC routing / CLB / security groups / CCN)? → VPC-CNI + Native Routing
+- Want to save VPC IPs, integrate IDC, or get full-featured cilium? → VPC-CNI + Overlay (also avoids GR's wasted ClusterCIDR)
 
 ### Can DataPlaneV2 be selected when creating a VPC-CNI cluster?
 

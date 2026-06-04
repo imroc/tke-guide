@@ -5,27 +5,31 @@
 - **Native Routing（原生路由）**：与 TKE CNI 共存，Pod 使用 TKE 分配的 IP，cilium 提供 NetworkPolicy、可观测性、kube-proxy 替代等增强能力。
 - **Overlay（vxlan 隧道）**：完全替代 TKE 所有 CNI，Pod IP 不占用 underlay 的 IP，可用于 IP 申请困难的场景，也可用于替代 TKE 内置的 CiliumOverlay 网络模式以获得满血功能。
 
-VPC-CNI 集群两种模式都支持；GR 集群仅支持 Overlay 模式。**推荐使用 VPC-CNI 集群**，网络性能更好且无节点数量限制。
+VPC-CNI 集群两种模式都支持；GR 集群仅支持 Overlay 模式。**推荐使用 VPC-CNI 集群**——性能更好、无节点数量限制，且不会像 GR 那样白白占用一段 VPC 辅助网段（详见 FAQ [为什么不推荐使用 GR 集群？](#为什么不推荐使用-gr-集群)）。
 
 :::note[如何选择]
 
-| 对比项               | Native Routing (VPC-CNI) ⭐ | Overlay (VPC-CNI) ⭐                       | Overlay (GR)                                       |
-| -------------------- | --------------------------- | ------------------------------------------ | -------------------------------------------------- |
-| 网络性能             | 最优                        | 略有开销（vxlan 封装）                     | 略有开销（vxlan 封装）                             |
-| Pod IP 范围          | VPC IP                      | 独立 CIDR，不占用 VPC IP                   | 独立 CIDR，不占用 VPC IP                           |
-| IP 容量扩容          | 给集群新增 VPC-CNI 子网     | 追加 CIDR 到 clusterPoolIPv4PodCIDRList    | 同左                                               |
-| 节点数量限制         | 无                          | 无                                         | 受 GR 集群的 ClusterCIDR 限制（GR 集群本身的限制） |
-| 集群外访问 Pod       | 可直接路由                  | 不可直接路由，需通过 Service/Ingress       | 不可直接路由                                       |
-| L7/DNS NetworkPolicy | ✅ 完整支持                 | ✅ 完整支持                                | ✅ 完整支持                                        |
-| 适用场景             | 常规场景（推荐）            | IP 资源紧张、纳管 IDC、满血 cilium（推荐） | 已有 GR 集群的场景                                 |
+| 对比项               | Native Routing (VPC-CNI) ⭐ | Overlay (VPC-CNI) ⭐                       | Overlay (GR)                                                                                                                                                                           |
+| -------------------- | --------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 网络性能             | 最优                        | 略有开销（vxlan 封装）                     | 略有开销（vxlan 封装）                                                                                                                                                                 |
+| Pod IP 范围          | VPC IP                      | 独立 CIDR，不占用 VPC IP                   | 独立 CIDR，不占用 VPC IP                                                                                                                                                               |
+| VPC 辅助网段消耗     | ❌ 无                       | ❌ 无                                      | ⚠️ GR 集群创建时**强制绑定一段 VPC 辅助网段**作为 ClusterCIDR，即使 Overlay 模式下 Pod IP 来自独立 CIDR、不会真正用到这段，这段辅助网段仍被占住无法被其它资源使用（GR 集群本身的限制） |
+| IP 容量扩容          | 给集群新增 VPC-CNI 子网     | 追加 CIDR 到 clusterPoolIPv4PodCIDRList    | 同左                                                                                                                                                                                   |
+| 节点数量限制         | 无                          | 无                                         | 受 GR 集群的 ClusterCIDR 限制（GR 集群本身的限制）                                                                                                                                     |
+| 集群外访问 Pod       | 可直接路由                  | 不可直接路由，需通过 Service/Ingress       | 不可直接路由                                                                                                                                                                           |
+| L7/DNS NetworkPolicy | ✅ 完整支持                 | ✅ 完整支持                                | ✅ 完整支持                                                                                                                                                                            |
+| 适用场景             | 常规场景（推荐）            | IP 资源紧张、纳管 IDC、满血 cilium（推荐） | 仅推荐已有 GR 集群的场景，不推荐为了装 cilium 新建 GR 集群                                                                                                                             |
 
 :::
 
-:::warning[GR 集群只用 Overlay，不要用 Native Routing]
+:::warning[GR 集群只用 Overlay，且不推荐为安装 cilium 新建 GR 集群]
 
-本系列教程**不再提供 GR + Native Routing** 部署方案。该模式下跨节点 Pod-to-Pod 流量不通、L7/DNS NetworkPolicy 不可用，组合后基本无法生产可用。完整试错记录与替代方案详见 [为什么不提供 GR Native Routing 部署方案？](./appendix/gr-native-not-recommended.md)。
+GR 集群有两个**与 cilium 不太搭**的硬限制：
 
-GR 集群希望使用 cilium，请只用 **Overlay 模式**；如需 **Native Routing**，请使用 **VPC-CNI 集群**。
+1. **GR + Native Routing 在 cilium chained CNI 下基本无法生产可用**：跨节点 Pod-to-Pod 流量不通、L7/DNS NetworkPolicy 不可用，本系列教程不再提供。完整试错记录见 [为什么不提供 GR Native Routing 部署方案？](./appendix/gr-native-not-recommended.md)。
+2. **GR 集群创建时强制要求 ClusterCIDR**——这段网段从 VPC 辅助网段中划出来分配给集群，即使后续装了 cilium Overlay、Pod IP 完全来自独立 CIDR、这段 ClusterCIDR 一个 IP 都用不上，它仍然被这个 GR 集群占着，无法挪给同 VPC 下的其它资源使用。详见下方 FAQ [为什么不推荐使用 GR 集群？](#为什么不推荐使用-gr-集群)。
+
+如果 GR 集群已存在，按本文 **Overlay (GR)** 路径安装即可；新建集群请直接选 **VPC-CNI 集群**。
 
 :::
 
@@ -927,6 +931,29 @@ helm upgrade --install cilium ./cilium-1.19.4.tgz \
 ### 大规模场景如何优化？
 
 集群规模较大（数百节点 / 万级 Pod 以上）时，cilium 默认配置可能出现 apiserver 压力大、cilium-agent OOM、策略计算慢等问题，可从启用 CiliumEndpointSlice、APF 限速、调整 client QPS、精简 Identity 等多方面调优，详见 [大规模集群 Cilium 调优指南](./appendix/large-scale-tuning.md)。
+
+### 为什么不推荐使用 GR 集群？
+
+GR (GlobalRouter) 集群本身有几个限制，叠加 cilium 后体验也受影响。**已有 GR 集群可以继续按 Overlay (GR) 方案装 cilium 用**，但**不推荐为了装 cilium 而新建 GR 集群**：
+
+1. **GR 集群创建时强制要求 ClusterCIDR，并占用 VPC 一段辅助网段**
+
+   GR 集群创建时必须指定 ClusterCIDR，这段网段会从 VPC 辅助网段中划出来分配给该 GR 集群，写入 VPC 的辅助 CIDR 列表。
+   - 如果选 Overlay (GR) 方案安装 cilium，**Pod IP 完全来自 cilium 自管的独立 CIDR（如 `10.244.0.0/16`），那段 ClusterCIDR 一个 IP 都不会被 Pod 用到**
+   - 但这段 ClusterCIDR 仍然挂在 GR 集群上，**同 VPC 下的其它资源（CVM、其它集群、CLB 等）都不能用这个网段**——白白占住一段 VPC 辅助网段，相当于浪费
+
+2. **节点数量受 ClusterCIDR 限制**
+
+   GR 集群每个节点会从 ClusterCIDR 中切一个子网（默认 /24，254 个 IP）作为节点 Pod CIDR，节点数上限就是 `ClusterCIDR 总 IP 数 / 单节点子网大小`，而 ClusterCIDR 一旦创建很难扩展。VPC-CNI 集群没有这个限制（节点数与 VPC 子网容量相关，可加新子网扩容）。
+
+3. **GR + Native Routing 在 cilium chained CNI 模式下存在严重兼容性问题**
+
+   跨节点 Pod-to-Pod 流量不通、L7 / DNS / toFQDNs NetworkPolicy 不可用，本系列教程不再提供。详见 [为什么不提供 GR Native Routing 部署方案？](./appendix/gr-native-not-recommended.md)。
+
+综合上述，**新装 cilium 一律推荐 VPC-CNI 集群**：
+
+- 想 Pod IP 等于 VPC IP（被 VPC 路由 / CLB / 安全组 / CCN 原生识别）→ VPC-CNI + Native Routing
+- 想节省 VPC IP 容量、纳管 IDC 或获得满血 cilium 能力 → VPC-CNI + Overlay（同时也避免了 GR 那段 ClusterCIDR 的浪费）
 
 ### VPC-CNI 集群创建时能否勾选 DataPlaneV2？
 

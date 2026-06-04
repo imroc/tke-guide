@@ -93,9 +93,57 @@ cilium connectivity test \
 | ----------------------------------- | ------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 国内地域 + 找不到可用 IP-only HTTPS | 动态解析 CN IP 失败 | `pod-to-cidr` / `to-cidr-external` / `from-cidr` / `client-egress-to-cidr*` | 国内公网无稳定的"纯 IP 直连 HTTPS"服务可用（无 SAN 含 IP 的证书）。可手动跳过：`--test '!/pod-to-cidr' --test '!/to-cidr-external' --test '!/from-cidr' --test '!/client-egress-to-cidr'`；CIDR 策略本身仍由 `to-entities-world`、`from-cidr` 等用例间接验证 |
 
-另一种容易遇到的失败：节点绑了 EIP 时，cilium-cli 会在 `pod-to-host` scenario 里生成一个 `ping-ipv4-external-ip` 子动作（从 Pod ping 节点 EIP）。EIP 安全组放行了公网 ICMP 入向则通过，TKE 默认拒绝时该子动作必失败。`pod-to-host` 与 cilium 数据通路本身无关（`Pod → 节点内网 IP` 的覆盖度已由 `pod-to-pod`、`pod-to-service` 提供），脚本不再为此打 WARN——若 EIP 安全组未放开 ICMP，可手动 `--test '!/pod-to-host$'` 跳过。
+另一种容易遇到的失败：节点绑了 EIP 时，cilium-cli 会在 `pod-to-host` scenario 里生成一个 `ping-ipv4-external-ip` 子动作（从 Pod ping 节点 EIP）。**在 TKE Native Routing 下这条 ping 恒定不通**，详见下一节《为什么 Native Routing 下 Pod ping 节点 EIP 永远不通》。要跳过该 scenario，可加 `--test '!/pod-to-host$'`（`$` 锚点避免误伤 `pod-to-hostport`）。
 
 cilium-cli 的 `--test` 过滤器只支持 scenario 级别匹配（`/pod-to-host$` 用 `$` 锚点避免误伤 `pod-to-hostport`）；无法只禁用 scenario 内的单个 action。
+
+### 为什么 Native Routing 下 Pod ping 节点 EIP 永远不通
+
+实测因果链（在 cls-148r0kxp Native 集群、cls-qj0gbg3f Overlay 集群分别复现）：
+
+A. **cilium-operator 把所有 Node 对象的 ExternalIP 都登记成 `remote-node identity`**（数字 6）。`cilium-dbg bpf ipcache list` 可以看到节点 EIP `42.193.37.239 identity=6` —— cilium 在数据面里把节点 EIP 当成"集群成员节点的合法地址"。
+
+B. **cilium 的 BPF masquerade 实现里有一道"目标 identity 是 cluster 内部就跳过 SNAT"的早退出**（保留 Pod identity 给 NetworkPolicy 用）。这道判断**先于 ipMasqAgent 的 `nonMasqueradeCIDRs` CIDR 匹配**，所以即使你把 ip-masq-agent 配上、节点 EIP 不在 `nonMasqueradeCIDRs` 列表里，也轮不到 CIDR 判断生效——目标 identity=remote-node 已经命中早退出，包不做 SNAT 直接出去。
+
+C. **包从源节点主网卡出来时，源 IP 仍是 Pod IP（`10.20.x.x`）、目的 IP 是 EIP（公网 IP）**。这种"VPC 私网源 IP + 公网 EIP 目的"的组合，TKE underlay 网络层不接受——节点 EIP 是云上 NAT 出口（不是节点的二/三层合法地址），云网络只在"包从公网外部进来"时才会做 EIP→节点 VPC IP 的 DNAT；集群内部 Pod 拿 Pod IP 直接打 EIP，没有匹配的转换规则，包被丢。
+
+D. 现象：从 host netns ping 同一个 EIP 通（内核走本地路由直接反射），从 Pod 内 ping 同节点 EIP 时偶尔可能通（取决于内核路由细节），但**Pod 跨节点 ping 其它节点的 EIP 必定不通**，cilium-cli 用例就是这种场景。
+
+> 抓包证据（源节点 10.10.21.26）：
+>
+> ```
+> enie1f5...   In  ... 10.20.0.208 > 42.193.37.239: ICMP echo request
+> eth1         Out ... 10.20.0.208 > 42.193.37.239: ICMP echo request   ← 源 IP 仍是 Pod IP，没 SNAT
+> ```
+
+#### Overlay 模式为什么不受影响
+
+| 维度                                | Native                                                                                                                                                                 | Overlay                                                        |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Pod IP 来源                         | VPC 网段（如 `10.20.0.x`）                                                                                                                                             | 独立 Overlay CIDR（如 `10.244.x.x`），**不在 VPC 网段**        |
+| `enableIPv4Masquerade`              | `false`（Pod IP 已是 VPC IP，无需 SNAT）                                                                                                                               | `true`                                                         |
+| 节点 EIP identity                   | `remote-node`                                                                                                                                                          | `remote-node`                                                  |
+| BPF masq 早退出（remote-node 跳过） | 命中，不做 SNAT                                                                                                                                                        | 命中，不做 SNAT                                                |
+| 但 cilium 还有第二道 masq 判断      | "目标在 cluster CIDR 内则跳过"——节点 EIP 不在 cluster CIDR，但 Pod IP 在 VPC 内、目的也在 VPC 外，判定为"出 cluster"……Native 模式禁用了 masq 整个路径，所以最终不 SNAT | 同样判定为"出 cluster"，**Overlay 模式启用 masq，所以做 SNAT** |
+| 出节点的源 IP                       | Pod IP（VPC 内）                                                                                                                                                       | **节点 VPC IP**（已 SNAT）                                     |
+| 这个组合 underlay 是否接受          | ❌ "私网源 + 公网 EIP" 被丢                                                                                                                                            | ✅ "节点 VPC IP → 公网 EIP" 是普通公网流量                     |
+
+简化一句话：Native 的 Pod IP 本身就是 VPC IP、cilium 默认不 SNAT，所以包以 Pod IP 出去；Overlay 的 Pod IP 是独立 CIDR、cilium 默认 SNAT，所以包以节点 IP 出去。"Pod ping 节点 EIP" 这一步要求源 IP **必须是节点的 VPC IP**——Overlay 天然成立，Native 死路一条。
+
+#### 这是不是 cilium / TKE 的 bug？
+
+都不是。
+
+- **cilium 把节点 EIP 当 remote-node 不 SNAT** 是有意的设计：保留 Pod identity 让 NetworkPolicy 在跨节点场景仍然按源 Pod label 生效。
+- **TKE underlay 不路由"私网源 + 公网 EIP" 包** 是云网络的合理行为：节点 EIP 是 NAT 出口，不是节点的正式地址。
+
+只是这两个合理行为叠在一起，恰好让 cilium-cli 的 `pod-to-host:ping-ipv4-external-ip` 在 Native 下跑不通。生产业务里几乎不会出现"Pod 内主动 ping 集群另一节点的 EIP" 这种访问模式，所以没有实际影响——直接 `--test '!/pod-to-host$'` 跳过即可。
+
+#### 为什么 ip-masq-agent 救不了
+
+直觉上 "ip-masq-agent 不是就是给 Native 做 SNAT 的吗，配上 EIP 段不就 SNAT 了？" —— 不行：cilium 的 ip-masq-agent 是 BPF 实现，与上面 B 点的 "目标 identity 是 remote-node 就早退出" 共用一套 BPF masq 判断。早退出在 ipMasqAgent CIDR 判断**之前**，根本走不到 CIDR 那一步。用户层面**没有合法的 helm 配置开关**能把 remote-node identity 排除在早退出之外。
+
+NAT 网关 / Egress Gateway 同理无效——它们只控制"决定要 SNAT 之后用什么源 IP"，决定不了"是否 SNAT"这一步。
 
 此外，cilium-cli 自身会按以下条件**自动跳过**约 74 个用例（与 TKE 环境无关，是 cilium 测试套件设计如此）：
 
