@@ -1524,14 +1524,13 @@ cmd_install_localdns() {
 #
 # 3. pod-to-host with EIPs
 #    The pod-to-host scenario iterates over node.status.addresses and pings each
-#    address by type. When nodes are bound to EIPs, cilium-cli generates an
-#    extra `ping-ipv4-external-ip` action that targets the EIP. TKE security
-#    groups by default block inbound public ICMP, so this single action fails;
-#    the cilium-cli `--test` filter only operates at SCENARIO granularity, so
-#    we cannot skip just that action. We only auto-skip pod-to-host when at
-#    least one node has an ExternalIP. This is a cloud-provider behavior, not a
-#    cilium issue — the same Pod → node-internal-IP path is already covered by
-#    pod-to-pod and pod-to-service scenarios.
+#    address by type. When nodes are bound to EIPs that are synced into
+#    .status.addresses, cilium-cli generates an extra `ping-ipv4-external-ip`
+#    action that targets the EIP. TKE security groups by default block inbound
+#    public ICMP, so this subaction would fail unless the user has explicitly
+#    opened ICMP on the EIP's security group. Since the SG is user-configurable
+#    we DO NOT auto-skip; we only WARN. User can manually skip the scenario via
+#    `--test '!/pod-to-host$'` (the `$` avoids matching pod-to-hostport).
 #
 # Image mapping:
 #   quay.io/cilium/*           → quay.tencentcloudcr.com/cilium/* (internal mirror)
@@ -1705,8 +1704,6 @@ cmd_test() {
   local cluster_region
   cluster_region=$(detect_cluster_region)
   local -a external_args=()
-  local -a extra_skip_args=()
-  local insecure_arg=""
   case "$cluster_region" in
     china)
       if is_zh; then
@@ -1749,24 +1746,20 @@ cmd_test() {
           --external-cidr "$cn_cidr"
         )
       else
-        # Couldn't find a working IP pair — skip pod-to-cidr / cidr-external scenarios
+        # Couldn't find a working IP pair — only WARN; user decides whether to skip.
         if is_zh; then
-          warn "未能动态解析到可用的国内 IP 对（CN 公网服务对裸 IP HTTPS 支持有限），跳过依赖 IP 的 CIDR 测试用例:"
+          warn "未能动态解析到可用的国内 IP 对（CN 公网服务对裸 IP HTTPS 支持有限），以下依赖 IP 的 CIDR 用例预计会失败:"
           warn "  - pod-to-cidr / to-cidr-external / from-cidr-external / client-egress-to-cidrgroup-deny / 等"
           warn "  这是国内公网环境的客观限制（无稳定的 IP-only HTTPS 服务），与 cilium 能力无关。"
           warn "  CIDR 策略能力本身仍由其它用例间接覆盖（如 to-entities-world、from-cidr 等）。"
+          warn "  如需跳过，可显式追加: --test '!/pod-to-cidr' --test '!/to-cidr-external' --test '!/from-cidr' --test '!/client-egress-to-cidr'"
         else
-          warn "Could not resolve a working CN IP pair (CN public services have limited IP-only HTTPS support), skipping IP-dependent CIDR test cases:"
+          warn "Could not resolve a working CN IP pair (CN public services have limited IP-only HTTPS support). The following IP-dependent CIDR test cases will likely fail:"
           warn "  - pod-to-cidr / to-cidr-external / from-cidr-external / client-egress-to-cidrgroup-deny / etc."
           warn "  This is a CN public-internet limitation (no stable IP-only HTTPS service), not a cilium issue."
           warn "  CIDR policy capability is still indirectly covered by other tests (to-entities-world, from-cidr, etc.)."
+          warn "  To skip explicitly, append: --test '!/pod-to-cidr' --test '!/to-cidr-external' --test '!/from-cidr' --test '!/client-egress-to-cidr'"
         fi
-        extra_skip_args+=(
-          --test '!/pod-to-cidr'
-          --test '!/to-cidr-external'
-          --test '!/from-cidr'
-          --test '!/client-egress-to-cidr'
-        )
       fi
       ;;
     overseas)
@@ -1831,32 +1824,24 @@ cmd_test() {
     fi
   fi
 
-  # ---- pod-to-host scenario auto-skip when nodes have EIP ----
+  # ---- pod-to-host scenario WARN when nodes have EIP ----
   # The ping-ipv4-external-ip action under pod-to-host targets the node's EIP.
-  # TKE security groups block inbound public ICMP by default, so this single
-  # action will fail. Since cilium-cli's --test filter only operates at SCENARIO
-  # granularity, we skip the entire pod-to-host scenario when any node has an
-  # ExternalIP. The Pod → node-internal-IP path is still covered by pod-to-pod
-  # and pod-to-service. '/pod-to-host$' uses '$' to avoid also matching
-  # pod-to-hostport.
-  local -a skip_args=()
+  # TKE EIP security groups block inbound public ICMP by default, but this is
+  # user-configurable, so we only WARN — user decides whether to skip.
   if nodes_have_external_ip; then
     if is_zh; then
-      info "检测到节点绑定了 EIP，自动跳过 pod-to-host scenario（其 ping-external-ip 子动作会因 EIP 安全组拒绝公网 ICMP 入向而失败）"
+      warn "检测到节点绑定了 EIP，pod-to-host scenario 包含 ping-external-ip 子动作，会从 Pod ping 节点 EIP："
+      warn "  - 若 EIP 安全组放行了公网 ICMP 入向，该用例可正常通过"
+      warn "  - 若 EIP 安全组拒绝公网 ICMP 入向（TKE 默认），该用例会失败，可显式跳过：--test '!/pod-to-host\$'"
     else
-      info "Nodes have EIPs bound, auto-skipping pod-to-host scenario (its ping-external-ip subaction fails because EIP security groups block inbound public ICMP)"
+      warn "Nodes have EIPs bound. The pod-to-host scenario contains a ping-external-ip subaction that pings the node's EIP from a Pod:"
+      warn "  - If the EIP security group allows inbound public ICMP, this case will pass"
+      warn "  - If the EIP security group blocks inbound public ICMP (TKE default), this case will fail; skip explicitly with: --test '!/pod-to-host\$'"
     fi
-    skip_args+=(--test '!/pod-to-host$')
-  fi
-  # Merge any region-specific skips collected above (e.g. pod-to-cidr when CN IP
-  # resolution failed). These come from the region case block.
-  if (( ${#extra_skip_args[@]} > 0 )); then
-    skip_args+=("${extra_skip_args[@]}")
   fi
   echo ""
 
   cilium connectivity test \
-    ${skip_args[@]+"${skip_args[@]}"} \
     --curl-image "$CILIUM_CURL_IMAGE" \
     --json-mock-image quay.tencentcloudcr.com/cilium/json-mock:v1.3.9 \
     --dns-test-server-image docker.io/k8smirror/coredns:v1.14.2 \
