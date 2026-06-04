@@ -45,13 +45,29 @@ GR 集群有两个**与 cilium 不太搭**的硬限制：
 
 在 [容器服务控制台](https://console.cloud.tencent.com/tke2/cluster) 创建 TKE 集群，注意以下关键选项：
 
-- 容器网络插件：根据上表选择 **VPC-CNI 共享网卡多 IP** 或 **GlobalRouter**。
+- 容器网络插件：选择 **VPC-CNI 共享网卡多 IP**。GR 集群有 ClusterCIDR 强制占用 VPC 辅助网段、节点数受 ClusterCIDR 限制等问题，**不推荐**为安装 cilium 新建 GR 集群（详见 [为什么不推荐使用 GR 集群？](#为什么不推荐使用-gr-集群)）；已有 GR 集群可以按 Overlay (GR) 方案继续装，但本节后续示例统一以 VPC-CNI 集群为准。
 - 集群类型：标准集群。
 - Kubernetes 版本: 不低于 1.32，建议选择最新版（参考 [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)）。
 - 操作系统：推荐 **TencentOS 4** 或 **Ubuntu 24.04**。最低要求 Linux kernel >= 5.10（参考 [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)）。完整已验证 OS 列表参考 [已验证的节点操作系统](./appendix/verified-os.md)。
-- 节点：安装前不要向集群添加任何普通节点或原生节点，避免残留相关规则和配置，等安装完成后再添加。
-- 基础组件：取消勾选 **TKE 自带的 ip-masq-agent** 组件，避免与 cilium 内置的 ipMasqAgent 冲突。
+- 节点：**安装 cilium 前，集群必须没有任何普通节点或原生节点**——超级节点（eklet）除外。详见下方 warning 块。
+- 基础组件：**保持勾选 ip-masq-agent**（默认勾选）。安装 cilium 时脚本会卸载 TKE 自带的 ip-masq-agent（避免和 cilium 内置 ipMasqAgent 冲突），但会**复用** TKE 安装它时自动写入的 `ip-masq-agent-config` ConfigMap——这份配置里已经按集群所在 VPC 自动列出了主网段 + 所有辅助网段，[一键安装脚本](#一键安装脚本) 会读取它作为 cilium ipMasqAgent 的 `nonMasqueradeCIDRs`，省去用户去控制台手动确认 VPC 网段的步骤。
 - 增强组件：如果节点池希望使用 Karpenter 节点池，需勾选安装 Karpenter 组件，否则无需勾选（参考后文的节点池选型）。
+
+:::danger[安装前不要向集群添加普通节点或原生节点]
+
+cilium 必须在**空集群**（无节点 / 仅有超级节点）上安装。如果集群中已存在普通节点或原生节点：
+
+- 这些节点上残留的 kube-proxy iptables 规则、tke-cni-agent CNI 配置会与 cilium 冲突，**导致安装后 Pod 网络不通、NetworkPolicy 失效**等难以排查的问题
+- 即使先卸载 TKE 组件再安装 cilium，节点上残留的内核态规则也不会被清理
+
+正确做法：
+
+1. **新建集群**：在控制台 / terraform 创建集群时不要添加节点
+2. **节点 → 安装 cilium → 加节点**：cilium 一键脚本安装完成后会暂停并提示加节点，等节点 Ready 后再继续
+
+如果意外在 cilium 安装前向集群加了节点，**重启或重建这些节点**才能让 cilium 干净接管。
+
+:::
 
 集群创建成功后，需开启集群访问来暴露集群的 apiserver 提供后续使用 helm 安装 cilium 时，helm 命令能正常操作 TKE 集群，参考 [开启集群访问的方法](https://cloud.tencent.com/document/product/457/32191#.E6.93.8D.E4.BD.9C.E6.AD.A5.E9.AA.A4)。
 
@@ -71,17 +87,18 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   # 节点默认操作系统（OsName），完整已验证 OS 列表见附录
   # 需要注意的是，节点的实际 OS 由节点池自身的 OS 属性决定，不受 cluster_os 的限制
   cluster_os = "tlinux4_x86_64_public"
-  # 容器网络插件: VPC-CNI / GR
+  # 容器网络插件: 推荐 VPC-CNI（GR 集群有 ClusterCIDR 占用 VPC 辅助网段等限制，不推荐）
   network_type = "VPC-CNI"
   # 集群 APIServer 开启访问
   cluster_internet = true
   # 通过内网 CLB 暴露 APIServer，需指定 CLB 所在子网 ID
   cluster_intranet_subnet_id = "subnet-xxx"
-  # 不安装 ip-masq-agent （disable_addons 要求 tencentcloud provider 版本 1.82.33+）
-  disable_addons = ["ip-masq-agent"]
+  # ip-masq-agent 保持安装（terraform provider 默认就会装）。cilium 安装脚本会
+  # 卸载它，但会复用它写入的 ip-masq-agent-config ConfigMap（包含 VPC 主网段
+  # + 所有辅助网段）作为 cilium ipMasqAgent 的 nonMasqueradeCIDRs。
   # 如需使用 Karpenter 节点池，需安装 Karpenter 组件。（cluster-autoscaler 与 karpenter 互斥，
   # 启用此组件将不会安装 cluster-autoscaler，也就会禁用原生节点池和普通节点池的扩缩容功能，
-  # 如不使用 Karpenter 节点池，可省略以下代码，具体节点池选型参考下文“新建节点池”一节）。
+  # 如不使用 Karpenter 节点池，可省略以下代码，具体节点池选型参考下文"新建节点池"一节）。
   extension_addon {
     name = "karpenter"
     param = jsonencode({
@@ -141,21 +158,19 @@ ROUTING_MODE=native CILIUM_VERSION=1.19.4 \
 
 ### 卸载 TKE 组件
 
-所有方案都需要卸载 kube-proxy（由 cilium 替代）和 tke-cni-agent（避免 CNI 配置冲突）：
+所有方案都需要卸载 kube-proxy（由 cilium 替代）、tke-cni-agent（避免 CNI 配置冲突）和 ip-masq-agent（避免与 cilium 内置 ipMasqAgent 冲突）：
 
 ```bash
 kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}' 2>/dev/null || true
 ```
 
 :::tip[说明]
 
 1. 通过加 nodeSelector 方式让 DaemonSet 不部署到任何节点，等同于卸载，同时也留个退路；当前 kube-proxy 也只能通过这种方式卸载，如果直接删除 kube-proxy，后续集群升级会被阻塞。
-2. 前面提到过安装 cilium 之前不建议添加节点，如果因某些原因导致在安装 cilium 前添加了普通节点或原生节点，需重启下存量节点，避免残留相关规则和配置。
-3. 如果创建集群时忘记了取消勾选 ip-masq-agent，可以手动卸载下：
-   ```bash
-   kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-   ```
+2. 上面已强调过：**cilium 必须在空集群上安装**。如果安装前误加了普通节点或原生节点，需重启或重建这些节点，避免残留 iptables / CNI 规则。
+3. **不要删除 `ip-masq-agent-config` ConfigMap**——TKE 自带的 ip-masq-agent 在创建集群时会把 VPC 主网段 + 所有辅助网段写进这个 cm。后续配置 cilium 内置 ipMasqAgent 的 `nonMasqueradeCIDRs` 时会直接读取它，省去人工确认 VPC 网段的麻烦。一键安装脚本会自动复用，手工安装也可以 `kubectl -n kube-system get cm ip-masq-agent-config -o yaml` 查看。
 
 :::
 

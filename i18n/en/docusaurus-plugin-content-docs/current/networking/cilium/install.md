@@ -45,13 +45,29 @@ Installing cilium is a major change to the cluster. Do not install it in a clust
 
 In the [TKE Console](https://console.cloud.tencent.com/tke2/cluster), create a TKE cluster with the following key options:
 
-- Container network plugin: choose **VPC-CNI Shared ENI Multi-IP** or **GlobalRouter** based on the comparison table above.
+- Container network plugin: choose **VPC-CNI Shared ENI Multi-IP**. GR clusters have several constraints (forced ClusterCIDR consuming a VPC secondary CIDR, node count capped by ClusterCIDR), so they are **not recommended** for new cilium deployments (see [Why aren't GR clusters recommended?](#why-arent-gr-clusters-recommended)). Existing GR clusters can still follow the Overlay (GR) install path, but the rest of this section uses VPC-CNI as the baseline.
 - Cluster type: Standard cluster.
 - Kubernetes version: 1.32 or later, latest is recommended (see [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/)).
 - Operating system: recommend **TencentOS 4** or **Ubuntu 24.04**. Minimum: Linux kernel >= 5.10 (see [System Requirements](https://docs.cilium.io/en/stable/operations/system_requirements/)). For the full verified OS list, see [Verified Node Operating Systems](./appendix/verified-os.md).
-- Nodes: do not add any regular or native nodes before installation, to avoid leftover rules and configuration. Add them after installation completes.
-- Base addons: uncheck the **TKE built-in ip-masq-agent** component to avoid conflict with cilium's built-in ipMasqAgent.
+- Nodes: **the cluster MUST have no regular or native nodes before cilium is installed** — super nodes (eklet) are fine. See the danger block below.
+- Base addons: **keep ip-masq-agent checked** (the default). The cilium install script will disable TKE's built-in ip-masq-agent (to avoid conflict with cilium's built-in ipMasqAgent), but it will **reuse** the `ip-masq-agent-config` ConfigMap that TKE auto-populates with the VPC's primary + all secondary CIDRs. The [one-click install script](#one-click-install-script) reads this cm and uses it as cilium ipMasqAgent's `nonMasqueradeCIDRs`, so you don't have to manually look up VPC CIDRs in the console.
 - Extension addons: if you plan to use Karpenter node pools, enable the Karpenter addon; otherwise skip (see node pool selection below).
+
+:::danger[Do NOT add regular or native nodes to the cluster before installing cilium]
+
+Cilium must be installed on an **empty cluster** (no nodes / super nodes only). If regular or native nodes already exist:
+
+- Their leftover kube-proxy iptables rules and tke-cni-agent CNI configs will conflict with cilium, **causing post-install Pod network failures, broken NetworkPolicy**, and other hard-to-debug issues
+- Even if you disable the TKE addons before installing cilium, kernel-level state on those nodes is NOT cleaned up
+
+The right order:
+
+1. **Create the cluster empty** (no nodes from console / terraform)
+2. **Install cilium → add nodes**: the one-click script pauses after install and prompts you to add nodes; once they're Ready, it continues
+
+If you accidentally added nodes before installing cilium, **reboot or recreate those nodes** so cilium can take over cleanly.
+
+:::
 
 After the cluster is created, enable cluster access so helm can talk to the apiserver during installation. See [Enabling Cluster Access](https://www.tencentcloud.com/document/product/457/30638).
 
@@ -71,14 +87,17 @@ resource "tencentcloud_kubernetes_cluster" "tke_cluster" {
   # Default node OS (OsName) — see appendix for the full verified list
   # Note: the actual OS of a node is determined by the node pool's own OS attribute, not cluster_os.
   cluster_os = "tlinux4_x86_64_public"
-  # Container network plugin: VPC-CNI / GR
+  # Container network plugin: prefer VPC-CNI (GR has ClusterCIDR / VPC secondary
+  # CIDR limitations and is not recommended for new cilium deployments)
   network_type = "VPC-CNI"
   # Enable apiserver access
   cluster_internet = true
   # Expose apiserver via intranet CLB — specify the CLB subnet ID
   cluster_intranet_subnet_id = "subnet-xxx"
-  # Do not install ip-masq-agent (disable_addons requires tencentcloud provider >= 1.82.33)
-  disable_addons = ["ip-masq-agent"]
+  # Keep ip-masq-agent installed (terraform provider installs it by default).
+  # The cilium install script will disable it but reuse its ip-masq-agent-config
+  # ConfigMap (containing VPC primary + secondary CIDRs) as cilium ipMasqAgent's
+  # nonMasqueradeCIDRs.
   # If you plan to use Karpenter node pools, install the Karpenter addon.
   # (cluster-autoscaler and karpenter are mutually exclusive — enabling this disables
   # cluster-autoscaler, which also disables scaling for regular and native node pools.
@@ -142,21 +161,19 @@ ROUTING_MODE=native CILIUM_VERSION=1.19.4 \
 
 ### Uninstall TKE Components
 
-All modes need kube-proxy uninstalled (cilium replaces it) and tke-cni-agent uninstalled (to avoid CNI config conflicts):
+All modes need kube-proxy disabled (cilium replaces it), tke-cni-agent disabled (to avoid CNI config conflicts), and ip-masq-agent disabled (to avoid conflict with cilium's built-in ipMasqAgent):
 
 ```bash
 kubectl -n kube-system patch daemonset kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
 kubectl -n kube-system patch daemonset tke-cni-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
+kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}' 2>/dev/null || true
 ```
 
 :::tip[Notes]
 
 1. Using a non-matching nodeSelector to keep the DaemonSet off all nodes is equivalent to uninstalling, and leaves a fallback path. For kube-proxy this is currently the only safe way — directly deleting kube-proxy will block future cluster upgrades.
-2. As noted above, don't add nodes before installing cilium. If for some reason regular or native nodes were added before installation, restart those existing nodes to clear any leftover rules and configuration.
-3. If you forgot to uncheck ip-masq-agent during cluster creation, uninstall it manually:
-   ```bash
-   kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"spec":{"nodeSelector":{"label-not-exist":"node-not-exist"}}}}}'
-   ```
+2. As emphasized above: **cilium must be installed on an empty cluster**. If regular or native nodes were added by mistake before installation, reboot or recreate them so cilium can take over cleanly.
+3. **Do NOT delete the `ip-masq-agent-config` ConfigMap** — TKE's ip-masq-agent populates it at cluster creation with the VPC primary + all secondary CIDRs. Cilium's built-in ipMasqAgent reads this cm for its `nonMasqueradeCIDRs`, saving you from manually looking up VPC CIDRs. The one-click install script reuses it automatically; for manual installs, inspect with `kubectl -n kube-system get cm ip-masq-agent-config -o yaml`.
 
 :::
 
