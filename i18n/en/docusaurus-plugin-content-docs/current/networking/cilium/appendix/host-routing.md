@@ -22,33 +22,55 @@ routing       │       → veth/eth → out  (skips netfilter / routing)  │
 
 ## Host Routing per TKE Deployment Mode
 
-| Deployment Mode      | Host Routing           | Switchable to BPF?              |
-| -------------------- | ---------------------- | ------------------------------- |
-| GR + Overlay (vxlan) | ✅ BPF (default)       | Already BPF                     |
-| VPC-CNI + Overlay    | ✅ BPF (default)       | Already BPF                     |
-| VPC-CNI + Native     | ❌ Legacy (**forced**) | **No** — cilium auto-falls-back |
+| Deployment Mode      | Host Routing           | Switchable to BPF?                                                                       |
+| -------------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
+| GR + Overlay (vxlan) | ✅ BPF (default)       | Already BPF                                                                              |
+| VPC-CNI + Overlay    | ✅ BPF (default)       | Already BPF                                                                              |
+| VPC-CNI + Native     | ❌ Legacy (**forced**) | **No** — under `endpointRoutes.enabled=true`, the BPF host routing path is never reached |
 
-In VPC-CNI Native mode, even setting `bpf.hostRouting=true` in helm values has no effect — cilium detects the situation at startup and falls back to legacy.
+In VPC-CNI Native mode, setting `bpf.hostRouting=true` in helm values has no effect — this is determined by the data path of endpointRoutes mode itself, not an active fallback by cilium.
 
 ## Why VPC-CNI Native Mode Cannot Use BPF Host Routing
 
 Causal chain:
 
-1. **TKE Native mode requires cilium to run in chained CNI mode alongside `tke-route-eni`**
-   - Pod IPs must be allocated by `tke-eni-ipamd` from the node's secondary ENI IP pool — cilium does not own IPAM
+1. **In TKE Native mode, Pod IPs must be valid VPC IPs, and each Pod has its own kernel routing entry on the node**
+   - Pod IPs are allocated by `tke-eni-ipamd` from the node's secondary ENI IP pool — cilium does not own IPAM
    - Cross-node connectivity relies on the VPC route table (ARP within a subnet, VPC routing across subnets) — cilium does not own routing
-   - Cilium only attaches BPF programs to handle NetworkPolicy / Service / Observability
-   - This forces helm values: `cni.chainingMode=generic-veth` and `endpointRoutes.enabled=true`
+   - This data path requires `endpointRoutes.enabled=true` in helm values — a per-Pod kernel route pointing directly to its lxc device
 
-2. **In chained CNI mode, cilium does not own the data path**
-   - BPF Host Routing requires cilium to **fully take over forwarding decisions** on the node — endpoint table lookup, service backend lookup, redirect to the right device
-   - In chained mode, the underlying connectivity belongs to the other CNI (`tke-route-eni` here); cilium cannot bypass it to redirect directly
+2. **The essence of `endpointRoutes` mode: host RX bypasses `cilium_host` and goes directly via kernel routing to lxc**
+   - In default (non-endpointRoutes) mode, all packets entering the host netns first hit the `cilium_host` device, where its tc-bpf program dispatches them — this is exactly where BPF Host Routing operates
+   - In endpointRoutes mode, each Pod has an independent kernel route (`ip route` pointing straight at lxc); packets **do not pass through** `cilium_host` at all
+   - In cilium's BPF source, the `ENABLE_HOST_ROUTING` branch in `bpf_host.c` only takes effect on the `cilium_host` path; under endpointRoutes mode this code is never executed
 
-3. **Cilium source code enforces this constraint**
-   - At startup, when chained CNI is detected, cilium forcibly sets `EnableHostLegacyRouting=true` (i.e. disables BPF host routing). This cannot be overridden via helm values.
-   - Upstream discussion: [GitHub Issue #20135](https://github.com/cilium/cilium/issues/20135)
+3. **Result: under endpointRoutes mode, packets must traverse the full kernel network stack (netfilter / conntrack / FIB)**
+   - Cilium still attaches BPF programs to lxc ingress/egress hooks for NetworkPolicy / Service / Hubble observability
+   - But **forwarding inside the host** can only rely on the kernel — that is the very definition of legacy host routing
 
-So: chained CNI mode → `endpointRoutes.enabled=true` is mandatory → cilium falls back to legacy host routing. This is an unavoidable chain.
+So Native mode (Pod IP = VPC IP) → must `endpointRoutes.enabled=true` → host RX skips `cilium_host` → BPF host routing is never triggered.
+
+## Cross-cloud comparison: AWS EKS with Cilium ENI IPAM has the same limitation
+
+The official cilium helm chart **automatically writes** `enable-endpoint-routes: "true"` whenever `eni.enabled=true` (cilium's own AWS ENI IPAM):
+
+```yaml
+# install/kubernetes/cilium/templates/cilium-configmap.yaml (v1.19.4)
+{{- if .Values.eni.enabled }}
+  {{- if not .Values.endpointRoutes.enabled }}
+  enable-endpoint-routes: "true"
+  {{- end }}
+```
+
+The reason is identical to TKE Native: AWS ENI IPs are also valid VPC IPs ("directly routable in the AWS VPC"), so cilium has no reason — and no need — to funnel traffic through `cilium_host` for redirect; instead each Pod gets its own kernel route via endpointRoutes. But this also means BPF host routing is not triggered in this mode either.
+
+| Solution                                   | IPAM          | endpointRoutes    | Host Routing |
+| ------------------------------------------ | ------------- | ----------------- | ------------ |
+| TKE VPC-CNI + Native (chained CNI)         | tke-eni-ipamd | required (manual) | Legacy       |
+| AWS EKS with cilium ENI IPAM (not chained) | cilium eni    | automatic (chart) | Legacy       |
+| AWS EKS chained aws-cni                    | aws-vpc-cni   | required (manual) | Legacy       |
+
+The pattern is clear: **whenever Pod IPs are valid VPC IPs, cilium uses endpointRoutes and BPF host routing is unavailable**. This is the common cost of cloud-native "Native" routing solutions, not a TKE-specific implementation choice.
 
 ## Performance Impact
 

@@ -389,7 +389,7 @@ routingMode: "native"
 endpointRoutes:
   # native routing 必须置为 true，转发 Pod 流量直接路由到 veth 设备
   # 注意：这同时意味着 cilium 走 legacy host routing 而非 BPF host routing，
-  # 详见 [Cilium Host Routing：legacy vs BPF](./appendix/host-routing.md)
+  # 详见附录《Cilium Host Routing：legacy vs BPF》
   enabled: true
 ipam:
   # Pod IP 分配由 tke-eni-ipamd 负责，cilium 无需负责

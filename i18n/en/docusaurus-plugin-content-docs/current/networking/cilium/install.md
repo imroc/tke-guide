@@ -389,8 +389,8 @@ Native Routing (VPC-CNI) mode-specific parameters:
 routingMode: "native"
 endpointRoutes:
   # Must be true for native routing — routes Pod traffic directly via veth device.
-  # Note: this also forces cilium onto legacy host routing rather than BPF host routing,
-  # see [Cilium Host Routing: Legacy vs BPF](./appendix/host-routing.md)
+  # Note: this also forces cilium onto legacy host routing rather than BPF host routing.
+  # See appendix "Cilium Host Routing: Legacy vs BPF" for details.
   enabled: true
 ipam:
   # Pod IP allocation handled by tke-eni-ipamd, not by cilium
