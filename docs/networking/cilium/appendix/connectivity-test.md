@@ -8,7 +8,7 @@ cilium 官方提供了 [`cilium connectivity test`](https://docs.cilium.io/en/st
 
 ### 一键脚本
 
-[一键安装脚本](../install.md#一键安装脚本) `cilium.sh` 提供了 `test` 子命令，会自动按节点地域选择外部目标、动态解析国内可用 IP，并使用 TKE 内网可拉取的 mirror 镜像。环境性失败的用例（如节点没公网）只打 WARN 提示用户，不自动跳过：
+[一键安装脚本](../install.md#一键安装脚本) `cilium.sh` 提供了 `test` 子命令，封装 `cilium connectivity test`：
 
 ```bash
 bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- test
@@ -20,12 +20,13 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- test
 ```
 
-脚本启动时会输出：
+脚本相比直接跑 `cilium connectivity test` 多做这几件事：
 
-- 节点地域识别结果（国内/海外/混合/未知）
-- 实际使用的外部目标（国内地域会动态解析 `npmmirror.com` 拿到当前公网 IP，并扫描其 `/16` 找到第二个可用 IP）
-- 节点出公网探测结果（不通时打印警告，不强制跳过）
-- `pod-to-cidr` 系列动态 IP 解析失败时的警告（不强制跳过）
+- **替换镜像**：所有用例镜像替换成 TKE 内网可拉取的 mirror 地址（`quay.io` → `quay.tencentcloudcr.com`，`registry.k8s.io` / `gcr.io` → `docker.io/k8smirror`），节点无需公网即可拉镜像
+- **国内地域适配**：自动检测节点地域，国内集群把外部目标从 `1.1.1.1` / `one.one.one.one.` / `k8s.io.`（GFW 不可达）替换成 `npmmirror.com` / `mirrors.aliyun.com`，并动态解析 `npmmirror.com` 当前公网 IP 注入 `--external-ip` / `--external-other-ip` / `--external-cidr`，让 `pod-to-cidr` 类用例能跑通
+- **环境探测打 WARN，不强制跳过**：节点能否从 Pod 出公网、Native + 节点 EIP 时 Pod 能否 ping 通节点 EIP 等会先实测，结果不通才打 WARN 给跳过建议（如 `--test '!/pod-to-host$'`），由用户决定是否要跳过
+- **自动清理上次残留**：跑前清理上次测试遗留的 `cilium-test-*` namespace（cilium-cli 在测试失败时会保留资源，TKE gatekeeper 又禁止 ns 内有 Pod 时删 ns，不预清理会让后续 perf 卡住，详见 [Cilium 性能测试 → 常见问题](./performance-test.md#为什么-perf-跑前要清理-cilium-test--namespace)）
+- **耗时统计**：测试结束打印总耗时
 
 ### 手动测试
 

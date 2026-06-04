@@ -8,7 +8,7 @@ cilium 官方提供了 [`cilium connectivity perf`](https://docs.cilium.io/en/st
 
 ### 一键脚本
 
-[一键安装脚本](../install.md#一键安装脚本) `cilium.sh` 提供了 `perf` 子命令，会用 TKE 内网可拉取的镜像跑 `cilium connectivity perf`：
+[一键安装脚本](../install.md#一键安装脚本) `cilium.sh` 提供了 `perf` 子命令，封装 `cilium connectivity perf`：
 
 ```bash
 bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- perf
@@ -20,7 +20,13 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- perf
 ```
 
-性能测试默认跑约 1 分钟（每个测试持续 10 秒），最后输出汇总表格。脚本会在跑测前自动清理上次测试残留的 `cilium-test-*` namespace（详见 [常见问题](#为什么-perf-跑前要清理-cilium-test--namespace)）。
+性能测试默认跑约 1 分钟（每个测试持续 10 秒），最后输出汇总表格。
+
+脚本相比直接跑 `cilium connectivity perf` 多做这几件事：
+
+- **替换镜像**：netperf 镜像替换成 TKE 内网可拉取的 mirror 地址（`quay.tencentcloudcr.com/cilium/network-perf`），节点无需公网即可拉镜像
+- **自动清理上次残留**：跑前清理上次测试遗留的 `cilium-test-*` namespace。`cilium connectivity perf` 启动时会 `kubectl delete ns cilium-test-1`，但 TKE gatekeeper 禁止 ns 内有 Pod 时删 ns，所以不预清理脚本会卡住（详见 [常见问题](#为什么-perf-跑前要清理-cilium-test--namespace)）
+- **耗时统计**：测试结束打印总耗时
 
 ### 手动测试
 
