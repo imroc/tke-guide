@@ -1956,19 +1956,28 @@ cmd_test() {
   # ---- Native + node EIP warning ----
   # In Native Routing mode, cilium-cli's pod-to-host scenario contains a
   # ping-ipv4-external-ip sub-action that pings every node's ExternalIP from a
-  # Pod. This ALWAYS fails on TKE Native — root cause:
-  #   1. cilium-operator registers all node ExternalIPs with identity=remote-node
-  #      (cluster-internal identity).
-  #   2. cilium's BPF masquerade has an early-exit "skip SNAT when destination
-  #      identity is cluster-internal" — fires BEFORE the ipMasqAgent
+  # Pod. This ALWAYS fails on TKE Native — root cause is two reasonable designs
+  # stacking on each other:
+  #   1. TKE VPC-CNI Native: Pod IPs are assigned from the secondary ENI's IP
+  #      pool, but the secondary ENI has no EIP — EIPs are only on the primary
+  #      ENI. So Pod IPs have NO public-internet egress on their own; reaching
+  #      ANY public destination requires SNAT to the primary-ENI IP first
+  #      (then out via primary-ENI's EIP / NAT gateway / Egress Gateway).
+  #   2. cilium registers all node ExternalIPs with identity=remote-node
+  #      (cluster-internal). BPF masquerade has an early-exit that skips SNAT
+  #      for cluster-internal destinations — fires BEFORE the ipMasqAgent
   #      nonMasqueradeCIDRs check, so ip-masq-agent cannot rescue this case.
-  #   3. The packet leaves the source node with src=Pod-IP (a private VPC IP)
-  #      and dst=node-EIP (a public IP). Tencent Cloud underlay does not route
-  #      this combination — the EIP is a NAT egress, not a node-routable
-  #      address; private-source + public-EIP-dest has no DNAT rule.
-  # Overlay mode is unaffected: Pod IP comes from an independent CIDR (not VPC),
-  # cilium SNATs egress to node IP by default, so packets reach EIP with the
-  # node's VPC IP as source — a normal "private → public" flow underlay accepts.
+  # Result: packet leaves with src=Pod-IP (no public egress path), dst=node-EIP
+  # (a public IP). Pod IP cannot reach the public internet by VPC routing.
+  #
+  # Note: Pod -> a real public IP (e.g. 223.5.5.5) DOES work — that destination
+  # is identity=world, doesn't hit the remote-node early-exit, so cilium SNATs
+  # via ipMasqAgent and the packet leaves with the node primary-ENI IP. Only
+  # node EIPs are special-cased because they're tagged remote-node.
+  #
+  # Overlay mode is unaffected: Pod IPs come from an independent CIDR not in
+  # the VPC, cilium always SNATs egress to the node primary-ENI IP, which has
+  # public egress capability.
   # See appendix/connectivity-test.md "Why Pod ping node EIP never works on
   # Native Routing" for full details + tcpdump evidence.
   local routing_mode eip_count
@@ -1981,10 +1990,14 @@ cmd_test() {
         warn "检测到 Native Routing + ${eip_count} 个节点绑了 EIP"
         warn "  pod-to-host scenario 中的 ping-ipv4-external-ip 子动作会从 Pod ping 节点 EIP，"
         warn "  在 TKE Native Routing 下**必定失败**。原因（与安全组/ICMP 无关）:"
-        warn "    - cilium 把节点 EIP 视为 remote-node identity"
-        warn "    - cilium BPF masquerade 对 remote-node 目标早退出，不做 SNAT"
-        warn "    - 包以 Pod IP（VPC 私网）出节点，目的是公网 EIP，TKE underlay 不接受这种组合"
-        warn "  生产业务不会出现此访问模式，可放心跳过该 scenario:"
+        warn "    - VPC-CNI Native 下 Pod IP 来自节点辅助 ENI 的 IP 池，辅助 ENI 不绑 EIP，"
+        warn "      Pod IP 本身没有公网能力——访问任何公网目的都必须先 SNAT 成节点主 ENI IP"
+        warn "    - cilium 把节点 EIP 视为 remote-node identity，BPF masquerade 对此早退出，"
+        warn "      不做 SNAT（早退出先于 ipMasqAgent CIDR 判断，ip-masq-agent 也救不了）"
+        warn "    - 结果包以 Pod IP 出节点，目的是公网 EIP，但 Pod IP 没公网出口路径"
+        warn "  Pod 访问真公网 IP 仍然正常（identity=world 不触发早退出，会 SNAT），"
+        warn "  只有节点 EIP 因为被打了 remote-node 标签才特殊不通。"
+        warn "  生产业务不会出现「Pod 主动 ping 集群节点 EIP」这种访问模式，可放心跳过:"
         warn "    --test '!/pod-to-host\$'"
         warn "  详细分析与抓包证据: https://imroc.cc/tke/networking/cilium/appendix/connectivity-test"
       else
@@ -1992,11 +2005,17 @@ cmd_test() {
         warn "  pod-to-host scenario contains a ping-ipv4-external-ip sub-action that pings"
         warn "  node EIPs from a Pod — this **always fails** on TKE Native Routing. Why"
         warn "  (NOT a security-group / ICMP issue):"
-        warn "    - cilium registers node EIPs with identity=remote-node"
-        warn "    - cilium BPF masquerade early-exits on remote-node destinations (no SNAT)"
-        warn "    - Packet leaves the node with src=Pod-IP (private VPC IP) and dst=EIP"
-        warn "      (public). TKE underlay rejects 'private-source → public-EIP-dest'."
-        warn "  This access pattern doesn't occur in real workloads. Safe to skip:"
+        warn "    - VPC-CNI Native Pod IPs come from the secondary ENI's IP pool; the"
+        warn "      secondary ENI has NO EIP, so Pod IPs have no public-internet egress."
+        warn "      Reaching ANY public destination requires SNAT to the primary-ENI IP first."
+        warn "    - cilium tags node EIPs as remote-node identity. BPF masquerade early-exits"
+        warn "      for remote-node destinations (no SNAT). Early-exit fires BEFORE the"
+        warn "      ipMasqAgent CIDR check, so ip-masq-agent cannot rescue this case."
+        warn "    - Result: packet leaves with src=Pod-IP (no egress path), dst=node-EIP."
+        warn "  Pod -> real public IPs still works fine (identity=world doesn't hit the"
+        warn "  early-exit, cilium SNATs normally). Node EIPs are uniquely affected because"
+        warn "  cilium specifically tags them as remote-node."
+        warn "  Real workloads don't 'ping cluster-peer node EIPs from Pods'. Safe to skip:"
         warn "    --test '!/pod-to-host\$'"
         warn "  Full analysis + tcpdump evidence: https://imroc.cc/tke/en/networking/cilium/appendix/connectivity-test"
       fi
