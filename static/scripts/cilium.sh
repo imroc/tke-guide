@@ -1975,12 +1975,34 @@ detect_cilium_routing_mode() {
   esac
 }
 
-# nodes_with_external_ip_count — Counts non-super nodes that have an
-# .status.addresses[type=ExternalIP] (i.e. an EIP attached). Used to decide
-# whether to print the Native + EIP pod-to-host warning.
-nodes_with_external_ip_count() {
+# first_node_external_ip — Returns the first non-super node's ExternalIP, or
+# empty if none. Used by probe_pod_to_node_eip to pick a target.
+first_node_external_ip() {
   kubectl get node -o jsonpath='{range .items[*]}{.metadata.labels.node\.kubernetes\.io/instance-type}{"|"}{.status.addresses[?(@.type=="ExternalIP")].address}{"\n"}{end}' 2>/dev/null \
-    | awk -F'|' '$1 != "eklet" && $2 != "" {n++} END {print n+0}'
+    | awk -F'|' '$1 != "eklet" && $2 != "" {print $2; exit}'
+}
+
+# probe_pod_to_node_eip — Launches a temporary Pod and tries to ping <eip> with
+# a 4s timeout. Returns 0 if reachable, non-zero otherwise.
+# Used to decide whether the Native + EIP pod-to-host warning is actually
+# applicable. If a NAT gateway is configured in the VPC, this ping succeeds
+# (Pod IP -> NAT gateway -> public -> node EIP DNAT -> node), so the warning
+# is suppressed; if no NAT gateway, the ping fails and we print the warning.
+probe_pod_to_node_eip() {
+  local eip="$1"
+  local probe_name="cilium-eip-probe-$$"
+  local rc
+  kubectl run "$probe_name" \
+    --image="$CILIUM_CURL_IMAGE" \
+    --restart=Never \
+    --attach \
+    --rm \
+    --quiet \
+    --command -- \
+    ping -c 1 -W 4 "$eip" >/dev/null 2>&1
+  rc=$?
+  kubectl delete pod "$probe_name" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+  return "$rc"
 }
 
 # probe_pod_egress — Launches a temporary curl Pod and tries to reach `target`
@@ -2197,69 +2219,82 @@ cmd_test() {
 
   # ---- Native + node EIP warning ----
   # In Native Routing mode, cilium-cli's pod-to-host scenario contains a
-  # ping-ipv4-external-ip sub-action that pings every node's ExternalIP from a
-  # Pod. This ALWAYS fails on TKE Native — root cause is two reasonable designs
-  # stacking on each other:
-  #   1. TKE VPC-CNI Native: Pod IPs are assigned from the secondary ENI's IP
-  #      pool, but the secondary ENI has no EIP — EIPs are only on the primary
-  #      ENI. So Pod IPs have NO public-internet egress on their own; reaching
-  #      ANY public destination requires SNAT to the primary-ENI IP first
-  #      (then out via primary-ENI's EIP / NAT gateway / Egress Gateway).
-  #   2. cilium registers all node ExternalIPs with identity=remote-node
-  #      (cluster-internal). BPF masquerade has an early-exit that skips SNAT
-  #      for cluster-internal destinations — fires BEFORE the ipMasqAgent
-  #      nonMasqueradeCIDRs check, so ip-masq-agent cannot rescue this case.
-  # Result: packet leaves with src=Pod-IP (no public egress path), dst=node-EIP
-  # (a public IP). Pod IP cannot reach the public internet by VPC routing.
+  # ping-ipv4-external-ip sub-action that pings every node's ExternalIP from
+  # a Pod. Whether this passes depends on whether the VPC has a public NAT
+  # gateway:
   #
-  # Note: Pod -> a real public IP (e.g. 223.5.5.5) DOES work — that destination
-  # is identity=world, doesn't hit the remote-node early-exit, so cilium SNATs
-  # via ipMasqAgent and the packet leaves with the node primary-ENI IP. Only
-  # node EIPs are special-cased because they're tagged remote-node.
+  #   - WITHOUT NAT gateway: fails. cilium tags node EIPs with identity=
+  #     remote-node, BPF masquerade early-exits and skips SNAT, so the packet
+  #     leaves with src=Pod-IP (no public-egress path) → dropped.
+  #   - WITH NAT gateway: succeeds. cilium still doesn't SNAT, but the packet
+  #     reaches the VPC route table which sends "dst=public" traffic to the
+  #     NAT gateway; NAT gateway SNATs to its own public IP, the packet loops
+  #     back to the node EIP via the public internet, and the cloud network
+  #     DNATs EIP → node VPC IP. Higher latency than direct routing, but works.
+  #
+  # Pod -> a real public IP (e.g. 223.5.5.5) always works either way: that
+  # destination is identity=world, doesn't hit the remote-node early-exit, so
+  # cilium SNATs via ipMasqAgent and the packet egresses with the node primary
+  # ENI IP. Only node EIPs hit the remote-node special case.
   #
   # Overlay mode is unaffected: Pod IPs come from an independent CIDR not in
   # the VPC, cilium always SNATs egress to the node primary-ENI IP, which has
   # public egress capability.
+  #
+  # Implementation: actually probe (Pod ping <some-node-EIP>) instead of
+  # blindly warning whenever Native + EIP. If the probe succeeds (NAT gateway
+  # configured), suppress the warning entirely.
   # See appendix/connectivity-test.md "Why Pod ping node EIP never works on
-  # Native Routing" for full details + tcpdump evidence.
-  local routing_mode eip_count
+  # Native Routing" + "Why does the test environment need a NAT gateway".
+  local routing_mode probe_eip
   routing_mode=$(detect_cilium_routing_mode)
   if [[ "$routing_mode" == "native" ]]; then
-    eip_count=$(nodes_with_external_ip_count)
-    if [[ "$eip_count" -gt 0 ]]; then
-      echo ""
+    probe_eip=$(first_node_external_ip)
+    if [[ -n "$probe_eip" ]]; then
       if is_zh; then
-        warn "检测到 Native Routing + ${eip_count} 个节点绑了 EIP"
-        warn "  pod-to-host scenario 中的 ping-ipv4-external-ip 子动作会从 Pod ping 节点 EIP，"
-        warn "  在 TKE Native Routing 下**必定失败**。原因（与安全组/ICMP 无关）:"
-        warn "    - VPC-CNI Native 下 Pod IP 来自节点辅助 ENI 的 IP 池，辅助 ENI 不绑 EIP，"
-        warn "      Pod IP 本身没有公网能力——访问任何公网目的都必须先 SNAT 成节点主 ENI IP"
-        warn "    - cilium 把节点 EIP 视为 remote-node identity，BPF masquerade 对此早退出，"
-        warn "      不做 SNAT（早退出先于 ipMasqAgent CIDR 判断，ip-masq-agent 也救不了）"
-        warn "    - 结果包以 Pod IP 出节点，目的是公网 EIP，但 Pod IP 没公网出口路径"
-        warn "  Pod 访问真公网 IP 仍然正常（identity=world 不触发早退出，会 SNAT），"
-        warn "  只有节点 EIP 因为被打了 remote-node 标签才特殊不通。"
-        warn "  生产业务不会出现「Pod 主动 ping 集群节点 EIP」这种访问模式，可放心跳过:"
-        warn "    --test '!/pod-to-host\$'"
-        warn "  详细分析与抓包证据: https://imroc.cc/tke/networking/cilium/appendix/connectivity-test"
+        info "探测从 Pod 是否能 ping 通节点 EIP (${probe_eip})..."
       else
-        warn "Detected Native Routing + ${eip_count} node(s) with EIP attached"
-        warn "  pod-to-host scenario contains a ping-ipv4-external-ip sub-action that pings"
-        warn "  node EIPs from a Pod — this **always fails** on TKE Native Routing. Why"
-        warn "  (NOT a security-group / ICMP issue):"
-        warn "    - VPC-CNI Native Pod IPs come from the secondary ENI's IP pool; the"
-        warn "      secondary ENI has NO EIP, so Pod IPs have no public-internet egress."
-        warn "      Reaching ANY public destination requires SNAT to the primary-ENI IP first."
-        warn "    - cilium tags node EIPs as remote-node identity. BPF masquerade early-exits"
-        warn "      for remote-node destinations (no SNAT). Early-exit fires BEFORE the"
-        warn "      ipMasqAgent CIDR check, so ip-masq-agent cannot rescue this case."
-        warn "    - Result: packet leaves with src=Pod-IP (no egress path), dst=node-EIP."
-        warn "  Pod -> real public IPs still works fine (identity=world doesn't hit the"
-        warn "  early-exit, cilium SNATs normally). Node EIPs are uniquely affected because"
-        warn "  cilium specifically tags them as remote-node."
-        warn "  Real workloads don't 'ping cluster-peer node EIPs from Pods'. Safe to skip:"
-        warn "    --test '!/pod-to-host\$'"
-        warn "  Full analysis + tcpdump evidence: https://imroc.cc/tke/en/networking/cilium/appendix/connectivity-test"
+        info "Probing whether a Pod can ping a node EIP (${probe_eip})..."
+      fi
+      if probe_pod_to_node_eip "$probe_eip"; then
+        if is_zh; then
+          info "Pod ping 节点 EIP 通过（VPC 已配 NAT 网关或其它公网路径），pod-to-host 用例不会受影响"
+        else
+          info "Pod can reach node EIP (NAT gateway or other public route configured); pod-to-host won't be affected"
+        fi
+      else
+        echo ""
+        if is_zh; then
+          warn "Pod 无法 ping 通节点 EIP (${probe_eip})"
+          warn "  pod-to-host scenario 中的 ping-ipv4-external-ip 子动作会失败。原因（与安全组/ICMP 无关）:"
+          warn "    - VPC-CNI Native 下 Pod IP 来自节点辅助 ENI 的 IP 池，辅助 ENI 不绑 EIP，"
+          warn "      Pod IP 本身没有公网能力——访问任何公网目的都必须先 SNAT 成节点主 ENI IP"
+          warn "    - cilium 把节点 EIP 视为 remote-node identity，BPF masquerade 对此早退出，"
+          warn "      不做 SNAT（早退出先于 ipMasqAgent CIDR 判断，ip-masq-agent 也救不了）"
+          warn "    - 结果包以 Pod IP 出节点，目的是公网 EIP，但 Pod IP 没公网出口路径"
+          warn "  Pod 访问真公网 IP 仍然正常（identity=world 不触发早退出，会 SNAT）。"
+          warn "  解决办法（任一即可）:"
+          warn "    a) VPC 配置 NAT 网关 → 让 Pod 借 NAT 网关公网能力绕回节点 EIP"
+          warn "    b) 跳过该 scenario: --test '!/pod-to-host\$'"
+          warn "  详细分析与抓包证据: https://imroc.cc/tke/networking/cilium/appendix/connectivity-test"
+        else
+          warn "Pod cannot ping node EIP (${probe_eip})"
+          warn "  pod-to-host's ping-ipv4-external-ip sub-action will fail. Why"
+          warn "  (NOT a security-group / ICMP issue):"
+          warn "    - VPC-CNI Native Pod IPs come from the secondary ENI's IP pool; the"
+          warn "      secondary ENI has NO EIP, so Pod IPs have no public-internet egress."
+          warn "      Reaching ANY public destination requires SNAT to the primary-ENI IP first."
+          warn "    - cilium tags node EIPs as remote-node identity. BPF masquerade early-exits"
+          warn "      for remote-node destinations (no SNAT). Early-exit fires BEFORE the"
+          warn "      ipMasqAgent CIDR check, so ip-masq-agent cannot rescue this case."
+          warn "    - Result: packet leaves with src=Pod-IP (no egress path), dst=node-EIP."
+          warn "  Pod -> real public IPs still works fine (identity=world doesn't hit the"
+          warn "  early-exit, cilium SNATs normally)."
+          warn "  Fix (choose either):"
+          warn "    a) Configure a NAT gateway in the VPC so Pod traffic loops back to node EIP"
+          warn "    b) Skip the scenario: --test '!/pod-to-host\$'"
+          warn "  Full analysis + tcpdump evidence: https://imroc.cc/tke/en/networking/cilium/appendix/connectivity-test"
+        fi
       fi
     fi
   fi
