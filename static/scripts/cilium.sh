@@ -102,9 +102,14 @@ set -euo pipefail
 #      ENABLE_HUBBLE    "true" or "false" (optional, default false)
 #      ENABLE_LOCALDNS  "true" or "false" (optional, default false)
 #      RUN_TEST_AFTER   "true" or "false" (optional, default false; when true,
-#                       cmd_test runs at the end of install-cilium with timing)
-#      RUN_PERF_AFTER   "true" or "false" (optional, default false; when true,
-#                       cmd_perf runs at the end of install-cilium with timing)
+#                       cmd_test runs after install — but only after
+#                       wait_for_nodes_ready blocks until ≥1 Ready node exists.
+#                       In env-var mode there's no Enter-prompt to add nodes;
+#                       the caller is expected to add nodes externally and
+#                       wait_for_nodes_ready will poll until Ready.)
+#      RUN_PERF_AFTER   "true" or "false" (optional, default false; same as
+#                       RUN_TEST_AFTER but requires ≥2 Ready nodes for cilium
+#                       connectivity perf's cross-node netperf pairs.)
 #    NETWORK_MODE is always auto-detected and cannot be overridden.
 #    When adding a new interactive prompt, follow the pattern:
 #      - Check if the env var is already set → if yes, skip the prompt.
@@ -836,19 +841,24 @@ confirm_enable_localdns() {
 }
 
 # confirm_run_test_perf — Asks user whether to run cilium connectivity test
-# and/or cilium connectivity perf at the end of install-cilium (default: N for
-# both — adds significant time, especially perf which spins up netperf pods on
-# at least 2 nodes).
+# and/or cilium connectivity perf (default: N for both — adds significant time,
+# especially perf which spins up netperf pods on at least 2 nodes).
 # Sets RUN_TEST_AFTER and RUN_PERF_AFTER (true/false).
 # Each variable is skipped individually if its env var is already set.
+#
+# Called from cmd_install_cilium AFTER the cilium helm install completes and
+# AFTER the user is told to add nodes — by that point cilium-agent / operator
+# are deployed but DaemonSet pods only schedule once nodes exist. Asking here
+# (not before install) makes the order match what the user actually does:
+#   install → add nodes → optionally run test / perf
 confirm_run_test_perf() {
   if [[ -z "${RUN_TEST_AFTER:-}" ]]; then
     echo ""
     local prompt
     if is_zh; then
-      prompt="安装完成后是否运行连通性测试 (cilium connectivity test)？[y/N]: "
+      prompt="是否运行连通性测试 (cilium connectivity test)？[y/N]: "
     else
-      prompt="Run connectivity test (cilium connectivity test) after install? [y/N]: "
+      prompt="Run connectivity test (cilium connectivity test)? [y/N]: "
     fi
     read -rp "$(echo -e "${BLUE}${prompt}${NC}")" test_input
     test_input=$(echo "$test_input" | tr '[:upper:]' '[:lower:]')
@@ -861,9 +871,9 @@ confirm_run_test_perf() {
   if [[ -z "${RUN_PERF_AFTER:-}" ]]; then
     local prompt
     if is_zh; then
-      prompt="安装完成后是否运行性能测试 (cilium connectivity perf)？[y/N]: "
+      prompt="是否运行性能测试 (cilium connectivity perf)？[y/N]: "
     else
-      prompt="Run performance test (cilium connectivity perf) after install? [y/N]: "
+      prompt="Run performance test (cilium connectivity perf)? [y/N]: "
     fi
     read -rp "$(echo -e "${BLUE}${prompt}${NC}")" perf_input
     perf_input=$(echo "$perf_input" | tr '[:upper:]' '[:lower:]')
@@ -873,6 +883,100 @@ confirm_run_test_perf() {
       RUN_PERF_AFTER=false
     fi
   fi
+}
+
+# prompt_add_nodes_and_wait — After cilium install, walk the user through:
+#   1. Show the manual "add nodes" guidance (console / terraform — not something
+#      the script can do, depends on the user's node-pool choice).
+#   2. Wait for the user to press Enter to confirm nodes have been added.
+#   3. Ask whether to run cilium connectivity test / perf (delegates to
+#      confirm_run_test_perf).
+# Skipped entirely when both RUN_TEST_AFTER and RUN_PERF_AFTER are explicitly
+# set via env vars (non-interactive mode). In that case wait_for_nodes_ready
+# will block instead — the env-var caller is expected to add nodes externally.
+prompt_add_nodes_and_wait() {
+  # Non-interactive mode: don't block on Enter, env caller controls the flow.
+  if [[ -n "${RUN_TEST_AFTER:-}" ]] && [[ -n "${RUN_PERF_AFTER:-}" ]]; then
+    return
+  fi
+  echo ""
+  if is_zh; then
+    info "============================================"
+    info "下一步：向集群添加节点"
+    info "============================================"
+    info "Cilium 已安装到集群（DaemonSet 已就位），但当前集群可能还没有可调度的"
+    info "节点。请按照以下任一方式添加节点（cilium-agent 会随节点就绪自动启动）："
+    info "  - 控制台：集群 → 节点管理 → 节点池 → 新建普通/原生/Karpenter 节点池"
+    info "  - terraform：tencentcloud_kubernetes_node_pool /"
+    info "    tencentcloud_kubernetes_native_node_pool / karpenter NodePool"
+    info "    （详见 https://imroc.cc/tke/networking/cilium/install#新建节点池）"
+    info ""
+    info "节点添加完成、节点状态变为 Ready 后，按 Enter 继续；如不想继续可按 Ctrl+C 退出。"
+  else
+    info "============================================"
+    info "Next step: add nodes to the cluster"
+    info "============================================"
+    info "Cilium is installed (DaemonSet ready), but the cluster may not have any"
+    info "schedulable nodes yet. Add nodes via one of the following (cilium-agent"
+    info "will auto-launch as nodes become Ready):"
+    info "  - Console: Cluster → Node Management → Node Pool → Create Pool"
+    info "  - terraform: tencentcloud_kubernetes_node_pool /"
+    info "    tencentcloud_kubernetes_native_node_pool / karpenter NodePool"
+    info "    (see https://imroc.cc/tke/en/networking/cilium/install#create-node-pools)"
+    info ""
+    info "Once nodes have joined and are Ready, press Enter to continue, or Ctrl+C to quit."
+  fi
+  read -rp ""
+  confirm_run_test_perf
+}
+
+# wait_for_nodes_ready — Verifies the cluster has at least `min_nodes` Ready
+# non-super nodes. If short, prompts the user to add nodes and waits, polling
+# every 10s until the threshold is met. Ctrl+C exits.
+# Used as a guard before cmd_test / cmd_perf so the user gets a clear "add
+# nodes" message instead of cilium-cli's cryptic timeout / image-pull errors.
+wait_for_nodes_ready() {
+  local min_nodes="${1:-1}"
+  local label="${2:-tests}"
+  local ready
+  ready=$(count_ready_nodes)
+  if [[ "$ready" -ge "$min_nodes" ]]; then
+    return 0
+  fi
+  echo ""
+  if is_zh; then
+    warn "运行 ${label} 需要至少 ${min_nodes} 个 Ready 节点，当前只有 ${ready} 个。"
+    warn "请向集群添加节点（控制台 / terraform / Karpenter），脚本会每 10 秒检查一次。"
+    warn "按 Ctrl+C 可放弃当前测试。"
+  else
+    warn "Running ${label} requires at least ${min_nodes} Ready node(s); only ${ready} found."
+    warn "Add nodes (console / terraform / Karpenter); the script will poll every 10s."
+    warn "Press Ctrl+C to skip this test."
+  fi
+  while true; do
+    sleep 10
+    ready=$(count_ready_nodes)
+    if [[ "$ready" -ge "$min_nodes" ]]; then
+      info "$(is_zh && echo "节点检查通过：${ready} 个 Ready 节点" || echo "Node check passed: ${ready} Ready node(s)")"
+      return 0
+    fi
+    info "$(is_zh && echo "等待节点中... (Ready ${ready}/${min_nodes})" || echo "Waiting for nodes... (Ready ${ready}/${min_nodes})")"
+  done
+}
+
+# count_ready_nodes — Counts non-super (non-eklet) nodes whose Ready condition
+# is True. Super nodes (eklet) are excluded because cilium-agent and netperf
+# DaemonSets won't run on them.
+# Uses jsonpath only (no jq dependency).
+count_ready_nodes() {
+  local out
+  out=$(kubectl get node -o jsonpath='{range .items[*]}{.metadata.labels.node\.kubernetes\.io/instance-type}{"|"}{range .status.conditions[?(@.type=="Ready")]}{.status}{end}{"\n"}{end}' 2>/dev/null)
+  if [[ -z "$out" ]]; then
+    echo 0
+    return
+  fi
+  # Each line: "<instance-type>|<Ready-status>" — keep only non-eklet + True
+  echo "$out" | awk -F'|' '$1 != "eklet" && $2 == "True" {n++} END {print n+0}'
 }
 
 # format_duration — Pretty-prints SECONDS-style elapsed seconds. Outputs e.g.
@@ -1301,10 +1405,16 @@ print_replay_command() {
 #   9. resolve_non_masq_cidrs (Native + Egress, OR Native + ip-masq-agent)
 #  10. confirm_enable_hubble (optional)
 #  11. confirm_enable_localdns (optional)
-#  12. confirm_run_test_perf (optional, run cilium connectivity test/perf at end)
-#  13. uninstall_tke_components → setup_* → helm_install → apply_apf
-#  14. (optional) install localdns
-#  15. (optional) cmd_test, then (optional) cmd_perf — both report duration + docs link
+#  12. uninstall_tke_components → setup_* → helm_install → apply_apf
+#  13. (optional) install localdns
+#  14. prompt_add_nodes_and_wait — print "add nodes" guidance, wait for Enter,
+#      then ask whether to run test / perf (skipped if both env vars preset)
+#  15. (optional) wait_for_nodes_ready 1 → cmd_test
+#  16. (optional) wait_for_nodes_ready 2 → cmd_perf
+# Why test/perf prompt is AFTER install (not before): tests need Ready nodes,
+# but in TKE the recommended flow is "install cilium on empty cluster, then add
+# nodes" — asking before install would be premature, and running tests before
+# nodes are added would just hang or fail.
 cmd_install_cilium() {
   echo ""
   echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
@@ -1324,7 +1434,6 @@ cmd_install_cilium() {
   resolve_non_masq_cidrs
   confirm_enable_hubble
   confirm_enable_localdns
-  confirm_run_test_perf
 
   echo ""
   info "$(is_zh && echo "安装方案" || echo "Plan"): ${ROUTING_MODE} (${NETWORK_MODE}), Cilium ${CILIUM_VERSION}"
@@ -1365,17 +1474,19 @@ cmd_install_cilium() {
   # Print non-interactive replay command for batch deployment
   print_replay_command
 
-  # Optional: run cilium connectivity test / perf at the end of install
-  # (default off — both add significant time, especially perf which spins up
-  # netperf pods on at least 2 nodes). When set via the interactive prompt or
-  # RUN_TEST_AFTER / RUN_PERF_AFTER env vars, we delegate to cmd_test / cmd_perf
-  # which already report duration + docs link.
-  # Use `|| true` to avoid `set -e` aborting after a non-zero cilium exit code
-  # (failed tests are a normal outcome, not a script error).
+  # ---- Add nodes & optional tests ----
+  # Up to here the install is done but the cluster may have zero schedulable
+  # nodes (recommended TKE flow is "install cilium on empty cluster first, then
+  # add nodes"). Walk the user through "add nodes → press Enter → choose test/perf"
+  # and gate the actual test execution on Ready node count.
+  prompt_add_nodes_and_wait
   if [[ "${RUN_TEST_AFTER:-false}" == "true" ]]; then
+    wait_for_nodes_ready 1 "$(is_zh && echo "连通性测试" || echo "connectivity test")"
     cmd_test || true
   fi
   if [[ "${RUN_PERF_AFTER:-false}" == "true" ]]; then
+    # cilium connectivity perf needs at least 2 nodes (cross-node pairs)
+    wait_for_nodes_ready 2 "$(is_zh && echo "性能测试" || echo "performance test")"
     cmd_perf || true
   fi
 
