@@ -699,13 +699,20 @@ run_service_scale_test() {
     local d="$OUTPUT_DIR/service-scale"
     mkdir -p "$d"
 
-    info "Creating 1000 dummy Services..."
+    info "Creating 1000 dummy Services in batches..."
     _kubectl create namespace test-services --dry-run=client -o yaml | _kubectl apply -f - 2>/dev/null
 
-    for i in $(seq 1 1000); do
-        local o3=$(( (i - 1) / 254 ))
-        local o4=$(( (i - 1) % 254 + 1 ))
-        cat <<EOF | _kubectl apply -f - 2>/dev/null
+    local batch_size=100
+    for ((start=1; start<=1000; start+=batch_size)); do
+        local end=$((start + batch_size - 1))
+        [[ $end -gt 1000 ]] && end=1000
+
+        info "  Creating services $start-$end..."
+        local batch_file=$(mktemp)
+        for i in $(seq $start $end); do
+            local o3=$(( (i - 1) / 254 ))
+            local o4=$(( (i - 1) % 254 + 1 ))
+            cat <<EOF >> "$batch_file"
 apiVersion: v1
 kind: Service
 metadata:
@@ -729,6 +736,9 @@ subsets:
   - port: 80
     protocol: TCP
 EOF
+        done
+        _kubectl apply -f "$batch_file" 2>/dev/null
+        rm -f "$batch_file"
     done
 
     info "Waiting 30s for sync..."
@@ -834,7 +844,8 @@ if os.path.exists(ctx):
 # Throughput
 def parse_iperf(p):
     fs = sorted(glob.glob(os.path.join(basedir, p))
-    if not fs: return None
+    if not fs:
+        return None
     vals = []
     for f in fs:
         try:
@@ -842,7 +853,8 @@ def parse_iperf(p):
                 d = json.load(fh)
                 vals.append(round(d['end']['sum_received']['bits_per_second'] / 1e9, 2))
         except: pass
-    if not vals: return None
+    if not vals:
+        return None
     return {"gbps": vals, "avg": round(sum(vals)/len(vals), 2)}
 
 for key, pat in [
@@ -857,7 +869,8 @@ for key, pat in [
 # RPS
 def parse_fortio(p):
     fs = sorted(glob.glob(os.path.join(basedir, p))
-    if not fs: return None
+    if not fs:
+        return None
     vals = []
     for f in fs:
         try:
@@ -865,7 +878,8 @@ def parse_fortio(p):
                 d = json.load(fh)
                 vals.append(int(d['ActualQPS']))
         except: pass
-    if not vals: return None
+    if not vals:
+        return None
     return {"qps": vals, "avg_qps": int(sum(vals)/len(vals))}
 
 for key, pat in [
@@ -880,7 +894,8 @@ for key, pat in [
 # Latency
 def parse_netperf_latency(p, fname):
     fs = sorted(glob.glob(os.path.join(basedir, p))
-    if not fs: return None
+    if not fs:
+        return None
     vals = []
     idx = {"p50": 2, "p99": 4, "mean": 1}.get(fname, 2)
     for f in fs:
@@ -891,7 +906,8 @@ def parse_netperf_latency(p, fname):
             parts = lines[-1].split(',')
             if len(parts) > idx: vals.append(float(parts[idx]))
         except: pass
-    if not vals: return None
+    if not vals:
+        return None
     return int(sum(vals)/len(vals))
 
 p50 = parse_netperf_latency("latency/tcp_rr_r*.txt", "p50")
@@ -931,7 +947,8 @@ for cf_key in ["iptables_rules_count.txt", "ipvs_rules_count.txt"]:
 # Resources
 def parse_csv(pattern):
     fs = sorted(glob.glob(os.path.join(basedir, pattern))
-    if not fs: return {}, {}
+    if not fs:
+        return {}, {}
     cpu_vals, mem_vals = [], []
     for f in fs:
         try:
@@ -942,7 +959,8 @@ def parse_csv(pattern):
                         mem_vals.append(float(row['memory_mib']))
                     except: pass
         except: pass
-    if not cpu_vals: return {}, {}
+    if not cpu_vals:
+        return {}, {}
     return {"avg_cpu_m": round(sum(cpu_vals)/len(cpu_vals), 1)}, \
            {"avg_mem_mb": round(sum(mem_vals)/len(mem_vals), 1)}
 
