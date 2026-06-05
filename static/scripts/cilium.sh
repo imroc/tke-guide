@@ -426,9 +426,18 @@ check_nodes() {
 detect_network_mode() {
   info "$(msg DETECT)"
   local has_bridge_agent has_eni_agent has_cilium cilium_image
-  has_bridge_agent=$(kubectl -n kube-system get ds tke-bridge-agent --no-headers 2>/dev/null | wc -l | tr -d ' '; exit 0)
-  has_eni_agent=$(kubectl -n kube-system get ds tke-eni-agent --no-headers 2>/dev/null | wc -l | tr -d ' '; exit 0)
-  has_cilium=$(kubectl -n kube-system get ds cilium --no-headers 2>/dev/null | wc -l | tr -d ' '; exit 0)
+  has_bridge_agent=$(
+    kubectl -n kube-system get ds tke-bridge-agent --no-headers 2>/dev/null | wc -l | tr -d ' '
+    exit 0
+  )
+  has_eni_agent=$(
+    kubectl -n kube-system get ds tke-eni-agent --no-headers 2>/dev/null | wc -l | tr -d ' '
+    exit 0
+  )
+  has_cilium=$(
+    kubectl -n kube-system get ds cilium --no-headers 2>/dev/null | wc -l | tr -d ' '
+    exit 0
+  )
 
   if [[ "$has_cilium" -gt 0 ]]; then
     cilium_image=$(kubectl -n kube-system get ds cilium -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)
@@ -909,7 +918,7 @@ prompt_add_nodes_and_wait() {
     info "============================================"
     info "下一步：向集群添加节点"
     info "============================================"
-    info "Cilium 已安装到集群（DaemonSet 已就位），但当前集群可能还没有可调度的"
+    info "Cilium 已安装到集群（工作负载已就位），但当前集群可能还没有可调度的"
     info "节点。请按需创建节点池并添加节点（cilium-agent 会随节点就绪自动启动）。"
     info "节点池选型与创建方法详见: https://imroc.cc/tke/networking/cilium/install#新建节点池"
     info ""
@@ -918,7 +927,7 @@ prompt_add_nodes_and_wait() {
     info "============================================"
     info "Next step: add nodes to the cluster"
     info "============================================"
-    info "Cilium is installed (DaemonSet ready), but the cluster may not have any"
+    info "Cilium is installed (workload ready), but the cluster may not have any"
     info "schedulable nodes yet. Create a node pool and add nodes (cilium-agent"
     info "will auto-launch as nodes become Ready)."
     info "Node pool selection and creation guide:"
@@ -988,17 +997,17 @@ format_duration() {
   local m=$(((total % 3600) / 60))
   local s=$((total % 60))
   if is_zh; then
-    if (( h > 0 )); then
+    if ((h > 0)); then
       printf '%d时%d分%d秒' "$h" "$m" "$s"
-    elif (( m > 0 )); then
+    elif ((m > 0)); then
       printf '%d分%d秒' "$m" "$s"
     else
       printf '%d秒' "$s"
     fi
   else
-    if (( h > 0 )); then
+    if ((h > 0)); then
       printf '%dh %dm %ds' "$h" "$m" "$s"
-    elif (( m > 0 )); then
+    elif ((m > 0)); then
       printf '%dm %ds' "$m" "$s"
     else
       printf '%ds' "$s"
@@ -1256,7 +1265,7 @@ helm_enable_egress() {
   local routing_mode
   routing_mode=$(helm -n kube-system get values cilium 2>/dev/null | awk '/^routingMode:/ {print $2}' | tr -d '"')
   ROUTING_MODE="$routing_mode"
-  ENABLE_EGRESS=true  # for resolve_non_masq_cidrs to take effect
+  ENABLE_EGRESS=true # for resolve_non_masq_cidrs to take effect
   resolve_non_masq_cidrs
 
   local -a egress_set_args=(
@@ -1368,8 +1377,8 @@ print_replay_command() {
   if [[ "$ROUTING_MODE" == "native" ]] && [[ "${ENABLE_EGRESS:-false}" != "true" ]] && [[ -n "${ENABLE_IP_MASQ:-}" ]]; then
     env_vars="${env_vars} ENABLE_IP_MASQ=${ENABLE_IP_MASQ}"
   fi
-  if [[ -n "${NON_MASQ_CIDRS:-}" ]] && [[ "$ROUTING_MODE" == "native" ]] \
-     && { [[ "${ENABLE_EGRESS:-false}" == "true" ]] || [[ "${ENABLE_IP_MASQ:-false}" == "true" ]]; }; then
+  if [[ -n "${NON_MASQ_CIDRS:-}" ]] && [[ "$ROUTING_MODE" == "native" ]] &&
+    { [[ "${ENABLE_EGRESS:-false}" == "true" ]] || [[ "${ENABLE_IP_MASQ:-false}" == "true" ]]; }; then
     # Quote because list contains spaces
     env_vars="${env_vars} NON_MASQ_CIDRS=\"${NON_MASQ_CIDRS}\""
   fi
@@ -1440,8 +1449,8 @@ cmd_install_cilium() {
 
   # Show ip-masq SNAT rules summary right before install whenever ip-masq-agent
   # will be enabled (either explicit ENABLE_IP_MASQ=true or implicit via Egress).
-  if [[ "$ROUTING_MODE" == "native" ]] \
-     && { [[ "${ENABLE_IP_MASQ:-false}" == "true" ]] || [[ "${ENABLE_EGRESS:-false}" == "true" ]]; }; then
+  if [[ "$ROUTING_MODE" == "native" ]] &&
+    { [[ "${ENABLE_IP_MASQ:-false}" == "true" ]] || [[ "${ENABLE_EGRESS:-false}" == "true" ]]; }; then
     print_ip_masq_summary
   fi
   echo ""
@@ -1579,9 +1588,9 @@ cmd_uninstall_cilium() {
       kubectl -n kube-system patch daemonset "$ds" \
         --type=json \
         -p='[{"op":"remove","path":"/spec/template/spec/nodeSelector/label-not-exist"}]' \
-        2>/dev/null || \
-      kubectl -n kube-system patch daemonset "$ds" \
-        -p='{"spec":{"template":{"spec":{"nodeSelector":null}}}}' 2>/dev/null || true
+        2>/dev/null ||
+        kubectl -n kube-system patch daemonset "$ds" \
+          -p='{"spec":{"template":{"spec":{"nodeSelector":null}}}}' 2>/dev/null || true
       info "  - ${ds}: $(is_zh && echo "已恢复调度" || echo "scheduling restored")"
     fi
   done
@@ -1912,11 +1921,11 @@ is_china_region() {
   #   jnec/hzec/fzec/whec/csec/sjwec/hfeec/sheec/xiyec/xbec/cgoec — EC
   #   zw                             — Zhongwei
   case "$code" in
-    gz|sh|bj|cd|cq|nj|szx|qy|tsn) return 0 ;;
-    shjr|szjr|bjjr) return 0 ;;
-    jnec|hzec|fzec|whec|csec|sjwec|hfeec|sheec|xiyec|xbec|cgoec) return 0 ;;
-    zw) return 0 ;;
-    *) return 1 ;;
+  gz | sh | bj | cd | cq | nj | szx | qy | tsn) return 0 ;;
+  shjr | szjr | bjjr) return 0 ;;
+  jnec | hzec | fzec | whec | csec | sjwec | hfeec | sheec | xiyec | xbec | cgoec) return 0 ;;
+  zw) return 0 ;;
+  *) return 1 ;;
   esac
 }
 
@@ -1948,19 +1957,17 @@ detect_cluster_region() {
     else
       saw_oversea=1
     fi
-  done <<< "$lines"
-  if (( saw_cn == 1 && saw_oversea == 0 )); then
+  done <<<"$lines"
+  if ((saw_cn == 1 && saw_oversea == 0)); then
     echo "china"
-  elif (( saw_cn == 0 && saw_oversea == 1 )); then
+  elif ((saw_cn == 0 && saw_oversea == 1)); then
     echo "overseas"
-  elif (( saw_cn == 1 && saw_oversea == 1 )); then
+  elif ((saw_cn == 1 && saw_oversea == 1)); then
     echo "mixed"
   else
     echo "unknown"
   fi
 }
-
-
 
 # detect_cilium_routing_mode — Reads the cilium helm release values to determine
 # whether this install is Native Routing or Overlay. Returns "native", "overlay",
@@ -1969,17 +1976,17 @@ detect_cilium_routing_mode() {
   local mode
   mode=$(helm -n kube-system get values cilium 2>/dev/null | awk '/^routingMode:/ {print $2}' | tr -d '"' | head -1)
   case "$mode" in
-    native) echo "native" ;;
-    tunnel) echo "overlay" ;;  # cilium uses routingMode=tunnel for vxlan/geneve
-    *) echo "unknown" ;;
+  native) echo "native" ;;
+  tunnel) echo "overlay" ;; # cilium uses routingMode=tunnel for vxlan/geneve
+  *) echo "unknown" ;;
   esac
 }
 
 # first_node_external_ip — Returns the first non-super node's ExternalIP, or
 # empty if none. Used by probe_pod_to_node_eip to pick a target.
 first_node_external_ip() {
-  kubectl get node -o jsonpath='{range .items[*]}{.metadata.labels.node\.kubernetes\.io/instance-type}{"|"}{.status.addresses[?(@.type=="ExternalIP")].address}{"\n"}{end}' 2>/dev/null \
-    | awk -F'|' '$1 != "eklet" && $2 != "" {print $2; exit}'
+  kubectl get node -o jsonpath='{range .items[*]}{.metadata.labels.node\.kubernetes\.io/instance-type}{"|"}{.status.addresses[?(@.type=="ExternalIP")].address}{"\n"}{end}' 2>/dev/null |
+    awk -F'|' '$1 != "eklet" && $2 != "" {print $2; exit}'
 }
 
 # probe_pod_to_node_eip — Launches a temporary Pod and tries to ping <eip> with
@@ -2098,86 +2105,86 @@ cmd_test() {
   cluster_region=$(detect_cluster_region)
   local -a external_args=()
   case "$cluster_region" in
-    china)
-      if is_zh; then
-        info "检测到节点位于中国大陆地域，使用国内可达的外部目标 (域名: ${CN_EXTERNAL_TARGET} / ${CN_EXTERNAL_OTHER_TARGET})"
-        info "动态解析 ${CN_EXTERNAL_IP_DOMAIN} 以确定 pod-to-cidr 用例的 external-ip..."
-      else
-        info "Cluster nodes are in China-mainland region, using China-reachable external targets (domains: ${CN_EXTERNAL_TARGET} / ${CN_EXTERNAL_OTHER_TARGET})"
-        info "Resolving ${CN_EXTERNAL_IP_DOMAIN} dynamically to determine external-ip for pod-to-cidr scenarios..."
-      fi
+  china)
+    if is_zh; then
+      info "检测到节点位于中国大陆地域，使用国内可达的外部目标 (域名: ${CN_EXTERNAL_TARGET} / ${CN_EXTERNAL_OTHER_TARGET})"
+      info "动态解析 ${CN_EXTERNAL_IP_DOMAIN} 以确定 pod-to-cidr 用例的 external-ip..."
+    else
+      info "Cluster nodes are in China-mainland region, using China-reachable external targets (domains: ${CN_EXTERNAL_TARGET} / ${CN_EXTERNAL_OTHER_TARGET})"
+      info "Resolving ${CN_EXTERNAL_IP_DOMAIN} dynamically to determine external-ip for pod-to-cidr scenarios..."
+    fi
 
-      external_args=(
-        --external-target "$CN_EXTERNAL_TARGET"
-        --external-other-target "$CN_EXTERNAL_OTHER_TARGET"
-        # CN public services don't sign certs for raw IPs, so direct-IP HTTPS
-        # in pod-to-cidr would fail SAN validation without --insecure.
-        # cilium-cli internal HTTP tests use plain HTTP (no TLS), so this
-        # only relaxes external-target HTTPS validation, which is safe here.
-        --curl-insecure
+    external_args=(
+      --external-target "$CN_EXTERNAL_TARGET"
+      --external-other-target "$CN_EXTERNAL_OTHER_TARGET"
+      # CN public services don't sign certs for raw IPs, so direct-IP HTTPS
+      # in pod-to-cidr would fail SAN validation without --insecure.
+      # cilium-cli internal HTTP tests use plain HTTP (no TLS), so this
+      # only relaxes external-target HTTPS validation, which is safe here.
+      --curl-insecure
+    )
+
+    local cn_ips
+    if cn_ips=$(resolve_cn_external_ips); then
+      # cn_ips format: "ip1 ip2 cidr"
+      local cn_ip1 cn_ip2 cn_cidr
+      read -r cn_ip1 cn_ip2 cn_cidr <<<"$cn_ips"
+      if is_zh; then
+        info "动态解析成功，将注入以下参数:"
+      else
+        info "Dynamic resolution succeeded, will inject:"
+      fi
+      echo "  --external-ip          ${cn_ip1}"
+      echo "  --external-other-ip    ${cn_ip2}"
+      echo "  --external-cidr        ${cn_cidr}"
+      echo "  --external-target      ${CN_EXTERNAL_TARGET}"
+      echo "  --external-other-target ${CN_EXTERNAL_OTHER_TARGET}"
+      echo "  --curl-insecure"
+      external_args+=(
+        --external-ip "$cn_ip1"
+        --external-other-ip "$cn_ip2"
+        --external-cidr "$cn_cidr"
       )
-
-      local cn_ips
-      if cn_ips=$(resolve_cn_external_ips); then
-        # cn_ips format: "ip1 ip2 cidr"
-        local cn_ip1 cn_ip2 cn_cidr
-        read -r cn_ip1 cn_ip2 cn_cidr <<< "$cn_ips"
-        if is_zh; then
-          info "动态解析成功，将注入以下参数:"
-        else
-          info "Dynamic resolution succeeded, will inject:"
-        fi
-        echo "  --external-ip          ${cn_ip1}"
-        echo "  --external-other-ip    ${cn_ip2}"
-        echo "  --external-cidr        ${cn_cidr}"
-        echo "  --external-target      ${CN_EXTERNAL_TARGET}"
-        echo "  --external-other-target ${CN_EXTERNAL_OTHER_TARGET}"
-        echo "  --curl-insecure"
-        external_args+=(
-          --external-ip "$cn_ip1"
-          --external-other-ip "$cn_ip2"
-          --external-cidr "$cn_cidr"
-        )
-      else
-        # Couldn't find a working IP pair — only WARN; user decides whether to skip.
-        if is_zh; then
-          warn "未能动态解析到可用的国内 IP 对（CN 公网服务对裸 IP HTTPS 支持有限），以下依赖 IP 的 CIDR 用例预计会失败:"
-          warn "  - pod-to-cidr / to-cidr-external / from-cidr-external / client-egress-to-cidrgroup-deny / 等"
-          warn "  这是国内公网环境的客观限制（无稳定的 IP-only HTTPS 服务），与 cilium 能力无关。"
-          warn "  CIDR 策略能力本身仍由其它用例间接覆盖（如 to-entities-world、from-cidr 等）。"
-          warn "  如需跳过，可显式追加: --test '!/pod-to-cidr' --test '!/to-cidr-external' --test '!/from-cidr' --test '!/client-egress-to-cidr'"
-        else
-          warn "Could not resolve a working CN IP pair (CN public services have limited IP-only HTTPS support). The following IP-dependent CIDR test cases will likely fail:"
-          warn "  - pod-to-cidr / to-cidr-external / from-cidr-external / client-egress-to-cidrgroup-deny / etc."
-          warn "  This is a CN public-internet limitation (no stable IP-only HTTPS service), not a cilium issue."
-          warn "  CIDR policy capability is still indirectly covered by other tests (to-entities-world, from-cidr, etc.)."
-          warn "  To skip explicitly, append: --test '!/pod-to-cidr' --test '!/to-cidr-external' --test '!/from-cidr' --test '!/client-egress-to-cidr'"
-        fi
-      fi
-      ;;
-    overseas)
+    else
+      # Couldn't find a working IP pair — only WARN; user decides whether to skip.
       if is_zh; then
-        info "检测到节点位于海外地域，使用 cilium 默认外部目标 (1.1.1.1 / one.one.one.one. / k8s.io.)"
+        warn "未能动态解析到可用的国内 IP 对（CN 公网服务对裸 IP HTTPS 支持有限），以下依赖 IP 的 CIDR 用例预计会失败:"
+        warn "  - pod-to-cidr / to-cidr-external / from-cidr-external / client-egress-to-cidrgroup-deny / 等"
+        warn "  这是国内公网环境的客观限制（无稳定的 IP-only HTTPS 服务），与 cilium 能力无关。"
+        warn "  CIDR 策略能力本身仍由其它用例间接覆盖（如 to-entities-world、from-cidr 等）。"
+        warn "  如需跳过，可显式追加: --test '!/pod-to-cidr' --test '!/to-cidr-external' --test '!/from-cidr' --test '!/client-egress-to-cidr'"
       else
-        info "Cluster nodes are in overseas region, using cilium default external targets (1.1.1.1 / one.one.one.one. / k8s.io.)"
+        warn "Could not resolve a working CN IP pair (CN public services have limited IP-only HTTPS support). The following IP-dependent CIDR test cases will likely fail:"
+        warn "  - pod-to-cidr / to-cidr-external / from-cidr-external / client-egress-to-cidrgroup-deny / etc."
+        warn "  This is a CN public-internet limitation (no stable IP-only HTTPS service), not a cilium issue."
+        warn "  CIDR policy capability is still indirectly covered by other tests (to-entities-world, from-cidr, etc.)."
+        warn "  To skip explicitly, append: --test '!/pod-to-cidr' --test '!/to-cidr-external' --test '!/from-cidr' --test '!/client-egress-to-cidr'"
       fi
-      ;;
-    mixed)
-      if is_zh; then
-        warn "检测到节点跨地域分布（部分国内、部分海外），保守使用 cilium 默认外部目标"
-        warn "如全部节点在国内，可手动追加: --external-target ${CN_EXTERNAL_TARGET} --external-other-target ${CN_EXTERNAL_OTHER_TARGET} --curl-insecure"
-      else
-        warn "Mixed-region cluster detected (some nodes in China, some overseas), falling back to cilium default external targets"
-        warn "If all nodes are in China, append manually: --external-target ${CN_EXTERNAL_TARGET} --external-other-target ${CN_EXTERNAL_OTHER_TARGET} --curl-insecure"
-      fi
-      ;;
-    unknown|*)
-      if is_zh; then
-        warn "未能识别节点地域（topology.kubernetes.io/region 标签缺失或值未知），使用 cilium 默认外部目标"
-      else
-        warn "Cannot detect cluster region (topology.kubernetes.io/region label missing or unknown), using cilium default external targets"
-      fi
-      ;;
+    fi
+    ;;
+  overseas)
+    if is_zh; then
+      info "检测到节点位于海外地域，使用 cilium 默认外部目标 (1.1.1.1 / one.one.one.one. / k8s.io.)"
+    else
+      info "Cluster nodes are in overseas region, using cilium default external targets (1.1.1.1 / one.one.one.one. / k8s.io.)"
+    fi
+    ;;
+  mixed)
+    if is_zh; then
+      warn "检测到节点跨地域分布（部分国内、部分海外），保守使用 cilium 默认外部目标"
+      warn "如全部节点在国内，可手动追加: --external-target ${CN_EXTERNAL_TARGET} --external-other-target ${CN_EXTERNAL_OTHER_TARGET} --curl-insecure"
+    else
+      warn "Mixed-region cluster detected (some nodes in China, some overseas), falling back to cilium default external targets"
+      warn "If all nodes are in China, append manually: --external-target ${CN_EXTERNAL_TARGET} --external-other-target ${CN_EXTERNAL_OTHER_TARGET} --curl-insecure"
+    fi
+    ;;
+  unknown | *)
+    if is_zh; then
+      warn "未能识别节点地域（topology.kubernetes.io/region 标签缺失或值未知），使用 cilium 默认外部目标"
+    else
+      warn "Cannot detect cluster region (topology.kubernetes.io/region label missing or unknown), using cilium default external targets"
+    fi
+    ;;
   esac
 
   # ---- Pod public-internet egress probe ----
@@ -2323,7 +2330,7 @@ cmd_test() {
 
   echo ""
   info "============================================"
-  if (( rc == 0 )); then
+  if ((rc == 0)); then
     if is_zh; then
       info "测试完成！耗时 ${pretty}"
     else
@@ -2468,7 +2475,7 @@ cmd_perf() {
 
   echo ""
   info "============================================"
-  if (( rc == 0 )); then
+  if ((rc == 0)); then
     if is_zh; then
       info "性能测试完成！耗时 ${pretty}"
     else
@@ -2567,8 +2574,14 @@ main() {
   install) cmd_install_cilium ;;
   uninstall) cmd_uninstall_cilium ;;
   install-localdns) cmd_install_localdns ;;
-  test) shift; cmd_test "$@" ;;
-  perf) shift; cmd_perf "$@" ;;
+  test)
+    shift
+    cmd_test "$@"
+    ;;
+  perf)
+    shift
+    cmd_perf "$@"
+    ;;
   enable-egress-gateway) cmd_enable_egress_gateway ;;
   enable-hubble) cmd_enable_hubble ;;
   help | --help | -h | "") show_help ;;

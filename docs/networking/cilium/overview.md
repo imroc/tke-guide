@@ -107,11 +107,11 @@ Cilium 路由支持两种模式：
 
 本系列教程提供以下三种经过完整 e2e 测试的部署方案：
 
-| 方案                         | 集群类型 | 路由模式 | Pod IP 来源 | 核心特点                 |
-| ---------------------------- | -------- | -------- | ----------- | ------------------------ |
-| **Native Routing (VPC-CNI)** | VPC-CNI  | Native   | VPC 子网 IP | Pod 被 VPC 原生识别      |
-| **Overlay (VPC-CNI)**        | VPC-CNI  | VXLAN    | 独立 CIDR   | IP 与 VPC 解耦、满血功能 |
-| **Overlay (GR)**             | GR       | VXLAN    | 独立 CIDR   | 仅推荐已有 GR 集群使用   |
+| 方案                         | 集群网络模式 | 路由模式 | Pod IP 来源 | 核心特点                 |
+| ---------------------------- | ------------ | -------- | ----------- | ------------------------ |
+| **Native Routing (VPC-CNI)** | VPC-CNI      | Native   | VPC 子网 IP | Pod 被 VPC 原生识别      |
+| **Overlay (VPC-CNI)**        | VPC-CNI      | VXLAN    | 独立 CIDR   | IP 与 VPC 解耦、满血功能 |
+| **Overlay (GR)**             | GR           | VXLAN    | 独立 CIDR   | 仅推荐已有 GR 集群使用   |
 
 > GR + Native Routing 因兼容性问题不再提供，详见 [为什么不提供 GR Native Routing 部署方案？](./appendix/gr-native-not-recommended.md)。
 
