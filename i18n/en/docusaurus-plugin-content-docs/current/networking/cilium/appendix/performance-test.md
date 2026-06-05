@@ -116,10 +116,10 @@ The TCP_STREAM tests in `cilium connectivity perf` (based on netperf) use large 
 
 | Instance | Mode    | Scenario   | Node       | Mean       | P50 | P90 | P99 | OP/s  |
 | -------- | ------- | ---------- | ---------- | ---------- | --- | --- | --- | ----- |
-| 4C       | Overlay | pod-to-pod | same-node  | **31.83**  | 31  | 35  | 44  | 31188 |
-| 4C       | Native  | pod-to-pod | same-node  | **37.84**  | 37  | 42  | 53  | 26257 |
-| 4C       | Overlay | pod-to-pod | other-node | **107.01** | 105 | 117 | 136 | 9323  |
-| 4C       | Native  | pod-to-pod | other-node | **96.89**  | 95  | 105 | 134 | 10294 |
+| 4C       | Overlay | pod-to-pod | same-node  | **31.27**  | 31  | 34  | 44  | 31736 |
+| 4C       | Native  | pod-to-pod | same-node  | **37.62**  | 37  | 41  | 53  | 26409 |
+| 4C       | Overlay | pod-to-pod | other-node | **94.29**  | 94  | 100 | 116 | 10576 |
+| 4C       | Native  | pod-to-pod | other-node | **112.83** | 113 | 119 | 138 | 8843  |
 | 8C       | Overlay | pod-to-pod | same-node  | **31.94**  | 32  | 34  | 43  | 31092 |
 | 8C       | Native  | pod-to-pod | same-node  | **38.03**  | 37  | 41  | 51  | 26135 |
 | 8C       | Overlay | pod-to-pod | other-node | **106.21** | 105 | 114 | 127 | 9394  |
@@ -129,10 +129,10 @@ The TCP_STREAM tests in `cilium connectivity perf` (based on netperf) use large 
 
 | Instance | Mode    | Scenario   | Node       | Single-stream | Multi-stream (8 streams) |
 | -------- | ------- | ---------- | ---------- | ------------- | ------------------------ |
-| 4C       | Overlay | pod-to-pod | same-node  | **22,730**    | **70,949**               |
-| 4C       | Native  | pod-to-pod | same-node  | **27,796**    | **65,833**               |
-| 4C       | Overlay | pod-to-pod | other-node | **10,146**    | **11,700**               |
-| 4C       | Native  | pod-to-pod | other-node | **1,679**     | **11,876**               |
+| 4C       | Overlay | pod-to-pod | same-node  | **22,997**    | **75,623**               |
+| 4C       | Native  | pod-to-pod | same-node  | **29,329**    | **64,128**               |
+| 4C       | Overlay | pod-to-pod | other-node | **11,116**    | **11,721**               |
+| 4C       | Native  | pod-to-pod | other-node | **10,767**    | **11,296**               |
 | 8C       | Overlay | pod-to-pod | same-node  | **25,537**    | **94,666**               |
 | 8C       | Native  | pod-to-pod | same-node  | **21,410**    | **88,831**               |
 | 8C       | Overlay | pod-to-pod | other-node | **11,113**    | **11,148**               |
