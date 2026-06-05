@@ -1,0 +1,1066 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+###############################################################################
+# TKE Network Benchmark
+#
+# A self-contained script for running network performance benchmarks across
+# different TKE network solutions (Cilium Native, Cilium Overlay,
+# kube-proxy iptables, kube-proxy IPVS).
+#
+# Usage:
+#   # Via tke CLI (TKE internal tool)
+#   MODE=local CLUSTER=cls-xxx bash network-benchmark.sh
+#
+#   # Or via standard kubectl kubeconfig
+#   bash network-benchmark.sh --context my-context
+#
+#   # Via curl (one-liner, will use current kubectl context)
+#   bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/network-benchmark.sh)" --
+#
+# Options:
+#   -h, --help       Show help
+#   --cluster ID     TKE cluster ID (uses 'tke kubectl' wrapper, overrides MODE/CLUSTER)
+#   --context NAME   Kubernetes context name (default: current context)
+#   --dir DIR        Output directory (default: ./benchmark-results-<cluster>)
+#   --skip-cleanup   Skip cleanup after benchmark
+#   --ns NS          Namespace for test workloads (default: network-benchmark)
+#
+# Environment Variables:
+#   NETPERF_IMAGE     netperf image (default: networkstatic/netperf:latest)
+#   IPERF_IMAGE       iperf3 image (default: networkstatic/iperf3:latest)
+#   FORTIO_IMAGE      fortio image (default: fortio/fortio:latest)
+#   TKE_MODE          tke CLI mode (default: local)
+#
+# Output:
+#   Creates benchmark-results-<cluster>/ directory with structured results.
+#
+###############################################################################
+
+SCRIPT_VERSION="1.0.0"
+
+# ─── Logging ─────────────────────────────────────────────────────────────────
+
+red()    { printf "\033[31m%s\033[0m\n" "$*"; }
+green()  { printf "\033[32m%s\033[0m\n" "$*"; }
+yellow() { printf "\033[33m%s\033[0m\n" "$*"; }
+blue()   { printf "\033[34m%s\033[0m\n" "$*"; }
+log()    { printf "[%s] %s\n" "$(date '+%H:%M:%S')" "$*"; }
+step()   { blue "━━━ $* ━━━"; }
+info()   { log "INFO: $*"; }
+warn()   { yellow "WARN: $*"; }
+err()    { red "ERROR: $*"; }
+
+# ─── Defaults ────────────────────────────────────────────────────────────────
+
+KUBECTL="kubectl"
+CLUSTER_ID=""
+CONTEXT=""
+OUTPUT_DIR=""
+SKIP_CLEANUP=false
+NS="network-benchmark"
+TKE_MODE="${TKE_MODE:-local}"
+
+NETPERF_IMAGE="${NETPERF_IMAGE:-networkstatic/netperf:latest}"
+IPERF_IMAGE="${IPERF_IMAGE:-networkstatic/iperf3:latest}"
+FORTIO_IMAGE="${FORTIO_IMAGE:-fortio/fortio:latest}"
+
+WORKER_NODE_1=""
+WORKER_NODE_2=""
+
+# ─── Parse Arguments ─────────────────────────────────────────────────────────
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            --cluster)
+                CLUSTER_ID="$2"
+                shift 2
+                ;;
+            --context)
+                CONTEXT="$2"
+                shift 2
+                ;;
+            --dir)
+                OUTPUT_DIR="$2"
+                shift 2
+                ;;
+            --ns)
+                NS="$2"
+                shift 2
+                ;;
+            --skip-cleanup)
+                SKIP_CLEANUP=true
+                shift
+                ;;
+            *)
+                err "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+show_help() {
+    cat << EOF
+TKE Network Benchmark v${SCRIPT_VERSION}
+
+Usage:
+  MODE=local CLUSTER=cls-xxx bash network-benchmark.sh               # via tke CLI
+  bash network-benchmark.sh --cluster cls-xxx                         # via tke CLI (shortcut)
+  bash network-benchmark.sh --context my-context                      # via kubeconfig
+  bash -c "\$(curl -sfL https://imroc.cc/tke/scripts/network-benchmark.sh)" --  # via curl
+
+Options:
+  -h, --help           Show this help
+  --cluster ID         TKE cluster ID (uses tke kubectl wrapper)
+  --context NAME       Kubernetes context name
+  --dir DIR            Output directory (default: ./benchmark-results-<cluster>)
+  --ns NS              Namespace for test workloads (default: network-benchmark)
+  --skip-cleanup       Skip cleanup after benchmark
+
+Environment Variables:
+  NETPERF_IMAGE     netperf image (default: networkstatic/netperf:latest)
+  IPERF_IMAGE       iperf3 image (default: networkstatic/iperf3:latest)
+  FORTIO_IMAGE      fortio image (default: fortio/fortio:latest)
+  TKE_MODE          tke CLI mode (default: local)
+EOF
+}
+
+# ─── Setup kubectl ───────────────────────────────────────────────────────────
+
+setup_kubectl() {
+    # Priority: --cluster > --context > MODE/CLUSTER env > default
+    if [[ -n "$CLUSTER_ID" ]]; then
+        # Use tke CLI wrapper
+        if ! command -v tke &>/dev/null; then
+            err "'tke' CLI not found. Install it first or use --context."
+            exit 1
+        fi
+        KUBECTL="MODE=${TKE_MODE} CLUSTER=${CLUSTER_ID} tke kubectl"
+        info "Using tke CLI: MODE=${TKE_MODE} CLUSTER=${CLUSTER_ID}"
+    elif [[ -n "$CONTEXT" ]]; then
+        KUBECTL="kubectl --context $CONTEXT"
+        info "Using kubectl context: $CONTEXT"
+    elif [[ -n "${MODE:-}" && -n "${CLUSTER:-}" ]]; then
+        # MODE and CLUSTER env vars already set, use tke directly
+        KUBECTL="MODE=${MODE} CLUSTER=${CLUSTER} tke kubectl"
+        info "Using tke CLI from env: MODE=${MODE} CLUSTER=${CLUSTER}"
+    else
+        info "Using default kubectl (current context)"
+    fi
+}
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+_kubectl() {
+    # Wrap kubectl call through the shell to expand the KUBECTL variable properly
+    # This ensures MODE=xxx CLUSTER=xxx tke kubectl works as a prefix
+    if [[ "$KUBECTL" == kubectl* ]] && ! echo "$KUBECTL" | grep -q "^MODE="; then
+        kubectl "$@"
+    elif [[ "$KUBECTL" == MODE=* ]]; then
+        eval "$KUBECTL" "$@"
+    else
+        eval "$KUBECTL" "$@"
+    fi
+}
+
+check_prereqs() {
+    local missing=0
+    for cmd in kubectl curl; do
+        if ! command -v "$cmd" &>/dev/null; then
+            err "Prerequisite '$cmd' not found"
+            missing=1
+        fi
+    done
+    # Check tke if cluster mode
+    if [[ -n "$CLUSTER_ID" ]] && ! command -v tke &>/dev/null; then
+        err "'tke' CLI not found"
+        missing=1
+    fi
+    return "$missing"
+}
+
+get_cluster_name() {
+    if [[ -n "$CLUSTER_ID" ]]; then
+        echo "$CLUSTER_ID"
+    else
+        _kubectl config current-context 2>/dev/null || echo "unknown"
+    fi
+}
+
+# ─── Cluster Detection ───────────────────────────────────────────────────────
+
+detect_cluster_type() {
+    info "Detecting cluster type..."
+
+    local cilium_ready
+    cilium_ready=$(_kubectl -n kube-system get ds cilium -o jsonpath='{.status.numberReady}' 2>/dev/null || echo "0")
+    if [[ "$cilium_ready" -gt 0 ]]; then
+        # Determine native vs overlay
+        local cilium_status
+        cilium_status=$(_kubectl -n kube-system exec ds/cilium -- cilium status 2>/dev/null || echo "")
+        if echo "$cilium_status" | grep -qi "Tunnel.*vxlan\|Tunnel.*geneve"; then
+            CLUSTER_TYPE="cilium-overlay"
+            info "Detected: Cilium Overlay"
+        else
+            CLUSTER_TYPE="cilium-native"
+            info "Detected: Cilium Native Routing"
+        fi
+        return 0
+    fi
+
+    local kube_proxy_running
+    kube_proxy_running=$(_kubectl -n kube-system get pod -l k8s-app=kube-proxy --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$kube_proxy_running" -gt 0 ]]; then
+        local proxy_mode
+        proxy_mode=$(_kubectl -n kube-system get configmap kube-proxy -o jsonpath='{.data.config}' 2>/dev/null | grep -o 'mode: "[^"]*"' | cut -d'"' -f2 || echo "iptables")
+        if [[ "$proxy_mode" == "ipvs" ]]; then
+            CLUSTER_TYPE="kubeproxy-ipvs"
+            info "Detected: kube-proxy IPVS"
+        else
+            CLUSTER_TYPE="kubeproxy-iptables"
+            info "Detected: kube-proxy iptables"
+        fi
+        return 0
+    fi
+
+    # Try configmap method as fallback
+    if _kubectl -n kube-system get configmap kube-proxy &>/dev/null; then
+        local proxy_mode
+        proxy_mode=$(_kubectl -n kube-system get configmap kube-proxy -o jsonpath='{.data.config}' 2>/dev/null | grep -o 'mode: "[^"]*"' | cut -d'"' -f2 || echo "iptables")
+        if [[ "$proxy_mode" == "ipvs" ]]; then
+            CLUSTER_TYPE="kubeproxy-ipvs"
+            info "Detected: kube-proxy IPVS (from config)"
+        else
+            CLUSTER_TYPE="kubeproxy-iptables"
+            info "Detected: kube-proxy iptables (from config)"
+        fi
+        return 0
+    fi
+
+    err "Unable to detect cluster type"
+    exit 1
+}
+
+collect_context_info() {
+    step "Collecting cluster context info"
+    mkdir -p "$OUTPUT_DIR"
+
+    local cluster_name
+    cluster_name=$(get_cluster_name)
+
+    cat > "$OUTPUT_DIR/context.yaml" << EOF
+cluster_name: $cluster_name
+cluster_type: $CLUSTER_TYPE
+test_date: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+k8s_version: $(_kubectl version -o json 2>/dev/null | grep -o '"gitVersion":"[^"]*"' | head -1 | cut -d'"' -f4)
+node_count: $(_kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')
+node_os: $(_kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.osImage}' 2>/dev/null)
+kernel_version: $(_kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.kernelVersion}' 2>/dev/null)
+node_model: $(_kubectl describe node 2>/dev/null | grep 'machine-size' | head -1 | awk '{print $NF}' || echo "unknown")
+EOF
+
+    info "Context info saved to $OUTPUT_DIR/context.yaml"
+}
+
+# ─── Select Worker Nodes ────────────────────────────────────────────────────
+
+select_worker_nodes() {
+    step "Selecting worker nodes for cross-node tests"
+
+    local nodes
+    nodes=$(_kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null | head -3)
+
+    WORKER_NODE_1=$(echo "$nodes" | sed -n '1p')
+    WORKER_NODE_2=$(echo "$nodes" | sed -n '2p')
+
+    if [[ -z "$WORKER_NODE_1" || -z "$WORKER_NODE_2" ]]; then
+        err "Need at least 2 worker nodes, found: $(echo "$nodes" | wc -l)"
+        exit 1
+    fi
+
+    info "Using nodes: $WORKER_NODE_1 (server) <-> $WORKER_NODE_2 (client)"
+}
+
+# ─── Deploy / Cleanup ───────────────────────────────────────────────────────
+
+deploy_test_workloads() {
+    step "Deploying test workloads"
+    local N="$NS"
+
+    _kubectl create namespace "$N" --dry-run=client -o yaml | _kubectl apply -f - 2>/dev/null
+
+    # Node Level (hostNetwork)
+    _kubectl apply -n "$N" -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: iperf-server-host
+  labels:
+    app: benchmark
+    role: iperf-server-host
+spec:
+  hostNetwork: true
+  nodeName: $WORKER_NODE_1
+  containers:
+  - name: iperf
+    image: $IPERF_IMAGE
+    command: ["iperf3", "-s", "-p", "5202"]
+    ports:
+    - containerPort: 5202
+      hostPort: 5202
+  terminationGracePeriodSeconds: 0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: iperf-client-host
+  labels:
+    app: benchmark
+    role: iperf-client-host
+spec:
+  hostNetwork: true
+  nodeName: $WORKER_NODE_2
+  containers:
+  - name: iperf
+    image: $IPERF_IMAGE
+    command: ["sleep", "infinity"]
+  terminationGracePeriodSeconds: 0
+EOF
+
+    # Pod-to-Pod workloads (iperf + netperf + fortio)
+    _kubectl apply -n "$N" -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: iperf-server
+  labels:
+    app: benchmark
+    role: iperf-server
+spec:
+  nodeName: $WORKER_NODE_1
+  containers:
+  - name: iperf
+    image: $IPERF_IMAGE
+    command: ["iperf3", "-s"]
+    ports:
+    - containerPort: 5201
+  terminationGracePeriodSeconds: 0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: iperf-client
+  labels:
+    app: benchmark
+    role: iperf-client
+spec:
+  nodeName: $WORKER_NODE_2
+  containers:
+  - name: iperf
+    image: $IPERF_IMAGE
+    command: ["sleep", "infinity"]
+  terminationGracePeriodSeconds: 0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netperf-server
+  labels:
+    app: benchmark
+    role: netperf-server
+spec:
+  nodeName: $WORKER_NODE_1
+  containers:
+  - name: netperf
+    image: $NETPERF_IMAGE
+    command: ["netserver", "-D"]
+    ports:
+    - containerPort: 12865
+  terminationGracePeriodSeconds: 0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netperf-client
+  labels:
+    app: benchmark
+    role: netperf-client
+spec:
+  nodeName: $WORKER_NODE_2
+  containers:
+  - name: netperf
+    image: $NETPERF_IMAGE
+    command: ["sleep", "infinity"]
+  terminationGracePeriodSeconds: 0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortio-server
+  labels:
+    app: benchmark
+    role: fortio-server
+spec:
+  nodeName: $WORKER_NODE_1
+  containers:
+  - name: fortio
+    image: $FORTIO_IMAGE
+    command: ["fortio", "server"]
+    ports:
+    - containerPort: 8080
+  terminationGracePeriodSeconds: 0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortio-client
+  labels:
+    app: benchmark
+    role: fortio-client
+spec:
+  nodeName: $WORKER_NODE_2
+  containers:
+  - name: fortio
+    image: $FORTIO_IMAGE
+    command: ["sleep", "infinity"]
+  terminationGracePeriodSeconds: 0
+EOF
+
+    # Services
+    _kubectl apply -n "$N" -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: iperf-service
+spec:
+  selector:
+    app: benchmark
+    role: iperf-server
+  ports:
+  - port: 5201
+    targetPort: 5201
+  type: ClusterIP
+EOF
+
+    info "Waiting for pods to be ready..."
+    local pods="pod/iperf-server-host pod/iperf-client-host pod/iperf-server pod/iperf-client pod/netperf-server pod/netperf-client pod/fortio-server pod/fortio-client"
+    _kubectl wait -n "$N" --for=condition=Ready $pods --timeout=300s
+    info "All test workloads ready"
+}
+
+cleanup_test_workloads() {
+    if [[ "$SKIP_CLEANUP" == "true" ]]; then
+        warn "Skipping cleanup (--skip-cleanup)"
+        return 0
+    fi
+    step "Cleaning up test workloads"
+    _kubectl delete namespace "$NS" --ignore-not-found --timeout=60s 2>/dev/null || {
+        _kubectl delete pod -n "$NS" --all --grace-period=0 --force --ignore-not-found 2>/dev/null || true
+        sleep 5
+        _kubectl delete namespace "$NS" --ignore-not-found 2>/dev/null || true
+    }
+    info "Cleanup complete"
+}
+
+# ─── exec helpers ───────────────────────────────────────────────────────────
+
+_pod_exec() {
+    local pod="$1"; shift
+    _kubectl exec -n "$NS" "$pod" -- "$@"
+}
+
+# ─── Resource Monitoring ────────────────────────────────────────────────────
+
+start_resource_monitor() {
+    local csv_file="$1"
+    local label="$2"
+    local pid_file="$3"
+    echo "timestamp,pod,cpu_millicores,memory_mib" > "$csv_file"
+    (
+        while true; do
+            _kubectl top pod -n kube-system -l "$label" --no-headers 2>/dev/null | while read -r pod cpu mem rest; do
+                echo "$(date +%H:%M:%S),$pod,${cpu%%m},${mem%%Mi}" >> "$csv_file"
+            done
+            sleep 5
+        done
+    ) &
+    echo $! > "$pid_file"
+}
+
+stop_resource_monitor() {
+    local pid_file="$1"
+    if [[ -f "$pid_file" ]]; then
+        kill "$(cat "$pid_file")" 2>/dev/null || true
+        rm -f "$pid_file"
+    fi
+}
+
+# ─── iperf3 Throughput Tests ────────────────────────────────────────────────
+
+_run_iperf() {
+    local label="$1" server_ip="$2" port="$3" parallel="$4" output_dir="$5" result_file="$6"
+    local out="$output_dir/$result_file"
+    mkdir -p "$output_dir"
+    info "Running: $label"
+    _pod_exec iperf-client iperf3 -c "$server_ip" -p "$port" -t 120 -P "$parallel" -J > "$out" 2>/dev/null
+
+    # Extract Gbps using temp Python script to avoid quote escaping issues
+    local py_tmp="/tmp/nb_iperf_$$.py"
+    cat > "$py_tmp" << 'PYEOF'
+import json, sys
+with open(sys.argv[1]) as f:
+    d = json.load(f)
+v = d["end"]["sum_received"]["bits_per_second"] / 1e9
+print(f"{v:.2f}")
+PYEOF
+    local gbps
+    gbps=$(python3 "$py_tmp" "$out" 2>/dev/null || echo "N/A")
+    rm -f "$py_tmp"
+
+    info "  → ${gbps} Gbps"
+}
+
+run_throughput_tests() {
+    step "Running Throughput Tests (iperf3, 120s × 3 rounds, 15s interval)"
+    local d="$OUTPUT_DIR/throughput"
+    mkdir -p "$d"
+
+    local N="$NS"
+    local node1_ip
+    node1_ip=$(_kubectl get pod -n "$N" iperf-server-host -o jsonpath='{.status.hostIP}')
+    local server_pod_ip
+    server_pod_ip=$(_kubectl get pod -n "$N" iperf-server -o jsonpath='{.status.podIP}')
+    local svc_ip
+    svc_ip=$(_kubectl get svc -n "$N" iperf-service -o jsonpath='{.spec.clusterIP}')
+
+    info "Node1 IP: $node1_ip | Server Pod IP: $server_pod_ip | Svc IP: $svc_ip"
+
+    # Start resource monitoring for the throughput phase
+    local mon_pid=""
+    if [[ "$CLUSTER_TYPE" == cilium-* ]]; then
+        start_resource_monitor "$OUTPUT_DIR/resources/cilium_throughput.csv" "k8s-app=cilium" "/tmp/nb_cilium_mon.pid"
+        mon_pid="/tmp/nb_cilium_mon.pid"
+    elif [[ "$CLUSTER_TYPE" == kubeproxy-* ]]; then
+        start_resource_monitor "$OUTPUT_DIR/resources/kubeproxy_throughput.csv" "k8s-app=kube-proxy" "/tmp/nb_kp_mon.pid"
+        mon_pid="/tmp/nb_kp_mon.pid"
+    fi
+
+    # Node Level
+    for r in 1 2 3; do _run_iperf "Node Level 8stream r$r" "$node1_ip" "5202" "8" "$d" "node_throughput_r${r}.json"; sleep 15; done
+    # Pod-to-Pod single
+    for r in 1 2 3; do _run_iperf "Pod-to-Pod single r$r" "$server_pod_ip" "5201" "1" "$d" "pod2pod_single_r${r}.json"; sleep 15; done
+    # Pod-to-Pod 8 streams
+    for r in 1 2 3; do _run_iperf "Pod-to-Pod 8stream r$r" "$server_pod_ip" "5201" "8" "$d" "pod2pod_8stream_r${r}.json"; sleep 15; done
+    # Via Service 8 streams
+    for r in 1 2 3; do _run_iperf "Via Service 8stream r$r" "$svc_ip" "5201" "8" "$d" "via_service_8stream_r${r}.json"; sleep 15; done
+
+    # Stop monitoring, wait for metrics to settle
+    [[ -n "$mon_pid" ]] && stop_resource_monitor "$mon_pid"
+    sleep 10
+    info "Throughput tests complete"
+}
+
+# ─── fortio RPS Tests ───────────────────────────────────────────────────────
+
+_run_fortio() {
+    local label="$1" url="$2" connections="$3" keepalive="$4"
+    local output_dir="$5" result_file="$6"
+    local out="$output_dir/$result_file"
+    mkdir -p "$output_dir"
+    local ka_flag=""
+    [[ "$keepalive" == "false" ]] && ka_flag="-keepalive=false"
+    local cmd="fortio load -c $connections -t 120s $ka_flag -json - \"$url\""
+    info "Running: $label (c=$connections, keepalive=$keepalive)"
+    _pod_exec fortio-client bash -c "$cmd" > "$out" 2>/dev/null
+    local qps
+    # Extract QPS using temp Python script
+    py_tmp="/tmp/nb_fortio_$$.py"
+    cat > "$py_tmp" << 'PYEOF'
+import json, sys
+with open(sys.argv[1]) as f:
+    d = json.load(f)
+print(int(d["ActualQPS"]))
+PYEOF
+    qps=$(python3 "$py_tmp" "$out" 2>/dev/null || echo "N/A")
+    rm -f "$py_tmp"
+    info "  → ${qps} req/s"
+}
+
+run_rps_tests() {
+    step "Running RPS Tests (fortio, 120s × 3 rounds, 15s interval)"
+    local d="$OUTPUT_DIR/rps"
+    mkdir -p "$d"
+    local N="$NS"
+
+    local server_pod_ip
+    server_pod_ip=$(_kubectl get pod -n "$N" fortio-server -o jsonpath='{.status.podIP}')
+
+    # Create fortio service
+    _kubectl apply -n "$N" -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: fortio-service
+spec:
+  selector:
+    app: benchmark
+    role: fortio-server
+  ports:
+  - port: 8080
+    targetPort: 8080
+  type: ClusterIP
+EOF
+    sleep 3
+    local fortio_svc_ip
+    fortio_svc_ip=$(_kubectl get svc -n "$N" fortio-service -o jsonpath='{.spec.clusterIP}')
+
+    # Start resource monitoring
+    local mon_pid=""
+    if [[ "$CLUSTER_TYPE" == cilium-* ]]; then
+        start_resource_monitor "$OUTPUT_DIR/resources/cilium_rps.csv" "k8s-app=cilium" "/tmp/nb_cilium_mon.pid"
+        mon_pid="/tmp/nb_cilium_mon.pid"
+    elif [[ "$CLUSTER_TYPE" == kubeproxy-* ]]; then
+        start_resource_monitor "$OUTPUT_DIR/resources/kubeproxy_rps.csv" "k8s-app=kube-proxy" "/tmp/nb_kp_mon.pid"
+        mon_pid="/tmp/nb_kp_mon.pid"
+    fi
+
+    for r in 1 2 3; do
+        _run_fortio "Pod-to-Pod 64c r$r" "http://${server_pod_ip}:8080/echo?size=512" 64 true "$d" "pod2pod_c64_r${r}.json"
+        sleep 15
+    done
+    for r in 1 2 3; do
+        _run_fortio "Via Svc 64c (ka) r$r" "http://${fortio_svc_ip}:8080/echo?size=512" 64 true "$d" "svc_c64_r${r}.json"
+        sleep 15
+    done
+    for r in 1 2 3; do
+        _run_fortio "Via Svc 256c (ka) r$r" "http://${fortio_svc_ip}:8080/echo?size=512" 256 true "$d" "svc_c256_r${r}.json"
+        sleep 15
+    done
+    for r in 1 2 3; do
+        _run_fortio "Via Svc 64c (short) r$r" "http://${fortio_svc_ip}:8080/echo?size=512" 64 false "$d" "svc_short_c64_r${r}.json"
+        sleep 15
+    done
+
+    [[ -n "$mon_pid" ]] && stop_resource_monitor "$mon_pid"
+    sleep 10
+    info "RPS tests complete"
+}
+
+# ─── netperf Latency Tests ──────────────────────────────────────────────────
+
+run_latency_tests() {
+    step "Running Latency Tests (netperf TCP_RR/TCP_CRR + fortio HTTP, 120s × 3)"
+    local d="$OUTPUT_DIR/latency"
+    mkdir -p "$d"
+    local N="$NS"
+
+    local np_ip
+    np_ip=$(_kubectl get pod -n "$N" netperf-server -o jsonpath='{.status.podIP}')
+    local fs_ip
+    fs_ip=$(_kubectl get svc -n "$N" fortio-service -o jsonpath='{.spec.clusterIP}')
+
+    # TCP_RR
+    for r in 1 2 3; do
+        info "TCP_RR round $r"
+        _pod_exec netperf-client netperf -H "$np_ip" -t TCP_RR -l 120 -- -r 1,1 \
+            -o MIN_LATENCY,MEAN_LATENCY,P50_LATENCY,P90_LATENCY,P99_LATENCY,MAX_LATENCY,THROUGHPUT \
+            > "$d/tcp_rr_r${r}.txt" 2>/dev/null
+        sleep 15
+    done
+
+    # TCP_CRR
+    for r in 1 2 3; do
+        info "TCP_CRR round $r"
+        _pod_exec netperf-client netperf -H "$np_ip" -t TCP_CRR -l 120 -- -r 1,1 \
+            -o MIN_LATENCY,MEAN_LATENCY,P50_LATENCY,P90_LATENCY,P99_LATENCY,MAX_LATENCY,THROUGHPUT \
+            > "$d/tcp_crr_r${r}.txt" 2>/dev/null
+        sleep 15
+    done
+
+    # HTTP p99 @ 1000 QPS
+    info "HTTP p99 @ 1000 QPS"
+    _pod_exec fortio-client fortio load -qps 1000 -c 16 -t 120s -json - \
+        "http://${fs_ip}:8080/echo?size=512" > "$d/http_1k_qps.json" 2>/dev/null
+
+    info "Latency tests complete"
+}
+
+# ─── Service Scale Test ─────────────────────────────────────────────────────
+
+run_service_scale_test() {
+    step "Running Service Scale Test (1000 dummy Services)"
+    local d="$OUTPUT_DIR/service-scale"
+    mkdir -p "$d"
+
+    info "Creating 1000 dummy Services..."
+    _kubectl create namespace test-services --dry-run=client -o yaml | _kubectl apply -f - 2>/dev/null
+
+    for i in $(seq 1 1000); do
+        local o3=$(( (i - 1) / 254 ))
+        local o4=$(( (i - 1) % 254 + 1 ))
+        cat <<EOF | _kubectl apply -f - 2>/dev/null
+apiVersion: v1
+kind: Service
+metadata:
+  name: dummy-svc-${i}
+  namespace: test-services
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: dummy-svc-${i}
+  namespace: test-services
+subsets:
+- addresses:
+  - ip: 10.99.${o3}.${o4}
+  ports:
+  - port: 80
+    protocol: TCP
+EOF
+    done
+
+    info "Waiting 30s for sync..."
+    sleep 30
+    echo "1000" > "$d/dummy_services_count.txt"
+
+    local fs_ip
+    fs_ip=$(_kubectl get svc -n "$NS" fortio-service -o jsonpath='{.spec.clusterIP}')
+
+    for r in 1 2 3; do
+        _run_fortio "Via Svc 64c short (1000svc) r$r" \
+            "http://${fs_ip}:8080/echo?size=512" 64 false "$d" "short_conn_1k_svc_r${r}.json"
+        sleep 15
+    done
+
+    info "Service scale tests complete"
+}
+
+# ─── Component-Specific Metrics ─────────────────────────────────────────────
+
+collect_component_metrics() {
+    step "Collecting component-specific metrics"
+    local rd="$OUTPUT_DIR/resources"
+    mkdir -p "$rd"
+
+    if [[ "$CLUSTER_TYPE" == cilium-* ]]; then
+        info "Collecting Cilium metrics..."
+
+        # Cilium agent resource usage (post-benchmark snapshot)
+        local cilium_csv="$rd/cilium_agent_cpu_mem.csv"
+        echo "timestamp,pod,cpu_millicores,memory_mib" > "$cilium_csv"
+        for _ in 1 2 3; do
+            _kubectl top pod -n kube-system -l k8s-app=cilium --no-headers 2>/dev/null | while read -r pod cpu mem rest; do
+                echo "$(date +%H:%M:%S),$pod,${cpu%%m},${mem%%Mi}" >> "$cilium_csv"
+            done
+            sleep 5
+        done
+
+        # BPF maps
+        info "Collecting BPF map info..."
+        _kubectl exec -n kube-system ds/cilium -- bpftool map list -j 2>/dev/null > "$rd/bpf_map_info.json" || true
+        _kubectl exec -n kube-system ds/cilium -- cilium bpf metrics 2>/dev/null > "$rd/bpf_metrics.txt" || true
+
+        # LB/CT/Identity
+        _kubectl exec -n kube-system ds/cilium -- cilium bpf lb list 2>/dev/null | wc -l > "$rd/lb_entries_count.txt" || true
+        _kubectl exec -n kube-system ds/cilium -- cilium bpf ct list global 2>/dev/null | wc -l > "$rd/ct_entries_count.txt" || true
+        _kubectl exec -n kube-system ds/cilium -- cilium identity list 2>/dev/null | wc -l > "$rd/identity_count.txt" || true
+
+    elif [[ "$CLUSTER_TYPE" == kubeproxy-* ]]; then
+        info "Collecting kube-proxy metrics..."
+
+        local kp_csv="$rd/kubeproxy_cpu_mem.csv"
+        echo "timestamp,pod,cpu_millicores,memory_mib" > "$kp_csv"
+        for _ in 1 2 3; do
+            _kubectl top pod -n kube-system -l k8s-app=kube-proxy --no-headers 2>/dev/null | while read -r pod cpu mem rest; do
+                echo "$(date +%H:%M:%S),$pod,${cpu%%m},${mem%%Mi}" >> "$kp_csv"
+            done
+            sleep 5
+        done
+
+        # Find a kube-proxy pod
+        local kp_pod
+        kp_pod=$(_kubectl get pod -n kube-system -l k8s-app=kube-proxy -o name 2>/dev/null | head -1)
+
+        if [[ "$CLUSTER_TYPE" == "kubeproxy-iptables" && -n "$kp_pod" ]]; then
+            # Remove "pod/" prefix if present
+            kp_pod="${kp_pod#pod/}"
+            _kubectl exec -n kube-system "$kp_pod" -- iptables-save 2>/dev/null | wc -l > "$rd/iptables_rules_count.txt" || true
+        fi
+
+        if [[ "$CLUSTER_TYPE" == "kubeproxy-ipvs" && -n "$kp_pod" ]]; then
+            kp_pod="${kp_pod#pod/}"
+            _kubectl exec -n kube-system "$kp_pod" -- ipvsadm -ln 2>/dev/null | wc -l > "$rd/ipvs_rules_count.txt" || true
+        fi
+    fi
+
+    info "Component metrics collected"
+}
+
+# ─── Generate Summary ───────────────────────────────────────────────────────
+
+generate_summary() {
+    step "Generating benchmark summary"
+    local pyfile="/tmp/nb_summary_$$.py"
+    cat > "$pyfile" << 'PYEOF'
+import json, glob, os, csv, sys
+
+basedir = os.environ.get('NB_OUTPUT_DIR', '.')
+if not os.path.isdir(basedir):
+    sys.exit(0)
+
+summary = {"cluster": {}, "throughput": {}, "rps": {}, "latency": {}, "service_scale": {}, "resources": {}}
+
+# Context
+ctx = os.path.join(basedir, "context.yaml")
+if os.path.exists(ctx):
+    with open(ctx) as f:
+        for line in f:
+            if ':' in line:
+                k, v = line.strip().split(':', 1)
+                summary["cluster"][k.strip()] = v.strip()
+
+# Throughput
+def parse_iperf(p):
+    fs = sorted(glob.glob(os.path.join(basedir, p))
+    if not fs: return None
+    vals = []
+    for f in fs:
+        try:
+            with open(f) as fh:
+                d = json.load(fh)
+                vals.append(round(d['end']['sum_received']['bits_per_second'] / 1e9, 2))
+        except: pass
+    if not vals: return None
+    return {"gbps": vals, "avg": round(sum(vals)/len(vals), 2)}
+
+for key, pat in [
+    ("node_level_8stream", "throughput/node_throughput_r*.json"),
+    ("pod2pod_single", "throughput/pod2pod_single_r*.json"),
+    ("pod2pod_8stream", "throughput/pod2pod_8stream_r*.json"),
+    ("via_service_8stream", "throughput/via_service_8stream_r*.json"),
+]:
+    r = parse_iperf(pat)
+    if r: summary["throughput"][key] = r
+
+# RPS
+def parse_fortio(p):
+    fs = sorted(glob.glob(os.path.join(basedir, p))
+    if not fs: return None
+    vals = []
+    for f in fs:
+        try:
+            with open(f) as fh:
+                d = json.load(fh)
+                vals.append(int(d['ActualQPS']))
+        except: pass
+    if not vals: return None
+    return {"qps": vals, "avg_qps": int(sum(vals)/len(vals))}
+
+for key, pat in [
+    ("pod2pod_c64", "rps/pod2pod_c64_r*.json"),
+    ("svc_c64", "rps/svc_c64_r*.json"),
+    ("svc_c256", "rps/svc_c256_r*.json"),
+    ("svc_short_c64", "rps/svc_short_c64_r*.json"),
+]:
+    r = parse_fortio(pat)
+    if r: summary["rps"][key] = r
+
+# Latency
+def parse_netperf_latency(p, fname):
+    fs = sorted(glob.glob(os.path.join(basedir, p))
+    if not fs: return None
+    vals = []
+    idx = {"p50": 2, "p99": 4, "mean": 1}.get(fname, 2)
+    for f in fs:
+        try:
+            with open(f) as fh:
+                lines = [l.strip() for l in fh.readlines() if l.strip()]
+            if not lines: continue
+            parts = lines[-1].split(',')
+            if len(parts) > idx: vals.append(float(parts[idx]))
+        except: pass
+    if not vals: return None
+    return int(sum(vals)/len(vals))
+
+p50 = parse_netperf_latency("latency/tcp_rr_r*.txt", "p50")
+p99 = parse_netperf_latency("latency/tcp_rr_r*.txt", "p99")
+crr99 = parse_netperf_latency("latency/tcp_crr_r*.txt", "p99")
+if p50: summary["latency"]["tcp_rr_p50_us"] = p50
+if p99: summary["latency"]["tcp_rr_p99_us"] = p99
+if crr99: summary["latency"]["tcp_crr_p99_us"] = crr99
+
+# HTTP p99
+hfs = glob.glob(os.path.join(basedir, "latency/http_1k_qps.json"))
+if hfs:
+    try:
+        with open(hfs[0]) as f: d = json.load(f)
+        for p in d.get('DurationHistogram', {}).get('Percentiles', []):
+            if p.get('Percentile') == 99:
+                summary["latency"]["http_p99_1k_qps_ms"] = round(p['Value'] * 1000, 2)
+                break
+    except: pass
+
+# Service scale
+scale_qps = parse_fortio("service-scale/short_conn_1k_svc_r*.json")
+baseline = summary.get("rps", {}).get("svc_short_c64", {}).get("avg_qps")
+if scale_qps and baseline and baseline > 0:
+    summary["service_scale"] = {
+        "short_conn_1k_svc_qps": scale_qps["avg_qps"],
+        "baseline_short_conn_qps": baseline,
+        "degradation_pct": round((scale_qps["avg_qps"] - baseline) / baseline * 100, 1)
+    }
+
+# Rules count
+for cf_key in ["iptables_rules_count.txt", "ipvs_rules_count.txt"]:
+    cf = os.path.join(basedir, "service-scale", cf_key)
+    if os.path.exists(cf):
+        with open(cf) as f: summary["service_scale"][cf_key.replace("_count.txt", "_rules")] = int(f.read().strip())
+
+# Resources
+def parse_csv(pattern):
+    fs = sorted(glob.glob(os.path.join(basedir, pattern))
+    if not fs: return {}, {}
+    cpu_vals, mem_vals = [], []
+    for f in fs:
+        try:
+            with open(f) as fh:
+                for row in csv.DictReader(fh):
+                    try:
+                        cpu_vals.append(float(row['cpu_millicores']))
+                        mem_vals.append(float(row['memory_mib']))
+                    except: pass
+        except: pass
+    if not cpu_vals: return {}, {}
+    return {"avg_cpu_m": round(sum(cpu_vals)/len(cpu_vals), 1)}, \
+           {"avg_mem_mb": round(sum(mem_vals)/len(mem_vals), 1)}
+
+for res_key, csv_pat in [
+    ("cilium_agent", "resources/cilium_*.csv"),
+    ("kubeproxy", "resources/kubeproxy_*.csv"),
+]:
+    cpu_d, mem_d = parse_csv(csv_pat)
+    if cpu_d: summary["resources"][res_key] = {**cpu_d, **mem_d}
+
+# Write
+out = os.path.join(basedir, "benchmark-summary.json")
+with open(out, 'w') as f:
+    json.dump(summary, f, indent=2, ensure_ascii=False)
+print(f"Summary written to {out}")
+PYEOF
+    NB_OUTPUT_DIR="$OUTPUT_DIR" python3 "$pyfile" 2>/dev/null || warn "Python3 not available for summary generation"
+    rm -f "$pyfile"
+}
+
+# ─── Print Summary Table ────────────────────────────────────────────────────
+
+print_summary_table() {
+    step "Benchmark Results Summary"
+    local f="$OUTPUT_DIR/benchmark-summary.json"
+    if [[ ! -f "$f" ]]; then
+        warn "No summary file found at $f"
+        return
+    fi
+    local pyfile="/tmp/nb_print_$$.py"
+    cat > "$pyfile" << 'PYEOF'
+import json, sys
+with open(sys.argv[1]) as f:
+    d = json.load(f)
+print()
+print(f"  Cluster:       {d.get('cluster', {}).get('cluster_name', '?')}")
+print(f"  Type:          {d.get('cluster', {}).get('cluster_type', '?')}")
+print(f"  K8s Version:   {d.get('cluster', {}).get('k8s_version', '?')}")
+print()
+t = d.get('throughput', {})
+if t:
+    print("  ── Throughput ──")
+    for k, v in t.items():
+        print(f"    {k}: {v.get('avg', '?')} Gbps (rounds: {v.get('gbps', [])})")
+    print()
+r = d.get('rps', {})
+if r:
+    print("  ── RPS ──")
+    for k, v in r.items():
+        print(f"    {k}: {v.get('avg_qps', '?')} req/s")
+    print()
+l = d.get('latency', {})
+if l:
+    print("  ── Latency ──")
+    for k, v in l.items():
+        print(f"    {k}: {v}")
+    print()
+ss = d.get('service_scale', {})
+if ss:
+    print("  ── Service Scale ──")
+    print(f"    baseline: {ss.get('baseline_short_conn_qps', '?')} req/s")
+    print(f"    1k svc:   {ss.get('short_conn_1k_svc_qps', '?')} req/s")
+    print(f"    degrade:  {ss.get('degradation_pct', '?')}%")
+    print()
+PYEOF
+    python3 "$pyfile" "$f" 2>/dev/null || return
+    rm -f "$pyfile"
+}
+
+# ─── Main ────────────────────────────────────────────────────────────────────
+
+main() {
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════╗"
+    echo "║         TKE Network Benchmark v${SCRIPT_VERSION}          ║"
+    echo "╚══════════════════════════════════════════════════════════╝"
+    echo ""
+
+    parse_args "$@"
+    setup_kubectl
+
+    # Detect cluster and setup context info
+    detect_cluster_type
+
+    # Setup output directory
+    local cname
+    cname=$(get_cluster_name)
+    OUTPUT_DIR="${OUTPUT_DIR:-./benchmark-results-${cname}}"
+    info "Output directory: $OUTPUT_DIR"
+    mkdir -p "$OUTPUT_DIR/resources"
+
+    # Collect baseline context
+    collect_context_info
+    select_worker_nodes
+
+    # Run benchmark
+    deploy_test_workloads
+    run_throughput_tests
+    run_rps_tests
+    run_latency_tests
+    run_service_scale_test
+    collect_component_metrics
+
+    # Generate summary and print results
+    generate_summary
+    print_summary_table
+
+    # Cleanup
+    cleanup_test_workloads
+
+    green ""
+    green "╔══════════════════════════════════════════════════════════╗"
+    green "║          Benchmark Complete!                            ║"
+    green "╚══════════════════════════════════════════════════════════╝"
+    green ""
+    green "Results saved to: $OUTPUT_DIR"
+    green "Summary file:     $OUTPUT_DIR/benchmark-summary.json"
+    echo ""
+}
+
+main "$@"
