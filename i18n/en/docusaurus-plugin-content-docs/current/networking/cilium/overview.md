@@ -6,11 +6,11 @@
 
 ### Getting Started
 
-| Article              | Content                                                      | Audience                  |
-| -------------------- | ------------------------------------------------------------ | ------------------------- |
-| **Install Cilium**   | Empty cluster creation, helm install, verification, rollback | First-time users          |
-| **E2E Test**         | Functional testing methodology and real-world results        | All users                 |
-| **Performance Test** | Network benchmark across all deployment schemes              | Performance-focused users |
+| Article                      | Content                                                      | Audience                  |
+| ---------------------------- | ------------------------------------------------------------ | ------------------------- |
+| **Install Cilium**           | Empty cluster creation, helm install, verification, rollback | First-time users          |
+| **Cilium Connectivity Test** | Functional testing methodology and real-world results        | All users                 |
+| **Cilium Performance Test**  | Network benchmark across all deployment schemes              | Performance-focused users |
 
 ### Networking Enhancements
 
