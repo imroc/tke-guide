@@ -2,10 +2,11 @@
 
 TKE 实践指南 - 腾讯云 TKE (Tencent Kubernetes Engine) 的实战经验电子书，使用 Docusaurus 构建。
 
-- 在线地址: https://imroc.cc/tke
-- 作者：roc（腾讯云 TKE 团队）
-- 定位：个人 TKE 实践经验沉淀，同时作为客户文档参考（有对应方案时直接抛链接给客户）
-- 相关电子书：[kubernetes 实践指南](https://imroc.cc/kubernetes)
+- **在线地址**：https://imroc.cc/tke
+- **作者**：roc（腾讯云 TKE 团队）
+- **定位**：个人 TKE 实践经验沉淀，同时作为客户文档参考（有对应方案时直接抛链接给客户）
+- **相关电子书**：[kubernetes 实践指南](https://imroc.cc/kubernetes)
+- **CI/CD**：本项目通过 GitOps 自动将改动编译并同步到在线电子书。`git push` 后将自动触发 CI 流水线，编译后部署到在线站点，通常有**几分钟的延迟**才生效（具体时长取决于 CI 队列与构建速度）。建议在每次 push 后等待在线站点确认更新。
 
 ## 常用命令
 
