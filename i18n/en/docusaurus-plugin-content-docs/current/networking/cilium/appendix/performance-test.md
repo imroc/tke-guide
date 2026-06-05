@@ -1,0 +1,243 @@
+# Cilium Performance Test
+
+This article explains how to run network performance tests on Cilium installed on a TKE cluster, and presents benchmark results for each recommended deployment scheme.
+
+Cilium provides the [`cilium connectivity perf`](https://docs.cilium.io/en/stable/operations/performance/benchmark/) performance testing tool, which runs netperf-based TCP_RR (request-response latency) and TCP_STREAM (throughput) tests across **same-node / other-node** × **Pod network / Host network** — four network combinations in total.
+
+## Test Method
+
+### One-Click Script
+
+The [one-click installation script](../install.md#one-click-installation-script) `cilium.sh` provides the `perf` subcommand wrapping `cilium connectivity perf`:
+
+```bash
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- perf
+```
+
+If GitHub is unreachable, use the site mirror:
+
+```bash
+bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- perf
+```
+
+:::tip[Concurrent Streams]
+
+On burst-capable instance types (e.g., SA5), the default 4 streams may not trigger burst bandwidth. It is recommended to use 8 streams:
+
+```bash
+# Direct cilium CLI usage
+cilium connectivity perf --streams 8
+
+# Or via the one-click script (pass via environment variable)
+CILIUM_PERF_STREAMS=8 bash -c "$(curl -sfL ...)" -- perf
+```
+
+8 streams have been verified on multiple SA5 instance sizes to reliably reach burst bandwidth limits, providing a more accurate throughput measurement. If switching to a different instance type, refer to the instance's queue count — a good rule of thumb is to set `--streams` to 2× the queue count.
+
+:::
+
+The script does the following additional work compared to running `cilium connectivity perf` directly:
+
+- **Replaces images**: netperf images are replaced with TKE-internal mirror addresses (`quay.tencentcloudcr.com/cilium/network-perf`) so nodes don't need public network access to pull images
+- **Auto-cleans previous leftovers**: cleans up `cilium-test-*` namespaces left by previous test runs. `cilium connectivity perf` tries `kubectl delete ns cilium-test-1` on startup, but TKE's gatekeeper prevents namespace deletion when Pods still exist — without pre-cleaning, the script would hang (see [FAQ](#why-clean-up-cilium-test--namespace-before-perf))
+- **Elapsed time summary**: prints total elapsed time at the end
+
+### Manual Test
+
+First install the [cilium CLI](https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/#install-the-cilium-cli):
+
+```bash
+cilium connectivity perf \
+  --streams 8 \
+  --performance-image quay.tencentcloudcr.com/cilium/network-perf:3.20-1772622563-6fd6a90
+```
+
+Common `cilium connectivity perf` parameters:
+
+- `--duration 10s`: each RR/STREAM test runs for 10 seconds
+- `--samples 1`: run each test once (can increase for averaged results)
+- `--streams`: number of concurrent streams for TCP_STREAM_MULTI (default 4, recommended 8)
+- `--rr / --throughput / --throughput-multi`: enable TCP_RR, TCP_STREAM, TCP_STREAM_MULTI tests (all on by default)
+- `--pod-net / --host-net / --other-node / --same-node`: all four network combinations (all on by default)
+- Add `--udp` for UDP, `--crr` for TCP_CRR (new connection per request), `--bandwidth` for bandwidth rate limiting tests
+
+See `cilium connectivity perf --help` for all parameters.
+
+### Test Types
+
+| Test Type          | Description                                               | What It Measures                                                  |
+| ------------------ | --------------------------------------------------------- | ----------------------------------------------------------------- |
+| `TCP_RR`           | TCP Request-Response: send small requests, wait for reply | **Latency** (µs, lower is better); OP/s = transactions per second |
+| `TCP_STREAM`       | Single-stream TCP bulk transfer                           | **Single-stream throughput** (Mb/s, higher is better)             |
+| `TCP_STREAM_MULTI` | Multi-stream concurrent TCP transfer (`--streams`)        | **Multi-stream throughput** (Mb/s)                                |
+
+### Network Combinations
+
+| Scenario       | Node       | Description                                                   | Data Path                                                                         |
+| -------------- | ---------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `pod-to-pod`   | same-node  | client Pod → server Pod on the same node                      | client veth → cilium ebpf → server veth                                           |
+| `pod-to-pod`   | other-node | client Pod → server Pod on a different node                   | client veth → cilium ebpf → NIC → underlay → peer NIC → cilium ebpf → server veth |
+| `host-to-host` | same-node  | client (hostNetwork) → server (hostNetwork) on same node      | host stack → host stack (no cilium veth path)                                     |
+| `host-to-host` | other-node | client (hostNetwork) → server (hostNetwork) on different node | host stack → NIC → underlay → peer NIC → host stack                               |
+
+:::tip[Interpreting Results]
+
+Performance data **strongly depends on instance type, VPC bandwidth, kernel version, and concurrent workloads**. The values here are measured on empty newly-created clusters and serve only as a **relative comparison between Cilium installation modes** — they should not be treated as production performance baselines.
+
+The TCP_STREAM tests in `cilium connectivity perf` (based on netperf) use large default buffers that limit per-connection PPS, making it difficult to trigger burst bandwidth on burst-capable instance types. With `--streams 8`, multi-stream cross-node throughput roughly reflects the instance's baseline bandwidth, but burst limits are best measured with tools like iperf3. This article focuses on **relative differences** between modes rather than absolute values.
+
+:::
+
+## Test Environment
+
+| Item               | Value                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------ |
+| Kubernetes version | v1.34.1 (containerd 1.7.28)                                                                      |
+| Cilium version     | v1.19.4                                                                                          |
+| Cilium CLI version | v0.19.4                                                                                          |
+| Node OS            | TencentOS Server 4 (kernel 6.6.117-45.7.3.tl4.x86_64)                                            |
+| Node count         | 3 nodes                                                                                          |
+| Node public IP     | Nodes have EIP (performance tests don't require public access)                                   |
+| Installation       | [One-click installation script](../install.md#one-click-installation-script) `cilium.sh install` |
+| perf params        | `--streams 8` (8 concurrent streams for multi-stream tests)                                      |
+| Native mode        | Legacy Host Routing (see [host-routing appendix](./host-routing.md))                             |
+| Overlay mode       | BPF Host Routing (see [host-routing appendix](./host-routing.md))                                |
+
+### Instance Types Tested
+
+| Instance           | vCPU | Memory | Baseline / Burst Bandwidth | Queues | Rationale                     |
+| ------------------ | ---- | ------ | -------------------------- | ------ | ----------------------------- |
+| SA5.LARGE8 (4C)    | 4    | 8G     | 1.5 / 10 Gbps              | 4      | Most common TKE entry-level   |
+| SA5.2XLARGE16 (8C) | 8    | 16G    | 3 / 10 Gbps                | 8      | Common upgrade, double queues |
+
+## Test Results Summary
+
+### TCP_RR (Request-Response Latency, µs)
+
+| Instance | Mode    | Scenario   | Node       | Mean       | P50 | P90 | P99 | OP/s  |
+| -------- | ------- | ---------- | ---------- | ---------- | --- | --- | --- | ----- |
+| 4C       | Overlay | pod-to-pod | same-node  | **31.83**  | 31  | 35  | 44  | 31188 |
+| 4C       | Native  | pod-to-pod | same-node  | **37.84**  | 37  | 42  | 53  | 26257 |
+| 4C       | Overlay | pod-to-pod | other-node | **107.01** | 105 | 117 | 136 | 9323  |
+| 4C       | Native  | pod-to-pod | other-node | **96.89**  | 95  | 105 | 134 | 10294 |
+| 8C       | Overlay | pod-to-pod | same-node  | **31.94**  | 32  | 34  | 43  | 31092 |
+| 8C       | Native  | pod-to-pod | same-node  | **38.03**  | 37  | 41  | 51  | 26135 |
+| 8C       | Overlay | pod-to-pod | other-node | **106.21** | 105 | 114 | 127 | 9394  |
+| 8C       | Native  | pod-to-pod | other-node | **94.13**  | 93  | 99  | 109 | 10598 |
+
+### TCP_STREAM / TCP_STREAM_MULTI (Throughput, Mb/s)
+
+| Instance | Mode    | Scenario   | Node       | Single-stream | Multi-stream (8 streams) |
+| -------- | ------- | ---------- | ---------- | ------------- | ------------------------ |
+| 4C       | Overlay | pod-to-pod | same-node  | **22,730**    | **70,949**               |
+| 4C       | Native  | pod-to-pod | same-node  | **27,796**    | **65,833**               |
+| 4C       | Overlay | pod-to-pod | other-node | **10,146**    | **11,700**               |
+| 4C       | Native  | pod-to-pod | other-node | **1,679**     | **11,876**               |
+| 8C       | Overlay | pod-to-pod | same-node  | **25,537**    | **94,666**               |
+| 8C       | Native  | pod-to-pod | same-node  | **21,410**    | **88,831**               |
+| 8C       | Overlay | pod-to-pod | other-node | **11,113**    | **11,148**               |
+| 8C       | Native  | pod-to-pod | other-node | **10,768**    | **10,776**               |
+
+> Same-node multi-stream throughput exceeds physical NIC limits because data travels on the loopback interface — bound by CPU and kernel stack performance, not the physical NIC.
+
+## Comparison Analysis
+
+### Key Metrics
+
+| Metric                                 | Overlay vs Native (4C) | Overlay vs Native (8C) | Consistent? |
+| -------------------------------------- | ---------------------- | ---------------------- | ----------- |
+| **Same-node pod-to-pod TCP_RR Mean**   | Overlay **16% faster** | Overlay **16% faster** | ✅ Yes      |
+| **Other-node pod-to-pod TCP_RR Mean**  | Native **10% faster**  | Native **11% faster**  | ✅ Yes      |
+| **Same-node single-stream throughput** | Native 18% higher      | Overlay 16% higher     | ❌ No       |
+| **Same-node multi-stream throughput**  | Overlay 8% higher      | Overlay 7% higher      | ✅ Yes      |
+| **Other-node multi-stream throughput** | ~11.8 Gbps (tie)       | ~11 Gbps (tie)         | ✅ Yes      |
+
+### Key Findings
+
+#### Same-Node Latency: Overlay's Advantage is Clear and Stable
+
+Overlay's BPF host routing performs endpoint lookup and redirect at the `cilium_host` device ingress, skipping the netfilter / conntrack / FIB overhead that Native's Legacy host routing must go through. This advantage is independent of CPU count — **~16%** latency improvement on both 4C and 8C instance types.
+
+Same-node multi-stream throughput is also consistently **~7-8%** higher with Overlay.
+
+#### Cross-Node Latency: Native Takes the Lead
+
+Unlike the old S5 data, on SA5 instance types Native outperforms Overlay in cross-node scenarios — **10% faster on 4C**, **11% faster on 8C**. This is because SA5's VPC underlay has lower baseline latency (~80-100µs), making the VXLAN encapsulation/decapsulation overhead a larger proportion of the total path, offsetting Overlay's BPF host routing advantage.
+
+#### Cross-Node Multi-Stream Throughput: No Difference
+
+Both instance types and modes stabilize around **~11 Gbps** for multi-stream throughput, with no meaningful difference between Native and Overlay. This is close to SA5's burst bandwidth cap (10 Gbps), confirming that the Cilium datapath is not the bottleneck.
+
+#### Cross-Node Single-Stream Throughput: Unstable, Not a Reliable Metric
+
+Native 4C single-stream reaches only 1.68 Gbps (limited by the 1.5 Gbps baseline bandwidth shaping), while Overlay 4C single-stream hits 10.15 Gbps (triggering burst). This gap is caused by netperf's TCP/CPU behavior differences on 4C instances, not by Overlay's inherent superiority in single-stream throughput. On 8C, both modes fill ~10-11 Gbps, confirming this.
+
+## Selection Guide
+
+| Scenario                                                                   | Recommended                 | Reason                                                                                                                       |
+| -------------------------------------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Same-node high-frequency small-packet workloads (RPC / KV / MQ)**        | Overlay (VPC-CNI) ⭐        | BPF host routing provides a stable **~16%** latency advantage for same-node small-packet traffic                             |
+| **Distributed services (primarily cross-node calls)**                      | Native Routing (VPC-CNI) ⭐ | Cross-node latency is slightly better (~10%); Pod IPs are native VPC IPs for routing / CLB / security groups / CCN           |
+| **Pod IPs must match VPC IPs (VPC routing / CLB / security groups / CCN)** | Native Routing (VPC-CNI) ⭐ | Pod IPs as VPC IPs is Native's core value; cross-node throughput matches Overlay                                             |
+| **Cross-node bulk traffic (8+ streams)**                                   | No difference               | Both fill the VPC bandwidth cap with multi-stream concurrency                                                                |
+| **East-west NetworkPolicy / Hubble / KPR / Egress Gateway**                | No difference               | These are application-layer Cilium capabilities, independent of the host routing path                                        |
+| **Operational simplicity (no VPC-CNI chaining dependency)**                | Overlay (VPC-CNI) ⭐        | Overlay gives Cilium full control of Pod networking, no VPC-CNI chaining required, simpler configuration and troubleshooting |
+
+### Summary
+
+**There is no absolute winner — the difference is in latency, not throughput.** Overlay is better for same-node high-frequency small-packet scenarios; Native is slightly better for cross-node distributed services. If your business isn't sensitive to sub-millisecond latency differences, either mode works — cross-node multi-stream throughput is identical, and all core capabilities (NetworkPolicy / Hubble / KPR) are fully functional on both.
+
+For a deep dive into the two host routing paths and their hit conditions, see [Cilium Host Routing: Legacy vs BPF](./host-routing.md).
+
+## FAQ
+
+### Why clean up cilium-test-\* namespace before perf?
+
+On startup, `cilium connectivity perf` runs `kubectl delete ns cilium-test-1`. However, TKE clusters have a gatekeeper policy `baseline.gatekeeper.sh / block-namespace-deletion-rule` that **prevents namespace deletion when Pods still exist**:
+
+```text
+admission webhook "baseline.gatekeeper.sh" denied the request:
+[block-namespace-deletion-rule] The Namespace cilium-test-1 is not allowed
+to be deleted. Reason: It is not allowed to delete a namespace when it
+includes any pod resource.
+```
+
+If a previous `cilium connectivity test` had failures (e.g., the LRP edge case that always fails on Native), cilium-cli **preserves** test resources (namespace + Deployment + Pod) for debugging — these Pods block the namespace deletion step, causing the script to hang:
+
+```text
+🔥 [cls-cluster] Deleting connectivity check deployments...
+⌛ [cls-cluster] Waiting for namespace cilium-test-1 to disappear
+(stuck forever)
+```
+
+`cilium.sh perf` cleans up before the main flow: it deletes Deployment / DaemonSet / StatefulSet / ReplicaSet / Job / CronJob resources that hold Pods → waits for Pods to disappear (using `--grace-period=0 --force` if necessary) → then deletes the namespace. This bypasses the gatekeeper restriction.
+
+For manual runs that hang, clean up with:
+
+```bash
+for ns in cilium-test-1 cilium-test-ccnp1 cilium-test-ccnp2; do
+  kubectl -n $ns delete deployment,daemonset,statefulset,replicaset,job,cronjob --all --wait=false --ignore-not-found
+done
+sleep 30  # wait for Pods to actually disappear
+for ns in cilium-test-1 cilium-test-ccnp1 cilium-test-ccnp2; do
+  kubectl delete ns $ns --ignore-not-found
+done
+```
+
+### Why recommend `--streams 8`?
+
+SA5 instances have queue count = vCPU count (capped at 48). Real-world measurements:
+
+| Instance | Queues | `--streams=4` | `--streams=8`  | `--streams=16` |
+| -------- | ------ | ------------- | -------------- | -------------- |
+| 4C       | 4      | ~1.7 Gbps     | **~11.8 Gbps** | —              |
+| 8C       | 8      | ~1.7 Gbps     | **~11.1 Gbps** | ~3.4 Gbps      |
+
+8 streams fill the burst bandwidth on both instance sizes; 16 streams actually reduce throughput (per-stream bandwidth gets too thin for PPS to consume burst credits). **`--streams 8` is recommended as the default.** For other instance types, set `--streams` to 2× the queue count (capped at 64) to fill burst bandwidth.
+
+## Related Links
+
+- [Install Cilium](../install.md)
+- [Cilium Connectivity Test](./connectivity-test.md)
+- [Cilium Host Routing: Legacy vs BPF](./host-routing.md)
+- [Cilium Performance Documentation](https://docs.cilium.io/en/stable/operations/performance/)
