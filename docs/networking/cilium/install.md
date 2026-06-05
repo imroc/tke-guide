@@ -905,9 +905,9 @@ GR (GlobalRouter) 集群本身有几个限制，叠加 cilium 后体验也受影
 
 **VPC-CNI Native 模式**：cilium 默认**关闭** IP 伪装（`enableIPv4Masquerade=false`），因为 Pod IP 本身就是合法 VPC IP，东西向流量直接路由即可。但这意味着 Pod 出公网时源 IP 是 Pod IP（来自节点辅助网卡的 IP 池），辅助网卡上没有 EIP，**节点即使绑了 EIP（EIP 只在主网卡）也无法让 Pod 出公网**。需要满足下列任一条件：
 
-1. **VPC 配置 NAT 网关**（最干净，对所有节点子网生效）：在集群所在 VPC 的路由表中新建路由规则，让访问外网的流量转发到公网 NAT 网关，并确保路由表关联到了集群使用的子网，参考 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)。
-2. **启用 cilium 的 ip-masq-agent**：Pod 出 VPC 的流量 SNAT 成节点 IP，从节点主网卡 + 节点 EIP 出公网（自建版 TKE ip-masq-agent），适合"节点本身有 EIP，希望复用节点公网带宽"的场景。具体方法参考 [配置 IP 伪装](./masquerading.md)。
-3. **启用 Cilium Egress Gateway**：适合需要按 namespace/Pod 选择固定出口 IP 的高级场景，参考 [Egress Gateway 应用实践](./egress-gateway.md)。
+1. **VPC 配置 NAT 网关**：在集群所在 VPC 的路由表中新建路由规则，让访问外网的流量转发到公网 NAT 网关，并确保路由表关联到了集群使用的子网，参考 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)。
+2. **启用 cilium 的 ip-masq-agent**：Pod 出 VPC 的流量 SNAT 成节点 IP，从节点主网卡 + 节点 EIP 出公网，适合"节点本身有公网，希望复用节点公网带宽"的场景。具体方法参考 [配置 IP 伪装](./masquerading.md)。
+3. **启用 Cilium Egress Gateway**：适合需要按 namespace/pod 选择固定出口 IP 的高级场景，参考 [Egress Gateway 应用实践](./egress-gateway.md)。
 
 ### 镜像拉取失败？
 
