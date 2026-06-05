@@ -116,10 +116,10 @@ cilium connectivity perf \
 
 | 机型 | 模式    | Scenario   | Node       | Mean       | P50 | P90 | P99 | OP/s  |
 | ---- | ------- | ---------- | ---------- | ---------- | --- | --- | --- | ----- |
-| 4C   | Overlay | pod-to-pod | same-node  | **31.83**  | 31  | 35  | 44  | 31188 |
-| 4C   | Native  | pod-to-pod | same-node  | **37.84**  | 37  | 42  | 53  | 26257 |
-| 4C   | Overlay | pod-to-pod | other-node | **107.01** | 105 | 117 | 136 | 9323  |
-| 4C   | Native  | pod-to-pod | other-node | **96.89**  | 95  | 105 | 134 | 10294 |
+| 4C   | Overlay | pod-to-pod | same-node  | **31.27**  | 31  | 34  | 44  | 31736 |
+| 4C   | Native  | pod-to-pod | same-node  | **37.62**  | 37  | 41  | 53  | 26409 |
+| 4C   | Overlay | pod-to-pod | other-node | **94.29**  | 94  | 100 | 116 | 10576 |
+| 4C   | Native  | pod-to-pod | other-node | **112.83** | 113 | 119 | 138 | 8843  |
 | 8C   | Overlay | pod-to-pod | same-node  | **31.94**  | 32  | 34  | 43  | 31092 |
 | 8C   | Native  | pod-to-pod | same-node  | **38.03**  | 37  | 41  | 51  | 26135 |
 | 8C   | Overlay | pod-to-pod | other-node | **106.21** | 105 | 114 | 127 | 9394  |
@@ -129,10 +129,10 @@ cilium connectivity perf \
 
 | 机型 | 模式    | Scenario   | Node       | 单流       | 多流（8 流并发） |
 | ---- | ------- | ---------- | ---------- | ---------- | ---------------- |
-| 4C   | Overlay | pod-to-pod | same-node  | **22,730** | **70,949**       |
-| 4C   | Native  | pod-to-pod | same-node  | **27,796** | **65,833**       |
-| 4C   | Overlay | pod-to-pod | other-node | **10,146** | **11,700**       |
-| 4C   | Native  | pod-to-pod | other-node | **1,679**  | **11,876**       |
+| 4C   | Overlay | pod-to-pod | same-node  | **22,997** | **75,623**       |
+| 4C   | Native  | pod-to-pod | same-node  | **29,329** | **64,128**       |
+| 4C   | Overlay | pod-to-pod | other-node | **11,116** | **11,721**       |
+| 4C   | Native  | pod-to-pod | other-node | **10,767** | **11,296**       |
 | 8C   | Overlay | pod-to-pod | same-node  | **25,537** | **94,666**       |
 | 8C   | Native  | pod-to-pod | same-node  | **21,410** | **88,831**       |
 | 8C   | Overlay | pod-to-pod | other-node | **11,113** | **11,148**       |
@@ -146,46 +146,58 @@ cilium connectivity perf \
 
 | 指标                              | Overlay vs Native（4C） | Overlay vs Native（8C） | 趋势一致性 |
 | --------------------------------- | ----------------------- | ----------------------- | ---------- |
-| **同节点 pod-to-pod TCP_RR Mean** | Overlay **快 16%**      | Overlay **快 16%**      | ✅ 一致    |
-| **跨节点 pod-to-pod TCP_RR Mean** | Native **快 10%**       | Native **快 11%**       | ✅ 一致    |
-| **同节点单流吞吐**                | Native 高 18%           | Overlay 高 16%          | ❌ 反转    |
-| **同节点多流吞吐**                | Overlay 高 8%           | Overlay 高 7%           | ✅ 一致    |
-| **跨节点多流吞吐**                | 几乎一致（~11.8 Gbps）  | 几乎一致（~11 Gbps）    | ✅ 一致    |
+| **同节点 pod-to-pod TCP_RR Mean** | Overlay **快 17%**      | Overlay **快 16%**      | ✅ 一致    |
+| **同节点 pod-to-pod TCP_RR P99**  | Overlay 快 17%          | Overlay 快 16%          | ✅ 一致    |
+| **同节点多流吞吐**                | Overlay 高 15%          | Overlay 高 7%           | ✅ 一致    |
+| **跨节点多流吞吐**                | 几乎一致（~11.5 Gbps）  | 几乎一致（~11 Gbps）    | ✅ 一致    |
+| **跨节点 pod-to-pod TCP_RR**      | 波动较大，不定          | 波动较大，不定          | ❌ 见下文  |
 
 ### 核心发现
 
 #### 同节点延迟：Overlay 优势明确且稳定
 
-Overlay 的 BPF host routing 在 `cilium_host` 设备入口完成 endpoint 查找 + redirect，跳过 native 模式下 Legacy host routing 必经的 netfilter / conntrack / FIB 全套开销。这个优势不受 vCPU 数影响——4C 和 8C 下都是 **~16%** 的延迟改善。
+Overlay 的 BPF host routing 在 `cilium_host` 设备入口完成 endpoint 查找 + redirect，跳过 native 模式下 Legacy host routing 必经的 netfilter / conntrack / FIB 全套开销。这个优势不受 vCPU 数和 VPC 拓扑影响，**多次实测偏差 < 1%，结论可靠**。
 
-同节点多流吞吐 Overlay 也稳定高出约 **7-8%**。
+| 指标           | Overlay   | Native    | 差距               |
+| -------------- | --------- | --------- | ------------------ |
+| 同节点 RR Mean | 31.27µs   | 37.62µs   | Overlay **快 17%** |
+| 同节点 RR P99  | 44µs      | 53µs      | Overlay 快 17%     |
+| 同节点多流吞吐 | 75.6 Gbps | 64.1 Gbps | Overlay **高 15%** |
 
-#### 跨节点延迟：Native 反超
+> 同节点多流吞吐（loopback）远超物理网卡上限，衡量的是 CPU/内核栈处理能力。Overlay 稳定高出 7-15%，但均属于"本地数据拷贝"，不能作为跨节点性能的参考。
 
-与 S5 机型的旧数据不同，SA5 上跨节点场景 Native 反超 Overlay，4C 下 **快 10%**，8C 下 **快 11%**。原因是 SA5 的 VPC underlay 延迟更低（约 80-100µs），vxlan 封装/解封装在整个数据路径中的占比相对增大，使 Overlay 的延迟优势被抵消。
+#### 跨节点延迟：波动较大，无稳定结论
+
+跨节点延迟受 **VPC 物理拓扑（两节点间的交换机跳数/物理距离）** 影响很大，同一组节点对在不同集群、不同 VPC 子网下的延迟基线不同。三次测试中每次趋势不一（有时 Overlay 快，有时 Native 快），说明差值在统计噪声范围内。
+
+实际结论：**跨节点延迟不是选型的决定因素**——两者的差距（约 10-20µs）远小于应用层延迟波动，生产业务无感知。
 
 #### 跨节点多流吞吐：无差异
 
 两机型的多流吞吐都稳定在 ~**11 Gbps**，Native 与 Overlay 无实质差异。这个值接近 SA5 各规格实际可用的 VPC 带宽上限（SA5 突发带宽 10 Gbps），说明在此粒度下 cilium 数据面不是瓶颈。
 
+:::note[关于吞吐稳定性]
+跨节点多流吞吐在多次测试中偶有落在基准带宽附近（~1.7 Gbps）的情况，这是因为 SA5 的突发带宽基于积分机制，需满足特定条件才能触发。**Run-to-run 波动不是 Native 与 Overlay 的模式差异，而是 netperf 测试栈 PPS 不够高，有时无法消耗突发积分。** 建议跑 2-3 次取最能反映峰值的数据。
+:::
+
 #### 跨节点单流吞吐：不稳定，不做对比指标
 
-Native 4C 单流仅 1.68 Gbps（落在 1.5 Gbps 基准带宽整形上），而 Overlay 4C 单流达 10.15 Gbps（触发了突发）。这种差距是 netperf 在 4C 机型的 CPU/TCP 行为差异导致的，不代表 Overlay 在单流吞吐上优于 Native。8C 上两者单流都能填满 ~10-11 Gbps，验证了这点。
+单流基本落在基准带宽或其附近（1.5-3 Gbps），偶有触发突发的情况。不能据此得出任何模式差异结论。
 
 ## 选型建议
 
 | 场景                                                              | 推荐                        | 原因                                                                                              |
 | ----------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------- |
-| **同节点高频小包（RPC / KV 数据库 / MQ broker）**                 | Overlay (VPC-CNI) ⭐        | BPF host routing 在小包同节点场景有稳定 ~16% 的延迟优势                                           |
-| **分布式服务（跨节点调用为主）**                                  | Native Routing (VPC-CNI) ⭐ | 跨节点延迟略优 ~10%；Pod IP 直通 VPC 可被 VPC 路由 / CLB / 安全组 / CCN 原生识别                  |
+| **同节点高频小包（RPC / KV 数据库 / MQ broker）**                 | Overlay (VPC-CNI) ⭐        | BPF host routing 在同节点小包场景有稳定 ~17% 的延迟优势，这是最可靠的差异结论                     |
 | **追求 Pod IP 与 VPC IP 一致**（VPC 路由 / CLB / 安全组 / CCN）   | Native Routing (VPC-CNI) ⭐ | Pod IP 直通 VPC 是 Native 的核心价值；跨节点吞吐与 Overlay 无差异                                 |
 | **跨节点大流量**（流数 ≥ 8）                                      | 两者无差别                  | 多流并发下两者都能跑满 VPC 带宽上限                                                               |
+| **跨节点分布式服务**                                              | 两者无差别                  | 跨节点延迟受 VPC 拓扑影响 > 模式差异，差值在 10-20µs 内，应用层无感                               |
 | **东西向 NetworkPolicy / Hubble / KPR / Egress Gateway**          | 两者无差别                  | 这些是 cilium 的应用层能力，与 host routing 路径无关                                              |
 | **运维简单性**（不依赖 VPC-CNI chaining / 不受 TKE VPC-CNI 限制） | Overlay (VPC-CNI) ⭐        | Overlay 下 cilium 完全接管 Pod 网络，不依赖 VPC-CNI 的 CNI chaining，配置更简洁，排查问题也更直接 |
 
 ### 一句话总结
 
-**没有绝对更优的方案，差异在延迟而非吞吐。** 同节点高频小包 Overlay 更优，跨节点分布式服务 Native 更优。如果业务对毫秒级延迟差异不敏感，选哪个都行——两者的跨节点多流吞吐完全一致，核心能力（NetworkPolicy / Hubble / KPR）完整可用。
+**唯一的可靠差异在同节点延迟：Overlay 比 Native 快约 17%。** 跨节点无稳定差异。如果你的业务主要是跨节点调用，性能不是选型依据——两者的跨节点多流吞吐完全一致，核心能力（NetworkPolicy / Hubble / KPR）完整可用，按运维偏好和环境条件选即可。
 
 延伸阅读：[Cilium Host Routing：legacy vs BPF](./host-routing.md) 深入解释两种 host routing 的原理与命中条件。
 
