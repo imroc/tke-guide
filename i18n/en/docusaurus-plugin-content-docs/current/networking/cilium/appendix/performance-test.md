@@ -146,46 +146,58 @@ The TCP_STREAM tests in `cilium connectivity perf` (based on netperf) use large 
 
 | Metric                                 | Overlay vs Native (4C) | Overlay vs Native (8C) | Consistent? |
 | -------------------------------------- | ---------------------- | ---------------------- | ----------- |
-| **Same-node pod-to-pod TCP_RR Mean**   | Overlay **16% faster** | Overlay **16% faster** | ✅ Yes      |
-| **Other-node pod-to-pod TCP_RR Mean**  | Native **10% faster**  | Native **11% faster**  | ✅ Yes      |
-| **Same-node single-stream throughput** | Native 18% higher      | Overlay 16% higher     | ❌ No       |
-| **Same-node multi-stream throughput**  | Overlay 8% higher      | Overlay 7% higher      | ✅ Yes      |
-| **Other-node multi-stream throughput** | ~11.8 Gbps (tie)       | ~11 Gbps (tie)         | ✅ Yes      |
+| **Same-node pod-to-pod TCP_RR Mean**   | Overlay **17% faster** | Overlay **16% faster** | ✅ Yes      |
+| **Same-node pod-to-pod TCP_RR P99**    | Overlay 17% lower      | Overlay 16% lower      | ✅ Yes      |
+| **Same-node multi-stream throughput**  | Overlay 15% higher     | Overlay 7% higher      | ✅ Yes      |
+| **Other-node multi-stream throughput** | ~11.5 Gbps (tie)       | ~11 Gbps (tie)         | ✅ Yes      |
+| **Other-node pod-to-pod TCP_RR**       | Unstable / varies      | Unstable / varies      | ❌ see text |
 
 ### Key Findings
 
 #### Same-Node Latency: Overlay's Advantage is Clear and Stable
 
-Overlay's BPF host routing performs endpoint lookup and redirect at the `cilium_host` device ingress, skipping the netfilter / conntrack / FIB overhead that Native's Legacy host routing must go through. This advantage is independent of CPU count — **~16%** latency improvement on both 4C and 8C instance types.
+Overlay's BPF host routing performs endpoint lookup and redirect at the `cilium_host` device ingress, skipping the netfilter / conntrack / FIB overhead that Native's Legacy host routing must go through. This advantage is independent of CPU count and VPC topology — **deviations across multiple runs are < 1%, making this a reliable conclusion**.
 
-Same-node multi-stream throughput is also consistently **~7-8%** higher with Overlay.
+| Metric                 | Overlay   | Native    | Gap                    |
+| ---------------------- | --------- | --------- | ---------------------- |
+| Same-node RR Mean      | 31.27µs   | 37.62µs   | Overlay **17% faster** |
+| Same-node RR P99       | 44µs      | 53µs      | Overlay 17% faster     |
+| Same-node multi-stream | 75.6 Gbps | 64.1 Gbps | Overlay **15% higher** |
 
-#### Cross-Node Latency: Native Takes the Lead
+> Same-node multi-stream throughput (loopback) far exceeds physical NIC limits — it reflects CPU/kernel stack processing power, not cross-node performance. Overlay is consistently 7-15% higher, but this is a local benchmark, not a cross-node metric.
 
-Unlike the old S5 data, on SA5 instance types Native outperforms Overlay in cross-node scenarios — **10% faster on 4C**, **11% faster on 8C**. This is because SA5's VPC underlay has lower baseline latency (~80-100µs), making the VXLAN encapsulation/decapsulation overhead a larger proportion of the total path, offsetting Overlay's BPF host routing advantage.
+#### Cross-Node Latency: Variable, No Stable Conclusion
+
+Cross-node latency is heavily influenced by **VPC physical topology (switch hops / physical distance between nodes)**. Different node pairs in different subnets can produce different baselines. Across three test runs, the trend was inconsistent — the gap (~10-20µs) is well within noise.
+
+Practical takeaway: **cross-node latency is not a decision factor** — the gap is far smaller than application-layer latency jitter and imperceptible in production.
 
 #### Cross-Node Multi-Stream Throughput: No Difference
 
-Both instance types and modes stabilize around **~11 Gbps** for multi-stream throughput, with no meaningful difference between Native and Overlay. This is close to SA5's burst bandwidth cap (10 Gbps), confirming that the Cilium datapath is not the bottleneck.
+Both modes reach ~**11 Gbps** for multi-stream throughput, with no meaningful difference. This is close to SA5's burst bandwidth cap (10 Gbps), confirming the Cilium datapath is not the bottleneck.
+
+:::note[Throughput Stability]
+Cross-node multi-stream throughput occasionally falls to ~1.7 Gbps (baseline bandwidth). This is because SA5's burst mechanism uses a credit-based model, and netperf's PPS is sometimes insufficient to consume burst credits. **These run-to-run variations are NOT a mode difference — they reflect the test tool's limitation.** If throughput appears low, re-run the test 2-3 times.
+:::
 
 #### Cross-Node Single-Stream Throughput: Unstable, Not a Reliable Metric
 
-Native 4C single-stream reaches only 1.68 Gbps (limited by the 1.5 Gbps baseline bandwidth shaping), while Overlay 4C single-stream hits 10.15 Gbps (triggering burst). This gap is caused by netperf's TCP/CPU behavior differences on 4C instances, not by Overlay's inherent superiority in single-stream throughput. On 8C, both modes fill ~10-11 Gbps, confirming this.
+Single-stream throughput typically falls at or near baseline bandwidth (1.5-3 Gbps), occasionally triggering burst. No mode conclusion can be drawn from this metric.
 
 ## Selection Guide
 
 | Scenario                                                                   | Recommended                 | Reason                                                                                                                       |
 | -------------------------------------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **Same-node high-frequency small-packet workloads (RPC / KV / MQ)**        | Overlay (VPC-CNI) ⭐        | BPF host routing provides a stable **~16%** latency advantage for same-node small-packet traffic                             |
-| **Distributed services (primarily cross-node calls)**                      | Native Routing (VPC-CNI) ⭐ | Cross-node latency is slightly better (~10%); Pod IPs are native VPC IPs for routing / CLB / security groups / CCN           |
+| **Same-node high-frequency small-packet workloads (RPC / KV / MQ)**        | Overlay (VPC-CNI) ⭐        | BPF host routing provides a stable **~17%** latency advantage for same-node traffic — the most reliable conclusion           |
 | **Pod IPs must match VPC IPs (VPC routing / CLB / security groups / CCN)** | Native Routing (VPC-CNI) ⭐ | Pod IPs as VPC IPs is Native's core value; cross-node throughput matches Overlay                                             |
 | **Cross-node bulk traffic (8+ streams)**                                   | No difference               | Both fill the VPC bandwidth cap with multi-stream concurrency                                                                |
+| **Cross-node distributed services**                                        | No difference               | Cross-node latency is dominated by VPC topology, not mode differences; the gap is 10-20µs and imperceptible                  |
 | **East-west NetworkPolicy / Hubble / KPR / Egress Gateway**                | No difference               | These are application-layer Cilium capabilities, independent of the host routing path                                        |
 | **Operational simplicity (no VPC-CNI chaining dependency)**                | Overlay (VPC-CNI) ⭐        | Overlay gives Cilium full control of Pod networking, no VPC-CNI chaining required, simpler configuration and troubleshooting |
 
 ### Summary
 
-**There is no absolute winner — the difference is in latency, not throughput.** Overlay is better for same-node high-frequency small-packet scenarios; Native is slightly better for cross-node distributed services. If your business isn't sensitive to sub-millisecond latency differences, either mode works — cross-node multi-stream throughput is identical, and all core capabilities (NetworkPolicy / Hubble / KPR) are fully functional on both.
+**The only reliable performance difference is same-node latency: Overlay is ~17% faster.** For cross-node scenarios, there is no stable difference. If your workload is predominantly cross-node, performance is not a decision factor — both modes have identical cross-node throughput and full core capabilities (NetworkPolicy / Hubble / KPR). Choose based on operational preference and environment constraints.
 
 For a deep dive into the two host routing paths and their hit conditions, see [Cilium Host Routing: Legacy vs BPF](./host-routing.md).
 
