@@ -97,7 +97,6 @@ cilium connectivity perf \
 | Cilium CLI 版本 | v0.19.4                                                            |
 | 节点 OS         | TencentOS Server 4 (kernel 6.6.117-45.7.3.tl4.x86_64)              |
 | 节点数量        | 3 个节点                                                           |
-| 节点公网        | 节点绑 EIP（性能测试不依赖公网）                                   |
 | 安装方式        | [一键安装脚本](../install.md#一键安装脚本) `cilium.sh install`     |
 | perf 参数       | `--streams 8`（多流并发 8 条）                                     |
 | Native 模式     | Legacy Host Routing（详见 [host-routing 附录](./host-routing.md)） |
