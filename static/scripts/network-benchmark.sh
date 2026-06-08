@@ -584,11 +584,11 @@ _run_fortio() {
   local rc=0
   if [[ "$keepalive" == "false" ]]; then
     timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-      fortio load -c "$connections" -t 120s -keepalive=false -json - "$url" \
+      fortio load -qps 0 -c "$connections" -t 120s -keepalive=false -json - "$url" \
       >"$out" 2>"${out}.err" || rc=$?
   else
     timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-      fortio load -c "$connections" -t 120s -json - "$url" \
+      fortio load -qps 0 -c "$connections" -t 120s -json - "$url" \
       >"$out" 2>"${out}.err" || rc=$?
   fi
   if [[ $rc -ne 0 ]]; then
