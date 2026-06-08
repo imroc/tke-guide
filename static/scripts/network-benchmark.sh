@@ -368,7 +368,9 @@ spec:
   containers:
   - name: fortio
     image: $FORTIO_IMAGE
-    command: ["sleep", "infinity"]
+    # fortio image is distroless: no sh, no sleep. Run fortio server on a
+    # dummy port just to keep the pod alive; we exec `fortio load` for tests.
+    command: ["fortio", "server", "-http-port", "8079"]
   terminationGracePeriodSeconds: 0
 EOF
 
@@ -521,11 +523,13 @@ _run_fortio() {
   local output_dir="$5" result_file="$6"
   local out="$output_dir/$result_file"
   mkdir -p "$output_dir"
-  local ka_flag=""
-  [[ "$keepalive" == "false" ]] && ka_flag="-keepalive=false"
-  local cmd="fortio load -c $connections -t 120s $ka_flag -json - \"$url\""
   info "Running: $label (c=$connections, keepalive=$keepalive)"
-  _pod_exec fortio-client bash -c "$cmd" >"$out" 2>/dev/null
+  # fortio image has no shell — exec fortio binary directly.
+  if [[ "$keepalive" == "false" ]]; then
+    _pod_exec fortio-client fortio load -c "$connections" -t 120s -keepalive=false -json - "$url" >"$out" 2>/dev/null
+  else
+    _pod_exec fortio-client fortio load -c "$connections" -t 120s -json - "$url" >"$out" 2>/dev/null
+  fi
 
   local py_tmp="/tmp/nb_fortio_$$.py"
   cat >"$py_tmp" <<'PYEOF'
