@@ -369,8 +369,8 @@ spec:
   - name: fortio
     image: $FORTIO_IMAGE
     # fortio image is distroless: no sh, no sleep. Run fortio server purely to
-    # keep the pod alive; we exec `fortio load` for tests. Disable all the
-    # extra listeners so it doesn't grab unrelated ports.
+    # keep the pod alive; the script execs fortio load for actual tests. Disable
+    # all extra listeners so it does not grab unrelated ports.
     command: ["fortio", "server", "-http-port", "9999", "-grpc-port", "disabled", "-tcp-port", "disabled", "-udp-port", "disabled", "-redirect-port", "disabled"]
   terminationGracePeriodSeconds: 0
 EOF
@@ -454,7 +454,21 @@ _run_iperf() {
   local out="$output_dir/$result_file"
   mkdir -p "$output_dir"
   info "Running: $label"
-  _pod_exec iperf-client iperf3 -c "$server_ip" -p "$port" -t 120 -P "$parallel" -J >"$out" 2>/dev/null
+
+  # Avoid streaming the large JSON output back over `kubectl exec` stdout —
+  # apiserver SPDY/exec channel buffers the whole payload at the end of the
+  # run and tends to stall on >100KB outputs (8 streams × 120s easily hits
+  # several hundred KB). Write to a file inside the pod, then kubectl cp out.
+  local pod_file="/tmp/iperf_${result_file}"
+  if ! kubectl exec -n "$NS" iperf-client -- \
+      iperf3 -c "$server_ip" -p "$port" -t 120 -P "$parallel" -J --logfile "$pod_file" >/dev/null 2>&1; then
+    warn "  iperf3 returned non-zero, result may be incomplete"
+  fi
+  if ! kubectl cp -n "$NS" "iperf-client:${pod_file}" "$out" >/dev/null 2>&1; then
+    warn "  kubectl cp failed for $result_file"
+    return 0
+  fi
+  kubectl exec -n "$NS" iperf-client -- rm -f "$pod_file" >/dev/null 2>&1 || true
 
   local py_tmp="/tmp/nb_iperf_$$.py"
   cat >"$py_tmp" <<'PYEOF'
