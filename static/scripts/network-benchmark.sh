@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# Note: intentionally NOT using `set -e`. A single iperf3/fortio exec
+# failure should warn and continue with the next round, not abort the
+# whole benchmark — we lose hours of work otherwise.
+set -uo pipefail
 
 ###############################################################################
 # TKE Network Benchmark
@@ -58,6 +61,25 @@ FORTIO_IMAGE="${FORTIO_IMAGE:-fortio/fortio:latest}"
 WORKER_NODE_1=""
 WORKER_NODE_2=""
 CLUSTER_TYPE=""
+
+# Timeout (seconds) wrapping every kubectl exec / kubectl cp that runs a 120s
+# test, so a stalled apiserver SPDY channel cannot hang the script forever.
+KUBECTL_TIMEOUT="${KUBECTL_TIMEOUT:-180}"
+
+# Track every background monitor pid so trap can reap them on exit. Keeping a
+# space-separated list rather than an array makes it easy to print in logs.
+MONITOR_PIDS=""
+
+_cleanup_on_exit() {
+  # Reap background monitors before exit / interrupt so they don't become
+  # orphans that keep appending to the resource CSVs forever.
+  if [[ -n "$MONITOR_PIDS" ]]; then
+    for pid in $MONITOR_PIDS; do
+      kill "$pid" 2>/dev/null || true
+    done
+  fi
+}
+trap _cleanup_on_exit EXIT INT TERM
 
 # ─── Parse Arguments ─────────────────────────────────────────────────────────
 
@@ -118,9 +140,10 @@ EOF
 
 check_prereqs() {
   local missing=0
-  for cmd in kubectl python3; do
+  for cmd in kubectl python3 timeout; do
     if ! command -v "$cmd" &>/dev/null; then
       err "Prerequisite '$cmd' not found"
+      [[ "$cmd" == "timeout" ]] && err "  on macOS install via: brew install coreutils && export PATH=\"\$(brew --prefix coreutils)/libexec/gnubin:\$PATH\""
       missing=1
     fi
   done
@@ -393,7 +416,11 @@ EOF
 
   info "Waiting for pods to be ready..."
   local pods="pod/iperf-server-host pod/iperf-client-host pod/iperf-server pod/iperf-client pod/netperf-server pod/netperf-client pod/fortio-server pod/fortio-client"
-  kubectl wait -n "$N" --for=condition=Ready $pods --timeout=300s
+  if ! kubectl wait -n "$N" --for=condition=Ready $pods --timeout=300s; then
+    err "Pods failed to become Ready within 300s — aborting"
+    kubectl get pod -n "$N" -o wide || true
+    exit 1
+  fi
   info "All test workloads ready"
 }
 
@@ -428,22 +455,33 @@ start_resource_monitor() {
   local pid_file="$3"
   mkdir -p "$(dirname "$csv_file")"
   echo "timestamp,pod,cpu_millicores,memory_mib" >"$csv_file"
+  # Capture parent (main script) pid so the subshell can self-terminate if the
+  # main process dies unexpectedly. Without this, a stalled main script leaves
+  # the monitor loop running under init(1) appending forever.
+  local parent_pid=$$
   (
-    while true; do
+    while kill -0 "$parent_pid" 2>/dev/null; do
       kubectl top pod -n kube-system -l "$label" --no-headers 2>/dev/null | while read -r pod cpu mem rest; do
         echo "$(date +%H:%M:%S),$pod,${cpu%%m},${mem%%Mi}" >>"$csv_file"
       done
       sleep 5
     done
   ) &
-  echo $! >"$pid_file"
+  local mon_pid=$!
+  echo "$mon_pid" >"$pid_file"
+  MONITOR_PIDS="$MONITOR_PIDS $mon_pid"
 }
 
 stop_resource_monitor() {
   local pid_file="$1"
   if [[ -f "$pid_file" ]]; then
-    kill "$(cat "$pid_file")" 2>/dev/null || true
+    local pid
+    pid=$(cat "$pid_file")
+    kill "$pid" 2>/dev/null || true
     rm -f "$pid_file"
+    # Drop it from MONITOR_PIDS so the trap doesn't double-kill (harmless,
+    # but keeps logs tidy if we ever decide to log kills).
+    MONITOR_PIDS=$(echo "$MONITOR_PIDS" | tr ' ' '\n' | grep -vx "$pid" | tr '\n' ' ')
   fi
 }
 
@@ -459,16 +497,17 @@ _run_iperf() {
   # apiserver SPDY/exec channel buffers the whole payload at the end of the
   # run and tends to stall on >100KB outputs (8 streams × 120s easily hits
   # several hundred KB). Write to a file inside the pod, then kubectl cp out.
+  # Wrap each call in `timeout` so a stalled SPDY channel can't hang us.
   local pod_file="/tmp/iperf_${result_file}"
-  if ! kubectl exec -n "$NS" iperf-client -- \
+  if ! timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" iperf-client -- \
       iperf3 -c "$server_ip" -p "$port" -t 120 -P "$parallel" -J --logfile "$pod_file" >/dev/null 2>&1; then
-    warn "  iperf3 returned non-zero, result may be incomplete"
+    warn "  iperf3 timed out or returned non-zero, result may be incomplete"
   fi
-  if ! kubectl cp -n "$NS" "iperf-client:${pod_file}" "$out" >/dev/null 2>&1; then
+  if ! timeout 60 kubectl cp -n "$NS" "iperf-client:${pod_file}" "$out" >/dev/null 2>&1; then
     warn "  kubectl cp failed for $result_file"
     return 0
   fi
-  kubectl exec -n "$NS" iperf-client -- rm -f "$pod_file" >/dev/null 2>&1 || true
+  timeout 30 kubectl exec -n "$NS" iperf-client -- rm -f "$pod_file" >/dev/null 2>&1 || true
 
   local py_tmp="/tmp/nb_iperf_$$.py"
   cat >"$py_tmp" <<'PYEOF'
@@ -539,12 +578,24 @@ _run_fortio() {
   local out="$output_dir/$result_file"
   mkdir -p "$output_dir"
   info "Running: $label (c=$connections, keepalive=$keepalive)"
-  # fortio image has no shell — exec fortio binary directly.
+  # Same SPDY-stall problem as iperf3: write fortio's JSON report to a file
+  # inside the pod (fortio supports `-json <path>`), then kubectl cp it out.
+  # Every kubectl call gets a timeout so a stuck channel can't hang the script.
+  local pod_file="/tmp/fortio_${result_file}"
   if [[ "$keepalive" == "false" ]]; then
-    _pod_exec fortio-client fortio load -c "$connections" -t 120s -keepalive=false -json - "$url" >"$out" 2>/dev/null
+    timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
+      fortio load -c "$connections" -t 120s -keepalive=false -json "$pod_file" "$url" \
+      >/dev/null 2>&1 || warn "  fortio timed out or returned non-zero"
   else
-    _pod_exec fortio-client fortio load -c "$connections" -t 120s -json - "$url" >"$out" 2>/dev/null
+    timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
+      fortio load -c "$connections" -t 120s -json "$pod_file" "$url" \
+      >/dev/null 2>&1 || warn "  fortio timed out or returned non-zero"
   fi
+  if ! timeout 60 kubectl cp -n "$NS" "fortio-client:${pod_file}" "$out" >/dev/null 2>&1; then
+    warn "  kubectl cp failed for $result_file"
+    return 0
+  fi
+  timeout 30 kubectl exec -n "$NS" fortio-client -- rm -f "$pod_file" >/dev/null 2>&1 || true
 
   local py_tmp="/tmp/nb_fortio_$$.py"
   cat >"$py_tmp" <<'PYEOF'
@@ -630,25 +681,35 @@ run_latency_tests() {
   local fs_ip
   fs_ip=$(kubectl get svc -n "$N" fortio-service -o jsonpath='{.spec.clusterIP}')
 
+  # netperf output is small (one CSV line), streaming over kubectl exec is OK,
+  # but still wrap in timeout so a stuck channel can't hang us.
   for r in 1 2 3; do
     info "TCP_RR round $r"
-    _pod_exec netperf-client netperf -H "$np_ip" -t TCP_RR -l 120 -- -r 1,1 \
+    timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" netperf-client -- \
+      netperf -H "$np_ip" -t TCP_RR -l 120 -- -r 1,1 \
       -o MIN_LATENCY,MEAN_LATENCY,P50_LATENCY,P90_LATENCY,P99_LATENCY,MAX_LATENCY,THROUGHPUT \
-      >"$d/tcp_rr_r${r}.txt" 2>/dev/null
+      >"$d/tcp_rr_r${r}.txt" 2>/dev/null || warn "  TCP_RR round $r failed"
     sleep 15
   done
 
   for r in 1 2 3; do
     info "TCP_CRR round $r"
-    _pod_exec netperf-client netperf -H "$np_ip" -t TCP_CRR -l 120 -- -r 1,1 \
+    timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" netperf-client -- \
+      netperf -H "$np_ip" -t TCP_CRR -l 120 -- -r 1,1 \
       -o MIN_LATENCY,MEAN_LATENCY,P50_LATENCY,P90_LATENCY,P99_LATENCY,MAX_LATENCY,THROUGHPUT \
-      >"$d/tcp_crr_r${r}.txt" 2>/dev/null
+      >"$d/tcp_crr_r${r}.txt" 2>/dev/null || warn "  TCP_CRR round $r failed"
     sleep 15
   done
 
+  # fortio HTTP p99 — write to pod, cp out (same reason as _run_fortio).
   info "HTTP p99 @ 1000 QPS"
-  _pod_exec fortio-client fortio load -qps 1000 -c 16 -t 120s -json - \
-    "http://${fs_ip}:8080/echo?size=512" >"$d/http_1k_qps.json" 2>/dev/null
+  local pod_file="/tmp/fortio_http_1k_qps.json"
+  timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
+    fortio load -qps 1000 -c 16 -t 120s -json "$pod_file" \
+    "http://${fs_ip}:8080/echo?size=512" >/dev/null 2>&1 || warn "  HTTP latency test failed"
+  timeout 60 kubectl cp -n "$NS" "fortio-client:${pod_file}" "$d/http_1k_qps.json" \
+    >/dev/null 2>&1 || warn "  kubectl cp failed for http_1k_qps.json"
+  timeout 30 kubectl exec -n "$NS" fortio-client -- rm -f "$pod_file" >/dev/null 2>&1 || true
 
   info "Latency tests complete"
 }
