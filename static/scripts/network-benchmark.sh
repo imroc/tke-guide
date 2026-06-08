@@ -64,7 +64,10 @@ CLUSTER_TYPE=""
 
 # Timeout (seconds) wrapping every kubectl exec / kubectl cp that runs a 120s
 # test, so a stalled apiserver SPDY channel cannot hang the script forever.
-KUBECTL_TIMEOUT="${KUBECTL_TIMEOUT:-180}"
+# Each test runs 120s. Leave generous headroom for TCP connection warmup
+# (can be slow under QoS throttling), JSON result generation, and kubectl
+# exec/channel overhead. 300s is safe; override via env if needed.
+KUBECTL_TIMEOUT="${KUBECTL_TIMEOUT:-300}"
 
 # Track every background monitor pid so trap can reap them on exit. Keeping a
 # space-separated list rather than an array makes it easy to print in logs.
