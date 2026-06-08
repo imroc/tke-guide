@@ -368,9 +368,10 @@ spec:
   containers:
   - name: fortio
     image: $FORTIO_IMAGE
-    # fortio image is distroless: no sh, no sleep. Run fortio server on a
-    # dummy port just to keep the pod alive; we exec `fortio load` for tests.
-    command: ["fortio", "server", "-http-port", "8079"]
+    # fortio image is distroless: no sh, no sleep. Run fortio server purely to
+    # keep the pod alive; we exec `fortio load` for tests. Disable all the
+    # extra listeners so it doesn't grab unrelated ports.
+    command: ["fortio", "server", "-http-port", "9999", "-grpc-port", "disabled", "-tcp-port", "disabled", "-udp-port", "disabled", "-redirect-port", "disabled"]
   terminationGracePeriodSeconds: 0
 EOF
 
