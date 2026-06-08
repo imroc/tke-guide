@@ -27,9 +27,14 @@ set -uo pipefail
 #   --ns NS          Namespace for test workloads (default: network-benchmark)
 #
 # Environment Variables:
-#   NETPERF_IMAGE     netperf image (default: networkstatic/netperf:latest)
-#   IPERF_IMAGE       iperf3 image (default: networkstatic/iperf3:latest)
-#   FORTIO_IMAGE      fortio image (default: fortio/fortio:latest)
+#   NETPERF_IMAGE      netperf image (default: networkstatic/netperf:latest)
+#   IPERF_IMAGE        iperf3 image (default: networkstatic/iperf3:latest)
+#   FORTIO_IMAGE       fortio image (default: fortio/fortio:latest)
+#   IPERF_DURATION     iperf3 test duration in seconds (default: 30)
+#   FORTIO_DURATION    fortio/netperf test duration in seconds (default: 60)
+#   ROUNDS             repetitions per scenario (default: 1)
+#   ROUND_SLEEP        seconds between rounds (default: 30)
+#   KUBECTL_TIMEOUT    timeout for kubectl exec/cp calls (default: 180)
 #
 # Output:
 #   Creates benchmark-results-<context>/ directory with structured results.
@@ -62,12 +67,23 @@ WORKER_NODE_1=""
 WORKER_NODE_2=""
 CLUSTER_TYPE=""
 
-# Timeout (seconds) wrapping every kubectl exec / kubectl cp that runs a 120s
-# test, so a stalled apiserver SPDY channel cannot hang the script forever.
-# Each test runs 120s. Leave generous headroom for TCP connection warmup
-# (can be slow under QoS throttling), JSON result generation, and kubectl
-# exec/channel overhead. 300s is safe; override via env if needed.
-KUBECTL_TIMEOUT="${KUBECTL_TIMEOUT:-300}"
+# ─── Test Parameters ─────────────────────────────────────────────────────────
+# Override via env to tune test intensity vs QoS budget.
+#   IPERF_DURATION: seconds per iperf3 run (default 30). Shorter = less burst
+#                   credit consumed, avoids QoS throttling on small instances.
+#   FORTIO_DURATION: seconds per fortio/netperf run (default 60).
+#   ROUNDS: repetitions per scenario (default 1). More rounds = better
+#           statistical confidence but consumes more QoS burst budget.
+#   ROUND_SLEEP: seconds to wait between rounds (default 30). Gives burst
+#                credit time to recover between tests.
+IPERF_DURATION="${IPERF_DURATION:-30}"
+FORTIO_DURATION="${FORTIO_DURATION:-60}"
+ROUNDS="${ROUNDS:-1}"
+ROUND_SLEEP="${ROUND_SLEEP:-30}"
+
+# Timeout wrapping kubectl exec/cp. Must be larger than the longest single
+# test (IPERF_DURATION or FORTIO_DURATION) plus warmup + overhead.
+KUBECTL_TIMEOUT="${KUBECTL_TIMEOUT:-180}"
 
 # Track every background monitor pid so trap can reap them on exit. Keeping a
 # space-separated list rather than an array makes it easy to print in logs.
@@ -133,9 +149,21 @@ Options:
   --skip-cleanup       Skip cleanup after benchmark
 
 Environment Variables:
-  NETPERF_IMAGE     netperf image (default: networkstatic/netperf:latest)
-  IPERF_IMAGE       iperf3 image (default: networkstatic/iperf3:latest)
-  FORTIO_IMAGE      fortio image (default: fortio/fortio:latest)
+  NETPERF_IMAGE      netperf image (default: networkstatic/netperf:latest)
+  IPERF_IMAGE        iperf3 image (default: networkstatic/iperf3:latest)
+  FORTIO_IMAGE       fortio image (default: fortio/fortio:latest)
+  IPERF_DURATION     iperf3 test duration in seconds (default: 30)
+  FORTIO_DURATION    fortio/netperf test duration in seconds (default: 60)
+  ROUNDS             repetitions per scenario (default: 1)
+  ROUND_SLEEP        seconds between rounds (default: 30)
+  KUBECTL_TIMEOUT    timeout for kubectl exec/cp calls (default: 180)
+
+Examples:
+  # Default: quick run (1 round × 30s iperf / 60s fortio), safe for small instances
+  bash network-benchmark.sh --dir ./bench
+
+  # Full run on large instances (no QoS worry): 3 rounds × 120s each
+  ROUNDS=3 IPERF_DURATION=120 FORTIO_DURATION=120 bash network-benchmark.sh --dir ./bench
 EOF
 }
 
@@ -494,16 +522,13 @@ _run_iperf() {
   local label="$1" server_ip="$2" port="$3" parallel="$4" output_dir="$5" result_file="$6"
   local out="$output_dir/$result_file"
   mkdir -p "$output_dir"
-  info "Running: $label"
+  info "Running: $label (${IPERF_DURATION}s, P=$parallel)"
 
-  # Avoid streaming the large JSON output back over `kubectl exec` stdout —
-  # apiserver SPDY/exec channel buffers the whole payload at the end of the
-  # run and tends to stall on >100KB outputs (8 streams × 120s easily hits
-  # several hundred KB). Write to a file inside the pod, then kubectl cp out.
-  # Wrap each call in `timeout` so a stalled SPDY channel can't hang us.
+  # Write JSON to a file inside the pod then kubectl cp out, avoiding SPDY
+  # channel stalls on large stdout payloads.
   local pod_file="/tmp/iperf_${result_file}"
   if ! timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" iperf-client -- \
-      iperf3 -c "$server_ip" -p "$port" -t 120 -P "$parallel" -J --logfile "$pod_file" >/dev/null 2>&1; then
+      iperf3 -c "$server_ip" -p "$port" -t "$IPERF_DURATION" -P "$parallel" -J --logfile "$pod_file" >/dev/null 2>&1; then
     warn "  iperf3 timed out or returned non-zero, result may be incomplete"
   fi
   if ! timeout 60 kubectl cp -n "$NS" "iperf-client:${pod_file}" "$out" >/dev/null 2>&1; then
@@ -528,7 +553,7 @@ PYEOF
 }
 
 run_throughput_tests() {
-  step "Running Throughput Tests (iperf3, 120s × 3 rounds, 15s interval)"
+  step "Running Throughput Tests (iperf3, ${IPERF_DURATION}s × ${ROUNDS} rounds, ${ROUND_SLEEP}s interval)"
   local d="$OUTPUT_DIR/throughput"
   mkdir -p "$d"
 
@@ -551,21 +576,21 @@ run_throughput_tests() {
     mon_pid="/tmp/nb_kp_mon.pid"
   fi
 
-  for r in 1 2 3; do
+  for r in $(seq 1 "$ROUNDS"); do
     _run_iperf "Node Level 8stream r$r" "$node1_ip" "5202" "8" "$d" "node_throughput_r${r}.json"
-    sleep 15
+    sleep "$ROUND_SLEEP"
   done
-  for r in 1 2 3; do
+  for r in $(seq 1 "$ROUNDS"); do
     _run_iperf "Pod-to-Pod single r$r" "$server_pod_ip" "5201" "1" "$d" "pod2pod_single_r${r}.json"
-    sleep 15
+    sleep "$ROUND_SLEEP"
   done
-  for r in 1 2 3; do
+  for r in $(seq 1 "$ROUNDS"); do
     _run_iperf "Pod-to-Pod 8stream r$r" "$server_pod_ip" "5201" "8" "$d" "pod2pod_8stream_r${r}.json"
-    sleep 15
+    sleep "$ROUND_SLEEP"
   done
-  for r in 1 2 3; do
+  for r in $(seq 1 "$ROUNDS"); do
     _run_iperf "Via Service 8stream r$r" "$svc_ip" "5201" "8" "$d" "via_service_8stream_r${r}.json"
-    sleep 15
+    sleep "$ROUND_SLEEP"
   done
 
   [[ -n "$mon_pid" ]] && stop_resource_monitor "$mon_pid"
@@ -587,11 +612,11 @@ _run_fortio() {
   local rc=0
   if [[ "$keepalive" == "false" ]]; then
     timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-      fortio load -qps 0 -c "$connections" -t 120s -keepalive=false -json - "$url" \
+      fortio load -qps 0 -c "$connections" -t "${FORTIO_DURATION}s" -keepalive=false -json - "$url" \
       >"$out" 2>"${out}.err" || rc=$?
   else
     timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-      fortio load -qps 0 -c "$connections" -t 120s -json - "$url" \
+      fortio load -qps 0 -c "$connections" -t "${FORTIO_DURATION}s" -json - "$url" \
       >"$out" 2>"${out}.err" || rc=$?
   fi
   if [[ $rc -ne 0 ]]; then
@@ -621,7 +646,7 @@ PYEOF
 }
 
 run_rps_tests() {
-  step "Running RPS Tests (fortio, 120s × 3 rounds, 15s interval)"
+  step "Running RPS Tests (fortio, ${FORTIO_DURATION}s × ${ROUNDS} rounds, ${ROUND_SLEEP}s interval)"
   local d="$OUTPUT_DIR/rps"
   mkdir -p "$d"
   local N="$NS"
@@ -656,21 +681,21 @@ EOF
     mon_pid="/tmp/nb_kp_mon.pid"
   fi
 
-  for r in 1 2 3; do
+  for r in $(seq 1 "$ROUNDS"); do
     _run_fortio "Pod-to-Pod 64c r$r" "http://${server_pod_ip}:8080/echo?size=512" 64 true "$d" "pod2pod_c64_r${r}.json"
-    sleep 15
+    sleep "$ROUND_SLEEP"
   done
-  for r in 1 2 3; do
+  for r in $(seq 1 "$ROUNDS"); do
     _run_fortio "Via Svc 64c (ka) r$r" "http://${fortio_svc_ip}:8080/echo?size=512" 64 true "$d" "svc_c64_r${r}.json"
-    sleep 15
+    sleep "$ROUND_SLEEP"
   done
-  for r in 1 2 3; do
+  for r in $(seq 1 "$ROUNDS"); do
     _run_fortio "Via Svc 256c (ka) r$r" "http://${fortio_svc_ip}:8080/echo?size=512" 256 true "$d" "svc_c256_r${r}.json"
-    sleep 15
+    sleep "$ROUND_SLEEP"
   done
-  for r in 1 2 3; do
+  for r in $(seq 1 "$ROUNDS"); do
     _run_fortio "Via Svc 64c (short) r$r" "http://${fortio_svc_ip}:8080/echo?size=512" 64 false "$d" "svc_short_c64_r${r}.json"
-    sleep 15
+    sleep "$ROUND_SLEEP"
   done
 
   [[ -n "$mon_pid" ]] && stop_resource_monitor "$mon_pid"
@@ -681,7 +706,7 @@ EOF
 # ─── netperf Latency Tests ──────────────────────────────────────────────────
 
 run_latency_tests() {
-  step "Running Latency Tests (netperf TCP_RR/TCP_CRR + fortio HTTP, 120s × 3)"
+  step "Running Latency Tests (netperf TCP_RR/TCP_CRR + fortio HTTP, ${FORTIO_DURATION}s × ${ROUNDS} rounds)"
   local d="$OUTPUT_DIR/latency"
   mkdir -p "$d"
   local N="$NS"
@@ -691,30 +716,28 @@ run_latency_tests() {
   local fs_ip
   fs_ip=$(kubectl get svc -n "$N" fortio-service -o jsonpath='{.spec.clusterIP}')
 
-  # netperf output is small (one CSV line), streaming over kubectl exec is OK,
-  # but still wrap in timeout so a stuck channel can't hang us.
-  for r in 1 2 3; do
+  for r in $(seq 1 "$ROUNDS"); do
     info "TCP_RR round $r"
     timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" netperf-client -- \
-      netperf -H "$np_ip" -t TCP_RR -l 120 -- -r 1,1 \
+      netperf -H "$np_ip" -t TCP_RR -l "$FORTIO_DURATION" -- -r 1,1 \
       -o MIN_LATENCY,MEAN_LATENCY,P50_LATENCY,P90_LATENCY,P99_LATENCY,MAX_LATENCY,THROUGHPUT \
       >"$d/tcp_rr_r${r}.txt" 2>/dev/null || warn "  TCP_RR round $r failed"
-    sleep 15
+    sleep "$ROUND_SLEEP"
   done
 
-  for r in 1 2 3; do
+  for r in $(seq 1 "$ROUNDS"); do
     info "TCP_CRR round $r"
     timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" netperf-client -- \
-      netperf -H "$np_ip" -t TCP_CRR -l 120 -- -r 1,1 \
+      netperf -H "$np_ip" -t TCP_CRR -l "$FORTIO_DURATION" -- -r 1,1 \
       -o MIN_LATENCY,MEAN_LATENCY,P50_LATENCY,P90_LATENCY,P99_LATENCY,MAX_LATENCY,THROUGHPUT \
       >"$d/tcp_crr_r${r}.txt" 2>/dev/null || warn "  TCP_CRR round $r failed"
-    sleep 15
+    sleep "$ROUND_SLEEP"
   done
 
   # fortio HTTP p99 — stream stdout like _run_fortio (small JSON).
   info "HTTP p99 @ 1000 QPS"
   timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-    fortio load -qps 1000 -c 16 -t 120s -json - \
+    fortio load -qps 1000 -c 16 -t "${FORTIO_DURATION}s" -json - \
     "http://${fs_ip}:8080/echo?size=512" >"$d/http_1k_qps.json" 2>"$d/http_1k_qps.err" || warn "  HTTP latency test failed"
   [[ ! -s "$d/http_1k_qps.err" ]] && rm -f "$d/http_1k_qps.err"
 
@@ -777,10 +800,10 @@ EOF
   local fs_ip
   fs_ip=$(kubectl get svc -n "$NS" fortio-service -o jsonpath='{.spec.clusterIP}')
 
-  for r in 1 2 3; do
+  for r in $(seq 1 "$ROUNDS"); do
     _run_fortio "Via Svc 64c short (1000svc) r$r" \
       "http://${fs_ip}:8080/echo?size=512" 64 false "$d" "short_conn_1k_svc_r${r}.json"
-    sleep 15
+    sleep "$ROUND_SLEEP"
   done
 
   info "Service scale tests complete"
