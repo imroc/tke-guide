@@ -1031,10 +1031,7 @@ cilium-operator 使用 hostNetwork 并配置了就绪探针，在超级节点上
 - [为什么 Native Routing 模式禁用 sysctlfix，Overlay 模式却启用？](./appendix/sysctlfix.md)
 - [Cilium Host Routing：legacy vs BPF](./appendix/host-routing.md)
 - [为什么不提供 GR Native Routing 部署方案？](./appendix/gr-native-not-recommended.md)
-
-### 如何加速集群 DNS 解析？
-
-安装 Cilium 替代 kube-proxy 后，TKE 内置的 [NodeLocalDNSCache](https://cloud.tencent.com/document/product/457/40613) 插件会失效。如需 DNS 缓存加速，可自建 Nodelocal DNSCache 并通过 CiliumLocalRedirectPolicy 实现共存，详见 [Cilium 与 Nodelocal DNSCache 共存](./appendix/with-node-local-dns.md)。
+- [Cilium 与 Nodelocal DNSCache 共存](./appendix/with-node-local-dns.md)
 
 ## 参考资料
 

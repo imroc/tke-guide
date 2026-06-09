@@ -1035,10 +1035,7 @@ Design rationale and operational guides have been split into standalone articles
 - [Why Native Routing disables sysctlfix while Overlay enables it](./appendix/sysctlfix.md)
 - [Cilium Host Routing: Legacy vs BPF](./appendix/host-routing.md)
 - [Why this guide does not offer GR Native Routing](./appendix/gr-native-not-recommended.md)
-
-### How to accelerate cluster DNS resolution?
-
-After installing Cilium (which replaces kube-proxy), TKE's built-in [NodeLocalDNSCache](https://www.tencentcloud.com/document/product/457/40613) plugin stops working. To get DNS caching acceleration, deploy a self-managed NodeLocal DNSCache alongside Cilium using CiliumLocalRedirectPolicy — see [Cilium with NodeLocal DNSCache](./appendix/with-node-local-dns.md).
+- [Cilium with NodeLocal DNSCache](./appendix/with-node-local-dns.md)
 
 ## External References
 
