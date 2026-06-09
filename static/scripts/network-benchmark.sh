@@ -628,7 +628,8 @@ _run_fortio() {
   local api_url="http://localhost:${local_port}/fortio/rest/run"
   local params="url=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$url")"
   params="${params}&qps=-1&t=${FORTIO_DURATION}s&c=${connections}&json=on"
-  [[ "$keepalive" == "false" ]] && params="${params}&keepalive=false"
+  # connection-reuse-range-value=0 means new connection per request (no keepalive)
+  [[ "$keepalive" == "false" ]] && params="${params}&connection-reuse-range-value=0"
 
   local rc=0
   timeout "$KUBECTL_TIMEOUT" curl -sf "${api_url}?${params}" >"$out" 2>/dev/null || rc=$?
