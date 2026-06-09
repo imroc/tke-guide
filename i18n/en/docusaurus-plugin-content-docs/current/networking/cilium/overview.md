@@ -35,7 +35,7 @@
 | **Enhanced Observability**                                 | Enable Hubble Relay / Hubble UI / network flow log audit   |
 | **Cilium + CLS for Network Flow Log Audit**                | Ship Hubble flow logs to CLS for search and analysis       |
 
-### Appendix (Design Principles & Operations Guide)
+### Appendix
 
 | Article                                                    | Content                                                            |
 | ---------------------------------------------------------- | ------------------------------------------------------------------ |
