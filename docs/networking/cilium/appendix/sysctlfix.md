@@ -1,5 +1,15 @@
 # 为什么 Native Routing 模式禁用 sysctlfix，Overlay 模式却启用？
 
+:::note[前置阅读]
+
+本文与以下两篇构成 Native Routing 模式的设计原理三部曲，建议按顺序阅读：
+
+1. **[Cilium Host Routing](./host-routing.md)**：理解 endpointRoutes 如何迫使 Native 模式走 legacy host routing。
+2. **[为什么 Native 要加 local-router-ipv4](./local-router-ipv4.md)**：解释 legacy host routing 下为什么需要手动指定 `cilium_host` IP。
+3. 本文：解释同一模式下 `systemd-sysctl.service` 重启对 eth0 rp_filter 的连带影响。
+
+:::
+
 ## 背景
 
 cilium 默认会启用一个名为 `sysctlfix` 的功能：通过一个 init container 在节点上写入：
@@ -62,5 +72,7 @@ kubectl -n kube-system get pod -l k8s-app=cilium -o jsonpath='{.items[0].status.
 ## 相关链接
 
 - [安装 Cilium](../install.md)
+- [Cilium Host Routing](./host-routing.md)
+- [为什么 Native 要加 local-router-ipv4](./local-router-ipv4.md)
 - [Cilium Source - sysctlfix](https://github.com/cilium/cilium/blob/main/daemon/cmd/sysctlfix.go)
 - [Linux 内核 rp_filter 说明](https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt)

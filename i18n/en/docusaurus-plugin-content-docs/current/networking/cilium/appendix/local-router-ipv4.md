@@ -1,5 +1,15 @@
 # Why Is local-router-ipv4 Required in Native Routing Mode?
 
+:::note[Prerequisites]
+
+This article, together with the following two, forms the design principles trilogy for Native Routing mode. Recommended reading order:
+
+1. **[Cilium Host Routing](./host-routing.md)**: Understand how endpointRoutes forces Native mode into legacy host routing.
+2. This article: Explains why `cilium_host`'s IP must be manually specified under legacy host routing.
+3. **[Why Native Disables sysctlfix](./sysctlfix.md)**: Explains the cascading impact on rp_filter in the same mode.
+
+:::
+
 ## Background
 
 When installing cilium on a TKE cluster, if you choose **Native Routing (VPC-CNI)**, you must explicitly set a `local-router-ipv4` parameter:
@@ -72,4 +82,6 @@ GR clusters only support Overlay mode; see [Why Not Provide a GR Native Routing 
 ## Related Links
 
 - [Installing Cilium](../install.md)
+- [Cilium Host Routing](./host-routing.md)
+- [Why Native Disables sysctlfix](./sysctlfix.md)
 - [Cilium Docs - local-router-ipv4](https://docs.cilium.io/en/stable/network/concepts/routing/)

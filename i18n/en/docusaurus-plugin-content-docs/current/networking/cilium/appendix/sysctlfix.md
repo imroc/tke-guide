@@ -1,5 +1,15 @@
 # Why Disable sysctlfix in Native Routing Mode but Enable It in Overlay Mode?
 
+:::note[Prerequisites]
+
+This article, together with the following two, forms the design principles trilogy for Native Routing mode. Recommended reading order:
+
+1. **[Cilium Host Routing](./host-routing.md)**: Understand how endpointRoutes forces Native mode into legacy host routing.
+2. **[Why Native Needs local-router-ipv4](./local-router-ipv4.md)**: Explains why `cilium_host`'s IP must be manually specified under legacy host routing.
+3. This article: Explains the side effect of `systemd-sysctl.service` restart on eth0 rp_filter in the same mode.
+
+:::
+
 ## Background
 
 By default, cilium enables a feature called `sysctlfix`: it uses an init container to write the following on each node:
@@ -63,5 +73,7 @@ Troubleshooting approach:
 ## Related Links
 
 - [Installing Cilium](../install.md)
+- [Cilium Host Routing](./host-routing.md)
+- [Why Native Needs local-router-ipv4](./local-router-ipv4.md)
 - [Cilium Source - sysctlfix](https://github.com/cilium/cilium/blob/main/daemon/cmd/sysctlfix.go)
 - [Linux Kernel rp_filter Documentation](https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt)

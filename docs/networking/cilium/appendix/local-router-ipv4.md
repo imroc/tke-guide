@@ -1,5 +1,15 @@
 # 为什么 Native Routing 模式要加 local-router-ipv4 配置？
 
+:::note[前置阅读]
+
+本文与以下两篇构成 Native Routing 模式的设计原理三部曲，建议按顺序阅读：
+
+1. **[Cilium Host Routing](./host-routing.md)**：理解 endpointRoutes 如何迫使 Native 模式走 legacy host routing。
+2. 本文：解释为什么 legacy host routing 下必须手动指定 `cilium_host` 的 IP。
+3. **[为什么 Native 禁用 sysctlfix](./sysctlfix.md)**：解释同一模式下 rp_filter 的连带风险。
+
+:::
+
 ## 背景
 
 在 TKE 集群安装 cilium 时，如果选择 **Native Routing (VPC-CNI)**，必须显式给 cilium 配置一个 `local-router-ipv4` 参数：
@@ -72,4 +82,6 @@ GR 集群仅支持 Overlay 模式，详见 [为什么不提供 GR Native Routing
 ## 相关链接
 
 - [安装 Cilium](../install.md)
+- [Cilium Host Routing](./host-routing.md)
+- [为什么 Native 禁用 sysctlfix](./sysctlfix.md)
 - [Cilium Docs - local-router-ipv4](https://docs.cilium.io/en/stable/network/concepts/routing/)

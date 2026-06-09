@@ -6,11 +6,12 @@
 
 ### Getting Started
 
-| Article                    | Content                                         | Audience                 |
-| -------------------------- | ----------------------------------------------- | ------------------------ |
-| **Installing Cilium**      | Empty cluster creation, helm installation, verification, rollback | First-time users |
-| **Cilium Functional Test** | Functional testing methods and measured data    | All post-install users   |
-| **Cilium Performance Test**| Baseline network performance and cross-scheme comparison | Performance-focused users |
+| Article                    | Content                                                    | Audience                  |
+| -------------------------- | ---------------------------------------------------------- | ------------------------- |
+| **Installing Cilium**      | Empty cluster creation, helm installation, verification, rollback | First-time users   |
+| **Hosting Images with TCR**| Use private TCR registry for production image pull         | Stability-focused users   |
+| **Cilium Functional Test** | Functional testing methods and measured data               | All post-install users    |
+| **Cilium Performance Test**| Baseline network performance and cross-scheme comparison   | Performance-focused users |
 
 ### Network Enhancement
 
@@ -37,14 +38,16 @@
 
 ### Appendix (Design Principles & Operations Guide)
 
-| Article                                                    | Content                                                    |
-| ---------------------------------------------------------- | ---------------------------------------------------------- |
-| **Cilium Tuning for Large Clusters**                       | Parameter, resource, and BPF map tuning for 200+ node clusters |
-| **Verified Node Operating Systems**                        | Compatibility verification results for 7 OS types          |
-| **Cilium Host Routing**                                    | Legacy vs BPF mechanisms, hit conditions, comparison       |
-| **Why Native Mode Needs local-router-ipv4**                | Principles and address selection                           |
-| **Why Native Mode Disables sysctlfix**                     | rp_filter differences and decision logic                   |
-| **Why GR Native Routing Is Not Available**                 | Complete trial-and-error record and 4 types of issues      |
+| Article                                                    | Content                                                            |
+| ---------------------------------------------------------- | ------------------------------------------------------------------ |
+| **Cilium Tuning for Large Clusters**                       | Parameter, resource, and BPF map tuning for 200+ node clusters     |
+| **Verified Node Operating Systems**                        | Compatibility verification results for 8 OS types                  |
+| **Cilium Host Routing** ◀─┬─▶                              | Trilogy 1: Legacy vs BPF mechanisms, hit conditions, comparison    |
+| **Why Native Mode Needs local-router-ipv4**                │ | Trilogy 2: cilium_host IP config principles and address selection  |
+| **Why Native Mode Disables sysctlfix**                     │ | Trilogy 3: rp_filter differences and decision logic                |
+| **Why GR Native Routing Is Not Available**                 | Complete trial-and-error record and 4 types of issues              |
+
+> Articles marked ◀─┬─▶ form the Native Routing design principles trilogy. Recommended reading order: Host Routing → local-router-ipv4 → sysctlfix.
 
 ### Troubleshooting
 

@@ -1,5 +1,15 @@
 # Cilium Host Routing: legacy vs BPF
 
+:::note[Prerequisites]
+
+This article, together with the following two, forms the design principles trilogy for Native Routing mode:
+
+1. This article: Explains why Native mode can only use legacy host routing, and how Overlay mode achieves BPF host routing.
+2. **[Why Native Needs local-router-ipv4](./local-router-ipv4.md)**: Understand the `cilium_host` IP configuration requirement under legacy host routing.
+3. **[Why Native Disables sysctlfix](./sysctlfix.md)**: Understand the cascading impact of `systemd-sysctl` restart on rp_filter in the same mode.
+
+:::
+
 ## What is Host Routing
 
 Host Routing determines **how a packet is forwarded** (next hop decision) after it enters the node's host network namespace. Cilium provides two implementations:
@@ -146,6 +156,8 @@ Although host routing falls back to legacy, the following core cilium capabiliti
 ## Related Links
 
 - [Installing Cilium](../install.md)
+- [Why Native Needs local-router-ipv4](./local-router-ipv4.md)
+- [Why Native Disables sysctlfix](./sysctlfix.md)
 - [Cilium Performance Test](./performance-test.md)
 - [Cilium Docs: eBPF Host-Routing](https://docs.cilium.io/en/stable/operations/performance/tuning/#ebpf-host-routing)
 - [GitHub Issue #20135: generic-veth chaining incompatible with BPF host routing](https://github.com/cilium/cilium/issues/20135)
