@@ -20,7 +20,6 @@
 | **配置 IP 伪装**                      | 让 Pod 借节点 EIP 出公网（SNAT）      | 已安装 Cilium |
 | **Egress Gateway 应用实践**           | 按策略选择固定出口 IP 访问外部        | 已安装 Cilium |
 | **启用通信加密**                      | WireGuard / IPsec 加密节点间 Pod 流量 | 已安装 Cilium |
-| **Cilium 与 Nodelocal DNSCache 共存** | 自建 NodeLocal DNS 加速 DNS 解析      | 已安装 Cilium |
 | **使用 Cilium 构建多集群网络**        | Cluster Mesh 打通多集群服务互访       | 已安装 Cilium |
 
 ### 安全策略
@@ -46,6 +45,7 @@
 | **为什么 Native 要加 local-router-ipv4** │ | 三部曲之二：cilium_host IP 配置原理与地址选择        |
 | **为什么 Native 禁用 sysctlfix**         │ | 三部曲之三：rp_filter 差异与决策逻辑                 |
 | **为什么不提供 GR Native Routing**       | 完整试错记录与 4 类不可用问题                        |
+| **Cilium 与 Nodelocal DNSCache 共存**   | 自建 NodeLocal DNS 加速 DNS 解析                    |
 
 > 标有 ◀─┬─▶ 的三篇文章构成 Native Routing 设计原理三部曲，建议按顺序阅读。
 

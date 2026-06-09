@@ -30,7 +30,6 @@ const sidebars: SidebarsConfig = {
             'networking/cilium/networkpolicy',
             'networking/cilium/observability',
             'networking/cilium/flow-logs',
-            'networking/cilium/with-node-local-dns',
             'networking/cilium/clustermesh',
             'networking/cilium/encryption',
             {
@@ -50,6 +49,7 @@ const sidebars: SidebarsConfig = {
                 'networking/cilium/appendix/sysctlfix',
                 'networking/cilium/appendix/host-routing',
                 'networking/cilium/appendix/gr-native-not-recommended',
+                'networking/cilium/appendix/with-node-local-dns',
                 {
                   type: 'category',
                   label: 'Cilium 问题排查',

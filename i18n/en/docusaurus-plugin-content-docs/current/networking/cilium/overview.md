@@ -20,7 +20,6 @@
 | **Configuring IP Masquerade**                    | Let Pods use node EIP for outbound internet (SNAT)       | Cilium installed  |
 | **Egress Gateway in Practice**                   | Select fixed egress IP per policy for external access    | Cilium installed  |
 | **Enabling Communication Encryption**            | WireGuard / IPsec encryption for inter-node Pod traffic  | Cilium installed  |
-| **Cilium with Nodelocal DNSCache**               | Self-built NodeLocal DNS to accelerate DNS resolution    | Cilium installed  |
 | **Building Multi-Cluster Networks with Cilium**  | Cluster Mesh to connect services across clusters         | Cilium installed  |
 
 ### Security Policies
@@ -46,6 +45,7 @@
 | **Why Native Mode Needs local-router-ipv4**                │ | Trilogy 2: cilium_host IP config principles and address selection  |
 | **Why Native Mode Disables sysctlfix**                     │ | Trilogy 3: rp_filter differences and decision logic                |
 | **Why GR Native Routing Is Not Available**                 | Complete trial-and-error record and 4 types of issues              |
+| **Cilium with NodeLocal DNSCache**               | Self-built NodeLocal DNS cache for DNS acceleration      |
 
 > Articles marked ◀─┬─▶ form the Native Routing design principles trilogy. Recommended reading order: Host Routing → local-router-ipv4 → sysctlfix.
 

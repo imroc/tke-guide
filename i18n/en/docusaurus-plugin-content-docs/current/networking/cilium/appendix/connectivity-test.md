@@ -199,7 +199,7 @@ Test [local-redirect-policy]:
      cilium-test-1/lrp-backend → 169.254.169.248:80/TCP succeeded while it should have failed
 ```
 
-**1 test case failed, no impact on production usability**: The only failing test case `local-redirect-policy/lrp-skip-redirect-from-backend` is an LRP edge case that consistently fails under VPC-CNI Native mode. See [FAQ → Why does the lrp-skip-redirect-from-backend test case consistently fail](#why-does-the-lrp-skip-redirect-from-backend-test-case-consistently-fail). Standard LRP usage (e.g., [Cilium co-existing with NodeLocal DNSCache](../with-node-local-dns.md)) works perfectly.
+**1 test case failed, no impact on production usability**: The only failing test case `local-redirect-policy/lrp-skip-redirect-from-backend` is an LRP edge case that consistently fails under VPC-CNI Native mode. See [FAQ → Why does the lrp-skip-redirect-from-backend test case consistently fail](#why-does-the-lrp-skip-redirect-from-backend-test-case-consistently-fail). Standard LRP usage (e.g., [Cilium co-existing with NodeLocal DNSCache](./with-node-local-dns.md)) works perfectly.
 
 **Effectively passable: 76/77**. Safe for production use. Duration: approximately 35 minutes 37 seconds.
 
@@ -509,7 +509,7 @@ Under chained CNI mode (required for VPC-CNI Native), Cilium's implementation of
 **Impact scope (no production impact)**:
 
 - ✅ Core LRP functionality `local-redirect-policy/lrp` works perfectly—forward traffic redirection works correctly
-- ✅ [Cilium co-existing with NodeLocal DNSCache](../with-node-local-dns.md), a typical LRP use case, **is completely unaffected** because node-local-dns Pods do not actively access the kube-dns ClusterIP (they are the redirection target)
+- ✅ [Cilium co-existing with NodeLocal DNSCache](./with-node-local-dns.md), a typical LRP use case, **is completely unaffected** because node-local-dns Pods do not actively access the kube-dns ClusterIP (they are the redirection target)
 - ❌ Only affects the specific scenario of "LRP backend Pod actively accessing the frontend it serves"—virtually non-existent in production workloads
 
 If you do not need the `skipRedirectFromBackend` edge feature, you can ignore this test failure. To skip it in the test report, add `--test '!/local-redirect-policy/lrp-skip-redirect-from-backend'`.

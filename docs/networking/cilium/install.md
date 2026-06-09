@@ -140,7 +140,7 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install
 ```
 
-脚本会自动检测集群网络模式、引导选择安装方案和版本，然后执行安装。安装过程中还可选择是否启用 [Egress Gateway](egress-gateway.md) 和 [Nodelocal DNSCache](with-node-local-dns.md)。如需手动安装，参考后续步骤。
+脚本会自动检测集群网络模式、引导选择安装方案和版本，然后执行安装。安装过程中还可选择是否启用 [Egress Gateway](egress-gateway.md) 和 [Nodelocal DNSCache](./appendix/with-node-local-dns.md)。如需手动安装，参考后续步骤。
 
 :::tip[为什么用 `bash -c "$(curl ...)"` 而不是 `curl ... \| bash`？]
 
@@ -1031,6 +1031,10 @@ cilium-operator 使用 hostNetwork 并配置了就绪探针，在超级节点上
 - [为什么 Native Routing 模式禁用 sysctlfix，Overlay 模式却启用？](./appendix/sysctlfix.md)
 - [Cilium Host Routing：legacy vs BPF](./appendix/host-routing.md)
 - [为什么不提供 GR Native Routing 部署方案？](./appendix/gr-native-not-recommended.md)
+
+### 如何加速集群 DNS 解析？
+
+安装 Cilium 替代 kube-proxy 后，TKE 内置的 [NodeLocalDNSCache](https://cloud.tencent.com/document/product/457/40613) 插件会失效。如需 DNS 缓存加速，可自建 Nodelocal DNSCache 并通过 CiliumLocalRedirectPolicy 实现共存，详见 [Cilium 与 Nodelocal DNSCache 共存](./appendix/with-node-local-dns.md)。
 
 ## 参考资料
 
