@@ -1021,7 +1021,7 @@ cilium-operator 使用 hostNetwork 并配置了就绪探针，在超级节点上
 
 ## 延伸阅读
 
-设计原理与运维指南已拆分到独立文章，归入 [Cilium 附录](./appendix) 目录：
+更多内容归入 [Cilium 附录](./appendix) 目录：
 
 - [大规模集群 Cilium 调优指南](./appendix/large-scale-tuning.md)
 - [已验证的节点操作系统](./appendix/verified-os.md)

@@ -1025,7 +1025,7 @@ For full root-cause analysis, reproduction steps, and the upstream cilium PR lin
 
 ## Further Reading
 
-Design rationale and operational guides have been split into standalone articles under the [Cilium Appendix](./appendix) directory:
+More content under the [Cilium Appendix](./appendix) directory:
 
 - [Cilium Tuning for Large-Scale Clusters](./appendix/large-scale-tuning.md)
 - [Verified Node Operating Systems](./appendix/verified-os.md)
