@@ -1022,7 +1022,7 @@ If during installation `k8sServiceHost` points to a CLB address (the CLB used fo
 
 So the recommendation is: do **not** configure `k8sServiceHost` with the apiserver's CLB address. Use the cluster's `169.254.x.x` apiserver address instead (`kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'`) — this is also a VIP, but cilium does not intercept and forward it, and it doesn't change once the cluster is created. For a more readable form, you can resolve a domain to this address and configure that domain in `k8sServiceHost`.
 
-For full root-cause analysis, reproduction steps, and the upstream cilium PR link, see [Troubleshooting: APIServer reports operation not permitted](./troubleshooting/connect-apiserver-operation-not-permitted.md).
+For full root-cause analysis, reproduction steps, and the upstream cilium PR link, see [Troubleshooting: APIServer reports operation not permitted](./appendix/troubleshooting/connect-apiserver-operation-not-permitted.md).
 
 ## Further Reading
 

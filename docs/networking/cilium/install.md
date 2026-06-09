@@ -1018,7 +1018,7 @@ cilium-operator 使用 hostNetwork 并配置了就绪探针，在超级节点上
 
 所以建议是 `k8sServiceHost` 不要配置 apiserver 的 CLB 地址，而是使用集群 `169.254.x.x` 的 apiserver 地址（`kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'`），该地址也是一个 VIP，但不会被 cilium 拦截转发，并且是自集群创建完后就再也不会变的，可以放心作为 `k8sServiceHost` 配置。如果希望使用辨识度更高的域名方式配置，也可以将域名解析到该地址然后再配置到 `k8sServiceHost`。
 
-完整的根因分析、复现步骤和 cilium 上游 PR 链接，参见 [问题排查：连接 APIServer 报错 operation not permitted](./troubleshooting/connect-apiserver-operation-not-permitted.md)。
+完整的根因分析、复现步骤和 cilium 上游 PR 链接，参见 [问题排查：连接 APIServer 报错 operation not permitted](./appendix/troubleshooting/connect-apiserver-operation-not-permitted.md)。
 
 ## 延伸阅读
 
