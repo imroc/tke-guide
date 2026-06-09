@@ -779,9 +779,16 @@ run_service_scale_test() {
 
     info "  Creating services $start-$end..."
     local batch_file=$(mktemp)
+    local first=true
     for i in $(seq $start $end); do
       local o3=$(((i - 1) / 254))
       local o4=$(((i - 1) % 254 + 1))
+      # YAML document separator between resources (not before the very first)
+      if [[ "$first" == "true" ]]; then
+        first=false
+      else
+        echo "---" >>"$batch_file"
+      fi
       cat <<EOF >>"$batch_file"
 apiVersion: v1
 kind: Service
