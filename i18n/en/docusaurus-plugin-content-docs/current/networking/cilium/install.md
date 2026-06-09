@@ -412,7 +412,7 @@ routingMode: "native"
 endpointRoutes:
   # Must be true for native routing — routes Pod traffic directly via veth device.
   # Note: this also forces cilium onto legacy host routing rather than BPF host routing.
-  # See appendix "Cilium Host Routing: Legacy vs BPF" for details.
+  # See "VPC-CNI Native Routing Details" for explanation.
   enabled: true
 ipam:
   # Pod IP allocation handled by tke-eni-ipamd, not by cilium
@@ -433,7 +433,8 @@ cni:
 extraConfig:
   # cilium doesn't allocate Pod IPs here — manually specify the cilium_host IP
   local-router-ipv4: 169.254.32.16
-# Disable sysctlfix — prevents restarting systemd-sysctl from resetting eth0 rp_filter. See FAQ.
+# Disable sysctlfix — prevents restarting systemd-sysctl from resetting eth0 rp_filter.
+# See "VPC-CNI Native Routing Details" for explanation.
 sysctlfix:
   enabled: false
 operator:
@@ -465,7 +466,7 @@ enableIPv4Masquerade: true
 bpf:
   # Must enable BPF masquerade. Without it cilium falls back to iptables masquerade,
   # which forces host routing back to legacy (BPF host routing won't be active).
-  # See appendix "Cilium Host Routing: Legacy vs BPF" for details.
+  # See "VPC-CNI Native Routing Details" for explanation.
   masquerade: true
 # Don't set sysctlfix (leave the default true) — ensures lxc interface rp_filter=0
 ```

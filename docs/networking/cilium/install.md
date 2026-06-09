@@ -409,7 +409,7 @@ routingMode: "native"
 endpointRoutes:
   # native routing 必须置为 true，转发 Pod 流量直接路由到 veth 设备
   # 注意：这同时意味着 cilium 走 legacy host routing 而非 BPF host routing，
-  # 详见附录《Cilium Host Routing：legacy vs BPF》
+  # 详见《VPC-CNI Native Routing 模式详解》
   enabled: true
 ipam:
   # Pod IP 分配由 tke-eni-ipamd 负责，cilium 无需负责
@@ -430,7 +430,8 @@ cni:
 extraConfig:
   # cilium 不负责 Pod IP 分配，需手动指定 cilium_host 虚拟网卡的 IP
   local-router-ipv4: 169.254.32.16
-# 禁用 sysctlfix，避免重启 systemd-sysctl 导致 eth0 rp_filter 被重置，详见 FAQ
+# 禁用 sysctlfix，避免重启 systemd-sysctl 导致 eth0 rp_filter 被重置，
+# 详见《VPC-CNI Native Routing 模式详解》
 sysctlfix:
   enabled: false
 operator:
@@ -462,7 +463,7 @@ enableIPv4Masquerade: true
 bpf:
   # 必须启用 BPF 实现的 masquerade，否则 cilium 默认走 iptables 实现，会让 host
   # routing 强制 fallback 到 legacy（无法启用 BPF host routing）。
-  # 详见附录《Cilium Host Routing：legacy vs BPF》
+  # 详见《VPC-CNI Native Routing 模式详解》
   masquerade: true
 # 不设置 sysctlfix（保持默认 true），确保 lxc 接口 rp_filter=0
 ```
