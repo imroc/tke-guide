@@ -627,7 +627,7 @@ _run_fortio() {
 
   local api_url="http://localhost:${local_port}/fortio/rest/run"
   local params="url=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$url")"
-  params="${params}&qps=0&t=${FORTIO_DURATION}s&c=${connections}&json=on"
+  params="${params}&qps=-1&t=${FORTIO_DURATION}s&c=${connections}&json=on"
   [[ "$keepalive" == "false" ]] && params="${params}&nocatchup=on&keepalive=off"
 
   local rc=0
