@@ -422,9 +422,9 @@ spec:
   containers:
   - name: fortio
     image: $FORTIO_IMAGE
-    # fortio image is distroless: no sh, no sleep. Run fortio server purely to
-    # keep the pod alive; the script execs fortio load for actual tests. Disable
-    # all extra listeners so it does not grab unrelated ports.
+    # Fortio distroless: keep pod alive with minimal server. We exec into
+    # this container for load tests. Results are written to stdout and may
+    # be lost on WebSocket errors — the script handles retries.
     command: ["fortio", "server", "-http-port", "9999", "-grpc-port", "disabled", "-tcp-port", "disabled", "-udp-port", "disabled", "-redirect-port", "disabled"]
   terminationGracePeriodSeconds: 0
 EOF
@@ -606,26 +606,46 @@ _run_fortio() {
   local out="$output_dir/$result_file"
   mkdir -p "$output_dir"
   info "Running: $label (c=$connections, keepalive=$keepalive)"
-  # Use -json - (stdout). kubectl exec WebSocket may close abnormally under
-  # heavy load (close 1006), causing non-zero exit even when fortio completed.
-  # We ignore the exit code and validate the output file directly.
-  local rc=0
-  if [[ "$keepalive" == "false" ]]; then
-    timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-      fortio load -qps 0 -c "$connections" -t "${FORTIO_DURATION}s" -keepalive=false -json - "$url" \
-      >"$out" 2>"${out}.err" || rc=$?
-  else
-    timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-      fortio load -qps 0 -c "$connections" -t "${FORTIO_DURATION}s" -json - "$url" \
-      >"$out" 2>"${out}.err" || rc=$?
-  fi
-  if [[ $rc -ne 0 && ! -s "$out" ]]; then
-    warn "  fortio returned exit $rc with no output"
-    [[ -s "${out}.err" ]] && warn "  stderr: $(tail -3 "${out}.err")"
-  fi
-  [[ ! -s "${out}.err" ]] && rm -f "${out}.err"
 
-  # Validate: check if we got valid JSON despite non-zero exit
+  # kubectl exec WebSocket may close abnormally under heavy load (close 1006),
+  # losing stdout data even when fortio completed. Retry up to 2 more times
+  # with shorter duration if first attempt yields no output.
+  local attempt max_attempts=3
+  local duration="$FORTIO_DURATION"
+  for attempt in $(seq 1 $max_attempts); do
+    local rc=0
+    if [[ "$keepalive" == "false" ]]; then
+      timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
+        fortio load -qps 0 -c "$connections" -t "${duration}s" -keepalive=false -json - "$url" \
+        >"$out" 2>"${out}.err" || rc=$?
+    else
+      timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
+        fortio load -qps 0 -c "$connections" -t "${duration}s" -json - "$url" \
+        >"$out" 2>"${out}.err" || rc=$?
+    fi
+    [[ ! -s "${out}.err" ]] && rm -f "${out}.err"
+
+    # If we got valid output, break out of retry loop
+    if [[ -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; then
+      break
+    fi
+
+    # No valid output — report and retry
+    if [[ $attempt -lt $max_attempts ]]; then
+      warn "  attempt $attempt failed (WebSocket error?), retrying in 10s with shorter duration..."
+      rm -f "$out" "${out}.err"
+      sleep 10
+      duration=30  # shorter retry to reduce WebSocket pressure
+    else
+      if [[ $rc -ne 0 && ! -s "$out" ]]; then
+        warn "  fortio failed after $max_attempts attempts"
+        [[ -s "${out}.err" ]] && warn "  stderr: $(tail -3 "${out}.err")"
+      fi
+    fi
+  done
+  [[ -f "${out}.err" && ! -s "${out}.err" ]] && rm -f "${out}.err"
+
+  # Parse result if we got valid output
   if [[ ! -s "$out" ]]; then
     warn "  no output for $result_file"
     return 0
