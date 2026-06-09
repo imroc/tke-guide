@@ -17,7 +17,7 @@ The following conditions must be met to enable Egress Gateway:
 
 1. Enable cilium to replace kube-proxy.
 2. Enable IP masquerade using BPF implementation instead of the default iptables implementation.
-3. **VPC-CNI Native Routing mode only**: Must configure `ipMasqAgent.config.nonMasqueradeCIDRs` to cover all VPC CIDR blocks (primary + all auxiliary CIDRs). Otherwise, cross-node Pod-to-Pod traffic will be incorrectly SNATed by BPF masquerade to node IPs or link-local addresses. The destination node will not be able to restore the SNATed source IP back to the original Pod's cilium identity, causing **cross-node NetworkPolicy to fail**.
+3. **VPC-CNI Native Routing mode only**: Must configure `ipMasqAgent.config.nonMasqueradeCIDRs` to cover all VPC CIDR blocks (primary + all Assistant CIDRs). Otherwise, cross-node Pod-to-Pod traffic will be incorrectly SNATed by BPF masquerade to node IPs or link-local addresses. The destination node will not be able to restore the SNATed source IP back to the original Pod's cilium identity, causing **cross-node NetworkPolicy to fail**.
 
 :::tip[Overlay mode is not affected]
 
@@ -46,7 +46,7 @@ bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- enable-egress-g
 When running `enable-egress-gateway` on a VPC-CNI Native Routing cluster, the script automatically determines `nonMasqueradeCIDRs` with the following priority:
 
 1. Environment variable `NON_MASQ_CIDRS="10.0.0.0/8 172.16.0.0/12 ..."` (space-separated) — suitable for non-interactive scenarios (CI / Terraform)
-2. Automatically reuse the TKE cluster's built-in `kube-system/ip-masq-agent-config` ConfigMap (TKE writes the VPC primary + auxiliary CIDRs into it when installing the plugin)
+2. Automatically reuse the TKE cluster's built-in `kube-system/ip-masq-agent-config` ConfigMap (TKE writes the VPC primary + Assistant CIDRs into it when installing the plugin)
 3. Interactive prompt (defaults to all three RFC 1918 CIDRs `10.0.0.0/8 172.16.0.0/12 192.168.0.0/16`, can be overridden with any valid Tencent Cloud VPC configuration)
 
 On Overlay clusters, the script will not ask about or inject this configuration.
@@ -119,9 +119,9 @@ kubectl rollout restart deploy cilium-operator -n kube-system
 
 :::tip[About nonMasqueradeCIDRs values]
 
-`ipMasqAgent.config.nonMasqueradeCIDRs` must **cover all VPC CIDR blocks** (primary + all auxiliary CIDRs, including node subnets and VPC-CNI Pod subnets). The example above uses all three [RFC 1918](https://datatracker.ietf.org/doc/html/rfc1918) CIDRs as a catch-all, which covers any valid Tencent Cloud VPC configuration — the simplest approach.
+`ipMasqAgent.config.nonMasqueradeCIDRs` must **cover all VPC CIDR blocks** (primary + all Assistant CIDRs, including node subnets and VPC-CNI Pod subnets). The example above uses all three [RFC 1918](https://datatracker.ietf.org/doc/html/rfc1918) CIDRs as a catch-all, which covers any valid Tencent Cloud VPC configuration — the simplest approach.
 
-If you want to specify exactly, you can get the values directly from the TKE cluster's built-in `kube-system/ip-masq-agent-config` ConfigMap (TKE automatically writes VPC primary + auxiliary CIDRs when installing the ip-masq-agent plugin):
+If you want to specify exactly, you can get the values directly from the TKE cluster's built-in `kube-system/ip-masq-agent-config` ConfigMap (TKE automatically writes VPC primary + Assistant CIDRs when installing the ip-masq-agent plugin):
 
 ```bash
 kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}'
@@ -155,7 +155,7 @@ Cilium provides two ways to tell BPF masquerade which traffic should not be SNAT
 
 | Configuration                         | Type       | Sufficient?                                                                                           |
 | -------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
-| `ipv4NativeRoutingCIDR`                | Single CIDR | ❌ No. Tencent Cloud VPC supports "primary CIDR + multiple auxiliary CIDRs". VPC-CNI Pods can be assigned IPs from any CIDR, and a single CIDR cannot express this. |
+| `ipv4NativeRoutingCIDR`                | Single CIDR | ❌ No. Tencent Cloud VPC supports "primary CIDR + multiple Assistant CIDRs". VPC-CNI Pods can be assigned IPs from any CIDR, and a single CIDR cannot express this. |
 | `ipMasqAgent.config.nonMasqueradeCIDRs` | CIDR list  | ✅ Can list all VPC CIDR blocks. The TKE built-in ip-masq-agent plugin uses the same field, so the configuration can be reused directly. |
 
 Therefore, Native Routing + Egress Gateway must use `nonMasqueradeCIDRs`. This guide uses this as the standard for all Native + Egress scenarios.
