@@ -911,7 +911,7 @@ Pod public-internet egress behaves differently per network mode — case-by-case
 **VPC-CNI Native mode**: cilium **disables** IP masquerading by default (`enableIPv4Masquerade=false`), since Pod IPs are valid VPC IPs and east-west traffic just needs to be routed. But this means when a Pod tries to reach the public internet, the source IP is the Pod IP (allocated from the node's secondary ENI IP pool), and the secondary ENI has no EIP — so **even if the node has an EIP bound (an EIP only sits on the primary ENI), Pods cannot reach the public internet**. One of the following must be true:
 
 1. **Configure a NAT gateway in the VPC** (cleanest, applies to all node subnets): add a route in the cluster's VPC route table forwarding outbound traffic to the NAT gateway, and make sure the route table is associated with the subnets used by the cluster. See [Accessing the Internet via NAT Gateway](https://www.tencentcloud.com/document/product/457/35427).
-2. **Enable cilium's ip-masq-agent**: SNAT Pod traffic destined outside the VPC to the node IP so it egresses via the primary ENI + node EIP (a self-managed equivalent of TKE's built-in ip-masq-agent). Suitable when "the node already has an EIP and we want Pods to share its public bandwidth". See [Configure IP Masquerading](./masquerading.md).
+2. **Enable cilium's ip-masq-agent**: SNAT Pod traffic destined outside the VPC to the node IP so it egresses via the primary ENI + node EIP (a self-managed equivalent of TKE's built-in ip-masq-agent). Suitable when "the node already has an EIP and we want Pods to share its public bandwidth". See [Configure IP Masquerading](./appendix/masquerading.md).
 3. **Enable Cilium Egress Gateway**: suitable for advanced cases like "route specific Pods through a specific public IP". See [Egress Gateway Practice](./egress-gateway.md).
 
 ### Image pull failure?
@@ -1005,7 +1005,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
 
 The TKE mirror registry doesn't come with an SLA — occasionally pulls may fail, though retries usually succeed eventually.
 
-For higher availability, you can [host Cilium images via TCR](./tcr.md) — sync cilium's image dependencies into your own [TCR registry](https://www.tencentcloud.com/products/tcr), then update the image override config to point at your synced addresses.
+For higher availability, you can [host Cilium images via TCR](./appendix/tcr.md) — sync cilium's image dependencies into your own [TCR registry](https://www.tencentcloud.com/products/tcr), then update the image override config to point at your synced addresses.
 
 :::
 
@@ -1036,6 +1036,8 @@ Design rationale and operational guides have been split into standalone articles
 - [Cilium Host Routing: Legacy vs BPF](./appendix/host-routing.md)
 - [Why this guide does not offer GR Native Routing](./appendix/gr-native-not-recommended.md)
 - [Cilium with NodeLocal DNSCache](./appendix/with-node-local-dns.md)
+- [Configure IP Masquerading](./appendix/masquerading.md)
+- [Host Cilium Images via TCR](./appendix/tcr.md)
 
 ## External References
 

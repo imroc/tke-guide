@@ -24,8 +24,6 @@ const sidebars: SidebarsConfig = {
           items: [
             'networking/cilium/overview',
             'networking/cilium/install',
-            'networking/cilium/masquerading',
-            'networking/cilium/tcr',
             'networking/cilium/egress-gateway',
             'networking/cilium/networkpolicy',
             'networking/cilium/observability',
@@ -50,6 +48,8 @@ const sidebars: SidebarsConfig = {
                 'networking/cilium/appendix/host-routing',
                 'networking/cilium/appendix/gr-native-not-recommended',
                 'networking/cilium/appendix/with-node-local-dns',
+                'networking/cilium/appendix/masquerading',
+                'networking/cilium/appendix/tcr',
                 {
                   type: 'category',
                   label: 'Cilium 问题排查',

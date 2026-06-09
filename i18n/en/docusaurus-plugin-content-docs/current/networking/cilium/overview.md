@@ -9,7 +9,7 @@
 | Article                    | Content                                                    | Audience                  |
 | -------------------------- | ---------------------------------------------------------- | ------------------------- |
 | **Installing Cilium**      | Empty cluster creation, helm installation, verification, rollback | First-time users   |
-| **Hosting Images with TCR**| Use private TCR registry for production image pull         | Stability-focused users   |
+
 | **Cilium Functional Test** | Functional testing methods and measured data               | All post-install users    |
 | **Cilium Performance Test**| Baseline network performance and cross-scheme comparison   | Performance-focused users |
 
@@ -17,7 +17,7 @@
 
 | Article                                           | Content                                                  | Prerequisites     |
 | ------------------------------------------------ | -------------------------------------------------------- | ----------------- |
-| **Configuring IP Masquerade**                    | Let Pods use node EIP for outbound internet (SNAT)       | Cilium installed  |
+
 | **Egress Gateway in Practice**                   | Select fixed egress IP per policy for external access    | Cilium installed  |
 | **Enabling Communication Encryption**            | WireGuard / IPsec encryption for inter-node Pod traffic  | Cilium installed  |
 | **Building Multi-Cluster Networks with Cilium**  | Cluster Mesh to connect services across clusters         | Cilium installed  |
@@ -46,6 +46,8 @@
 | **Why Native Mode Disables sysctlfix**                     │ | Trilogy 3: rp_filter differences and decision logic                |
 | **Why GR Native Routing Is Not Available**                 | Complete trial-and-error record and 4 types of issues              |
 | **Cilium with NodeLocal DNSCache**               | Self-built NodeLocal DNS cache for DNS acceleration      |
+| **Configure IP Masquerading**                    | Let Pods egress via node EIP without NAT gateway         |
+| **Host Cilium Images via TCR**                   | Use internal TCR instead of pulling from Docker Hub      |
 
 > Articles marked ◀─┬─▶ form the Native Routing design principles trilogy. Recommended reading order: Host Routing → local-router-ipv4 → sysctlfix.
 

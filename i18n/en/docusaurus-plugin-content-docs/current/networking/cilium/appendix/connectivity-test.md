@@ -542,7 +542,7 @@ VPC-CNI Native mode defaults to `enableIPv4Masquerade=false` (Pod IPs are VPC IP
 However, enabling any of the following capabilities will **force Cilium to enable BPF masquerade**:
 
 - **Egress Gateway**: Cilium source code mandates `enableIPv4Masquerade=true` + `bpf.masquerade=true` ([`pkg/egressgateway/manager.go`](https://github.com/cilium/cilium/blob/main/pkg/egressgateway/manager.go))
-- **ip-masq-agent** (allows Native Pods to egress to the public internet via the node's primary ENI EIP, see [Configuring IP Masquerade](../masquerading.md)): The script also sets `enableIPv4Masquerade=true` + `bpf.masquerade=true` + `ipMasqAgent.enabled=true`
+- **ip-masq-agent** (allows Native Pods to egress to the public internet via the node's primary ENI EIP, see [Configuring IP Masquerade](./masquerading.md)): The script also sets `enableIPv4Masquerade=true` + `bpf.masquerade=true` + `ipMasqAgent.enabled=true`
 
 Once masquerade is enabled, the **default behavior is to SNAT all traffic leaving the cluster CIDR**—in Native mode, this means cross-node Pod-to-Pod traffic will also be SNATed (the source Pod IP is replaced with a link-local `169.254.x.x` or the node IP), causing the receiving Cilium agent to be unable to resolve the correct endpoint identity, resulting in **all NetworkPolicy rules based on source endpoint labels failing in cross-node scenarios**.
 
