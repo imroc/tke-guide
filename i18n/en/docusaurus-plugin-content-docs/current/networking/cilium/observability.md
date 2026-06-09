@@ -1,8 +1,18 @@
-# Enhancing Observability with Cilium
+# Enhanced Observability with Cilium
+
+## One-Click Enable Hubble
+
+If Hubble Relay and Hubble UI were not enabled during Cilium installation, use the one-click script to quickly enable them:
+
+```bash
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- enable-hubble
+```
+
+The script runs `helm upgrade --reuse-values --set hubble.relay.enabled=true --set hubble.ui.enabled=true` and restarts cilium-agent / operator. The following sections provide manual commands for enabling each component, for reference as needed.
 
 ## Enable Hubble Relay
 
-Hubble includes Hubble Server and Hubble Relay. Hubble Server is built into each node's cilium-agent and is enabled by default. Hubble Relay is a component that needs to be deployed separately to aggregate data from all Hubble Servers in the cluster and provide a unified API entry point.
+Hubble consists of Hubble Server and Hubble Relay. Hubble Server is built into the cilium-agent on each node and is enabled by default. Hubble Relay is a separately deployed component that aggregates data from all Hubble Servers across the cluster, providing a unified API entry point.
 
 Use the following command to enable Hubble Relay:
 
@@ -14,7 +24,7 @@ helm upgrade cilium cilium/cilium --version 1.19.4 \
    --set hubble.relay.enabled=true
 ```
 
-Verify that Hubble is enabled and running normally using `cilium status`:
+Verify Hubble is enabled and running correctly with `cilium status`:
 
 ```bash showLineNumbers
 $ cilium status
@@ -45,12 +55,11 @@ Image versions         cilium             quay.tencentcloudcr.com/cilium/cilium:
                        hubble-relay       quay.tencentcloudcr.com/cilium/hubble-relay:v1.19.4@sha256:e53e00c47fe4ffb9c086bad0c1c77f23cb968be4385881160683d9e15aa34dc3: 1
 ```
 
-
 ## Install Hubble Client
 
-The Hubble client is used to interact with the API provided by Hubble Relay. Refer to [Install the Hubble Client](https://docs.cilium.io/en/stable/observability/hubble/setup/#install-the-hubble-client) to install the `hubble` binary (Hubble client) on your local machine.
+The Hubble client is used to interact with the Hubble Relay API. Refer to [Install the Hubble Client](https://docs.cilium.io/en/stable/observability/hubble/setup/#install-the-hubble-client) to install the `hubble` binary (Hubble client) on your local machine.
 
-After installation, verify that the Hubble client can access the Hubble API normally:
+After installation, verify that the Hubble client can access the Hubble API:
 
 ```bash
 $ hubble status -P
@@ -62,7 +71,7 @@ Connected Nodes: 3/3
 
 ## Enable Hubble UI
 
-Hubble UI can be used to visualize service topology in the cluster.
+Hubble UI provides a visual view of the cluster's service topology.
 
 Use the following command to enable Hubble UI:
 
@@ -76,8 +85,7 @@ helm upgrade cilium cilium/cilium --version 1.19.4 \
    --set hubble.ui.frontend.image.repository=quay.tencentcloudcr.com/cilium/hubble-ui
 ```
 
-
-Confirm that the Hubble UI Pod is running normally:
+Confirm the Hubble UI Pod is running:
 
 ```bash
 $ kubectl --namespace=kube-system get pod -l app.kubernetes.io/name=hubble-ui
@@ -86,15 +94,15 @@ hubble-ui-5dd5877df5-8c69k   2/2     Running   0          5m41s
 
 ```
 
-Then you can execute `cilium hubble ui` to automatically open a browser and view the cluster's service topology:
+Then run `cilium hubble ui` to automatically open the browser and view the cluster's service topology.
 
 ```bash
 $ cilium hubble ui
 ℹ  Opening "http://localhost:12000" in your browser...
 ```
 
-For more information, refer to [Network Observability with Hubble / Service Map & Hubble UI](https://docs.cilium.io/en/stable/observability/hubble/hubble-ui/).
+For more details, see [Network Observability with Hubble / Service Map & Hubble UI](https://docs.cilium.io/en/stable/observability/hubble/hubble-ui/).
 
 ## Auditing Network Flow Logs
 
-If you want to audit network packets (e.g., for troubleshooting or security auditing), refer to [Auditing Network Flow Logs with Cilium + CLS](flow-logs.md).
+If you need to audit network packets (e.g., for troubleshooting or security auditing), see [Cilium + CLS for Network Flow Log Audit](flow-logs.md).

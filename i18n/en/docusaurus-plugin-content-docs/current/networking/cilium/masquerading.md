@@ -1,67 +1,67 @@
-# Configuring IP Masquerading
+# Configuring IP Masquerade
 
-## Introduction to IP Masquerading
+## IP Masquerade Overview
 
-Simply put, IP masquerading is the process of disguising the source IP of Pod traffic leaving the cluster as the node IP (SNAT). This is typically used in scenarios where the Pod IP cannot be directly routed outside the cluster, but traffic still needs to be accessible externally.
+In simple terms, IP masquerade translates the source IP of outbound Pod traffic to the node IP (SNAT). It is typically used when Pod IPs cannot be routed directly outside the cluster but outbound access is still needed.
 
-## VPC-CNI Mostly Does Not Require IP Masquerading
+## VPC-CNI Mostly Does Not Need IP Masquerade
 
-In TKE VPC-CNI network mode, Pod IPs use VPC IPs, which are the same as node IPs and can be directly routed within the VPC. After connecting with other VPCs or other clouds (such as AWS) through cloud networking, Pod IPs can also be directly routed. Additionally, it also supports NAT gateways, allowing Pods to access the public internet through NAT gateways.
+In TKE VPC-CNI network mode, Pod IPs are VPC IPs, just like node IPs, and can be routed directly within the VPC. When connected to other VPCs or other clouds (e.g., AWS) via Cloud Connect Network, Pod IPs can also be routed directly. Additionally, NAT Gateways are supported, allowing Pods to access the internet through them.
 
-Therefore, in most scenarios, we don't need to enable IP masquerading. The default installation method provided in [Installing Cilium](./install.md) also disables Cilium's IP masquerading function (`--set enableIPv4Masquerade=false`).
+Therefore, in most scenarios, IP masquerade is not needed. The default installation method in [Installing Cilium](./install.md) also disables Cilium's IP masquerade feature (`--set enableIPv4Masquerade=false`).
 
-## When is IP Masquerading Needed?
+## When Is IP Masquerade Needed?
 
-You can enable Cilium's IP masquerading function in the following scenarios:
+Enable Cilium's IP masquerade if you have the following requirements:
 
-1. Want Pods to utilize the node's public bandwidth to access the public internet.
-2. Pods need to call certain Tencent Cloud interfaces that authenticate based on node IP, such as [CVM metadata interface](https://cloud.tencent.com/document/product/213/4934).
-3. When interconnecting across VPCs or across clouds, the network segments overlap, but Node IPs can communicate with each other.
+1. Pods need to use the node's public bandwidth to access the internet.
+2. Pods need to call certain Tencent Cloud APIs that authenticate based on node IP, such as [CVM metadata API](https://cloud.tencent.com/document/product/213/4934).
+3. Cross-VPC or cross-cloud connectivity with overlapping CIDRs, but node IPs can communicate.
 
-:::caution[VPC-CNI Native Mode: IP Masquerading is Required for Pods to Reach the Public Internet]
+:::caution[VPC-CNI Native Mode: Pods Must Enable IP Masquerade for Outbound Internet]
 
-In VPC-CNI Native mode, Pod IPs are valid VPC IPs allocated from the IP pool of the node's **secondary ENI**, while the node's EIP (public IP) is bound only to the **primary ENI**. So when a Pod tries to reach the public internet:
+In VPC-CNI Native mode, Pod IPs are allocated from the **secondary ENI** IP pool — valid VPC IPs. However, the node's EIP is only bound to the **primary ENI**. So when a Pod accesses the internet:
 
-1. Source IP of the packet = Pod IP (a VPC IP on a secondary ENI);
-2. The kernel routes the packet out through the corresponding secondary ENI (NOT the primary ENI);
-3. The secondary ENI has no EIP, so once the packet hits the VPC boundary, there's no return path from the public internet;
-4. Result: **Even if the node has an EIP bound, Pods CANNOT reach the public internet**.
+1. The packet source IP = Pod IP (VPC IP on the secondary ENI);
+2. The kernel forwards the packet through the corresponding secondary ENI (bypassing the primary ENI);
+3. The secondary ENI has no EIP, so the packet has no return path at the VPC boundary;
+4. Result: **Even if the node has an EIP, the Pod cannot access the internet**.
 
-To make Pods in Native mode reach the public internet, one of the following must be true:
+To allow Native mode Pods to access the internet, one of the following conditions must be met:
 
-- A NAT gateway is configured in the VPC (recommended for most cases — cleanest);
-- [Cilium Egress Gateway](./egress-gateway.md) is enabled (suitable when you need a fixed egress IP per namespace/Pod);
-- The ip-masq-agent described in this doc is enabled, which SNATs Pod traffic leaving the VPC to the node IP so it egresses via the primary ENI + node EIP (a self-managed equivalent of TKE's built-in ip-masq-agent).
+- Configure a NAT Gateway in the VPC (suitable for most scenarios, cleanest approach);
+- Enable [Cilium Egress Gateway](./egress-gateway.md) (suitable for scenarios requiring per-namespace/Pod fixed egress IP selection);
+- Enable the ip-masq-agent described in this article to SNAT outbound VPC traffic to the node IP, going out through the node's primary ENI + node EIP (self-built TKE ip-masq-agent).
 
-GR and VPC-CNI Overlay modes don't have this issue:
+GR and VPC-CNI Overlay modes do not have this issue:
 
-- **GR / Overlay**: Pod IPs are NOT valid VPC IPs, so cilium enables IP masquerading by default (`enableIPv4Masquerade=true`); when a Pod's traffic leaves the node it has already been SNAT'd to the node IP, and the node's existing public-internet capability (NAT gateway / EIP) carries it through.
-- **Native**: Pod IPs are valid VPC IPs, so cilium disables IP masquerading by default (`enableIPv4Masquerade=false`) — which is the source of the limitation above.
+- **GR / Overlay**: Pod IPs are not valid VPC IPs, Cilium enables IP masquerade by default (`enableIPv4Masquerade=true`), traffic is SNATed to node IP when leaving the node. The node has an EIP, so outbound internet works;
+- **Native**: Pod IPs are valid VPC IPs, Cilium disables IP masquerade by default (`enableIPv4Masquerade=false`), hence the issue above.
 
 :::
 
-## Cilium's IP Masquerading Function Introduction
+## Cilium IP Masquerade Features
 
-Cilium enables IP masquerading by default, and requires explicit configuration to disable it with `--set enableIPv4Masquerade=false`.
+Cilium enables IP masquerade by default. To disable it, explicitly configure `--set enableIPv4Masquerade=false`.
 
-The default behavior is that as long as the destination IP is not on the local machine, it will be SNATed to the node IP. Typically, Pod IPs are routable within the cluster. If all Pod IPs are within a fixed network segment, you can configure `ipv4NativeRoutingCIDR` to only masquerade IP communications outside that segment.
+The default behavior is to SNAT any traffic whose destination IP is not local to the node IP. Since Pod IPs are typically routable within the cluster, if all Pod IPs are within a fixed CIDR range, you can configure `ipv4NativeRoutingCIDR` to only masquerade traffic destined outside that CIDR.
 
 ## eBPF vs iptables
 
-Cilium supports both eBPF and iptables implementations for IP masquerading. In TKE environments, you need to use the eBPF implementation.
+Cilium supports both eBPF and iptables implementations for IP masquerade. In TKE environments, the eBPF implementation must be used.
 
-The eBPF implementation also has two usage methods:
+The eBPF implementation also has two approaches:
 
-1. Configure `ipv4NativeRoutingCIDR` to avoid SNAT for a single CIDR.
-2. Enable the eBPF version of ipMasqAgent implementation, which can be configured to avoid SNAT for multiple CIDRs.
+1. Use `ipv4NativeRoutingCIDR` to configure a single CIDR that should not be SNATed.
+2. Enable the eBPF-based ipMasqAgent to configure multiple CIDRs that should not be SNATed.
 
-Tencent Cloud VPC supports adding secondary CIDRs to extend the VPC's CIDR range. Pod IPs in the same cluster may therefore belong to different large internal network segments (e.g., Pod A's IP is 172.x.x.x, while Pod B's IP is 10.x.x.x). Additionally, if you plan to interconnect with Kubernetes clusters on other clouds (such as AWS EKS clusters), the Pod IPs used by both clusters may also belong to different large internal network segments.
+Tencent Cloud VPC supports adding secondary CIDRs to extend the VPC CIDR range, meaning Pod IPs in the same cluster may belong to different large internal network ranges (e.g., Pod A's IP is 172.x.x.x, while Pod B's IP is 10.x.x.x). Additionally, when interconnecting with Kubernetes clusters on other clouds (e.g., AWS EKS), the Pod IPs used by both sides may also belong to different large internal network ranges.
 
-Therefore, if you need to enable IP masquerading, it's recommended to use Cilium's built-in eBPF version of ipMasqAgent.
+Therefore, if you need to enable IP masquerade, it is recommended to use Cilium's built-in eBPF-based ipMasqAgent.
 
-## How to Enable IP Masquerading?
+## How to Enable IP Masquerade?
 
-You can enable it with the following command:
+Enable it with the following command:
 
 ```bash showLineNumbers
 helm upgrade cilium cilium/cilium --version 1.19.4 \
@@ -77,7 +77,7 @@ helm upgrade cilium cilium/cilium --version 1.19.4 \
 
 :::info[Note]
 
-If you're adjusting the configuration of an already installed Cilium, existing nodes need to restart cilium-agent for the changes to take effect:
+If adjusting an already installed Cilium configuration, existing nodes need a cilium-agent restart to take effect:
 
 ```bash
 kubectl -n kube-system rollout restart daemonset cilium
@@ -87,24 +87,24 @@ kubectl -n kube-system rollout restart daemonset cilium
 
 :::tip[Parameter Explanation]
 
-Here's a `values.yaml` file containing explanations of the relevant parameters:
+Below is the `values.yaml` with relevant parameter explanations:
 
 ```yaml title="values.yaml"
-# Enable Cilium's IP MASQUERADE function
+# Enable Cilium's IP MASQUERADE feature
 enableIPv4Masquerade: true
 bpf:
-  # Cilium's IP MASQUERADE function has both bpf and iptables versions. In TKE environments, you need to use the bpf version. Reference: https://docs.cilium.io/en/stable/network/concepts/masquerading/
+  # Cilium's IP MASQUERADE has bpf and iptables implementations. In TKE environments, use the bpf version. See https://docs.cilium.io/en/stable/network/concepts/masquerading/
   masquerade: true
 ipMasqAgent:
-  # Use Cilium's eBPF-based ipMasqAgent to control IP MASQUERADE, which supports configuring multiple CIDR segments to avoid SNAT.
-  # Note: The ipv4NativeRoutingCIDR method only supports a single CIDR, while Tencent Cloud VPC supports adding secondary CIDRs to extend the VPC's CIDR range.
-  # Therefore, Pod IPs in the same cluster may belong to different large internal network segments (e.g., Pod A's IP is 172.x.x.x, while Pod B's IP is 10.x.x.x).
+  # Use Cilium's eBPF-based ipMasqAgent to control IP MASQUERADE, supporting multiple CIDR ranges that should not be SNATed.
+  # Note: ipv4NativeRoutingCIDR only supports a single CIDR, while Tencent Cloud VPC supports adding secondary CIDRs to extend VPC CIDR, so
+  # Pod IPs in the same cluster may belong to different large internal network ranges (e.g., Pod A's IP is 172.x.x.x, and Pod B's IP is 10.x.x.x).
   enabled: true
   config:
-    # masqLinkLocal controls whether to perform SNAT for the link local segment (169.254.0.0/16). This segment is used for public services on Tencent Cloud,
-    # such as CVM metadata service (querying current CVM metadata), or other interfaces that require node IP authentication.
-    # When calling these interfaces from Pods, you need to ensure SNAT to node IP, so set masqLinkLocal to true to ensure that traffic sent to the 169.254.0.0/16
-    # segment is SNATed to node IP, avoiding failures when calling such interfaces.
+    # masqLinkLocal controls whether the link-local range (169.254.0.0/16) is SNATed. This range is used for public services on Tencent Cloud,
+    # such as CVM metadata service (querying current CVM metadata) or other interfaces requiring node IP authentication. Pods calling
+    # these interfaces need to ensure SNAT to node IP, so set masqLinkLocal to true to ensure traffic to 169.254.0.0/16 is SNATed
+    # to node IP, preventing such interface calls from failing.
     masqLinkLocal: true
 ```
 
@@ -112,13 +112,13 @@ ipMasqAgent:
 
 ## Configuring nonMasqueradeCIDRs
 
-The previous IP masquerading enabling method avoids SNAT for all internal network segments (except 169.255.0.0/16). If you need more granular control, you can explicitly configure specific CIDRs to avoid SNAT. The specific method is as follows.
+The IP masquerade enablement method described above does not SNAT traffic to all internal network ranges (except 169.255.0.0/16). For more fine-grained control, you can explicitly configure which CIDRs should not be SNATed, as follows.
 
-1. Prepare the ip-masq-agent ConfigMap in the file `ip-masq-agent-config.yaml`:
+1. Prepare the ip-masq-agent ConfigMap in a file `ip-masq-agent-config.yaml`:
 
-:::tip[Explanation]
+:::tip[Note]
 
-Add all CIDRs that don't require SNAT to nonMasqueradeCIDRs. These are typically the VPC CIDRs used by Pods in the TKE cluster (including VPC secondary CIDRs).
+Add CIDRs that do not need SNAT to nonMasqueradeCIDRs, typically the VPC CIDRs used by Pods in the TKE cluster (including VPC secondary CIDRs).
 
 :::
 

@@ -27,7 +27,7 @@ VPC-CNI clusters support both modes; GR clusters only support Overlay mode. **VP
 
 GR clusters have two hard limitations that don't pair well with cilium:
 
-1. **GR + Native Routing on cilium chained CNI is not production-viable**: cross-node Pod-to-Pod traffic is broken, and L7 / DNS NetworkPolicy is unsupported. This guide no longer offers that combination. Full write-up: [Why this guide does not offer GR Native Routing](./appendix/gr-native-not-recommended.md).
+1. **GR + Native Routing on cilium chained CNI is not production-viable**: cross-node Pod-to-Pod traffic is broken, and L7/DNS NetworkPolicy is unsupported. This guide no longer offers that combination. Full write-up: [Why this guide does not offer GR Native Routing](./appendix/gr-native-not-recommended.md).
 2. **GR clusters mandate a ClusterCIDR at creation** — that CIDR is carved out of the VPC's secondary CIDR list and pinned to the cluster. Even after installing cilium Overlay, when Pod IPs come entirely from an independent CIDR and not a single IP in ClusterCIDR is ever used, that CIDR is still held by the GR cluster and cannot be reused by any other resource in the same VPC. See FAQ [Why aren't GR clusters recommended?](#why-arent-gr-clusters-recommended) below.
 
 If you already have a GR cluster, follow the **Overlay (GR)** path in this guide. For new clusters, choose **VPC-CNI** instead.
@@ -145,7 +145,7 @@ bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install
 
 The script auto-detects the cluster's network mode, guides you through choosing a mode and version, then performs the installation. During installation you can optionally enable [Egress Gateway](egress-gateway.md) and [Nodelocal DNSCache](with-node-local-dns.md). For manual installation, follow the steps below.
 
-:::tip[Why `bash -c "$(curl ...)"` and not `curl ... \| bash`?]
+:::tip[Why `bash -c "$(curl ...)"` and not `curl ... | bash`?]
 
 The `install` subcommand is interactive (it calls `read` to ask for choices). With `curl ... | bash`, bash's stdin is consumed by curl's pipe output, so `read` returns EOF immediately and the script exits.
 

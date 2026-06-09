@@ -1,152 +1,152 @@
 # Overview
 
-[Cilium](https://cilium.io/) is an open-source cloud-native networking solution based on eBPF that provides high-performance networking, advanced network security policies, observability, and more for Kubernetes clusters. This series of tutorials explains how to install and use Cilium on TKE clusters.
+[Cilium](https://cilium.io/) is an eBPF-based open-source cloud-native networking solution that provides high-performance networking, advanced network security policies, and observability for Kubernetes clusters. This series of tutorials covers how to install and use Cilium in TKE clusters.
 
 ## Article Map
 
 ### Getting Started
 
-| Article                      | Content                                                      | Audience                  |
-| ---------------------------- | ------------------------------------------------------------ | ------------------------- |
-| **Install Cilium**           | Empty cluster creation, helm install, verification, rollback | First-time users          |
-| **Cilium Connectivity Test** | Functional testing methodology and real-world results        | All users                 |
-| **Cilium Performance Test**  | Network benchmark across all deployment schemes              | Performance-focused users |
+| Article                    | Content                                         | Audience                 |
+| -------------------------- | ----------------------------------------------- | ------------------------ |
+| **Installing Cilium**      | Empty cluster creation, helm installation, verification, rollback | First-time users |
+| **Cilium Functional Test** | Functional testing methods and measured data    | All post-install users   |
+| **Cilium Performance Test**| Baseline network performance and cross-scheme comparison | Performance-focused users |
 
-### Networking Enhancements
+### Network Enhancement
 
-| Article                                  | Content                                                | Prerequisites    |
-| ---------------------------------------- | ------------------------------------------------------ | ---------------- |
-| **Configuring IP Masquerade**            | Let Pods use node EIP for outbound Internet (SNAT)     | Cilium installed |
-| **Egress Gateway**                       | Select fixed egress IPs per policy for external access | Cilium installed |
-| **Enabling Encryption**                  | WireGuard / IPsec encrypt inter-node Pod traffic       | Cilium installed |
-| **Cilium with Nodelocal DNSCache**       | Self-deployed NodeLocal DNS for faster DNS resolution  | Cilium installed |
-| **Multi-Cluster Networking with Cilium** | Cluster Mesh for multi-cluster service connectivity    | Cilium installed |
+| Article                                           | Content                                                  | Prerequisites     |
+| ------------------------------------------------ | -------------------------------------------------------- | ----------------- |
+| **Configuring IP Masquerade**                    | Let Pods use node EIP for outbound internet (SNAT)       | Cilium installed  |
+| **Egress Gateway in Practice**                   | Select fixed egress IP per policy for external access    | Cilium installed  |
+| **Enabling Communication Encryption**            | WireGuard / IPsec encryption for inter-node Pod traffic  | Cilium installed  |
+| **Cilium with Nodelocal DNSCache**               | Self-built NodeLocal DNS to accelerate DNS resolution    | Cilium installed  |
+| **Building Multi-Cluster Networks with Cilium**  | Cluster Mesh to connect services across clusters         | Cilium installed  |
 
 ### Security Policies
 
-| Article           | Content                                           |
-| ----------------- | ------------------------------------------------- |
-| **NetworkPolicy** | CiliumNetworkPolicy intro and 20+ common patterns |
+| Article                                | Content                                                        |
+| -------------------------------------- | -------------------------------------------------------------- |
+| **NetworkPolicy in Practice**          | CiliumNetworkPolicy introduction with 20+ common patterns      |
 
 ### Observability
 
-| Article                         | Content                                              |
-| ------------------------------- | ---------------------------------------------------- |
-| **Enhance Observability**       | Enable Hubble Relay / Hubble UI / flow log audit     |
-| **Cilium + CLS Flow Log Audit** | Send Hubble flow logs to CLS for search and analysis |
+| Article                                                    | Content                                                    |
+| ---------------------------------------------------------- | ---------------------------------------------------------- |
+| **Enhanced Observability**                                 | Enable Hubble Relay / Hubble UI / network flow log audit   |
+| **Cilium + CLS for Network Flow Log Audit**                | Ship Hubble flow logs to CLS for search and analysis       |
 
-### Appendices (Design Principles & Operations)
+### Appendix (Design Principles & Operations Guide)
 
-| Article                                      | Content                                                        |
-| -------------------------------------------- | -------------------------------------------------------------- |
-| **Large-Scale Cilium Tuning**                | Parameter, resource, and BPF map tuning for 200+ node clusters |
-| **Verified Node OS**                         | Compatibility verification for 7 operating systems             |
-| **Cilium Host Routing**                      | Legacy vs BPF: mechanism, conditions, comparison               |
-| **Why Native Needs local-router-ipv4**       | Principle and address selection                                |
-| **Why Native Disables sysctlfix**            | rp_filter differences and decision logic                       |
-| **Why GR Native Routing Is Not Recommended** | Complete trial record with 4 categories of issues              |
+| Article                                                    | Content                                                    |
+| ---------------------------------------------------------- | ---------------------------------------------------------- |
+| **Cilium Tuning for Large Clusters**                       | Parameter, resource, and BPF map tuning for 200+ node clusters |
+| **Verified Node Operating Systems**                        | Compatibility verification results for 7 OS types          |
+| **Cilium Host Routing**                                    | Legacy vs BPF mechanisms, hit conditions, comparison       |
+| **Why Native Mode Needs local-router-ipv4**                | Principles and address selection                           |
+| **Why Native Mode Disables sysctlfix**                     | rp_filter differences and decision logic                   |
+| **Why GR Native Routing Is Not Available**                 | Complete trial-and-error record and 4 types of issues      |
 
 ### Troubleshooting
 
-| Article                                                       | Content                                          |
-| ------------------------------------------------------------- | ------------------------------------------------ |
-| **Connect to apiserver fails with `operation not permitted`** | Cilium bug investigation and root cause analysis |
-| **Cilium Debugging Tips**                                     | Common commands: `cilium status`, monitor, etc.  |
+| Article                                                    | Content                                                    |
+| ---------------------------------------------------------- | ---------------------------------------------------------- |
+| **Apiserver Connection Error: operation not permitted**    | Cilium bug investigation and root cause analysis           |
+| **Cilium Debugging Tips**                                  | `cilium status`, monitor, and other common commands        |
 
 ## Quick Decision Tree
 
-Based on your needs, jump to the relevant article:
+Find the target article based on your needs:
 
 ```text
 What do you want to do?
 ├─ Install Cilium
-│  ├─ New cluster, first install → Install Cilium
-│  ├─ Existing cluster, verify it works → E2E Test
+│  ├─ New cluster, first-time install → Installing Cilium
+│  ├─ Existing cluster, want to test → Functional Test
 │  └─ Care about performance → Performance Test
-├─ Configure networking
-│  ├─ Pod needs outbound Internet access
-│  │  ├─ Already has NAT Gateway → No extra config needed
-│  │  ├─ Want to reuse node EIP → Configuring IP Masquerade
+├─ Configure network capabilities
+│  ├─ Pods need outbound internet
+│  │  ├─ Already have NAT Gateway → No additional config needed
+│  │  ├─ Want to reuse node EIP → Configure IP Masquerade
 │  │  └─ Want fixed egress IP → Egress Gateway
-│  ├─ Encrypt inter-node traffic → Enabling Encryption
-│  ├─ Connect multiple clusters → Multi-Cluster Networking
-│  └─ Speed up DNS resolution → Nodelocal DNSCache
+│  ├─ Encrypt inter-node traffic → Enable Communication Encryption
+│  ├─ Connect multiple clusters → Building Multi-Cluster Networks
+│  └─ Accelerate DNS resolution → Nodelocal DNSCache
 ├─ Write network policies
-│  └─ Restrict inter-Pod/egress/ingress access → NetworkPolicy
-├─ Do observability
-│  ├─ See cluster service topology → Enhance Observability
-│  └─ Audit network flows → Cilium + CLS Flow Log Audit
-├─ Tune & troubleshoot
-│  ├─ Large-scale optimization → Large-Scale Tuning Guide
-│  ├─ Check OS compatibility → Verified Node OS
-│  └── Connect to apiserver errors → Troubleshooting articles
+│  └─ Restrict Pod-to-Pod/egress/ingress access → NetworkPolicy in Practice
+├─ Observability
+│  ├─ View cluster service topology → Enhanced Observability
+│  └─ Audit network flow logs → Cilium + CLS Log Audit
+├─ Tuning & Troubleshooting
+│  ├─ Large cluster optimization → Large Cluster Tuning Guide
+│  ├─ Check OS compatibility → Verified Node Operating Systems
+│  └─ Apiserver connection error → Corresponding troubleshooting article
 └─ Understand design principles
-   ├─ What is Host Routing → Host Routing appendix
+   ├─ What is Host Routing → Host Routing Appendix
    ├─ Why configure local-router-ipv4 → Corresponding appendix
-   └─ Why GR doesn't work → GR Native not recommended
+   └─ Why GR doesn't work → GR Native Not Recommended
 ```
 
 ## Network Modes
 
 Cilium supports two routing modes:
 
-1. **Encapsulation Mode**: Adds an additional network packet layer (e.g., VXLAN) on top of the existing network for forwarding. It offers good compatibility and adaptability to various network environments, albeit with slightly lower performance.
-2. **Native-Routing**: Pod IPs are directly routed on the underlying network; Cilium doesn't interfere. Performance is excellent, but it depends on the underlying network's support for Pod IP routing.
+1. **Encapsulation**: Wraps network packets in another layer (e.g., vxlan) for forwarding. Good compatibility across various network environments, slightly lower performance.
+2. **Native-Routing**: Pod IPs are routed directly on the underlying network without Cilium intervention. Better performance, but relies on the underlying network's support for Pod IP routing.
 
-In cloud-hosted Kubernetes clusters including TKE, the VPC underlying network already supports Pod IP routing, eliminating the need for an overlay layer for optimal performance. Therefore, Native-Routing mode is typically used.
+In cloud-managed Kubernetes clusters, including TKE, the VPC underlay network already supports Pod IP routing, eliminating the need for an overlay layer to achieve optimal network performance. Therefore, Native-Routing mode is typically used.
 
-Consider Encapsulation (VXLAN overlay) mode if:
+However, if you have the following requirements, you may choose Encapsulation (vxlan overlay) mode:
 
-- VPC IP resources are scarce and you prefer Pod IPs not to consume underlay IPs.
-- You need to manage IDC clusters, replacing TKE's built-in CiliumOverlay network mode.
-- You want the latest Cilium with full features (no kube-proxy coexistence, avoiding NetworkPolicy feature degradation).
+- VPC IP resources are scarce and you don't want Pod IPs to consume underlay IPs.
+- Need to manage IDC clusters, replacing TKE's built-in CiliumOverlay network mode.
+- Want to use the latest Cilium version with full feature set (without coexisting with kube-proxy, avoiding degradation of NetworkPolicy and other features).
 
-> For more details, see the official Cilium documentation: [Routing](https://docs.cilium.io/en/stable/network/concepts/routing/).
+> For more details, refer to the Cilium official documentation: [Routing](https://docs.cilium.io/en/stable/network/concepts/routing/).
 
 ### Three Recommended Deployment Schemes
 
-This series provides the following three deployment schemes that have passed comprehensive e2e testing:
+This series provides three deployment schemes that have been fully e2e tested:
 
-| Scheme                       | Cluster Type | Routing | Pod IP Source    | Key Feature                               |
-| ---------------------------- | ------------ | ------- | ---------------- | ----------------------------------------- |
-| **Native Routing (VPC-CNI)** | VPC-CNI      | Native  | VPC subnet IP    | Pod natively recognized by VPC            |
-| **Overlay (VPC-CNI)**        | VPC-CNI      | VXLAN   | Independent CIDR | IP decoupled from VPC, full features      |
-| **Overlay (GR)**             | GR           | VXLAN   | Independent CIDR | Only recommended for existing GR clusters |
+| Scheme                        | Cluster Network Mode | Routing Mode | Pod IP Source   | Key Features                              |
+| ----------------------------- | -------------------- | ------------ | --------------- | ----------------------------------------- |
+| **Native Routing (VPC-CNI)**  | VPC-CNI              | Native       | VPC subnet IP   | Pods natively recognized by VPC           |
+| **Overlay (VPC-CNI)**         | VPC-CNI              | VXLAN        | Independent CIDR| IP decoupled from VPC, full feature set   |
+| **Overlay (GR)**              | GR                   | VXLAN        | Independent CIDR| Only recommended for existing GR clusters |
 
-> GR + Native Routing is no longer provided due to compatibility issues. See [Why GR Native Routing Is Not Recommended](./appendix/gr-native-not-recommended.md).
+> GR + Native Routing is no longer provided due to compatibility issues. See [Why GR Native Routing Deployment Is Not Recommended](./appendix/gr-native-not-recommended.md).
 
 ## Prerequisites
 
-To install Cilium on a TKE cluster, the following prerequisites must be met:
+To install Cilium in a TKE cluster, the following prerequisites must be met:
 
-- Cluster version: TKE 1.32+, see [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/).
+- Cluster version: TKE 1.32 and above, see [Cilium Kubernetes Compatibility](https://docs.cilium.io/en/stable/network/kubernetes/compatibility/).
 - Node type: Regular nodes or native nodes.
-- Operating system: TencentOS 4 or Ubuntu >= 22.04 (full list in [Verified Node OS](./appendix/verified-os.md)).
+- Operating system: TencentOS 4 or Ubuntu >= 22.04 (full verified list at [Verified Node Operating Systems](./appendix/verified-os.md)).
 
-## Companion Script
+## Companion Tools
 
-This series comes with a [one-click installation script](https://github.com/imroc/tke-guide/blob/main/static/scripts/cilium.sh), `cilium.sh`, which wraps common operations:
+This series comes with a [one-click installation script](https://github.com/imroc/tke-guide/blob/main/static/scripts/cilium.sh) `cilium.sh` that wraps common operations such as installation, testing, and uninstallation:
 
-| Subcommand                        | Function                                                         |
-| --------------------------------- | ---------------------------------------------------------------- |
-| `cilium.sh install`               | Auto-detect cluster environment, interactive guided installation |
-| `cilium.sh uninstall`             | Uninstall Cilium and restore TKE components                      |
-| `cilium.sh test`                  | Run 130+ functional test cases (with China region adaptation)    |
-| `cilium.sh perf`                  | Run network performance benchmarks (TCP_RR / TCP_STREAM)         |
-| `cilium.sh enable-hubble`         | One-click enable Hubble Relay + UI                               |
-| `cilium.sh enable-egress-gateway` | One-click enable Egress Gateway                                  |
-| `cilium.sh install-localdns`      | One-click install NodeLocal DNSCache (Cilium-compatible)         |
+| Subcommand                           | Function                                                     |
+| ------------------------------------ | ------------------------------------------------------------ |
+| `cilium.sh install`                  | Auto-detect cluster environment, interactive guided installation |
+| `cilium.sh uninstall`                | Uninstall Cilium, restore TKE components                     |
+| `cilium.sh test`                     | Run 130+ functional test cases (with China region adaptation)|
+| `cilium.sh perf`                     | Execute network performance benchmarks (TCP_RR / TCP_STREAM) |
+| `cilium.sh enable-hubble`            | One-click enable Hubble Relay + UI                           |
+| `cilium.sh enable-egress-gateway`    | One-click enable Egress Gateway                              |
+| `cilium.sh install-localdns`         | One-click install NodeLocal DNSCache (coexists with Cilium)  |
 
 ## Key Capabilities
 
-Installing Cilium on TKE can replace or enhance the following native TKE networking components:
+After installing Cilium in TKE, it can replace or enhance the following TKE native network components:
 
-| Capability         | TKE Native           | Cilium Replacement / Enhancement                  |
-| ------------------ | -------------------- | ------------------------------------------------- |
-| **kube-proxy**     | Installed by default | kubeProxyReplacement (full replacement)           |
-| **NetworkPolicy**  | No L7/DNS support    | CiliumNetworkPolicy (supports L7 / FQDN)          |
-| **Observability**  | None                 | Hubble (service topology + network flow logs)     |
-| **Egress control** | Requires extra setup | Egress Gateway (per-policy egress IP selection)   |
-| **Encryption**     | None                 | WireGuard / IPsec transparent encryption          |
-| **IP masquerade**  | ip-masq-agent        | Built-in BPF ip-masq-agent (better performance)   |
-| **Multi-cluster**  | None                 | Cluster Mesh (cross-cluster Service connectivity) |
+| Capability            | TKE Native       | Cilium Replacement/Enhancement                   |
+| --------------------- | ---------------- | ------------------------------------------------ |
+| **kube-proxy**        | Installed by default | kubeProxyReplacement (complete replacement)   |
+| **NetworkPolicy**     | L7/DNS not supported | CiliumNetworkPolicy (supports L7 / FQDN)      |
+| **Observability**     | None             | Hubble (service topology + network flow logs)    |
+| **Egress Control**    | Requires additional config | Egress Gateway (per-policy egress IP selection)  |
+| **Encryption**        | None             | WireGuard / IPsec transparent encryption         |
+| **IP Masquerade**     | ip-masq-agent    | Built-in BPF ip-masq-agent (better performance)   |
+| **Multi-Cluster Network** | None         | Cluster Mesh (cross-cluster Service access)      |

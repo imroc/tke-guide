@@ -1,46 +1,46 @@
-# Host Cilium Images Using TCR
+# Using TCR to Host Cilium Images
 
 ## Overview
 
-If you have high availability requirements for your cluster and need to ensure that nodes can complete initialization and become ready quickly during scaling, it is recommended to synchronize Cilium's dependency images to a TCR image repository. When installing Cilium, specify the use of images from the TCR image repository to avoid delays in node readiness caused by slow or failed Cilium image pulls.
+If you have high availability requirements for your cluster and need to ensure nodes can complete initialization and become ready quickly during scaling, it is recommended to sync Cilium's dependency images to a TCR image repository. When installing Cilium, specify the images from the TCR repository to avoid delays in node readiness caused by slow or failed Cilium image pulls.
 
-This article will describe how to change Cilium's dependency images to be hosted by the TCR image repository.
+This article describes how to migrate Cilium's dependency images to be hosted in a TCR image repository.
 
-## Create TCR Image Repository
+## Create a TCR Image Repository
 
-To achieve fast image pulls, you must create a TCR image repository in the same region as your cluster. If you have clusters in multiple regions that need to install Cilium, you can utilize TCR's [Cross-Region Image Replication](https://cloud.tencent.com/document/product/1141/52095) or [Cross-Instance (Account) Image Synchronization](https://cloud.tencent.com/document/product/1141/41945) capabilities to automatically synchronize Cilium dependency images to other regional image repositories after uploading them to one repository.
+For fast image pulling, create a TCR image repository in the same region as your cluster. If you have clusters in multiple regions that need Cilium installation, you can use TCR's [cross-region image replication](https://cloud.tencent.com/document/product/1141/52095) or [cross-instance (account) image sync](https://cloud.tencent.com/document/product/1141/41945) capabilities to upload Cilium dependency images to one repository and automatically sync them to repositories in other regions.
 
-## Create Namespace
+## Create a Namespace
 
-After the TCR image repository is created, create a new namespace:
-1. **Name**: quay.io
-1. **Access Level**: Public
+After creating the TCR image repository, create a new namespace:
+1. **Name**: quay.io.
+2. **Access Level**: Public.
 
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F11%2F07%2F20251107105451.png)
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F11%2F07%2F20251107105339.png)
 
 ## Configure Access Control
 
-Uploading Cilium images requires that the client uploading the images can access the TCR image repository:
-1. For public network image pushes: Refer to [Configuring Public Network Access Control](https://cloud.tencent.com/document/product/1141/41837) to enable the image repository's public network access capability.
-2. For private network image pushes: Refer to [Configuring Private Network Access Control](https://cloud.tencent.com/document/product/1141/41838) to enable the image repository's private network access capability, ensuring that the VPC where the Cilium upload client is located establishes a private network access link with the TCR image repository.
+To upload Cilium images, the client needs to access the TCR image repository:
+1. Pushing images from the public network: Refer to [Configuring Public Network Access Control](https://cloud.tencent.com/document/product/1141/41837) to enable public network access for the image repository.
+2. Pushing images from the private network: Refer to [Configuring Private Network Access Control](https://cloud.tencent.com/document/product/1141/41838) to enable private network access, ensuring that the VPC of the client uploading Cilium images establishes a private network connection with the TCR image repository.
 
-Additionally, TKE cluster nodes pulling Cilium dependency images also need to be able to access the TCR image repository. Refer to [Configuring Private Network Access Control](https://cloud.tencent.com/document/product/1141/41838) to enable private network access between the image repository and the VPC where the TKE cluster is located, ensure that the VPC where the Cilium upload client is located establishes a private network access link with the TCR image repository, and make sure to check **Auto Resolution**:
+Additionally, nodes in the TKE cluster also need to access the TCR image repository to pull Cilium dependency images. Refer to [Configuring Private Network Access Control](https://cloud.tencent.com/document/product/1141/41838) to enable private network access between the repository and the TKE cluster's VPC, and ensure **Auto Resolution** is checked:
 
-![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F11%2F07%2F20251107105604.png)
+![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F31%2F20251031140032.png)
 
-## Install TCR Plugin
+## Install the TCR Addon
 
-In the cluster's **Component Management** page, search for tcr, install this component, open **Advanced Settings** in the parameter configuration, ensure that the **Private Network Access Link** shows the link is normal, and do not check **Enable Private Network Resolution Function** (we have already configured auto resolution when we set up the TCR private network access link earlier, so there's no need to deploy hosts to nodes for TCR domain name resolution):
+In the cluster's **Component Management** page, search for "tcr" and install the component. In the parameter configuration, expand **Advanced Settings**, ensure the **Private Network Access Link** shows normal status, and do not check **Enable Private Network Resolution** (since we already configured auto resolution when setting up the TCR private network access link, there is no need to deploy hosts entries for TCR domain resolution):
 
 ![](https://image-host-1251893006.cos.ap-chengdu.myqcloud.com/2025%2F10%2F31%2F20251031144916.png)
 
 ## Configure and Obtain Access Credentials
 
-Before uploading Cilium images, you need to configure TCR access credentials. Refer to [User Account Management](https://cloud.tencent.com/document/product/1141/41829) and [Service Account Management](https://cloud.tencent.com/document/product/1141/89137) to obtain access credentials that can log in to the TCR image repository.
+Before uploading Cilium images, configure TCR access credentials. Refer to [User-level Account Management](https://cloud.tencent.com/document/product/1141/41829) and [Service-level Account Management](https://cloud.tencent.com/document/product/1141/89137) to obtain an access credential for logging into the TCR image repository.
 
-## Transfer Cilium Images
+## Migrate Cilium Images
 
-Before uploading Cilium images, you need to confirm which images your current installation configuration depends on. You can use `helm template` with the planned installation parameters to see which images are actually used in the rendered YAML:
+Before uploading Cilium images, first determine which images are depended on by the current installation configuration. Use `helm template` with the installation parameters you plan to add to see which images are used in the rendered YAML:
 
 ```bash
 $ helm template cilium cilium/cilium --version 1.19.4 \
@@ -70,15 +70,15 @@ quay.io/cilium/cilium:v1.19.4
 quay.io/cilium/operator-generic:v1.19.4
 ```
 
-Next, prepare to upload the images. You can use [skopeo](https://github.com/containers/skopeo) to transfer Cilium dependency images to the TCR image repository. Refer to [Installing Skopeo](https://github.com/containers/skopeo/blob/main/install.md) for installation instructions.
+Next, prepare to upload images. You can use [skopeo](https://github.com/containers/skopeo) to migrate Cilium dependency images to the TCR image repository. Refer to [Installing Skopeo](https://github.com/containers/skopeo/blob/main/install.md) for installation instructions.
 
-Then use skopeo to log in to the TCR image repository (replace the repository domain, username, and password):
+Then log in to the TCR image repository with skopeo (replace the repository domain, username, and password):
 
 ```bash
 skopeo login xxx.tencentcloudcr.com --username xxx --password xxx
 ```
 
-Finally, use skopeo to synchronize all Cilium dependency images to the TCR image repository:
+Finally, use skopeo to sync all Cilium dependency images to the TCR image repository:
 
 ```bash
 skopeo copy -a docker://quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222
@@ -86,12 +86,12 @@ skopeo copy -a docker://quay.io/cilium/cilium:v1.19.4  docker://your-tcr-name.te
 skopeo copy -a docker://quay.io/cilium/operator-generic:v1.19.4  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/operator-generic:v1.19.4
 ```
 
-If your installation configuration depends on many images, you can also use a script to synchronize all dependency images to the TCR image repository with one click. Save the following script content to a file named `sync-cilium-images.sh`:
+If your installation configuration depends on many images, you can use a script to sync all dependency images to the TCR repository at once. Save the script content below to `sync-cilium-images.sh`:
 
 :::info[Note]
 
-1. `TARGET_REGISTRY` is the target TCR image repository address, replace it with your own repository address.
-2. Modify the installation parameters used after `helm template` according to your actual deployment configuration needs.
+1. `TARGET_REGISTRY` is the target TCR image repository address. Replace it with your own repository address.
+2. Modify the installation parameters used after `helm template` according to your actual deployment configuration.
 
 :::
 
@@ -130,7 +130,7 @@ if [[ -z "${source_images}" ]]; then
   exit 1
 fi
 
-echo "The following image synchronization operations will be performed:"
+echo "The following images will be synced:"
 while IFS= read -r source_image; do
   if [[ -n "${source_image}" ]]; then
     target_image="${TARGET_REGISTRY}/${source_image}"
@@ -138,7 +138,7 @@ while IFS= read -r source_image; do
   fi
 done <<<"${source_images}"
 
-read -p "Confirm to start synchronization? (y/n): " confirm
+read -p "Start syncing? (y/n): " confirm
 if [ "$confirm" != "y" ]; then
   echo "Cancelled"
   exit 0
@@ -147,13 +147,13 @@ fi
 while IFS= read -r source_image; do
   if [[ -n "${source_image}" ]]; then
     target_image="${TARGET_REGISTRY}/${source_image}"
-    echo "Synchronizing image ${source_image} to ${target_image}"
+    echo "Syncing image ${source_image} to ${target_image}"
     skopeo copy -a "docker://${source_image}" "docker://${target_image}"
   fi
 done <<<"${source_images}"
 ```
 
-Grant execution permissions and execute:
+Grant execute permission and run:
 
 ```bash
 chmod +x sync-cilium-images.sh
@@ -162,7 +162,7 @@ chmod +x sync-cilium-images.sh
 
 ## Install Cilium Using TCR Images
 
-Refer to [Installing Cilium](https://imroc.cc/tke/networking/cilium/install) for installation, replacing the dependency images with the corresponding image addresses from the TCR image repository:
+Refer to [Installing Cilium](https://imroc.cc/tke/networking/cilium/install) for installation, replacing dependency images with the corresponding TCR repository addresses:
 
 ```bash showLineNumbers
 helm upgrade --install cilium cilium/cilium --version 1.19.4 \
@@ -194,7 +194,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
   --set k8sServicePort=60002
 ```
 
-If you have already performed the installation, you can modify the dependency image addresses in the following way:
+If installation has already been performed, modify the dependency image addresses as follows:
 
 ```bash
 helm upgrade cilium cilium/cilium --version 1.19.4 \

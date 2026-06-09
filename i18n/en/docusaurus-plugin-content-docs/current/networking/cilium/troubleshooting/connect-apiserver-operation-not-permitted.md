@@ -1,12 +1,12 @@
-# Troubleshooting: Connecting APIServer failed with "operation not permitted"
+# Troubleshooting: Connecting to APIServer Returns "operation not permitted"
 
 ## Symptoms
 
-A TKE cluster with Cilium installed was running normally for many days, then suddenly became paralyzed. All nodes' cilium-agent pods were in `CrashLoopBackoff` state and failed to start successfully.
+After running normally for many days, a Cilium-installed TKE cluster suddenly became unresponsive. All cilium-agent pods on every node were in `CrashLoopBackoff` state and could not start successfully.
 
-## Analyzing the Scene
+## Scene Analysis
 
-Analyzing the cilium pod status, we found that the config init container kept failing to start, with the following error logs:
+Analyzing the cilium pod status, the `config` init container kept failing to start, with the following error log:
 
 ```txt
 $ kubectl -n kube-system logs cilium-qsj2r -c config -p --tail 10
@@ -21,7 +21,7 @@ time=2026-01-03T23:17:26.850304873Z level=info msg="Stopped hive" subsys=cilium-
 Error: Build config failed: failed to start: Get "https://10.15.1.8:443/api/v1/namespaces/kube-system": dial tcp 10.15.1.8:443: connect: operation not permitted
 ```
 
-The logs show that the connection to the apiserver failed with `operation not permitted` error. We tried to manually curl test the connection to the apiserver on the node, and got the same error:
+The log shows connection to the apiserver failed with `operation not permitted`. Trying to curl the apiserver from the node manually also returned the same error:
 
 ```txt
 $ curl -v -k https://10.15.1.8:443
@@ -34,9 +34,9 @@ curl: (7) Failed to connect to 10.15.1.8 port 443 after 0 ms: Couldn't connect t
 
 ## Analyzing Historical Logs
 
-After comprehensively analyzing the cluster event logs and APIServer audit logs, we found that after a cilium update (executing helm upgrade to modify cilium configuration), the cilium pod was recreated and then failed to start successfully, though this was not noticed initially.
+Comprehensively analyzing the cluster event logs and APIServer audit logs, it was found that after a cilium update (helm upgrade modifying cilium configuration), the cilium pods were recreated and then never started successfully — it just wasn't noticed initially.
 
-Before the cilium pod was recreated, the cilium-agent was also reporting similar error logs:
+Before the cilium pods were recreated, cilium-agent was also logging similar errors:
 
 ```txt
 time=2026-01-03T23:17:48.232653954Z level=info msg="/healthz returning unhealthy" module=agent.infra.agent-healthz state=Failure error="1.18.6 (v1.18.6-7d4d8932)    Kubernetes service is not ready: Get \"https://10.15.1.8:443/version\": dial tcp 10.15.1.8:443: connect: operation not permitted"
@@ -51,11 +51,11 @@ time=2026-01-03T23:18:02.953060556Z level=error msg=k8sError error="failed to li
 time=2026-01-03T23:18:05.295364811Z level=error msg=k8sError error="failed to list *v1.Node: Get \"https://10.15.1.8:443/api/v1/nodes?fieldSelector=metadata.name%3D10.15.0.4&resourceVersion=2589037860\": dial tcp 10.15.1.8:443: connect: operation not permitted"
 ```
 
-## Initial Root Cause Analysis
+## Preliminary Root Cause Analysis
 
-From the `operation not permitted` error, we can tell that the packets accessing the apiserver never left the node and were directly dropped by the kernel (normally, if the apiserver is unreachable, you would get errors like `timeout` or `connection refused`).
+The `operation not permitted` error indicates the packet destined for the apiserver never left the node — it was dropped by the kernel (normally, if the apiserver were unreachable, the error would be `timeout` or `connection refused`).
 
-The apiserver address configured for cilium is the CLB address created after enabling internal network access for the TKE cluster (the CLB automatically created by the LoadBalancer type Service `kubernetes-intranet`):
+The apiserver address configured for cilium was the CLB address created when the TKE cluster enabled internal network access (a LoadBalancer type Service named `kubernetes-intranet`):
 
 ```bash
 $ kubectl -n default get svc kubernetes-intranet
@@ -63,7 +63,7 @@ NAME                  TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)     
 kubernetes-intranet   LoadBalancer   192.168.60.179   10.15.1.8     443:30965/TCP   11d
 ```
 
-Since cilium is installed with kubeProxyReplacement enabled, traffic accessing the apiserver is directly intercepted by cilium's eBPF program and forwarded to the backend address - the traffic doesn't actually go through the CLB (this behavior is consistent with native Kubernetes kube-proxy).
+Since Cilium was installed with kubeProxyReplacement enabled, traffic to the apiserver is intercepted by Cilium's eBPF program and forwarded directly to the backend address, bypassing the CLB (this behavior is consistent with native Kubernetes kube-proxy).
 
 Checking the eBPF data written by cilium-agent:
 
@@ -75,9 +75,9 @@ SERVICE ADDRESS               BACKEND ADDRESS (REVNAT_ID) (SLOT)
 192.168.60.179:443/TCP (0)    0.0.0.0:0 (15) (0) [ClusterIP, non-routable]
 ```
 
-We can see that the backend address for the server addresses related to the `kubernetes-intranet` svc are all empty (NodePort, CLB VIP, ClusterIP).
+You can see that the server addresses related to the `kubernetes-intranet` svc all have empty backend addresses (NodePort, CLB VIP, ClusterIP).
 
-Checking the data in cilium-agent's process memory, we found they were also empty:
+Checking the in-memory data of the cilium-agent process also showed empty backends:
 
 ```txt
 $ kubectl -n kube-system exec cilium-kddvm -- cilium shell -- db/show frontends
@@ -93,7 +93,7 @@ ID   Frontend                  Service Type   Backend
 7    192.168.60.179:443/TCP    ClusterIP
 ```
 
-The backend addresses recorded in cilium come from the EndpointSlice associated with the k8s Service. Checking the EndpointSlice for this Service, we found addresses exist and the association with the Service is correct:
+The backend addresses recorded in cilium come from the EndpointSlice associated with the k8s Service. Checking the EndpointSlice for this Service showed that addresses existed and the association with the Service was correct:
 
 ```txt
 $ kubectl get endpointslices.discovery.k8s.io | grep kubernetes-intranet
@@ -103,18 +103,18 @@ $ kubectl get endpointslices.discovery.k8s.io kubernetes-intranet-qxgk4 -o yaml 
     kubernetes.io/service-name: kubernetes-intranet
 ```
 
-A possibility came to mind:
+One possibility came to mind:
 
-1. When cilium first connects to the apiserver, since cilium is not yet ready and eBPF data is not initialized, packets accessing the apiserver actually go to the CLB.
-2. When the EndpointSlice corresponding to `kubernetes-intranet` is recreated or endpoints are temporarily deleted, cilium temporarily clears the backend data in eBPF.
-3. When the endpoint is added back, since cilium has already initialized the eBPF program and data, subsequent packets accessing the apiserver are intercepted and processed by the eBPF program.
-4. Since the backend data in eBPF for `kubernetes-intranet` was temporarily cleared, packets accessing this address are considered to have no corresponding backend, resulting in the `operation not permitted` error.
+1. When cilium first connects to the apiserver, since cilium is not yet ready and eBPF data has not been initialized, the packets to the apiserver actually reach the CLB.
+2. When the EndpointSlice for `kubernetes-intranet` is recreated or endpoints are temporarily deleted, cilium temporarily clears the backend data in eBPF.
+3. When the endpoint is added back, since cilium has already initialized the eBPF program and data, subsequent packets to the apiserver are intercepted by the eBPF program.
+4. Since the eBPF backend data for `kubernetes-intranet` was temporarily cleared, packets to this address are considered to have no corresponding backend, and the error `operation not permitted` is returned.
 
-This creates a circular dependency - once the EndpointSlice corresponding to `kubernetes-intranet` changes, the node can no longer access the apiserver through the corresponding CLB address.
+This creates a circular dependency — any change to the EndpointSlice for `kubernetes-intranet` would make the node unable to reach the apiserver via the corresponding CLB address.
 
-This issue can indeed be reproduced by manually deleting and recreating the EndpointSlice corresponding to `kubernetes-intranet`.
+Manually deleting and recreating the EndpointSlice for `kubernetes-intranet` did reproduce the issue.
 
-Returning to the current issue, the EndpointSlice corresponding to this Service has actually always existed and has not been deleted or recreated:
+However, going back to the current problem, the EndpointSlice for this Service had always existed and was never deleted or recreated:
 
 ```txt
 $ kubectl get endpointslices kubernetes-intranet-qxgk4
@@ -122,27 +122,27 @@ NAME                        ADDRESSTYPE   PORTS   ENDPOINTS       AGE
 kubernetes-intranet-qxgk4   IPv4          60002   169.254.128.7   11d
 ```
 
-Furthermore, checking the cluster audit, there were no patch/update operations on this EndpointSlice object, so this couldn't be the cause.
+Checking the cluster audit logs, this EndpointSlice object had no patch/update operations. So, this could not be the cause.
 
-At this point, we hadn't found the root cause yet, but we could derive a workaround: when installing cilium, don't use the CLB address for the apiserver address - instead, directly use the endpoint address of the `kubernetes` svc (an address starting with 169.254, which doesn't change after cluster creation). This address is not intercepted and forwarded by cilium, so it doesn't have this problem.
+At this point, the root cause had not been found, but a workaround was identified: when installing cilium, do not use the CLB address as the apiserver address. Instead, use the endpoint address of the `kubernetes` svc (the address starting with 169.254, which never changes after cluster creation). This address is not intercepted by cilium and does not have this issue.
 
-Without finding the root cause, we couldn't be sure if other scenarios would also have problems, representing a significant hidden risk, so further investigation was needed.
+Without finding the root cause, it was impossible to determine if other scenarios would also have problems, posing a significant risk. Further investigation was needed.
 
-## Finding Reproduction Conditions
+## Finding the Reproduction Condition
 
-For further investigation, we first needed to find the reproduction conditions before continuing with debugging and analysis.
+To investigate further, the reproduction condition had to be found first.
 
-After various suspicions and attempts (details omitted here), **we finally discovered the reproduction condition: adjusting the TKE cluster specification**.
+After various hypotheses and attempts (skipping ten thousand words here), **the reproduction condition was finally discovered: adjusting the TKE cluster规格 (spec/size).**
 
-TKE cluster specifications can be adjusted automatically or manually. After attempting to manually adjust the cluster specification, the problem was reproduced, though not all nodes reproduced it every time.
+The TKE cluster spec can be adjusted automatically or manually. After manually adjusting the cluster spec, the issue was reproduced, though sometimes not on all nodes.
 
-This reproduction condition has an obvious characteristic: the apiserver will be recreated, and all ListWatch operations will be disconnected.
+This reproduction condition had a clear characteristic: the apiserver would restart, causing all ListWatch connections to disconnect.
 
 ## Adding Debug Code to Cilium
 
-Based on previous investigation, it was obvious that the backend state recorded internally in cilium didn't match the actual EndpointSlice resource - the former was empty while the latter always existed and hadn't changed.
+Based on the previous investigation, it was clear that the backend state recorded internally by cilium did not match the actual EndpointSlice resource — the former was empty, while the latter had always existed and never changed.
 
-So, we suspected there was a logic problem in how cilium synchronizes Service/EndpointSlice. The key processing function is `runServiceEndpointsReflector` (`pkg/loadbalancer/reflectors/k8s.go`). First, we added two debug log lines to see whether the code path goes to processServiceEvent or processEndpointsEvent during reproduction, or both:
+Therefore, the issue was suspected to be in cilium's Service/EndpointSlice synchronization logic. The key handler function was identified as `runServiceEndpointsReflector` (`pkg/loadbalancer/reflectors/k8s.go`). Two debug log lines were added to see which code path would be taken during reproduction — `processServiceEvent` or `processEndpointsEvent`, or both:
 
 ```go
   processBuffer := func(buf buffer) {
@@ -160,7 +160,7 @@ So, we suspected there was a logic problem in how cilium synchronizes Service/En
   }
 ```
 
-Building the image, retagging and pushing to our own image registry:
+Build the image, retag, and push to a private registry:
 
 ```bash
 make dev-docker-image-debug
@@ -168,50 +168,50 @@ docker tag quay.io/cilium/cilium-dev:latest docker.io/imroc/cilium:dev
 docker push docker.io/imroc/cilium:dev
 ```
 
-Then replacing the cilium image in the cluster:
+Then replace the cilium image in the cluster:
 
 ```bash
 kubectl -n kube-system patch ds cilium --patch '{"spec": {"template": {"spec": {"containers": [{"name": "cilium-agent","image": "docker.io/imroc/cilium:dev" }]}}}}'
 ```
 
-After adjusting the cluster specification to reproduce the problem, we observed that during the adjustment:
+Then adjust the cluster spec to reproduce the issue. It was observed that during the spec adjustment:
 
-1. cilium-agent receives events for the `default/kubernetes-intranet` Service, with no corresponding EndpointSlice events.
-2. cilium-agent receives EndpointSlice events for `default/kubernetes`, with no corresponding Service events.
+1. cilium-agent received events for the `default/kubernetes-intranet` Service, but no corresponding EndpointSlice events.
+2. cilium-agent received events for the `default/kubernetes` EndpointSlice, but no corresponding Service events.
 
-## Analyzing APIServer Audit
+## Analyzing APIServer Audit Logs
 
-In the cluster's **Monitoring & Alerts - Logs - Audit Logs - Global Search**, we used the following CQL to search audit logs related to the `kubernetes-intranet` and `kubernetes` Services and their associated EndpointSlices:
+Searching the cluster's **Monitoring & Alerts - Logs - Audit Logs - Global Search** with the following CQL for audit logs related to the `kubernetes-intranet` and `kubernetes` Services and their associated EndpointSlices:
 
 ```txt
 objectRef.namespace:"default" AND objectRef.name:"kubernetes*" AND (NOT verb:get NOT verb:watch) AND (objectRef.resource:"services" OR objectRef.resource:"endpointslices")
 ```
 
-From the logs, we discovered that during cluster specification adjustment:
+Based on the logs, during the cluster spec adjustment:
 
-1. The `default/kubernetes-intranet` Service has some patch operations, but no operations on the corresponding EndpointSlice object.
-2. The `default/kubernetes` Service has no operations, but the corresponding EndpointSlice has update operations.
+1. The `default/kubernetes-intranet` Service had some patch operations, but its corresponding EndpointSlice object had no operations.
+2. The `default/kubernetes` Service had no operations, but its corresponding EndpointSlice had update operations.
 
 Further analysis:
 
-1. The patch operations on the `default/kubernetes-intranet` Service come from TKE's service-controller, because this Service is of LoadBalancer type and is processed by service-controller. When the cluster specification is adjusted, the apiserver is recreated, causing service-controller's existing ListWatch connection to disconnect, then automatically reconnect and re-reconcile. After reconciliation, it issues a patch operation to record the latest reconciliation timestamp in the Service annotation.
-2. The update operations on the `default/kubernetes` EndpointSlice come from kube-apiserver. The content of the update has no difference from before the change - both point to the TKE apiserver address 169.254.128.7.
+1. The patch operations on `default/kubernetes-intranet` came from TKE's service-controller. Since this Service is of type LoadBalancer, it is handled by service-controller. When the cluster spec is adjusted, the apiserver restarts, causing service-controller's existing ListWatch connections to disconnect, then automatically reconnect and reconcile. After reconciliation, a patch operation is issued to record the latest reconciliation timestamp in the Service annotations.
+2. The update operations on the `default/kubernetes` EndpointSlice came from kube-apiserver. The content of the update was identical to before the change, both pointing to the TKE apiserver address 169.254.128.7.
 
 ## Further Debugging
 
-Returning to the key issue: why does the backend for the `default/kubernetes-intranet` Service get cleared in cilium-agent's memory when the cluster specification is adjusted, even though there were no changes to this Service's corresponding EndpointSlice?
+Back to the key question: why, during the cluster spec adjustment, did the `default/kubernetes-intranet` Service's corresponding EndpointSlice remain unchanged, yet its backends in cilium-agent memory were cleared?
 
-This can clearly be identified as a state inconsistency between cilium-agent's backend state and the actual EndpointSlice state, most likely a logic problem in cilium itself.
+This clearly indicated that the backend state in cilium-agent was inconsistent with the actual EndpointSlice state, most likely a bug in cilium itself.
 
-So we needed to add more debug code for further analysis. Following the previous method, we continued adding debug code deeper into `processServiceEvent` and `processEndpointsEvent` (details omitted here).
+So more debug code was needed. Following the same approach, more debug logging was added inside `processServiceEvent` and `processEndpointsEvent` (skipping another ten thousand words here).
 
-Finally, we found a key clue: when adjusting the cluster specification, multiple events for the `default/kubernetes` EndpointSlice are received, some of which have empty backends, while the next event has non-empty backends.
+Finally, a key clue was discovered: during the cluster spec adjustment, multiple events for the `default/kubernetes` EndpointSlice were received, some with empty backends, and the next event would have backends again.
 
 Key debug code:
 
 :::tip[Note]
 
-Printing the invocation of `convertEndpoints` and `UpsertAndReleaseBackends` functions respectively.
+Print the calls to `convertEndpoints` and `UpsertAndReleaseBackends` respectively.
 
 :::
 
@@ -239,17 +239,17 @@ func runServiceEndpointsReflector(ctx context.Context, health cell.Health, p ref
 }
 ```
 
-From the debug logs, we could roughly see that when convertEndpoints calculates backends as empty, orphans is not empty. UpsertAndReleaseBackends is called to clean up orphan backends (backends not referenced by any service). From the timing of event processing, there was no corresponding update operation in the APIServer audit logs at that time.
+From the debug logs, when `convertEndpoints` computed empty backends and orphans was not empty, `UpsertAndReleaseBackends` was called to clean up orphan backends (backends not referenced by any service). Looking at the event processing timestamps, there was no corresponding update operation in the APIServer audit logs.
 
 ## Investigating APIServer Audit Policy
 
-Checking the file corresponding to the `--audit-policy-file` parameter configured for the TKE cluster's APIServer, we found that the current configuration couldn't possibly ignore the audit of the `default/kubernetes` EndpointSlice. Moreover, we could see kube-apiserver's operation records for this EndpointSlice in the logs, though it seemed like some were missing.
+Checking the file configured by the `--audit-policy-file` parameter of the TKE cluster's kube-apiserver, the current configuration should not ignore the audit of the `default/kubernetes` EndpointSlice. The logs did show kube-apiserver's operations on this EndpointSlice, but some seemed to be missing.
 
-## Developing a Test Program to Observe K8s Events
+## Developing a Test Program to Observe k8s Events
 
-Since we couldn't see the update operation that clears the `default/kubernetes` EndpointSlice's endpoint in the APIServer audit logs, but we suspected it might exist, we developed a test program to verify. This program ListWatches all events for the `default/kubernetes` Service/EndpointSlice and prints detailed logs.
+The APIServer audit logs did not show an update operation that cleared the endpoints of the `default/kubernetes` EndpointSlice. However, suspicion remained, so a test program was developed to verify. This program ListWatch'd all events for the `default/kubernetes` Service/EndpointSlice and printed detailed logs.
 
-Finally, we discovered: during cluster specification adjustment, there is indeed an update operation that clears the endpoint of the `default/kubernetes` EndpointSlice, with the content:
+Finally, it was found that during the cluster spec adjustment, an update operation that cleared the endpoints of the `default/kubernetes` EndpointSlice was indeed received. The content was:
 
 ```json
 {
@@ -290,23 +290,23 @@ Finally, we discovered: during cluster specification adjustment, there is indeed
 }
 ```
 
-We can see the endpoints field is null, meaning the endpoint list is cleared.
+The `endpoints` field was null, meaning the endpoint list was cleared.
 
-From managedFields, we can see the operation was initiated by kube-apiserver, but the corresponding update operation couldn't be found in the audit logs.
+From `managedFields`, this was an operation initiated by kube-apiserver, but no corresponding update operation was found in the audit logs.
 
-## APIServer Code Analysis
+## Code Analysis of APIServer
 
-To understand why we receive an update operation that clears the `default/kubernetes` EndpointSlice's endpoint when adjusting the cluster specification, we need to analyze the relevant Kubernetes code.
+To understand why the `default/kubernetes` EndpointSlice received an update clearing its endpoints during the cluster spec adjustment, the relevant Kubernetes code needed to be analyzed.
 
-EndpointSlices are generally automatically created and managed by kube-controller-manager based on Service definitions, but for the special `default/kubernetes` service, endpoint, and endpointslice, their controller runs in kube-apiserver rather than kube-controller-manager. It synchronizes the master IP list to the corresponding endpoint/endpointslice.
+EndpointSlices are typically created and managed automatically by kube-controller-manager based on Service definitions. However, for the special `default/kubernetes` service, endpoint, and endpointslice, the controller runs inside kube-apiserver rather than kube-controller-manager. It synchronizes the master IP list into the corresponding endpoint/endpointslice.
 
-The code for this controller running in kube-apiserver is in `pkg/controlplane/controller/kubernetesservice/controller.go`. When kube-apiserver is recreated, the old kube-apiserver instance is stopped, and stopping goes into the Controller's Stop method:
+This controller running in kube-apiserver is located in `pkg/controlplane/controller/kubernetesservice/controller.go`. When kube-apiserver is restarted, the old instance is stopped, triggering the Controller's Stop method:
 
 ```go title="pkg/controlplane/controller/kubernetesservice/controller.go"
 func (c *Controller) Stop() {
   // ...
   go func() {
-    //  Remove own IP from the master IP list
+    //  Remove its own IP from the master IP list
     if err := c.EndpointReconciler.RemoveEndpoints(c.CustomKubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
       klog.Errorf("Unable to remove endpoints from kubernetes service: %v", err)
     }
@@ -314,35 +314,35 @@ func (c *Controller) Stop() {
 }
 ```
 
-In Stop, `c.EndpointReconciler.RemoveEndpoints` is called to remove its own IP from the master IP list.
+In `Stop`, `c.EndpointReconciler.RemoveEndpoints` is called to remove its own IP from the master IP list.
 
-Let's look at the RemoveEndpoints implementation:
+Looking at the implementation of `RemoveEndpoints`:
 
 ```go title="pkg/controlplane/reconcilers/lease.go"
 func (r *leaseEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
-  // Delete own lease from etcd /masterleases/{ip}
+  // Remove its own lease from etcd /masterleases/{ip}
   if err := r.masterLeases.RemoveLease(ip.String()); err != nil {
     return err
   }
 
-  // Sync master IP list from etcd to endpoint/endpointslice
+  // Sync the master IP list from etcd to endpoint/endpointslice
   return r.doReconcile(serviceName, endpointPorts, true)
 }
 
 func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
-  // Get current master IP list from endpoint object
+  // Get the current master IP list from the endpoint object
   e, err := r.epAdapter.Get(corev1.NamespaceDefault, serviceName, metav1.GetOptions{})
 
-  // Get master IP list from etcd
+  // Get the master IP list from etcd
   masterIPs, err := r.masterLeases.ListLeases()
   if err != nil {
     return err
   }
 
-  // Compare the differences between the two master IP lists
+  // Compare the two master IP lists
   formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
 
-  // If IPs differ, update the master IP list in endpoint, using etcd's master IP list as the source of truth
+  // If IPs differ, update the endpoint's master IP list using etcd's list as source of truth
   if !formatCorrect || !ipCorrect {
     e.Subsets[0].Addresses = make([]corev1.EndpointAddress, len(masterIPs))
     for ind, ip := range masterIPs {
@@ -362,9 +362,9 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 }
 ```
 
-We can see: the logic for removing own IP from the master IP list is to first remove own IP from the master IP list stored in etcd, then trigger reconciliation of the special `default/kubernetes` endpoint/endpointslice, overwriting it with the master IP list from etcd.
+The logic is clear: to remove its own IP from the master IP list, it first removes its own lease from etcd's master IP list, then triggers reconciliation of the `default/kubernetes` endpoint/endpointslice, overwriting with etcd's master IP list as the source of truth.
 
-Let's continue to look at the source of the passed IP value (`c.PublicIP`). If kube-apiserver is configured with the `--advertise-address` parameter, this address will be used as its own IP:
+Now, looking at the source of its own IP value (`c.PublicIP`): if kube-apiserver is configured with `--advertise-address`, this address is used as its own IP:
 
 ```go
   fs.IPVar(&s.AdvertiseAddress, "advertise-address", s.AdvertiseAddress, ""+
@@ -374,28 +374,28 @@ Let's continue to look at the source of the passed IP value (`c.PublicIP`). If k
     "be used.")
 ```
 
-Checking the TKE cluster's kube-apiserver startup parameters, this parameter is configured with the IP address of the `default/kubernetes` endpoint:
+Checking the startup parameters of the TKE cluster's kube-apiserver, this parameter was configured with the IP address of the `default/kubernetes` endpoint:
 
 ```yaml
     - kube-apiserver
     - --advertise-address=169.254.128.7
 ```
 
-TKE's kube-apiserver is deployed with multiple replicas for high availability by default. Its external address is load-balanced by a VIP starting with `169.254`, which is dynamically allocated when the cluster is created and doesn't change after cluster creation.
+TKE's kube-apiserver is typically deployed with multiple replicas for high availability. Its external address is load-balanced by a VIP starting with `169.254`, which is dynamically allocated when the cluster is created and never changes thereafter.
 
-All kube-apiserver instances think their IP is this address. Once a kube-apiserver instance enters the stopping process, it removes this address from etcd's master IP list and re-reconciles the `default/kubernetes` endpoint/endpointslice, thereby removing this IP from the endpoint/endpointslice resource as well (update operation).
+All kube-apiserver instances consider this address as their own IP. When any kube-apiserver instance enters the shutdown process, it removes this address from etcd's master IP list and reconciles the `default/kubernetes` endpoint/endpointslice, which also removes this IP from the endpoint/endpointslice resource (update operation).
 
-So why can't we find this update operation in the audit logs? It should be because kube-apiserver was already stopping at that time, causing the final operation audit to not be recorded.
+So, why couldn't this update operation be found in the audit logs? Probably because the kube-apiserver was already shutting down at that point, and the final operation audit was not recorded.
 
 ## Cilium Code Analysis
 
-We've confirmed that when TKE's kube-apiserver is recreated, it issues a clearing update operation to the `default/kubernetes` EndpointSlice, but the EndpointSlice corresponding to the `default/kubernetes-intranet` Service has no operations, because this Service is not managed by kube-apiserver and won't be cleared due to kube-apiserver recreation.
+It was confirmed that when the TKE kube-apiserver restarts, it issues an update operation that clears the endpoints of the `default/kubernetes` EndpointSlice. However, the `default/kubernetes-intranet` Service's corresponding EndpointSlice had no operations, since this Service is not managed by kube-apiserver and is not cleared during apiserver restarts.
 
-So why does the clearing operation on `default/kubernetes` cause the backend associated with `default/kubernetes-intranet` to also be cleared in cilium?
+So, why did clearing `default/kubernetes` in cilium also clear the backends associated with `default/kubernetes-intranet`?
 
-This required further analysis of cilium code. Continuing with the previous debugging method, we added more debug logs.
+This required deeper analysis of the cilium code. Following the same debugging approach, more debug logging was added.
 
-Finally, we found that in the EndpointSlice update operation, if an address is removed, it goes to `backendRelease` to release the corresponding backend:
+Finally, it was discovered that when an EndpointSlice update removes an address, it reaches `backendRelease` to release the corresponding backend:
 
 ```go title="pkg/loadbalancer/writer/writer.go"
 func backendRelease(be *loadbalancer.Backend, name loadbalancer.ServiceName) (*loadbalancer.Backend, bool) {
@@ -407,7 +407,7 @@ func backendRelease(be *loadbalancer.Backend, name loadbalancer.ServiceName) (*l
       }
     }
   }
-  // If Service matches, delete the corresponding instance from the backend
+  // If the Service matches, delete the corresponding instance from the backend
   for k := range be.GetInstancesOfService(name) {
     instances = instances.Delete(k)
   }
@@ -417,7 +417,7 @@ func backendRelease(be *loadbalancer.Backend, name loadbalancer.ServiceName) (*l
 }
 ```
 
-Looking at the `GetInstancesOfService` implementation:
+Looking at the implementation of `GetInstancesOfService`:
 
 ```go title="pkg/loadbalancer/backend.go"
 // pkg/loadbalancer/backend.go
@@ -431,7 +431,7 @@ type BackendInstanceKey struct {
 }
 
 func (k BackendInstanceKey) Key() []byte {
-  if k.SourcePriority == 0 { // Key point: when SourcePriority is 0, key equals ServiceName
+  if k.SourcePriority == 0 { // Key point: when SourcePriority is 0, the key equals ServiceName
     return k.ServiceName.Key()
   }
   sk := k.ServiceName.Key()
@@ -441,17 +441,17 @@ func (k BackendInstanceKey) Key() []byte {
 }
 ```
 
-From the implementation, we can see that BackendInstanceKey's Key is ServiceName + space + SourcePriority, and when SourcePriority is 0, it's just ServiceName.
+From the implementation, the Key of BackendInstanceKey is `ServiceName + space + SourcePriority`. When SourcePriority is 0, it is just the `ServiceName`.
 
-Here SourcePriority is fixed at 0 (indicating the data source comes from Kubernetes resources), so the key is always ServiceName. The `GetInstancesOfService` above uses `[]byte` prefix matching to find backend instances. When looking for backend instances of `default/kubernetes`, it also finds backend instances of `default/kubernetes-intranet`. And coincidentally, the backend instance address of `default/kubernetes-intranet` is the same as the backend instance address of `default/kubernetes`. When releasing backend addresses for `default/kubernetes`, the backend instances of `default/kubernetes-intranet` are also released. During kube-apiserver recreation, service-controller's ListWatch connection disconnects and reconnects, then re-reconciles, recording the reconciliation timestamp in the `default/kubernetes-intranet` Service annotation. cilium-agent watches this event and re-reconciles this Service, finding that the corresponding backend is now empty, updating the corresponding eBPF Map. This ultimately causes all addresses related to the `default/kubernetes-intranet` Service to be inaccessible (NodePort, ClusterIP, CLB VIP).
+Here, SourcePriority is always 0 (indicating the data source is from Kubernetes resources), so the key is always just the ServiceName. Since `GetInstancesOfService` uses `[]byte` prefix matching to find backend instances, looking up backend instances for `default/kubernetes` would also find those for `default/kubernetes-intranet`. And since the backend instance address for `default/kubernetes-intranet` happens to be the same as that for `default/kubernetes`, when releasing the backend address for `default/kubernetes`, the backend instance for `default/kubernetes-intranet` was also released. During the kube-apiserver restart, the service-controller's ListWatch connections would disconnect and reconnect, performing reconciliation and recording the reconciliation timestamp in the `default/kubernetes-intranet` Service annotations. cilium-agent watched this event and also reconciled this Service, finding its backends empty, and updated the corresponding eBPF Map. This eventually caused all addresses related to `default/kubernetes-intranet` (NodePort, ClusterIP, CLB VIP) to become unreachable.
 
-## Refining Reproduction Steps
+## Extracting Reproduction Steps
 
-Based on the previous code analysis, we can deduce that: if Service B's name has Service A's name as a prefix, and they have the same endpoint addresses, then when Service A's endpoint removes an address, Service B's address will also be removed.
+Based on the code analysis, it can be deduced: if Service B's name is a prefix of Service A's name, and their corresponding endpoints share the same address, then when an address is removed from Service A's endpoint, the same address in Service B will also be removed.
 
-Based on this conclusion, we can refine a simplified stable reproduction procedure.
+From this conclusion, a simplified and stable reproduction procedure can be derived.
 
-First, save the following yaml to file `test.yaml`:
+First, save the following yaml to `test.yaml`:
 
 ```yaml
 apiVersion: v1
@@ -512,7 +512,7 @@ ports:
   protocol: TCP
 ```
 
-Then apply it to the cluster and observe the k8s resource status:
+Then apply it to the cluster and observe the k8s resource state:
 
 ```txt
 $ kubectl apply -f test.yaml
@@ -528,7 +528,7 @@ test                        IPv4          80      1.1.1.1         93s
 test-extended               IPv4          80      1.1.1.1         93s
 ```
 
-Observe that cilium's backend addresses for Services starting with test match the EndpointSlice addresses:
+Observe the backend addresses of the Services starting with `test` in both cilium and k8s, consistent with the EndpointSlice:
 
 ```txt
 $ kubectl -n kube-system exec ds/cilium -- cilium shell -- db/show frontends | grep test
@@ -536,7 +536,7 @@ $ kubectl -n kube-system exec ds/cilium -- cilium shell -- db/show frontends | g
 192.168.92.25:80/TCP      ClusterIP      default/test-extended                                 1.1.1.1:80/TCP                                       Done     2m25s
 ```
 
-Then patch the `test` EndpointSlice to remove the address, and observe cilium's in-memory Service state:
+Then patch the `test` EndpointSlice to remove the address, and observe the Service state in cilium's memory:
 
 ```txt
 $ kubectl -n default patch endpointslices test -p '{"endpoints": []}'
@@ -546,9 +546,9 @@ $ kubectl -n kube-system exec ds/cilium -- cilium shell -- db/show frontends | g
 192.168.92.25:80/TCP      ClusterIP      default/test-extended                                 1.1.1.1:80/TCP                                       Done     5m14s
 ```
 
-We can see that the `test` Service's backend address is now empty, while the `test-extended` Service's backend address is unaffected.
+Now the `test` Service's backend address is empty, while the `test-extended` Service's backend address remains unaffected.
 
-Then patch the `test-extended` Service to trigger cilium-agent to re-reconcile this Service, and observe cilium's in-memory Service state again:
+Next, patch the `test-extended` Service to trigger cilium-agent to reconcile this Service, then re-observe the Service state in cilium's memory:
 
 ```txt
 $ kubectl -n default patch service test-extended -p '{"metadata": {"annotations": {"test": "'$(date +%s)'"}}}'
@@ -558,28 +558,28 @@ $ kubectl -n kube-system exec ds/cilium -- cilium shell -- db/show frontends | g
 192.168.92.25:80/TCP      ClusterIP      default/test-extended                                                                                      Done     7s
 ```
 
-We can see that after re-reconciliation, the `test-extended` Service's backend address is also cleared. Looking at this Service's backend data at the eBPF level, there's also no backend and it's non-routable:
+After reconciliation, the `test-extended` Service's backend address was also cleared. Checking this Service's backend data at the eBPF level, there were also no backends, showing as non-routable:
 
 ```bash
 $ kubectl -n kube-system exec ds/cilium -- cilium bpf lb list | grep 192.168.92.25
 192.168.92.25:80/TCP (0)      0.0.0.0:0 (21) (0) [ClusterIP, non-routable]
 ```
 
-Phenomenon summary: Removing an endpoint from Service A's EndpointSlice can actually cause all requests to Service B to fail.
+Summary of the phenomenon: removing an endpoint from Service A's EndpointSlice could cause all requests to Service B to fail.
 
 ## How to Fix?
 
-The key is in the `BackendInstanceKey.Key` implementation. When SourcePriority is 0, we should also add a space at the end. This will solve the problem. Using the current issue as an example, `default/kubernetes ` will no longer be a prefix of `default/kubernetes-intranet ` because it has a trailing space.
+The key is in the implementation of `BackendInstanceKey.Key`. When SourcePriority is 0, adding a trailing space at the end would fix this. Using the current issue as an example, `default/kubernetes ` would no longer be a prefix of `default/kubernetes-intranet ` because it has a trailing space.
 
-The issue and PR have been submitted to the community:
+The issue and fix have been submitted to the community:
 
 - Issue: https://github.com/cilium/cilium/issues/43619
 - PR: https://github.com/cilium/cilium/pull/43620
 
-The pull request has been merged, and the issue is expected to be resolved by upgrading Cilium in the next version release.
+The PR has been merged. Upgrading cilium in the next release should resolve the issue.
 
-## Afterword
+## Postscript
 
-The debugging process was extremely complex. We suspected issues with the kernel, k8s, and TKE, but ultimately identified it as a bug in cilium. The troubleshooting steps summarized in this article assume expertise in the underlying principles and code implementation of k8s and cilium, as well as proficiency in their respective debugging methods and tools - these are the ideal steps. The actual process was many times more complex, with many unrelated debugging details removed.
+The root cause analysis was extremely complex. Suspicions included the kernel, k8s, and TKE, but ultimately it was identified as a cilium bug. The troubleshooting steps summarized in this article assume proficiency in k8s and cilium internals, code implementation, and debugging methods and tools. The actual process was many times more complex, with many irrelevant debugging details removed.
 
-When facing giant complex projects like k8s and cilium, using AI to assist with analysis and review can significantly improve efficiency. The test program was also written by AI.
+For large complex projects like k8s and cilium, using AI-assisted analysis and organization can significantly improve efficiency. The test program was also written by AI.

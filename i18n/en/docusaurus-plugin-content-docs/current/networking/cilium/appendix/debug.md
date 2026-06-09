@@ -2,10 +2,10 @@
 
 ## Check Cilium Feature Status
 
-View the actual status of various features in the currently deployed Cilium:
+Check the actual status of various cilium features in the current deployment:
 
 <Tabs>
-  <TabItem value="1" label="Brief">
+  <TabItem value="1" label="Summary">
 
 ```bash
 kubectl exec ds/cilium -- cilium status
@@ -47,6 +47,6 @@ kubectl --namespace=kube-system exec -it $POD -- cilium monitor
 
 :::info[Note]
 
-Replace the value of `NODE` with the actual node name you want to monitor.
+Replace `NODE` with the actual name of the node you want to monitor.
 
 :::

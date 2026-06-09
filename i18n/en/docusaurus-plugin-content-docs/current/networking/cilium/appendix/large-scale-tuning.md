@@ -1,37 +1,37 @@
-# Cilium Tuning for Large-Scale Clusters
+# Large-Scale Cilium Tuning Guide
 
-## When to Use This Guide
+## Applicable Scenarios
 
-When your TKE cluster grows past any of the following thresholds, cilium's defaults may show apiserver pressure, cilium-agent OOMs, slow policy compilation, or BPF map exhaustion. Use this guide for tuning:
+When a TKE cluster reaches any of the following scale thresholds, cilium's default configuration may exhibit issues such as high apiserver pressure, cilium-agent OOM, slow policy computation, or insufficient BPF map capacity. We recommend tuning as described in this document:
 
-| Dimension           | Approximate Threshold |
-| ------------------- | --------------------- |
-| Node count          | ≥ 200                 |
-| Pod count           | ≥ 10,000              |
-| Service count       | ≥ 1,000               |
-| Identity count      | ≥ 1,000               |
-| NetworkPolicy count | ≥ 500                 |
+| Dimension        | Trigger Threshold (Reference) |
+| ---------------- | ----------------------------- |
+| Node count       | ≥ 200                         |
+| Pod count        | ≥ 10,000                      |
+| Service count    | ≥ 1,000                       |
+| Identity count   | ≥ 1,000                       |
+| NetworkPolicy count | ≥ 500                       |
 
-Thresholds are guidance only — judge with concrete signals from cilium-agent / cilium-operator / apiserver (resource usage, latency, throttle metrics).
+Thresholds are for reference only. Whether tuning is needed should be determined by examining the resource usage and latency metrics of cilium-agent, cilium-operator, and apiserver.
 
 ## Tuning Checklist
 
-The table below summarizes every tuning item, sorted by recommended priority and risk:
+The table below summarizes all tuning items, categorized by "recommended priority + evaluation needed" for quick decision-making:
 
-| Priority                | Item                                                                  | Risk / Cost                            | When to enable                                       |
-| ----------------------- | --------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------- |
-| ⭐ Strongly recommended | [1. Enable CiliumEndpointSlice](#1-enable-ciliumendpointslice)        | Beta on 1.19; track GA status          | Node count ≥ 200                                     |
-| ⭐ Strongly recommended | [2. Enable APF rate limiting](#2-enable-apf-rate-limiting)            | Almost none                            | Any scale (the install script enables it by default) |
-| Recommended             | [3. Tune K8s client QPS/Burst](#3-tune-k8s-client-qpsburst)           | Too high overloads apiserver           | When you see cilium-agent sync latency spikes        |
-| Recommended             | [4. Trim Security Identities](#4-trim-security-identities)            | Label exclusion needs business design  | Identity count ≥ 1000 or visible identity bloat      |
-| Recommended             | [5. Raise Agent/Operator resources](#5-raise-agentoperator-resources) | Uses more node resources               | Default limits hit OOM or CPU throttle               |
-| As needed               | [6. Adjust BPF map size](#6-adjust-bpf-map-size)                      | Larger maps consume more kernel memory | BPF map writes fail or saturation alerts             |
+| Priority       | Tuning Item                                                    | Risk/Cost                      | When to Enable                              |
+| -------------- | -------------------------------------------------------------- | ------------------------------ | ------------------------------------------- |
+| ⭐ Strongly recommended | [1. Enable CiliumEndpointSlice](#1-enable-ciliumendpointslice) | Still Beta in 1.19, track GA status | Enable when node count ≥ 200          |
+| ⭐ Strongly recommended | [2. Enable APF Rate Limiting](#2-enable-apf-rate-limiting)     | Nearly zero                    | Should be enabled at any scale (default in install script) |
+| Recommended    | [3. Adjust K8s Client QPS/Burst](#3-adjust-k8s-client-qps-burst) | Over-configuring may overwhelm apiserver | Enable when cilium-agent sync latency is observed |
+| Recommended    | [4. Trim Security Identity](#4-trim-security-identity)         | Label exclusion policy must match business needs | Enable when identity count ≥ 1000 or identity bloat is observed |
+| Recommended    | [5. Increase Agent/Operator Resources](#5-increase-agentoperator-resources) | Consumes more node resources | Enable when default limits are insufficient, OOM or throttling occurs |
+| On demand      | [6. Adjust BPF Map Size](#6-adjust-bpf-map-size)               | Larger maps consume more kernel memory | Enable when BPF map writes fail or capacity warnings appear |
 
 ## 1. Enable CiliumEndpointSlice
 
-**Why**: Aggregates many CiliumEndpoint objects into a single CiliumEndpointSlice resource, dramatically reducing apiserver watch/list pressure.
+**Effect**: Aggregates multiple CiliumEndpoints into a single CiliumEndpointSlice resource, significantly reducing apiserver watch/list pressure.
 
-**Background**: By default, each Pod gets a CiliumEndpoint object. In a cluster with tens of thousands of Pods, this means tens of thousands of objects for cilium-agent to watch and apiserver to maintain. CiliumEndpointSlice borrows the EndpointSlice design to group multiple CEPs into one slice object — reducing total objects by roughly 100x.
+**Background**: By default, each Pod corresponds to one CiliumEndpoint object. In a cluster with tens of thousands of Pods, this means tens of thousands of objects that cilium-agent must watch and apiserver must maintain. CiliumEndpointSlice borrows the EndpointSlice concept to aggregate multiple CEPs into one slice object, reducing the total object count to roughly 1/100 of the original.
 
 **Configuration**:
 
@@ -42,35 +42,35 @@ ciliumEndpointSlice:
 
 :::warning[Beta Feature]
 
-This feature was introduced in cilium 1.11 and is still **Beta** in 1.19. Validate thoroughly in a test cluster before enabling in production. Stable tracking: [cilium/cilium#31904](https://github.com/cilium/cilium/issues/31904).
+This feature was introduced in cilium 1.11 and is still **Beta** in 1.19. We recommend thorough verification in a test cluster before using it in production. Track Stable progress: [cilium/cilium#31904](https://github.com/cilium/cilium/issues/31904).
 
-There is no smooth rollback once enabled (CEPSlice and CEP are not dual-written) — plan your rollback strategy in advance.
+Once enabled, a smooth rollback is not possible (CEPSlice and CEP are not dual-written). Evaluate your rollback plan.
 
 :::
 
 ## 2. Enable APF Rate Limiting
 
-**Why**: Use Kubernetes [API Priority and Fairness](https://kubernetes.io/docs/concepts/cluster-administration/flow-control/) to give cilium dedicated FlowSchema + PriorityLevelConfiguration, preventing cilium-agent's heavy list traffic from squeezing out other control-plane components.
+**Effect**: Uses Kubernetes [API Priority and Fairness](https://kubernetes.io/docs/concepts/cluster-administration/flow-control/) to configure dedicated FlowSchema and PriorityLevelConfiguration for cilium, preventing cilium-agent's large list requests from consuming apiserver quota for other control plane components.
 
-**Configuration**: The one-click installer in [Installing Cilium](../install.md) provisions cilium-specific APF objects by default (see the "Configure API Priority and Fairness (APF)" section). For manual helm installs, apply the same YAML separately.
+**Configuration**: The one-click install script in [Installing Cilium](../install.md) already creates dedicated APF configuration for cilium by default (see the "Configure APF Rate Limiting" section in install.md). For manual helm installations, we recommend applying the YAML from the script separately.
 
 **Benefits**:
 
-- cilium-agent restarts or cilium upgrades won't slow down kube-controller-manager, kube-scheduler, or other core components
-- Avoid "Too many requests" / 429 errors stalling cilium synchronization
+- cilium-agent restarts or cilium upgrades will not slow down core components like kube-controller-manager or kube-scheduler
+- Prevents "Too many requests" / 429 errors on apiserver that could stall cilium synchronization
 
-## 3. Tune K8s Client QPS/Burst
+## 3. Adjust K8s Client QPS/Burst
 
-**Why**: cilium-agent / cilium-operator use client-go to talk to apiserver. Defaults are conservative and can become a sync bottleneck at scale.
+**Effect**: cilium-agent and cilium-operator use client-go internally to communicate with apiserver. The default QPS/Burst values are conservative and may become a synchronization bottleneck at scale.
 
-**Defaults**:
+**Default values**:
 
 | Component       | QPS | Burst |
 | --------------- | --- | ----- |
 | cilium-agent    | 10  | 20    |
 | cilium-operator | 100 | 200   |
 
-**Tuned configuration** (adjust based on cluster size):
+**Tuning configuration** (adjust based on cluster size):
 
 ```yaml
 k8sClientRateLimit:
@@ -81,54 +81,54 @@ k8sClientRateLimit:
     burst: 400
 ```
 
-:::tip[How to decide if you need this]
+:::tip[Determining if adjustment is needed]
 
-Check cilium-agent's client rate limit metrics (a high throttle count means you're being limited):
+Run the following command to check cilium-agent's client rate limit metrics (significant throttling indicates rate limiting):
 
 ```bash
 kubectl -n kube-system exec ds/cilium -- cilium metrics list | grep client_rate_limiter
 ```
 
-If throttle counts are constantly growing, raise QPS/Burst.
+If the throttle count keeps increasing, you need to raise QPS/Burst.
 
 :::
 
-## 4. Trim Security Identities
+## 4. Trim Security Identity
 
-**Why**: cilium allocates one Security Identity per unique label combination. Too many identities drive up cilium-agent memory and policy compilation cost, plus apiserver storage pressure for CiliumIdentity resources.
+**Effect**: Cilium assigns a Security Identity to each unique set of labels. Too many identities increases cilium-agent memory usage and policy computation overhead, as well as the storage pressure on CiliumIdentity resources on apiserver.
 
 **Typical sources of identity bloat**:
 
-| High-cardinality label               | Source                             |
-| ------------------------------------ | ---------------------------------- |
-| `pod-template-hash`                  | Changes on every Deployment update |
-| `controller-revision-hash`           | StatefulSet/DaemonSet rollouts     |
-| `job-name`                           | Job instance names                 |
-| `batch.kubernetes.io/controller-uid` | Job controller UID                 |
+| High-cardinality label                  | Source                       |
+| --------------------------------------- | ---------------------------- |
+| `pod-template-hash`                     | Changes with every Deployment update |
+| `controller-revision-hash`              | StatefulSet/DaemonSet rolling updates |
+| `job-name`                              | Job instance name            |
+| `batch.kubernetes.io/controller-uid`    | Job controller UID           |
 
-**Configuration**: Exclude these labels via `extraConfig.labels` so they don't participate in Identity calculation:
+**Configuration**: Exclude these labels via `extraConfig.labels` to prevent them from participating in Identity computation:
 
 ```yaml
 extraConfig:
   labels: "!pod-template-hash !controller-revision-hash !job-name !batch.kubernetes.io/controller-uid"
 ```
 
-`!` means "exclude" (negation) — only the listed labels are excluded, all other labels still contribute to Identity.
+`!` means exclude (negation). Only the specified labels are excluded; all other labels still participate in Identity computation.
 
 **Verify the effect**:
 
 ```bash
-# Total Identity count
+# Check current total Identity count
 kubectl get ciliumidentities | wc -l
 ```
 
-After tuning, the count should drop noticeably over time.
+After adjustment, observe for a while — the total Identity count should decrease significantly.
 
-## 5. Raise Agent/Operator Resources
+## 5. Increase Agent/Operator Resources
 
-**Why**: Default cilium-agent / cilium-operator resource requests/limits are conservative. Large clusters may hit OOMs or CPU throttling, causing policy sync lag and slow Pod network setup.
+**Effect**: The default resource requests/limits for cilium-agent and cilium-operator are conservative. At large scale, OOM or CPU throttling may occur, causing policy synchronization delays and late Pod network configuration.
 
-**Recommended configuration** (adjust based on observation):
+**Recommended configuration** (adjust based on actual observation):
 
 ```yaml
 resources:
@@ -148,35 +148,35 @@ operator:
       memory: 1Gi
 ```
 
-:::tip[How to size the limits]
+:::tip[How to determine appropriate limits]
 
-Observe actual cilium-agent and cilium-operator usage:
+Observe the actual resource usage of cilium-agent and cilium-operator:
 
 ```bash
 kubectl -n kube-system top pod -l app.kubernetes.io/part-of=cilium
 ```
 
-Set limit ≥ 2× the observed peak, leaving headroom for spikes.
+Set limits to ≥ 2x the actual peak usage (to avoid OOMKill during traffic bursts).
 
 :::
 
 ## 6. Adjust BPF Map Size
 
-**Why**: cilium stores service / endpoint / policy data in BPF maps. Default sizes are calculated dynamically from node memory (`mapDynamicSizeRatio=0.0025`, i.e. about 0.25% of total memory). When a single Pod / Service fills up the map, writes fail.
+**Effect**: Cilium stores service, endpoint, policy, and other data in BPF maps. The default map capacity is auto-calculated based on node memory (`mapDynamicSizeRatio=0.0025`, i.e., 0.25% of total memory). Once a single Pod or Service runs out of capacity, writes will fail.
 
 **When to adjust**:
 
-- cilium-agent logs show `Unable to update element for cilium_lb4_services_v2` or similar BPF map saturation errors
-- Hubble alerts on BPF map utilization approaching 100%
+- cilium-agent logs show `Unable to update element for cilium_lb4_services_v2` or similar BPF map full errors
+- Hubble alerts BPF map usage near 100%
 
-**Tuned configuration**:
+**Tuning configuration**:
 
 ```yaml
 bpf:
-  mapDynamicSizeRatio: 0.005  # Use 0.5% of node memory (default 0.0025)
+  mapDynamicSizeRatio: 0.005  # Calculate as 0.5% of node memory (default 0.0025)
 ```
 
-Or specify exact map sizes (not recommended unless you have specific needs):
+Or specify individual map sizes directly (not recommended unless you have special requirements):
 
 ```yaml
 bpf:
@@ -184,27 +184,27 @@ bpf:
   policyMapMax: 32768   # NetworkPolicy map (default 16384)
 ```
 
-:::warning[Memory Cost]
+:::warning[Memory Overhead]
 
-Larger BPF maps consume more kernel memory (not counted against container memory limits — they come directly from node memory). Observe before adjusting to avoid OOM-killing the node.
+Increasing BPF map sizes increases kernel memory usage (not counted against container memory limits; it directly consumes node memory). Adjust gradually and observe, to avoid exhausting node memory.
 
 :::
 
-## Post-Tuning Observability
+## Post-Deployment Observation
 
-After tuning, monitor these signals to confirm impact:
+After completing the tuning, observe the following metrics to verify the effect:
 
-| Metric                                         | Healthy Baseline                                |
-| ---------------------------------------------- | ----------------------------------------------- |
-| cilium-agent CPU / memory usage                | Well under limits (keep 50% headroom)           |
-| `cilium_endpoint_regeneration_time_seconds`    | p99 < 5s                                        |
-| `cilium_policy_l7_total` / policy compile time | No visible backlog                              |
-| apiserver `apiserver_request_duration_seconds` | cilium traffic doesn't degrade other components |
-| Total CiliumIdentity count                     | Clear downward trend after tuning               |
+| Metric                                          | Healthy Baseline                 |
+| ----------------------------------------------- | -------------------------------- |
+| cilium-agent CPU/memory usage                   | Well below limits (recommend 50% headroom) |
+| `cilium_endpoint_regeneration_time_seconds`      | p99 < 5s                         |
+| `cilium_policy_l7_total` / policy computation time | No significant backlog         |
+| apiserver `apiserver_request_duration_seconds`  | cilium-related requests do not affect other components |
+| Total CiliumIdentity count                      | Significant downward trend after tuning |
 
-## Related
+## Related Links
 
 - [Installing Cilium](../install.md)
 - [Cilium Scaling Performance Tuning Guide](https://docs.cilium.io/en/stable/operations/performance/scalability/)
-- [Cilium API Priority and Fairness](https://docs.cilium.io/en/stable/operations/scalability/apf/)
-- [CiliumEndpointSlice Stable tracking](https://github.com/cilium/cilium/issues/31904)
+- [Cilium API Priority and Fairness Documentation](https://docs.cilium.io/en/stable/operations/scalability/apf/)
+- [CiliumEndpointSlice Stable Progress](https://github.com/cilium/cilium/issues/31904)

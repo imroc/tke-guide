@@ -33,7 +33,6 @@ const sidebars: SidebarsConfig = {
             'networking/cilium/with-node-local-dns',
             'networking/cilium/clustermesh',
             'networking/cilium/encryption',
-            'networking/cilium/roadmap',
             {
               type: 'category',
               label: 'Cilium 附录',
