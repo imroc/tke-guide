@@ -606,27 +606,37 @@ _run_fortio() {
   local out="$output_dir/$result_file"
   mkdir -p "$output_dir"
   info "Running: $label (c=$connections, keepalive=$keepalive)"
-  # fortio JSON output is typically ~5-15KB (much smaller than iperf3's 300KB+),
-  # so streaming over kubectl exec stdout is safe and avoids any writable-fs
-  # issues inside the distroless container.
+  # kubectl exec WebSocket channel tends to drop stdout data on abnormal close
+  # (especially under heavy short-connection load). Write JSON to a file inside
+  # the pod and kubectl cp it out — more reliable than stdout streaming.
+  # fortio distroless image does have a writable /tmp (overlay fs).
+  local pod_file="/tmp/fortio_${result_file}"
   local rc=0
   if [[ "$keepalive" == "false" ]]; then
     timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-      fortio load -qps 0 -c "$connections" -t "${FORTIO_DURATION}s" -keepalive=false -json - "$url" \
-      >"$out" 2>"${out}.err" || rc=$?
+      fortio load -qps 0 -c "$connections" -t "${FORTIO_DURATION}s" -keepalive=false -json "$pod_file" "$url" \
+      >/dev/null 2>"${out}.err" || rc=$?
   else
     timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-      fortio load -qps 0 -c "$connections" -t "${FORTIO_DURATION}s" -json - "$url" \
-      >"$out" 2>"${out}.err" || rc=$?
+      fortio load -qps 0 -c "$connections" -t "${FORTIO_DURATION}s" -json "$pod_file" "$url" \
+      >/dev/null 2>"${out}.err" || rc=$?
   fi
   if [[ $rc -ne 0 ]]; then
-    warn "  fortio returned exit $rc"
-    [[ -s "${out}.err" ]] && warn "  stderr: $(head -3 "${out}.err")"
+    warn "  fortio returned exit $rc (may still have results in pod)"
+    [[ -s "${out}.err" ]] && warn "  stderr: $(tail -3 "${out}.err")"
   fi
-  # Clean up .err file if empty
   [[ ! -s "${out}.err" ]] && rm -f "${out}.err"
 
-  # Parse result if we got output
+  # Try to cp the result file — it may exist even if exit code was non-zero
+  # (kubectl exec returns non-zero on WebSocket close errors even when fortio
+  # completed successfully).
+  if ! timeout 60 kubectl cp -n "$NS" "fortio-client:${pod_file}" "$out" >/dev/null 2>&1; then
+    warn "  kubectl cp failed for $result_file"
+    return 0
+  fi
+  timeout 30 kubectl exec -n "$NS" fortio-client -- rm -f "$pod_file" >/dev/null 2>&1 || true
+
+  # Parse result
   if [[ ! -s "$out" ]]; then
     warn "  no output for $result_file"
     return 0
@@ -734,12 +744,15 @@ run_latency_tests() {
     sleep "$ROUND_SLEEP"
   done
 
-  # fortio HTTP p99 — stream stdout like _run_fortio (small JSON).
+  # fortio HTTP p99 — write to pod file + kubectl cp (consistent with _run_fortio).
   info "HTTP p99 @ 1000 QPS"
+  local pod_file="/tmp/fortio_http_1k_qps.json"
   timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-    fortio load -qps 1000 -c 16 -t "${FORTIO_DURATION}s" -json - \
-    "http://${fs_ip}:8080/echo?size=512" >"$d/http_1k_qps.json" 2>"$d/http_1k_qps.err" || warn "  HTTP latency test failed"
-  [[ ! -s "$d/http_1k_qps.err" ]] && rm -f "$d/http_1k_qps.err"
+    fortio load -qps 1000 -c 16 -t "${FORTIO_DURATION}s" -json "$pod_file" \
+    "http://${fs_ip}:8080/echo?size=512" >/dev/null 2>&1 || warn "  HTTP latency test failed"
+  timeout 60 kubectl cp -n "$NS" "fortio-client:${pod_file}" "$d/http_1k_qps.json" \
+    >/dev/null 2>&1 || warn "  kubectl cp failed for http_1k_qps.json"
+  timeout 30 kubectl exec -n "$NS" fortio-client -- rm -f "$pod_file" >/dev/null 2>&1 || true
 
   info "Latency tests complete"
 }
