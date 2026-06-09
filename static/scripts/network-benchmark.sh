@@ -615,42 +615,64 @@ _run_fortio() {
   mkdir -p "$output_dir"
   info "Running: $label (c=$connections, keepalive=$keepalive)"
 
-  # kubectl exec WebSocket may close abnormally under heavy load (close 1006),
-  # losing stdout data even when fortio completed. Retry up to 2 more times
-  # with shorter duration if first attempt yields no output.
-  local attempt max_attempts=3
-  local duration="$FORTIO_DURATION"
-  for attempt in $(seq 1 $max_attempts); do
-    local rc=0
-    if [[ "$keepalive" == "false" ]]; then
-      timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-        fortio load -qps 0 -c "$connections" -t "${duration}s" -keepalive=false -json - "$url" \
-        >"$out" 2>"${out}.err" || rc=$?
-    else
-      timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-        fortio load -qps 0 -c "$connections" -t "${duration}s" -json - "$url" \
-        >"$out" 2>"${out}.err" || rc=$?
-    fi
-    [[ ! -s "${out}.err" ]] && rm -f "${out}.err"
+  # Primary method: use fortio's REST API via kubectl port-forward.
+  # This completely bypasses kubectl exec WebSocket — the JSON result comes
+  # back as a normal HTTP response, 100% reliable regardless of test load.
+  # fortio-client runs server on port 9999 (configured in pod spec).
+  local pf_pid=""
+  local local_port=$((19000 + RANDOM % 1000))
+  kubectl port-forward -n "$NS" pod/fortio-client ${local_port}:9999 >/dev/null 2>&1 &
+  pf_pid=$!
+  sleep 2  # wait for port-forward to establish
 
-    # If we got valid output, break out of retry loop
-    if [[ -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; then
-      break
-    fi
+  local api_url="http://localhost:${local_port}/fortio/rest/run"
+  local params="url=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$url")"
+  params="${params}&qps=0&t=${FORTIO_DURATION}s&c=${connections}&json=on"
+  [[ "$keepalive" == "false" ]] && params="${params}&nocatchup=on&keepalive=off"
 
-    # No valid output — report and retry
-    if [[ $attempt -lt $max_attempts ]]; then
-      warn "  attempt $attempt failed (WebSocket error?), retrying in 10s with shorter duration..."
-      rm -f "$out" "${out}.err"
-      sleep 10
-      duration=30  # shorter retry to reduce WebSocket pressure
-    else
-      if [[ $rc -ne 0 && ! -s "$out" ]]; then
+  local rc=0
+  timeout "$KUBECTL_TIMEOUT" curl -sf "${api_url}?${params}" >"$out" 2>/dev/null || rc=$?
+
+  # Kill port-forward
+  kill "$pf_pid" 2>/dev/null || true
+  wait "$pf_pid" 2>/dev/null || true
+
+  # Validate JSON from REST API
+  if [[ $rc -eq 0 && -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; then
+    # Success via REST API
+    :
+  else
+    # REST API failed — fall back to kubectl exec with retry
+    [[ -s "$out" ]] || warn "  REST API returned no data (rc=$rc), falling back to kubectl exec..."
+    rm -f "$out"
+    local attempt max_attempts=3
+    local duration="$FORTIO_DURATION"
+    for attempt in $(seq 1 $max_attempts); do
+      rc=0
+      if [[ "$keepalive" == "false" ]]; then
+        timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
+          fortio load -qps 0 -c "$connections" -t "${duration}s" -keepalive=false -json - "$url" \
+          >"$out" 2>"${out}.err" || rc=$?
+      else
+        timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
+          fortio load -qps 0 -c "$connections" -t "${duration}s" -json - "$url" \
+          >"$out" 2>"${out}.err" || rc=$?
+      fi
+      [[ ! -s "${out}.err" ]] && rm -f "${out}.err"
+      if [[ -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; then
+        break
+      fi
+      if [[ $attempt -lt $max_attempts ]]; then
+        warn "  attempt $attempt failed, retrying in 10s with shorter duration..."
+        rm -f "$out" "${out}.err"
+        sleep 10
+        duration=30
+      else
         warn "  fortio failed after $max_attempts attempts"
         [[ -s "${out}.err" ]] && warn "  stderr: $(tail -3 "${out}.err")"
       fi
-    fi
-  done
+    done
+  fi
   [[ -f "${out}.err" && ! -s "${out}.err" ]] && rm -f "${out}.err"
 
   # Parse result if we got valid output
