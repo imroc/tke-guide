@@ -567,6 +567,14 @@ run_throughput_tests() {
 
   info "Node1 IP: $node1_ip | Server Pod IP: $server_pod_ip | Svc IP: $svc_ip"
 
+  # Warmup: short 5s burst to prime TCP cwnd, route caches, and ENI token
+  # bucket. Without this, the first test shows ~25% lower throughput due to
+  # TCP slow-start from cold state.
+  info "Warmup (5s)..."
+  timeout 30 kubectl exec -n "$NS" iperf-client -- \
+    iperf3 -c "$node1_ip" -p 5202 -t 5 -P 8 >/dev/null 2>&1 || true
+  sleep 5
+
   local mon_pid=""
   if [[ "$CLUSTER_TYPE" == cilium-* ]]; then
     start_resource_monitor "$OUTPUT_DIR/resources/cilium_throughput.csv" "k8s-app=cilium" "/tmp/nb_cilium_mon.pid"
