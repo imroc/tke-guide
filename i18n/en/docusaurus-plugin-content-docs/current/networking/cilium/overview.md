@@ -41,9 +41,7 @@
 | ------------------------------------------- | ----------------------------------------------------------------- |
 | **Cilium Tuning for Large Clusters**        | Parameter, resource, and BPF map tuning for 200+ node clusters    |
 | **Verified Node Operating Systems**         | Compatibility verification results for 8 OS types                 |
-| **Cilium Host Routing**                     | Trilogy 1: Legacy vs BPF mechanisms, hit conditions, comparison   |
-| **Why Native Mode Needs local-router-ipv4** | Trilogy 2: cilium_host IP config principles and address selection |
-| **Why Native Mode Disables sysctlfix**      | Trilogy 3: rp_filter differences and decision logic               |
+| **VPC-CNI Native Routing Details**         | Configuration principles of local-router-ipv4, sysctlfix, and Host Routing |
 | **Why GR Native Routing Is Not Available**  | Complete trial-and-error record and 4 types of issues             |
 | **Cilium with NodeLocal DNSCache**          | Self-built NodeLocal DNS cache for DNS acceleration               |
 | **Configure IP Masquerading**               | Let Pods egress via node EIP without NAT gateway                  |

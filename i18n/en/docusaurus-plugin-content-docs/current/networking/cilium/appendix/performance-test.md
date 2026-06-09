@@ -99,8 +99,8 @@ The TCP_STREAM test in `cilium connectivity perf` (based on netperf) uses relati
 | Node Count       | 3 nodes                                                             |
 | Installation     | [One-click install script](../install.md#one-click-install-script) `cilium.sh install` |
 | perf parameters  | `--streams 8` (8 concurrent streams)                                |
-| Native Mode      | Legacy Host Routing (see [host-routing appendix](./host-routing.md)) |
-| Overlay Mode     | BPF Host Routing (see [host-routing appendix](./host-routing.md))   |
+| Native Mode      | Legacy Host Routing (see [Native Routing Details](./native-routing.md)) |
+| Overlay Mode     | BPF Host Routing (see [Native Routing Details](./native-routing.md))   |
 
 ### Test Instance Types
 
@@ -198,7 +198,7 @@ Single-stream throughput typically falls at or near the baseline bandwidth (1.5-
 
 **The only reliable difference is same-node latency: Overlay is about 17% faster than Native.** Cross-node shows no stable difference. If your workloads primarily involve cross-node communication, performance is not a deciding factor for choosing between modes — both achieve identical cross-node multi-stream throughput, and all core capabilities (NetworkPolicy / Hubble / KPR) are fully available. Choose based on operational preference and environmental conditions.
 
-Further reading: [Cilium Host Routing: legacy vs BPF](./host-routing.md) provides an in-depth explanation of the two host routing implementations and their enabling conditions.
+Further reading: [VPC-CNI Native Routing Details](./native-routing.md) provides an in-depth explanation of the two host routing implementations and their enabling conditions.
 
 ## FAQ
 
@@ -250,5 +250,5 @@ For SA5 instances, the queue count = vCPU count (capped at 48). Measured results
 
 - [Installing Cilium](../install.md)
 - [Cilium Connectivity Test](./connectivity-test.md)
-- [Cilium Host Routing: legacy vs BPF](./host-routing.md)
+- [VPC-CNI Native Routing Details](./native-routing.md)
 - [Cilium Performance Documentation](https://docs.cilium.io/en/stable/operations/performance/)
