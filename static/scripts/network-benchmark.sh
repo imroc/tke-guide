@@ -621,8 +621,9 @@ _run_fortio() {
 
   if [[ "$keepalive" == "false" ]]; then
     # Short-connection mode: must use kubectl exec (REST API doesn't support
-    # disabling keepalive). Short-conn tests have low QPS (~10K) and small
-    # JSON output, so WebSocket close 1006 is rare. Retry if it does happen.
+    # disabling keepalive). Overlay clusters are prone to WebSocket close 1006
+    # during short-conn tests. Progressively shorten duration on retry:
+    # 60s → 20s → 10s to minimize stdout data volume.
     local attempt max_attempts=3
     local duration="$FORTIO_DURATION"
     for attempt in $(seq 1 $max_attempts); do
@@ -638,7 +639,7 @@ _run_fortio() {
         warn "  attempt $attempt failed, retrying in 10s with shorter duration..."
         rm -f "$out" "${out}.err"
         sleep 10
-        duration=30
+        duration=$((duration > 20 ? 20 : 10))
       else
         warn "  fortio failed after $max_attempts attempts"
         [[ -s "${out}.err" ]] && warn "  stderr: $(tail -3 "${out}.err")"
