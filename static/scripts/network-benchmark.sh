@@ -615,51 +615,17 @@ _run_fortio() {
   mkdir -p "$output_dir"
   info "Running: $label (c=$connections, keepalive=$keepalive)"
 
-  # Primary method: use fortio's REST API via kubectl port-forward.
-  # This completely bypasses kubectl exec WebSocket — the JSON result comes
-  # back as a normal HTTP response, 100% reliable regardless of test load.
-  # fortio-client runs server on port 9999 (configured in pod spec).
-  local pf_pid=""
-  local local_port=$((19000 + RANDOM % 1000))
-  kubectl port-forward -n "$NS" pod/fortio-client ${local_port}:9999 >/dev/null 2>&1 &
-  pf_pid=$!
-  sleep 2  # wait for port-forward to establish
-
-  local api_url="http://localhost:${local_port}/fortio/rest/run"
-  local params="url=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$url")"
-  params="${params}&qps=-1&t=${FORTIO_DURATION}s&c=${connections}&json=on"
-  # To disable keepalive: set connection reuse to exactly 1 (each conn used once
-  # then closed). This maps to fortio CLI's -keepalive=false behavior.
-  [[ "$keepalive" == "false" ]] && params="${params}&connection-reuse-range-min=1&connection-reuse-range-max=1"
-
-  local rc=0
-  timeout "$KUBECTL_TIMEOUT" curl -sf "${api_url}?${params}" >"$out" 2>/dev/null || rc=$?
-
-  # Kill port-forward
-  kill "$pf_pid" 2>/dev/null || true
-  wait "$pf_pid" 2>/dev/null || true
-
-  # Validate JSON from REST API
-  if [[ $rc -eq 0 && -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; then
-    # Success via REST API
-    :
-  else
-    # REST API failed — fall back to kubectl exec with retry
-    [[ -s "$out" ]] || warn "  REST API returned no data (rc=$rc), falling back to kubectl exec..."
-    rm -f "$out"
+  if [[ "$keepalive" == "false" ]]; then
+    # Short-connection mode: must use kubectl exec (REST API doesn't support
+    # disabling keepalive). Short-conn tests have low QPS (~10K) and small
+    # JSON output, so WebSocket close 1006 is rare. Retry if it does happen.
     local attempt max_attempts=3
     local duration="$FORTIO_DURATION"
     for attempt in $(seq 1 $max_attempts); do
-      rc=0
-      if [[ "$keepalive" == "false" ]]; then
-        timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-          fortio load -qps 0 -c "$connections" -t "${duration}s" -keepalive=false -json - "$url" \
-          >"$out" 2>"${out}.err" || rc=$?
-      else
-        timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-          fortio load -qps 0 -c "$connections" -t "${duration}s" -json - "$url" \
-          >"$out" 2>"${out}.err" || rc=$?
-      fi
+      local rc=0
+      timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
+        fortio load -qps 0 -c "$connections" -t "${duration}s" -keepalive=false -json - "$url" \
+        >"$out" 2>"${out}.err" || rc=$?
       [[ ! -s "${out}.err" ]] && rm -f "${out}.err"
       if [[ -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; then
         break
@@ -674,6 +640,52 @@ _run_fortio() {
         [[ -s "${out}.err" ]] && warn "  stderr: $(tail -3 "${out}.err")"
       fi
     done
+  else
+    # Keepalive mode: use fortio REST API via port-forward. This bypasses
+    # kubectl exec WebSocket entirely — high-throughput keepalive tests
+    # (80K+ req/s) always triggered WebSocket close 1006 via exec.
+    local pf_pid=""
+    local local_port=$((19000 + RANDOM % 1000))
+    kubectl port-forward -n "$NS" pod/fortio-client ${local_port}:9999 >/dev/null 2>&1 &
+    pf_pid=$!
+    sleep 2
+
+    local api_url="http://localhost:${local_port}/fortio/rest/run"
+    local params="url=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$url")"
+    params="${params}&qps=-1&t=${FORTIO_DURATION}s&c=${connections}&json=on"
+
+    local rc=0
+    timeout "$KUBECTL_TIMEOUT" curl -sf "${api_url}?${params}" >"$out" 2>/dev/null || rc=$?
+
+    kill "$pf_pid" 2>/dev/null || true
+    wait "$pf_pid" 2>/dev/null || true
+
+    # If REST API failed, fall back to kubectl exec with retry
+    if ! { [[ -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; }; then
+      warn "  REST API failed (rc=$rc), falling back to kubectl exec..."
+      rm -f "$out"
+      local attempt max_attempts=3
+      local duration="$FORTIO_DURATION"
+      for attempt in $(seq 1 $max_attempts); do
+        rc=0
+        timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
+          fortio load -qps 0 -c "$connections" -t "${duration}s" -json - "$url" \
+          >"$out" 2>"${out}.err" || rc=$?
+        [[ ! -s "${out}.err" ]] && rm -f "${out}.err"
+        if [[ -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; then
+          break
+        fi
+        if [[ $attempt -lt $max_attempts ]]; then
+          warn "  attempt $attempt failed, retrying in 10s with shorter duration..."
+          rm -f "$out" "${out}.err"
+          sleep 10
+          duration=30
+        else
+          warn "  fortio failed after $max_attempts attempts"
+          [[ -s "${out}.err" ]] && warn "  stderr: $(tail -3 "${out}.err")"
+        fi
+      done
+    fi
   fi
   [[ -f "${out}.err" && ! -s "${out}.err" ]] && rm -f "${out}.err"
 
