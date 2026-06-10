@@ -43,6 +43,7 @@ const sidebars: SidebarsConfig = {
                 'networking/cilium/appendix/verified-os',
                 'networking/cilium/appendix/connectivity-test',
                 'networking/cilium/appendix/performance-test',
+                'networking/cilium/appendix/network-benchmark',
                 'networking/cilium/appendix/native-routing',
                 'networking/cilium/appendix/gr-native-not-recommended',
                 'networking/cilium/appendix/with-node-local-dns',
