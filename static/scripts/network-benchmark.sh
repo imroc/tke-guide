@@ -597,6 +597,10 @@ run_throughput_tests() {
     sleep "$ROUND_SLEEP"
   done
   for r in $(seq 1 "$ROUNDS"); do
+    _run_iperf "Pod-to-Pod 16stream r$r" "$server_pod_ip" "5201" "16" "$d" "pod2pod_16stream_r${r}.json"
+    sleep "$ROUND_SLEEP"
+  done
+  for r in $(seq 1 "$ROUNDS"); do
     _run_iperf "Via Service 8stream r$r" "$svc_ip" "5201" "8" "$d" "via_service_8stream_r${r}.json"
     sleep "$ROUND_SLEEP"
   done
@@ -883,6 +887,91 @@ EOF
   info "Service scale tests complete"
 }
 
+# ─── Hubble Overhead Test ────────────────────────────────────────────────────
+
+run_hubble_overhead_test() {
+  if [[ "$CLUSTER_TYPE" != cilium-* ]]; then
+    info "Skipping Hubble overhead test (not a Cilium cluster)"
+    return 0
+  fi
+  step "Running Hubble Overhead Test"
+  local d="$OUTPUT_DIR/hubble"
+  mkdir -p "$d"
+
+  local fs_ip
+  fs_ip=$(kubectl get svc -n "$NS" fortio-service -o jsonpath='{.spec.clusterIP}')
+
+  # Phase 1: with Hubble (default state)
+  info "Testing with Hubble enabled (default)..."
+  _run_fortio "Hubble ON (keepalive)" "http://${fs_ip}:8080/echo?size=512" 64 true "$d" "hubble_on.json"
+
+  # Phase 2: disable Hubble
+  info "Disabling Hubble..."
+  kubectl -n kube-system exec ds/cilium -- cilium config set hubble-disable true >/dev/null 2>&1 || true
+  sleep 15  # wait for config to propagate
+
+  _run_fortio "Hubble OFF (keepalive)" "http://${fs_ip}:8080/echo?size=512" 64 true "$d" "hubble_off.json"
+
+  # Restore Hubble
+  info "Re-enabling Hubble..."
+  kubectl -n kube-system exec ds/cilium -- cilium config set hubble-disable false >/dev/null 2>&1 || true
+  sleep 10
+
+  info "Hubble overhead test complete"
+}
+
+# ─── NetworkPolicy Overhead Test ─────────────────────────────────────────────
+
+run_networkpolicy_test() {
+  if [[ "$CLUSTER_TYPE" != cilium-* ]]; then
+    info "Skipping NetworkPolicy test (not a Cilium cluster)"
+    return 0
+  fi
+  step "Running NetworkPolicy L3/L4 Overhead Test"
+  local d="$OUTPUT_DIR/networkpolicy"
+  mkdir -p "$d"
+
+  local fs_ip
+  fs_ip=$(kubectl get svc -n "$NS" fortio-service -o jsonpath='{.spec.clusterIP}')
+
+  # Phase 1: baseline (no policy)
+  info "Testing without NetworkPolicy (baseline)..."
+  _run_fortio "No policy (keepalive)" "http://${fs_ip}:8080/echo?size=512" 64 true "$d" "no_policy.json"
+
+  # Phase 2: apply L3/L4 CiliumNetworkPolicy
+  info "Applying L3/L4 CiliumNetworkPolicy..."
+  kubectl apply -n "$NS" -f - <<'CNPEOF'
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-fortio-benchmark
+spec:
+  endpointSelector:
+    matchLabels:
+      app: benchmark
+      role: fortio-server
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app: benchmark
+        role: fortio-client
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+CNPEOF
+  sleep 10  # wait for policy to take effect
+
+  _run_fortio "L3/L4 policy (keepalive)" "http://${fs_ip}:8080/echo?size=512" 64 true "$d" "l3l4_policy.json"
+
+  # Cleanup policy
+  info "Removing CiliumNetworkPolicy..."
+  kubectl delete -n "$NS" ciliumnetworkpolicy allow-fortio-benchmark --ignore-not-found >/dev/null 2>&1
+  sleep 5
+
+  info "NetworkPolicy overhead test complete"
+}
+
 # ─── Component-Specific Metrics ─────────────────────────────────────────────
 
 collect_component_metrics() {
@@ -981,6 +1070,7 @@ for key, pat in [
     ("node_level_8stream", "throughput/node_throughput_r*.json"),
     ("pod2pod_single", "throughput/pod2pod_single_r*.json"),
     ("pod2pod_8stream", "throughput/pod2pod_8stream_r*.json"),
+    ("pod2pod_16stream", "throughput/pod2pod_16stream_r*.json"),
     ("via_service_8stream", "throughput/via_service_8stream_r*.json"),
 ]:
     r = parse_iperf(pat)
@@ -1099,6 +1189,37 @@ for res_key, csv_pat in [
     cpu_d, mem_d = parse_csv(csv_pat)
     if cpu_d: summary["resources"][res_key] = {**cpu_d, **mem_d}
 
+# Hubble overhead
+def parse_single_fortio(path):
+    fp = os.path.join(basedir, path)
+    if not os.path.exists(fp):
+        return None
+    try:
+        with open(fp) as fh:
+            d = json.load(fh)
+            return int(d['ActualQPS'])
+    except:
+        return None
+
+hubble_on = parse_single_fortio("hubble/hubble_on.json")
+hubble_off = parse_single_fortio("hubble/hubble_off.json")
+if hubble_on and hubble_off and hubble_off > 0:
+    summary["hubble"] = {
+        "with_hubble_qps": hubble_on,
+        "without_hubble_qps": hubble_off,
+        "overhead_pct": round((hubble_on - hubble_off) / hubble_off * 100, 1)
+    }
+
+# NetworkPolicy overhead
+np_baseline = parse_single_fortio("networkpolicy/no_policy.json")
+np_l3l4 = parse_single_fortio("networkpolicy/l3l4_policy.json")
+if np_baseline and np_l3l4 and np_baseline > 0:
+    summary["networkpolicy"] = {
+        "baseline_qps": np_baseline,
+        "l3l4_qps": np_l3l4,
+        "l3l4_overhead_pct": round((np_l3l4 - np_baseline) / np_baseline * 100, 1)
+    }
+
 # Write
 out = os.path.join(basedir, "benchmark-summary.json")
 with open(out, 'w') as f:
@@ -1158,6 +1279,20 @@ if ss:
         print(f"    short-conn 1k svc:   {ss['short_conn_1k_svc_qps']} req/s")
         print(f"    short-conn degrade:  {ss['short_conn_degradation_pct']}%")
     print()
+hb = d.get('hubble', {})
+if hb:
+    print("  ── Hubble Overhead ──")
+    print(f"    with Hubble:    {hb.get('with_hubble_qps', '?')} req/s")
+    print(f"    without Hubble: {hb.get('without_hubble_qps', '?')} req/s")
+    print(f"    overhead:       {hb.get('overhead_pct', '?')}%")
+    print()
+np = d.get('networkpolicy', {})
+if np:
+    print("  ── NetworkPolicy L3/L4 Overhead ──")
+    print(f"    no policy:  {np.get('baseline_qps', '?')} req/s")
+    print(f"    L3/L4 CNP:  {np.get('l3l4_qps', '?')} req/s")
+    print(f"    overhead:   {np.get('l3l4_overhead_pct', '?')}%")
+    print()
 PYEOF
   python3 "$pyfile" "$f" 2>/dev/null || true
   rm -f "$pyfile"
@@ -1196,6 +1331,8 @@ main() {
   run_throughput_tests
   run_rps_tests
   run_latency_tests
+  run_hubble_overhead_test
+  run_networkpolicy_test
   run_service_scale_test
   collect_component_metrics
 
