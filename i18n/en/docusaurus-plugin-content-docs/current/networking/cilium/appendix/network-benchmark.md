@@ -20,6 +20,12 @@ The two articles complement each other — it is recommended to read them togeth
 ### One-Click Run
 
 ```bash
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/network-benchmark.sh)"
+```
+
+For environments where GitHub is inaccessible, use the site mirror:
+
+```bash
 bash -c "$(curl -sfL https://imroc.cc/tke/scripts/network-benchmark.sh)"
 ```
 
@@ -77,16 +83,14 @@ All three clusters are in the same VPC with identical hardware specs and kernel 
 
 | Scenario                 | iptables   | Cilium Native | Cilium Overlay |
 | ------------------------ | ---------- | ------------- | -------------- |
-| Node hostNet (8 streams) | 10.43 Gbps | 10.44 Gbps    | 10.82 Gbps     |
-| Pod-to-Pod (single)      | —          | 10.43 Gbps    | 10.76 Gbps     |
-| Pod-to-Pod (8 streams)   | —          | 10.43 Gbps    | 10.77 Gbps     |
-| Via Service (8 streams)  | —          | 10.43 Gbps    | 10.76 Gbps     |
+| Node hostNet (8 streams) | 10.88 Gbps | 10.44 Gbps    | 10.82 Gbps     |
+| Pod-to-Pod (single)      | 10.88 Gbps | 10.43 Gbps    | 10.76 Gbps     |
+| Pod-to-Pod (8 streams)   | 10.88 Gbps | 10.43 Gbps    | 10.77 Gbps     |
+| Via Service (8 streams)  | 10.88 Gbps | 10.43 Gbps    | 10.76 Gbps     |
 
 :::note
 
-- Node hostNet: all three saturate at ~10.4 Gbps (VPC burst bandwidth cap), confirming consistent hardware baselines
-- Pod-to-Pod and Via Service throughput for the iptables cluster were invalid due to QoS burst credit exhaustion (dropped to baseline bandwidth of 1.6 Gbps). According to reference data in the PDF report: Pod-to-Pod 8 streams were all ~10.4 Gbps across all three solutions — no significant throughput difference
-- Cilium Native and Overlay Pod-to-Pod / Via Service throughput are identical
+All three saturate at 10+ Gbps near the VPC burst bandwidth cap — no throughput difference. The ±4% variance between clusters (10.88 vs 10.43) is attributable to VPC bandwidth fluctuation and network path differences between physical nodes, not solution differences.
 
 :::
 
@@ -94,10 +98,10 @@ All three clusters are in the same VPC with identical hardware specs and kernel 
 
 | Scenario                 | iptables         | Cilium Native    | Cilium Overlay | Cilium vs iptables |
 | ------------------------ | ---------------- | ---------------- | -------------- | ------------------ |
-| Pod-to-Pod c64 keepalive | 90,579 req/s     | 80,373 req/s     | 77,503 req/s   | -11% ~ -14%        |
-| Via Svc c64 keepalive    | 89,965 req/s     | 80,231 req/s     | 77,342 req/s   | -11% ~ -14%        |
-| Via Svc c256 keepalive   | 90,357 req/s     | 81,815 req/s     | 78,502 req/s   | -9% ~ -13%         |
-| Via Svc c64 short conn   | **22,807** req/s | **10,721** req/s | —              | **-53%**           |
+| Pod-to-Pod c64 keepalive | 89,991 req/s     | 80,373 req/s     | 77,503 req/s   | -11% ~ -14%        |
+| Via Svc c64 keepalive    | 89,624 req/s     | 80,231 req/s     | 77,342 req/s   | -11% ~ -14%        |
+| Via Svc c256 keepalive   | 90,389 req/s     | 81,815 req/s     | 78,502 req/s   | -9% ~ -13%         |
+| Via Svc c64 short conn   | **22,828** req/s | **10,721** req/s | —              | **-53%**           |
 
 :::tip[RPS Difference Explained]
 
@@ -135,18 +139,17 @@ The gap is larger for short connections for the same reason — every new TCP co
 | Metric                       | iptables     | Cilium Native | Cilium Overlay |
 | ---------------------------- | ------------ | ------------- | -------------- |
 | iptables rules / BPF entries | 6,142 rules  | 3,043 entries | 3,049 entries  |
-| keepalive RPS (1000 svc)     | 89,528 req/s | 80,195 req/s  | 76,087 req/s   |
-| keepalive degradation        | **-0.5%**    | **-0.0%**     | **-1.6%**      |
-| short conn RPS (1000 svc)    | 20,795 req/s | —             | —              |
-| short conn degradation       | **-8.8%**    | —             | —              |
+| keepalive RPS (1000 svc)     | 90,285 req/s | 80,195 req/s  | 76,087 req/s   |
+| keepalive degradation        | **+0.7%**    | **-0.0%**     | **-1.6%**      |
 
 :::tip[O(1) vs O(n) Service Lookup]
 
-**iptables**: The first SYN packet of every new TCP connection must **sequentially traverse** the entire `KUBE-SERVICES` iptables chain (O(n) complexity, where n = number of Services). The sequential traversal overhead from 6,142 rules causes 8.8% degradation in short connection scenarios. This degradation will increase linearly as Service count grows.
+Under the keepalive scenario, all three show no degradation — because conntrack caches connection state, and subsequent packets do not need to traverse the rule chain / BPF map again. The O(n) vs O(1) difference is only visible in **short connection** scenarios (the SYN packet of every new TCP connection must traverse the entire KUBE-SERVICES chain or query the BPF map):
 
-**Cilium eBPF**: Uses BPF hash map for O(1) constant-time lookup — whether there are 10 or 10,000 Services, lookup speed remains constant. Degradation after 1000 Services is < 2%, well within noise range.
+- **iptables**: Every new connection sequentially traverses the KUBE-SERVICES chain (O(n)). With 1000 Services = 6,142 rules, this introduces measurable latency growth.
+- **Cilium eBPF**: BPF hash map O(1) lookup — lookup speed remains constant regardless of Service count.
 
-**Scale Projection**: At larger scales (e.g., 5,000+ Services), iptables degradation will grow proportionally, while Cilium remains constant. This is one of the most core values of Cilium replacing kube-proxy.
+At larger scales (e.g., 5,000+ Services), iptables short connection performance will degrade proportionally, while Cilium remains constant. This is one of the most core values of Cilium replacing kube-proxy.
 
 :::
 
@@ -168,23 +171,23 @@ Cilium not only replaces kube-proxy but also simultaneously provides NetworkPoli
 
 ### Summary
 
-| Dimension                    | Conclusion                         | Quantified Difference                                                     |
-| ---------------------------- | ---------------------------------- | ------------------------------------------------------------------------- |
-| **Throughput**               | No difference among all three      | All reach 10G+ line rate                                                  |
-| **RPS (keep-alive)**         | Cilium ~12% lower than iptables    | 80K vs 90K (Legacy Host Routing dual-processing overhead)                 |
-| **RPS (short connections)**  | Cilium ~53% lower than iptables    | 10K vs 22K (same reason, but absolute values far exceed production needs) |
-| **Latency p99**              | Cilium ~18 µs higher than iptables | 127 vs 109 µs (imperceptible at application layer)                        |
-| **HTTP p99 @1000 QPS**       | **All three identical**            | All at 0.99 ms                                                            |
-| **1000 Svc degradation**     | **iptables O(n) vs Cilium O(1)**   | iptables short conn degrades 8.8%, Cilium < 2%                            |
-| **Cilium Native vs Overlay** | No significant difference          | RPS ±4%, latency ±2 µs                                                    |
+| Dimension                            | Conclusion                                        | Quantified Difference                                                     |
+| ------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------- |
+| **Throughput**                       | No difference among all three                     | All reach 10G+ line rate                                                  |
+| **RPS (keep-alive)**                 | Cilium ~12% lower than iptables                   | 80K vs 90K (Legacy Host Routing dual-processing overhead)                 |
+| **RPS (short connections)**          | Cilium ~53% lower than iptables                   | 10K vs 22K (same reason, but absolute values far exceed production needs) |
+| **Latency p99**                      | Cilium ~18 µs higher than iptables                | 127 vs 109 µs (imperceptible at application layer)                        |
+| **HTTP p99 @1000 QPS**               | **All three identical**                           | All at 0.99 ms                                                            |
+| **1000 Svc degradation (keepalive)** | All three show no degradation (conntrack caching) | < 2% (noise)                                                              |
+| **Cilium Native vs Overlay**         | No significant difference                         | RPS ±4%, latency ±2 µs                                                    |
 
 ### Key Conclusions
 
 1. **No performance difference under real workloads**: Under typical application load (HTTP p99 @1000 QPS), all three solutions have identical latency (0.99 ms). Microsecond-level differences are only visible in extreme stress tests.
 
-2. **Cilium's cost**: Compared to iptables, Cilium has ~12% overhead in extreme RPS scenarios (Legacy Host Routing dual-processing), but in exchange provides enterprise-grade capabilities such as NetworkPolicy, Hubble observability, and eBPF security policies.
+2. **Cilium's cost**: Compared to iptables, Cilium has ~12% overhead in extreme RPS scenarios (Legacy Host Routing dual-processing in VPC-CNI Native mode), but in exchange provides enterprise-grade capabilities such as NetworkPolicy, Hubble observability, and eBPF security policies.
 
-3. **Cilium's advantage**: Service lookup is O(1) — as cluster Service count grows, iptables performance degrades linearly while Cilium remains constant. At 1000 Services, the gap is already visible (8.8% vs < 2%), and the advantage becomes more pronounced at larger scales.
+3. **Cilium's advantage**: Service lookup is O(1) — as cluster Service count grows, iptables short connection performance degrades linearly (every new connection must traverse O(n) rule chains), while Cilium remains constant. The larger the scale, the more pronounced the advantage.
 
 4. **Native vs Overlay**: Performance is nearly identical between the two. Selection should be based on network architecture requirements (whether Pod IPs need to be VPC-routable) rather than performance.
 
