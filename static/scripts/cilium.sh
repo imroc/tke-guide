@@ -1365,10 +1365,7 @@ print_installed_values() {
 # Called at the end of cmd_install_cilium to help users batch-deploy to multiple clusters.
 print_replay_command() {
   local script_url="https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh"
-  local env_vars="ROUTING_MODE=${ROUTING_MODE} CILIUM_VERSION=${CILIUM_VERSION}"
-  if [[ "${IMAGE_REGISTRY}" != "${DEFAULT_IMAGE_REGISTRY}" ]]; then
-    env_vars="${env_vars} IMAGE_REGISTRY=${IMAGE_REGISTRY}"
-  fi
+  local env_vars="ROUTING_MODE=${ROUTING_MODE} CILIUM_VERSION=${CILIUM_VERSION} IMAGE_REGISTRY=${IMAGE_REGISTRY}"
   if [[ "$ROUTING_MODE" == "overlay" ]]; then
     env_vars="${env_vars} POD_CIDR=${POD_CIDR} POD_CIDR_MASK=${POD_CIDR_MASK}"
   fi
