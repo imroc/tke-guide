@@ -34,6 +34,7 @@ set -uo pipefail
 #   FORTIO_DURATION    fortio/netperf test duration in seconds (default: 60)
 #   ROUNDS             repetitions per scenario (default: 1)
 #   ROUND_SLEEP        seconds between rounds (default: 30)
+#   SVC_SCALE_COUNT    number of dummy Services for scale test (default: 5000)
 #   KUBECTL_TIMEOUT    timeout for kubectl exec/cp calls (default: 180)
 #
 # Output:
@@ -156,6 +157,7 @@ Environment Variables:
   FORTIO_DURATION    fortio/netperf test duration in seconds (default: 60)
   ROUNDS             repetitions per scenario (default: 1)
   ROUND_SLEEP        seconds between rounds (default: 30)
+  SVC_SCALE_COUNT    number of dummy Services for scale test (default: 5000)
   KUBECTL_TIMEOUT    timeout for kubectl exec/cp calls (default: 180)
 
 Examples:
@@ -814,17 +816,18 @@ run_latency_tests() {
 # ─── Service Scale Test ─────────────────────────────────────────────────────
 
 run_service_scale_test() {
-  step "Running Service Scale Test (1000 dummy Services)"
+  local svc_count="${SVC_SCALE_COUNT:-5000}"
+  step "Running Service Scale Test (${svc_count} dummy Services)"
   local d="$OUTPUT_DIR/service-scale"
   mkdir -p "$d"
 
-  info "Creating 1000 dummy Services in batches..."
+  info "Creating ${svc_count} dummy Services in batches..."
   kubectl create namespace test-services --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null
 
   local batch_size=100
-  for ((start = 1; start <= 1000; start += batch_size)); do
+  for ((start = 1; start <= svc_count; start += batch_size)); do
     local end=$((start + batch_size - 1))
-    [[ $end -gt 1000 ]] && end=1000
+    [[ $end -gt $svc_count ]] && end=$svc_count
 
     info "  Creating services $start-$end..."
     local batch_file=$(mktemp)
@@ -867,9 +870,9 @@ EOF
     rm -f "$batch_file"
   done
 
-  info "Waiting 30s for sync..."
-  sleep 30
-  echo "1000" >"$d/dummy_services_count.txt"
+  info "Waiting 60s for sync..."
+  sleep 60
+  echo "$svc_count" >"$d/dummy_services_count.txt"
 
   local fs_ip
   fs_ip=$(kubectl get svc -n "$NS" fortio-service -o jsonpath='{.spec.clusterIP}')
@@ -1141,6 +1144,11 @@ if hfs:
 
 # Service scale — compare keepalive and short-connection with their baselines
 summary["service_scale"] = {}
+# Read svc_count from file
+svc_count_file = os.path.join(basedir, "service-scale", "dummy_services_count.txt")
+if os.path.exists(svc_count_file):
+    with open(svc_count_file) as f:
+        summary["service_scale"]["svc_count"] = int(f.read().strip())
 # Keepalive
 scale_ka = parse_fortio("service-scale/svc_1k_svc_r*.json")
 baseline_ka = summary.get("rps", {}).get("svc_c64", {}).get("avg_qps")
@@ -1270,15 +1278,16 @@ if l:
     print()
 ss = d.get('service_scale', {})
 if ss:
-    print("  ── Service Scale (1000 Services) ──")
+    svc_count = ss.get('svc_count', '?')
+    print(f"  ── Service Scale ({svc_count} Services) ──")
     if 'keepalive_baseline_qps' in ss:
-        print(f"    keepalive baseline: {ss['keepalive_baseline_qps']} req/s")
-        print(f"    keepalive 1k svc:   {ss['keepalive_1k_svc_qps']} req/s")
-        print(f"    keepalive degrade:  {ss['keepalive_degradation_pct']}%")
+        print(f"    keepalive baseline:    {ss['keepalive_baseline_qps']} req/s")
+        print(f"    keepalive {svc_count} svc: {ss['keepalive_1k_svc_qps']} req/s")
+        print(f"    keepalive degrade:     {ss['keepalive_degradation_pct']}%")
     if 'short_conn_baseline_qps' in ss:
-        print(f"    short-conn baseline: {ss['short_conn_baseline_qps']} req/s")
-        print(f"    short-conn 1k svc:   {ss['short_conn_1k_svc_qps']} req/s")
-        print(f"    short-conn degrade:  {ss['short_conn_degradation_pct']}%")
+        print(f"    short-conn baseline:    {ss['short_conn_baseline_qps']} req/s")
+        print(f"    short-conn {svc_count} svc: {ss['short_conn_1k_svc_qps']} req/s")
+        print(f"    short-conn degrade:     {ss['short_conn_degradation_pct']}%")
     print()
 hb = d.get('hubble', {})
 if hb:
