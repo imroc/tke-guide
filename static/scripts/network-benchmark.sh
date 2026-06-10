@@ -870,8 +870,13 @@ EOF
   fs_ip=$(kubectl get svc -n "$NS" fortio-service -o jsonpath='{.spec.clusterIP}')
 
   for r in $(seq 1 "$ROUNDS"); do
-    _run_fortio "Via Svc 64c (1000svc) r$r" \
+    _run_fortio "Via Svc 64c keepalive (1000svc) r$r" \
       "http://${fs_ip}:8080/echo?size=512" 64 true "$d" "svc_1k_svc_r${r}.json"
+    sleep "$ROUND_SLEEP"
+  done
+  for r in $(seq 1 "$ROUNDS"); do
+    _run_fortio "Via Svc 64c short (1000svc) r$r" \
+      "http://${fs_ip}:8080/echo?size=512" 64 false "$d" "short_conn_1k_svc_r${r}.json"
     sleep "$ROUND_SLEEP"
   done
 
@@ -1043,15 +1048,22 @@ if hfs:
                 break
     except: pass
 
-# Service scale — compare svc_c64 (baseline, keepalive) with 1k-svc test (same mode)
-scale_qps = parse_fortio("service-scale/svc_1k_svc_r*.json")
-baseline = summary.get("rps", {}).get("svc_c64", {}).get("avg_qps")
-if scale_qps and baseline and baseline > 0:
-    summary["service_scale"] = {
-        "1k_svc_qps": scale_qps["avg_qps"],
-        "baseline_qps": baseline,
-        "degradation_pct": round((scale_qps["avg_qps"] - baseline) / baseline * 100, 1)
-    }
+# Service scale — compare keepalive and short-connection with their baselines
+summary["service_scale"] = {}
+# Keepalive
+scale_ka = parse_fortio("service-scale/svc_1k_svc_r*.json")
+baseline_ka = summary.get("rps", {}).get("svc_c64", {}).get("avg_qps")
+if scale_ka and baseline_ka and baseline_ka > 0:
+    summary["service_scale"]["keepalive_baseline_qps"] = baseline_ka
+    summary["service_scale"]["keepalive_1k_svc_qps"] = scale_ka["avg_qps"]
+    summary["service_scale"]["keepalive_degradation_pct"] = round((scale_ka["avg_qps"] - baseline_ka) / baseline_ka * 100, 1)
+# Short-connection
+scale_short = parse_fortio("service-scale/short_conn_1k_svc_r*.json")
+baseline_short = summary.get("rps", {}).get("svc_short_c64", {}).get("avg_qps")
+if scale_short and baseline_short and baseline_short > 0:
+    summary["service_scale"]["short_conn_baseline_qps"] = baseline_short
+    summary["service_scale"]["short_conn_1k_svc_qps"] = scale_short["avg_qps"]
+    summary["service_scale"]["short_conn_degradation_pct"] = round((scale_short["avg_qps"] - baseline_short) / baseline_short * 100, 1)
 
 # Rules count
 for cf_key in ["iptables_rules_count.txt", "ipvs_rules_count.txt"]:
@@ -1136,10 +1148,15 @@ if l:
     print()
 ss = d.get('service_scale', {})
 if ss:
-    print("  ── Service Scale ──")
-    print(f"    baseline: {ss.get('baseline_qps', '?')} req/s")
-    print(f"    1k svc:   {ss.get('1k_svc_qps', '?')} req/s")
-    print(f"    degrade:  {ss.get('degradation_pct', '?')}%")
+    print("  ── Service Scale (1000 Services) ──")
+    if 'keepalive_baseline_qps' in ss:
+        print(f"    keepalive baseline: {ss['keepalive_baseline_qps']} req/s")
+        print(f"    keepalive 1k svc:   {ss['keepalive_1k_svc_qps']} req/s")
+        print(f"    keepalive degrade:  {ss['keepalive_degradation_pct']}%")
+    if 'short_conn_baseline_qps' in ss:
+        print(f"    short-conn baseline: {ss['short_conn_baseline_qps']} req/s")
+        print(f"    short-conn 1k svc:   {ss['short_conn_1k_svc_qps']} req/s")
+        print(f"    short-conn degrade:  {ss['short_conn_degradation_pct']}%")
     print()
 PYEOF
   python3 "$pyfile" "$f" 2>/dev/null || true
