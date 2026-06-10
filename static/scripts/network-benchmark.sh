@@ -858,8 +858,8 @@ EOF
   fs_ip=$(kubectl get svc -n "$NS" fortio-service -o jsonpath='{.spec.clusterIP}')
 
   for r in $(seq 1 "$ROUNDS"); do
-    _run_fortio "Via Svc 64c short (1000svc) r$r" \
-      "http://${fs_ip}:8080/echo?size=512" 64 false "$d" "short_conn_1k_svc_r${r}.json"
+    _run_fortio "Via Svc 64c (1000svc) r$r" \
+      "http://${fs_ip}:8080/echo?size=512" 64 true "$d" "svc_1k_svc_r${r}.json"
     sleep "$ROUND_SLEEP"
   done
 
@@ -1031,13 +1031,13 @@ if hfs:
                 break
     except: pass
 
-# Service scale
-scale_qps = parse_fortio("service-scale/short_conn_1k_svc_r*.json")
-baseline = summary.get("rps", {}).get("svc_short_c64", {}).get("avg_qps")
+# Service scale — compare svc_c64 (baseline, keepalive) with 1k-svc test (same mode)
+scale_qps = parse_fortio("service-scale/svc_1k_svc_r*.json")
+baseline = summary.get("rps", {}).get("svc_c64", {}).get("avg_qps")
 if scale_qps and baseline and baseline > 0:
     summary["service_scale"] = {
-        "short_conn_1k_svc_qps": scale_qps["avg_qps"],
-        "baseline_short_conn_qps": baseline,
+        "1k_svc_qps": scale_qps["avg_qps"],
+        "baseline_qps": baseline,
         "degradation_pct": round((scale_qps["avg_qps"] - baseline) / baseline * 100, 1)
     }
 
@@ -1125,8 +1125,8 @@ if l:
 ss = d.get('service_scale', {})
 if ss:
     print("  ── Service Scale ──")
-    print(f"    baseline: {ss.get('baseline_short_conn_qps', '?')} req/s")
-    print(f"    1k svc:   {ss.get('short_conn_1k_svc_qps', '?')} req/s")
+    print(f"    baseline: {ss.get('baseline_qps', '?')} req/s")
+    print(f"    1k svc:   {ss.get('1k_svc_qps', '?')} req/s")
     print(f"    degrade:  {ss.get('degradation_pct', '?')}%")
     print()
 PYEOF
