@@ -623,11 +623,12 @@ _run_fortio() {
 
   if [[ "$keepalive" == "false" ]]; then
     # Short-connection mode: must use kubectl exec (REST API doesn't support
-    # disabling keepalive). Overlay clusters are prone to WebSocket close 1006
-    # during short-conn tests. Progressively shorten duration on retry:
-    # 60s → 20s → 10s to minimize stdout data volume.
+    # disabling keepalive). Use shorter duration than keepalive (30s vs 60s) —
+    # short-conn QPS is ~10K so 30s yields 300K requests (statistically sound),
+    # while halving the stdout JSON size reduces WebSocket close 1006 risk.
+    # Especially important under 5000+ Service load where the node is busier.
     local attempt max_attempts=3
-    local duration="$FORTIO_DURATION"
+    local duration=$((FORTIO_DURATION > 30 ? 30 : FORTIO_DURATION))
     for attempt in $(seq 1 $max_attempts); do
       local rc=0
       timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
@@ -641,7 +642,7 @@ _run_fortio() {
         warn "  attempt $attempt failed, retrying in 10s with shorter duration..."
         rm -f "$out" "${out}.err"
         sleep 10
-        duration=$((duration > 20 ? 20 : 10))
+        duration=$((duration > 15 ? 15 : 10))
       else
         warn "  fortio failed after $max_attempts attempts"
         [[ -s "${out}.err" ]] && warn "  stderr: $(tail -3 "${out}.err")"
