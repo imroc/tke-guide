@@ -114,15 +114,26 @@ SVC_SCALE_COUNT=10000 SVC_CREATE_PARALLEL=8 bash network-benchmark.sh
 
 :::tip[RPS 差异解读：iptables 高于 Cilium 的根因]
 
-**iptables vs Cilium（长连接 -18%、短连接 -55%）**：
+**Cilium Native：双重协议栈处理（-18% / -55%）**
 
-Cilium 在 VPC-CNI Native 模式下需设置 `endpointRoutes=true`，导致数据包绕过 `cilium_host` 设备，**无法启用 BPF Host Routing**，回退为 Legacy Host Routing。数据包经 Cilium eBPF 处理（conntrack + Service 解析 + Policy 检查）后，仍需再次穿越完整的内核网络栈（netfilter + conntrack + FIB），产生**双重处理开销**。
+Cilium Native 在 VPC-CNI Native 模式下需设置 `endpointRoutes=true`，导致数据包绕过 `cilium_host` 设备，**无法启用 BPF Host Routing**，回退为 Legacy Host Routing。数据包经 Cilium eBPF 处理（conntrack + Service 解析 + Policy 检查）后，仍需再次穿越完整的内核网络栈（netfilter + conntrack + FIB），产生**双重处理开销**。每包多走一次内核协议栈：长连接下表现为 ~18% RPS 下降，短连接因每个连接都要重复 BPF + 内核两次完整处理，差异放大到 ~55%。
 
-每包多走一次内核协议栈在长连接下表现为 ~18% 的 RPS 下降；短连接因每个连接都要重复 BPF + 内核两次完整处理，差异放大到 ~55%。
+**Cilium Overlay：BPF Host Routing 可用，但 VXLAN encap/decap 抵消收益**
 
-**这并非 Cilium 的缺陷**，而是 VPC-CNI 与 Cilium 链式 CNI（cni-chaining）架构上的妥协。在不采用 VPC-CNI、可启用 BPF Host Routing 的纯 Cilium 集群下，Cilium 性能反超 iptables。
+Overlay 模式 Pod 走 `cilium_vxlan` 设备，Cilium 启用了 BPF Host Routing —— eBPF 直接 redirect 出口设备，跳过内核 netfilter 和 FIB lookup，理论上比 Native 的 Legacy Host Routing 更快。但每个跨节点包都要做一次 VXLAN encap（出口）+ decap（入口），额外的 50 字节封包构造、UDP checksum 计算、内层包 metadata 维护等成本，**正好抵消了跳过内核栈节省的开销**。
 
-**Native vs Overlay 性能几乎一致**：两者长连接差异 < 1%，短连接差异 < 4%。VXLAN 封装的开销在跨节点 RPS 场景下并不显著（封解包在 eBPF 中完成，未引入额外内核态切换）。
+最终 Native 和 Overlay RPS 几乎持平（差异 &lt; 1%），但路径上的开销构成完全不同：
+
+| 集群                                 | Host Routing 模式    | 主要开销来源         |
+| ------------------------------------ | -------------------- | -------------------- |
+| Cilium Native (VPC-CNI cni-chaining) | Legacy（强制回退）   | BPF + 内核栈双重处理 |
+| Cilium Overlay                       | **BPF Host Routing** | VXLAN encap/decap    |
+
+**为什么 iptables 反而更高？**
+
+iptables 模式在小规模 Service 下，每个包只走一次内核协议栈（kube-proxy 的 NAT 规则只是 PREROUTING/POSTROUTING 链上的几条规则匹配），路径最短。Cilium 无论哪种模式都额外引入了一层处理（要么是协议栈双重，要么是 VXLAN 封装），所以在小规模、极限压测场景下 iptables 取得绝对值领先。
+
+**关键认知**：iptables 的小规模 RPS 优势是 ClusterIP Service 在简单架构下的局部最优；一旦 Service 数量增长，iptables 的 O(n) 退化（见后续 Service Scale 章节）会迅速吞掉这部分优势。在不采用 VPC-CNI、Native 也能启用 BPF Host Routing 的纯 Cilium 集群下，Native 性能也会显著提升。
 
 :::
 
