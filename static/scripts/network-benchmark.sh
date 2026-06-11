@@ -35,6 +35,7 @@ set -uo pipefail
 #   ROUNDS             repetitions per scenario (default: 1)
 #   ROUND_SLEEP        seconds between rounds (default: 30)
 #   SVC_SCALE_COUNT    number of dummy Services for scale test (default: 5000)
+#   SVC_CREATE_PARALLEL parallel workers when creating dummy Services (default: 4)
 #   KUBECTL_TIMEOUT    timeout for kubectl exec/cp calls (default: 180)
 #
 # Output:
@@ -158,6 +159,7 @@ Environment Variables:
   ROUNDS             repetitions per scenario (default: 1)
   ROUND_SLEEP        seconds between rounds (default: 30)
   SVC_SCALE_COUNT    number of dummy Services for scale test (default: 5000)
+  SVC_CREATE_PARALLEL parallel workers when creating dummy Services (default: 4)
   KUBECTL_TIMEOUT    timeout for kubectl exec/cp calls (default: 180)
 
 Examples:
@@ -825,18 +827,26 @@ run_service_scale_test() {
   info "Creating ${svc_count} dummy Services in batches..."
   kubectl create namespace test-services --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null
 
-  local batch_size=100
+  # Generate all YAML up-front then apply in parallel batches.
+  # Optimizations vs naive approach:
+  #   - Larger batches (500/batch) reduce kubectl invocation overhead
+  #   - Parallel apply (PARALLEL workers) maximizes apiserver throughput
+  #   - --validate=false skips OpenAPI schema validation (dummy svc don't need it)
+  local batch_size=500
+  local parallel="${SVC_CREATE_PARALLEL:-4}"
+  local tmpdir
+  tmpdir=$(mktemp -d)
+
+  info "  Generating YAML..."
+  local batch_idx=0
   for ((start = 1; start <= svc_count; start += batch_size)); do
     local end=$((start + batch_size - 1))
     [[ $end -gt $svc_count ]] && end=$svc_count
-
-    info "  Creating services $start-$end..."
-    local batch_file=$(mktemp)
+    local batch_file="$tmpdir/batch_${batch_idx}.yaml"
     local first=true
     for i in $(seq $start $end); do
       local o3=$(((i - 1) / 254))
       local o4=$(((i - 1) % 254 + 1))
-      # YAML document separator between resources (not before the very first)
       if [[ "$first" == "true" ]]; then
         first=false
       else
@@ -867,9 +877,19 @@ subsets:
     protocol: TCP
 EOF
     done
-    kubectl apply -f "$batch_file" 2>/dev/null
-    rm -f "$batch_file"
+    batch_idx=$((batch_idx + 1))
   done
+
+  local total_batches=$batch_idx
+  info "  Applying ${total_batches} batches with ${parallel} parallel workers..."
+  local start_ts
+  start_ts=$(date +%s)
+  # xargs -P does parallel apply; -n 1 = one batch per worker invocation
+  ls "$tmpdir"/batch_*.yaml | xargs -n 1 -P "$parallel" -I {} \
+    kubectl apply --validate=false -f {} >/dev/null 2>&1
+  local elapsed=$(($(date +%s) - start_ts))
+  info "  Created ${svc_count} services in ${elapsed}s"
+  rm -rf "$tmpdir"
 
   info "Waiting 60s for sync..."
   sleep 60
