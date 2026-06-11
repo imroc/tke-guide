@@ -256,7 +256,7 @@ collect_context_info() {
 cluster_name: $cluster_name
 cluster_type: $CLUSTER_TYPE
 test_date: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-k8s_version: $(kubectl version -o json 2>/dev/null | grep -o '"gitVersion":"[^"]*"' | head -1 | cut -d'"' -f4)
+k8s_version: $(kubectl version -o json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('serverVersion',{}).get('gitVersion',''))" 2>/dev/null || kubectl version 2>/dev/null | awk '/Server Version/{print $NF}')
 node_count: $(kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')
 node_os: $(kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.osImage}' 2>/dev/null)
 kernel_version: $(kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.kernelVersion}' 2>/dev/null)
