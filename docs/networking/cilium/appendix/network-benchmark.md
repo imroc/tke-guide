@@ -133,7 +133,7 @@ Overlay 模式 Pod 走 `cilium_vxlan` 设备，Cilium 启用了 BPF Host Routing
 
 iptables 模式在小规模 Service 下，每个包只走一次内核协议栈（kube-proxy 的 NAT 规则只是 PREROUTING/POSTROUTING 链上的几条规则匹配），路径最短。Cilium 无论哪种模式都额外引入了一层处理（要么是协议栈双重，要么是 VXLAN 封装），所以在小规模、极限压测场景下 iptables 取得绝对值领先。
 
-**关键认知**：iptables 的小规模 RPS 优势是 ClusterIP Service 在简单架构下的局部最优；一旦 Service 数量增长，iptables 的 O(n) 退化（见后续 Service Scale 章节）会迅速吞掉这部分优势。在不采用 VPC-CNI、Native 也能启用 BPF Host Routing 的纯 Cilium 集群下，Native 性能也会显著提升。
+**关键认知**：iptables 的小规模 RPS 优势是 ClusterIP Service 在简单架构下的局部最优；一旦 Service 数量增长，iptables 的 O(n) 退化（见后续 Service Scale 章节）会迅速吞掉这部分优势。本测试的 Cilium Native 跑在 VPC-CNI cni-chaining 之下才被迫回退 Legacy Host Routing；BPF Host Routing 本身只要求 `kubeProxyReplacement=true` + `bpf.masquerade=true`，与路由模式（Native/Tunnel）无关，脱离 VPC-CNI cni-chaining 的纯 Cilium 集群无论 Native 还是 Overlay 都能启用，Native RPS 会显著提升、不再有 ~18% 差距。
 
 :::
 

@@ -133,7 +133,7 @@ The result: Native and Overlay land on nearly identical RPS (differing &lt;1%), 
 
 In iptables mode at small Service scale, every packet only traverses the kernel network stack once (kube-proxy's NAT rules are just a handful of matches on PREROUTING/POSTROUTING) — the shortest path. Cilium, in either mode, introduces an extra processing layer (either double-stack or VXLAN encap), so iptables takes the absolute lead at small-scale, saturation benchmarks.
 
-**Key insight**: iptables's small-scale RPS advantage is a local optimum for ClusterIP Service in a simple architecture. Once Service count grows, iptables's O(n) degradation (see Service Scale section below) quickly eats up that lead. On pure Cilium clusters without VPC-CNI (where Native can also enable BPF Host Routing), Native performance improves substantially.
+**Key insight**: iptables's small-scale RPS advantage is a local optimum for ClusterIP Service in a simple architecture. Once Service count grows, iptables's O(n) degradation (see Service Scale section below) quickly eats up that lead. The Cilium Native cluster in this test only falls back to Legacy Host Routing because it runs under VPC-CNI cni-chaining; BPF Host Routing itself only requires `kubeProxyReplacement=true` + `bpf.masquerade=true` and is independent of routing mode (Native/Tunnel). On a pure Cilium cluster without VPC-CNI cni-chaining, both Native and Overlay can enable BPF Host Routing — Native RPS improves substantially and the ~18% gap disappears.
 
 :::
 
