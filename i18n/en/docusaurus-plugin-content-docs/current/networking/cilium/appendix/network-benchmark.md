@@ -73,15 +73,15 @@ SVC_SCALE_COUNT=10000 SVC_CREATE_PARALLEL=8 bash network-benchmark.sh
 
 ## Test Environment
 
-| Item               | Cluster A (iptables)          | Cluster B (Cilium Native)                             | Cluster C (Cilium Overlay)                        |
-| ------------------ | ----------------------------- | ----------------------------------------------------- | ------------------------------------------------- |
-| Network Solution   | VPC-CNI + kube-proxy iptables | VPC-CNI + Cilium Native Routing (Legacy Host Routing) | VPC-CNI + Cilium VXLAN Overlay (BPF Host Routing) |
-| Kubernetes Version | v1.34.1                       | v1.34.1                                               | v1.34.1                                           |
-| Cilium Version     | N/A                           | v1.19.4                                               | v1.19.4                                           |
-| Node OS            | TencentOS Server 4            | TencentOS Server 4                                    | TencentOS Server 4                                |
-| Kernel Version     | 6.6.117                       | 6.6.117                                               | 6.6.117                                           |
-| Node Spec          | SA5.LARGE8 (4C 8G)            | SA5.LARGE8 (4C 8G)                                    | SA5.LARGE8 (4C 8G)                                |
-| Node Count         | 3                             | 3                                                     | 3                                                 |
+| Item               | Cluster A (iptables)          | Cluster B (Cilium Native)                      | Cluster C (Cilium Overlay)                    |
+| ------------------ | ----------------------------- | ---------------------------------------------- | --------------------------------------------- |
+| Network Solution   | VPC-CNI + kube-proxy iptables | VPC-CNI + Cilium cni-chaining (Native Routing) | Cilium VXLAN Overlay (Cilium as sole Pod CNI) |
+| Kubernetes Version | v1.34.1                       | v1.34.1                                        | v1.34.1                                       |
+| Cilium Version     | N/A                           | v1.19.4                                        | v1.19.4                                       |
+| Node OS            | TencentOS Server 4            | TencentOS Server 4                             | TencentOS Server 4                            |
+| Kernel Version     | 6.6.117                       | 6.6.117                                        | 6.6.117                                       |
+| Node Spec          | SA5.LARGE8 (4C 8G)            | SA5.LARGE8 (4C 8G)                             | SA5.LARGE8 (4C 8G)                            |
+| Node Count         | 3                             | 3                                              | 3                                             |
 
 All three clusters are in the same VPC, with identical hardware spec and kernel version, ensuring a fair comparison.
 
@@ -114,26 +114,26 @@ All three solutions saturate ~10 Gbps, close to the SA5.LARGE8 instance burst ba
 
 :::tip[RPS difference: why iptables exceeds Cilium]
 
-**Cilium Native: double protocol-stack processing (-18% / -55%)**
+**Cilium Native: cni-chaining + per-endpoint routing (-18% / -55%)**
 
-In VPC-CNI Native mode, Cilium requires `endpointRoutes=true`, which causes packets to bypass the `cilium_host` device, **disabling BPF Host Routing** and forcing Legacy Host Routing as a fallback. After packets are processed by Cilium eBPF (conntrack + Service resolution + Policy check), they still must traverse the full kernel network stack again (netfilter + conntrack + FIB), incurring **double-processing overhead**. This extra kernel-stack pass causes ~18% RPS drop in keepalive; in the short-conn case, every connection repeats both BPF and kernel processing, amplifying the gap to ~55%.
+VPC-CNI is the primary Pod CNI (assigning VPC IPs); Cilium plugs in via cni-chaining to provide policy and observability features. This architecture forces per-endpoint routing (`endpointRoutes=true`), so Pod traffic bypasses the `cilium_host` device and must traverse the kernel network stack (netfilter + FIB lookup) at both Pod ingress and egress; meanwhile Cilium eBPF still performs conntrack + Service resolution + Policy checks. This is the root cause of Native's ~18% keepalive RPS deficit and ~55% short-conn deficit relative to iptables — every packet picks up an extra eBPF processing layer without saving the kernel-stack pass.
 
-**Cilium Overlay: BPF Host Routing works, but VXLAN encap/decap cancels the gain**
+**Cilium Overlay: Cilium is the sole Pod CNI; VXLAN encap/decap is the dominant cost**
 
-In Overlay mode Pod traffic flows through the `cilium_vxlan` device, and Cilium enables BPF Host Routing — eBPF directly redirects to the egress device, skipping kernel netfilter and FIB lookup, which should in theory be faster than Native's Legacy Host Routing. But every cross-node packet must undergo VXLAN encap (egress) + decap (ingress): the extra 50-byte header construction, UDP checksum computation, and inner-packet metadata bookkeeping **exactly offset the gain from skipping the kernel stack**.
+In Overlay mode, Cilium assigns Pod IPs from its own PodCIDR and connects nodes via VXLAN tunnels — Cilium is the only Pod CNI; there is no cni-chaining. Pod traffic flows through `cilium_host` and `cilium_vxlan`, and BPF Host Routing operates normally (given `kubeProxyReplacement=true` + `bpf.masquerade=true`). However, every cross-node packet undergoes VXLAN encap (egress) + decap (ingress): the 50-byte header construction, UDP checksum, and inner metadata bookkeeping form the dominant cost.
 
-The result: Native and Overlay land on nearly identical RPS (differing &lt;1%), but the cost composition is completely different:
+In the test, Native and Overlay land on nearly identical RPS (differing &lt;1%), but their datapaths and cost structures are completely different:
 
-| Cluster                              | Host Routing Mode        | Main Cost Source                     |
-| ------------------------------------ | ------------------------ | ------------------------------------ |
-| Cilium Native (VPC-CNI cni-chaining) | Legacy (forced fallback) | BPF + kernel-stack double-processing |
-| Cilium Overlay                       | **BPF Host Routing**     | VXLAN encap/decap                    |
+| Cluster                              | Pod CNI Relationship             | Main Cost Source                    |
+| ------------------------------------ | -------------------------------- | ----------------------------------- |
+| Cilium Native (VPC-CNI cni-chaining) | VPC-CNI primary + Cilium chained | per-endpoint routing + kernel stack |
+| Cilium Overlay                       | Cilium alone                     | VXLAN encap/decap                   |
 
 **Why does iptables come out higher?**
 
-In iptables mode at small Service scale, every packet only traverses the kernel network stack once (kube-proxy's NAT rules are just a handful of matches on PREROUTING/POSTROUTING) — the shortest path. Cilium, in either mode, introduces an extra processing layer (either double-stack or VXLAN encap), so iptables takes the absolute lead at small-scale, saturation benchmarks.
+In iptables mode at small Service scale, the data path is the shortest: every packet traverses the kernel network stack once, kube-proxy's NAT rules are just a handful of matches on PREROUTING/POSTROUTING, and there is no extra eBPF processing or encapsulation cost. Cilium — in either Native or Overlay — introduces one inevitable extra processing layer, so iptables takes the absolute lead at small-scale, saturation benchmarks.
 
-**Key insight**: iptables's small-scale RPS advantage is a local optimum for ClusterIP Service in a simple architecture. Once Service count grows, iptables's O(n) degradation (see Service Scale section below) quickly eats up that lead. The Cilium Native cluster in this test only falls back to Legacy Host Routing because it runs under VPC-CNI cni-chaining; BPF Host Routing itself only requires `kubeProxyReplacement=true` + `bpf.masquerade=true` and is independent of routing mode (Native/Tunnel). A pure Cilium Native cluster without VPC-CNI cni-chaining can also enable BPF Host Routing — Native RPS improves substantially and the ~18% gap disappears.
+**Key insight**: iptables's small-scale RPS advantage is a local optimum for ClusterIP Service in a simple architecture. Once Service count grows, iptables's O(n) degradation (see Service Scale section below) quickly eats up that lead. The Cilium clusters in this test integrate with the cloud provider's VPC-CNI, which is the most common deployment shape for TKE customers; only when Cilium fully manages Pod CIDR (e.g. Overlay mode, or pure Cilium clusters with Cluster Pool IPAM + auto-direct-node-routes/BGP) does cni-chaining go away — but then the VPC-routable Pod IP advantage is also lost.
 
 :::
 
@@ -149,9 +149,9 @@ In iptables mode at small Service scale, every packet only traverses the kernel 
 :::tip[Latency analysis]
 
 - **TCP_RR** (keepalive request-response): Cilium adds ~18-22 µs over iptables — the inherent cost of eBPF datapath conntrack lookup + policy check. Sub-millisecond, invisible at the application layer.
-- **TCP_CRR** (per-connection setup): Cilium adds ~180-210 µs because every new connection's SYN must traverse BPF conntrack creation + Service resolution + Legacy Host Routing double-processing.
+- **TCP_CRR** (per-connection setup): Cilium adds ~180-210 µs — every new connection's SYN packet performs BPF conntrack creation + Service resolution + a full kernel-stack pass.
 - **HTTP p99 @1000 QPS**: Under realistic application load, all three are **identical** at 0.99 ms — microsecond differences are dwarfed by application processing time.
-- **Native vs Overlay**: cross-node latency differs &lt;10 µs. The two clusters take different datapaths (Native uses BPF + kernel-stack double-processing under cni-chaining, Overlay uses BPF Host Routing + VXLAN encap/decap), but the latency cost happens to be numerically comparable.
+- **Native vs Overlay**: cross-node latency differs &lt;10 µs. The two clusters take different datapaths (Native uses per-endpoint routing + kernel stack under cni-chaining, Overlay uses BPF Host Routing + VXLAN encap/decap), but the latency cost happens to be numerically comparable.
 
 **Key insight**: The microsecond-level latency gap visible in saturating benchmarks (wrk/fortio with empty HTTP responses) disappears once the application performs any meaningful work (DB query, JSON serialization). Network-layer µs differences are completely masked.
 
@@ -251,7 +251,7 @@ If NetworkPolicy and observability were implemented via separate sidecars instea
 | Dimension                           | Conclusion                                                     | Quantified Difference                                                      |
 | ----------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | **Throughput**                      | All three identical                                            | All hit ~10 Gbps burst ceiling                                             |
-| **RPS keepalive**                   | iptables ~18% higher than Cilium                               | 92K vs 75K (double-processing overhead)                                    |
+| **RPS keepalive**                   | iptables ~18% higher than Cilium                               | 92K vs 75K (cni-chaining / VXLAN extra overhead)                           |
 | **RPS short conn**                  | iptables ~55% higher than Cilium                               | 23K vs 10K (same cause; absolute values still far exceed production needs) |
 | **TCP_RR p99**                      | Cilium ~20 µs higher than iptables                             | Application-layer invisible                                                |
 | **HTTP p99 @1000 QPS**              | **All three identical**                                        | All 0.99 ms                                                                |
@@ -268,7 +268,7 @@ HTTP p99 @1000 QPS is 0.99 ms across all three. The differences exposed by extre
 
 #### 2. iptables wins at small scale but loses badly at large scale
 
-iptables has **~18% absolute RPS lead over Cilium** at small Service counts (under a thousand) — this is the inevitable consequence of VPC-CNI cni-chaining forcing Cilium into Legacy Host Routing, not a Cilium flaw.
+iptables has **~18% absolute RPS lead over Cilium** at small Service counts (under a thousand). The Native gap comes from cni-chaining + per-endpoint routing forcing each packet through the kernel stack on top of eBPF processing; the Overlay gap comes from VXLAN encap/decap. Either way, Cilium adds an extra processing layer that iptables doesn't have at small scale — this is architectural cost, not a Cilium flaw.
 
 But the cost is that iptables datapath performance scales with Service count:
 
