@@ -34,7 +34,7 @@ set -uo pipefail
 #   FORTIO_DURATION    fortio/netperf test duration in seconds (default: 60)
 #   ROUNDS             repetitions per scenario (default: 1)
 #   ROUND_SLEEP        seconds between rounds (default: 30)
-#   SVC_SCALE_COUNT    number of dummy Services for scale test (default: 5000)
+#   SVC_SCALE_STEPS    comma-separated Service counts for scale test (default: "5000,10000")
 #   SVC_CREATE_PARALLEL parallel workers when creating dummy Services (default: 4)
 #   KUBECTL_TIMEOUT    timeout for kubectl exec/cp calls (default: 180)
 #
@@ -158,7 +158,7 @@ Environment Variables:
   FORTIO_DURATION    fortio/netperf test duration in seconds (default: 60)
   ROUNDS             repetitions per scenario (default: 1)
   ROUND_SLEEP        seconds between rounds (default: 30)
-  SVC_SCALE_COUNT    number of dummy Services for scale test (default: 5000)
+  SVC_SCALE_STEPS    comma-separated Service counts for scale test (default: "5000,10000")
   SVC_CREATE_PARALLEL parallel workers when creating dummy Services (default: 4)
   KUBECTL_TIMEOUT    timeout for kubectl exec/cp calls (default: 180)
 
@@ -168,6 +168,9 @@ Examples:
 
   # Full run on large instances (no QoS worry): 3 rounds × 120s each
   ROUNDS=3 IPERF_DURATION=120 FORTIO_DURATION=120 bash network-benchmark.sh --dir ./bench
+
+  # Custom scale steps: test at 1000, 5000, 10000 Services
+  SVC_SCALE_STEPS="1000,5000,10000" bash network-benchmark.sh
 EOF
 }
 
@@ -819,40 +822,56 @@ run_latency_tests() {
 # ─── Service Scale Test ─────────────────────────────────────────────────────
 
 run_service_scale_test() {
-  local svc_count="${SVC_SCALE_COUNT:-5000}"
-  step "Running Service Scale Test (${svc_count} dummy Services)"
+  # Support multi-step scale testing: SVC_SCALE_STEPS="5000,10000" (comma-separated, ascending)
+  local steps_str="${SVC_SCALE_STEPS:-5000,10000}"
+  local -a steps
+  IFS=',' read -ra steps <<< "$steps_str"
+
+  local max_svc="${steps[${#steps[@]}-1]}"
+  step "Running Service Scale Test (steps: ${steps_str})"
   local d="$OUTPUT_DIR/service-scale"
   mkdir -p "$d"
 
-  info "Creating ${svc_count} dummy Services in batches..."
+  local fs_ip
+  fs_ip=$(kubectl get svc -n "$NS" fortio-service -o jsonpath='{.spec.clusterIP}')
+
+  # Save scale steps metadata
+  printf '%s\n' "${steps[@]}" | paste -sd',' - >"$d/scale_steps.txt"
+
   kubectl create namespace test-services --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null
 
-  # Generate all YAML up-front then apply in parallel batches.
-  # Optimizations vs naive approach:
-  #   - Larger batches (500/batch) reduce kubectl invocation overhead
-  #   - Parallel apply (PARALLEL workers) maximizes apiserver throughput
-  #   - --validate=false skips OpenAPI schema validation (dummy svc don't need it)
   local batch_size=500
   local parallel="${SVC_CREATE_PARALLEL:-4}"
-  local tmpdir
-  tmpdir=$(mktemp -d)
+  local prev_count=0
 
-  info "  Generating YAML..."
-  local batch_idx=0
-  for ((start = 1; start <= svc_count; start += batch_size)); do
-    local end=$((start + batch_size - 1))
-    [[ $end -gt $svc_count ]] && end=$svc_count
-    local batch_file="$tmpdir/batch_${batch_idx}.yaml"
-    local first=true
-    for i in $(seq $start $end); do
-      local o3=$(((i - 1) / 254))
-      local o4=$(((i - 1) % 254 + 1))
-      if [[ "$first" == "true" ]]; then
-        first=false
-      else
-        echo "---" >>"$batch_file"
-      fi
-      cat <<EOF >>"$batch_file"
+  for svc_count in "${steps[@]}"; do
+    local start_idx=$((prev_count + 1))
+    local create_count=$((svc_count - prev_count))
+
+    if [[ $create_count -le 0 ]]; then
+      warn "Step ${svc_count} <= prev ${prev_count}, skipping"
+      continue
+    fi
+
+    info "Creating dummy Services ${start_idx}..${svc_count} (${create_count} new)..."
+    local tmpdir
+    tmpdir=$(mktemp -d)
+
+    local batch_idx=0
+    for ((s = start_idx; s <= svc_count; s += batch_size)); do
+      local e=$((s + batch_size - 1))
+      [[ $e -gt $svc_count ]] && e=$svc_count
+      local batch_file="$tmpdir/batch_${batch_idx}.yaml"
+      local first=true
+      for i in $(seq $s $e); do
+        local o3=$(((i - 1) / 254))
+        local o4=$(((i - 1) % 254 + 1))
+        if [[ "$first" == "true" ]]; then
+          first=false
+        else
+          echo "---" >>"$batch_file"
+        fi
+        cat <<EOF >>"$batch_file"
 apiVersion: v1
 kind: Service
 metadata:
@@ -876,40 +895,59 @@ subsets:
   - port: 80
     protocol: TCP
 EOF
+      done
+      batch_idx=$((batch_idx + 1))
     done
-    batch_idx=$((batch_idx + 1))
-  done
 
-  local total_batches=$batch_idx
-  info "  Applying ${total_batches} batches with ${parallel} parallel workers..."
-  local start_ts
-  start_ts=$(date +%s)
-  # xargs -P does parallel apply; -n 1 = one batch per worker invocation
-  ls "$tmpdir"/batch_*.yaml | xargs -n 1 -P "$parallel" -I {} \
-    kubectl apply --validate=false -f {} >/dev/null 2>&1
-  local elapsed=$(($(date +%s) - start_ts))
-  info "  Created ${svc_count} services in ${elapsed}s"
-  rm -rf "$tmpdir"
+    local total_batches=$batch_idx
+    info "  Applying ${total_batches} batches with ${parallel} parallel workers..."
+    local start_ts
+    start_ts=$(date +%s)
+    ls "$tmpdir"/batch_*.yaml | xargs -n 1 -P "$parallel" -I {} \
+      kubectl apply --validate=false -f {} >/dev/null 2>&1
+    local elapsed=$(($(date +%s) - start_ts))
+    info "  Created ${create_count} services in ${elapsed}s (total: ${svc_count})"
+    rm -rf "$tmpdir"
 
-  info "Waiting 60s for sync..."
-  sleep 60
-  echo "$svc_count" >"$d/dummy_services_count.txt"
+    info "Waiting 60s for sync..."
+    sleep 60
 
-  local fs_ip
-  fs_ip=$(kubectl get svc -n "$NS" fortio-service -o jsonpath='{.spec.clusterIP}')
+    # Collect rules count at this scale point
+    _collect_rules_at_scale "$d" "$svc_count"
 
-  for r in $(seq 1 "$ROUNDS"); do
-    _run_fortio "Via Svc 64c keepalive (1000svc) r$r" \
-      "http://${fs_ip}:8080/echo?size=512" 64 true "$d" "svc_1k_svc_r${r}.json"
-    sleep "$ROUND_SLEEP"
-  done
-  for r in $(seq 1 "$ROUNDS"); do
-    _run_fortio "Via Svc 64c short (1000svc) r$r" \
-      "http://${fs_ip}:8080/echo?size=512" 64 false "$d" "short_conn_1k_svc_r${r}.json"
-    sleep "$ROUND_SLEEP"
+    # Run fortio tests at this scale point
+    for r in $(seq 1 "$ROUNDS"); do
+      _run_fortio "Via Svc 64c keepalive (${svc_count}svc) r$r" \
+        "http://${fs_ip}:8080/echo?size=512" 64 true "$d" "ka_at_${svc_count}svc_r${r}.json"
+      sleep "$ROUND_SLEEP"
+    done
+    for r in $(seq 1 "$ROUNDS"); do
+      _run_fortio "Via Svc 64c short (${svc_count}svc) r$r" \
+        "http://${fs_ip}:8080/echo?size=512" 64 false "$d" "short_at_${svc_count}svc_r${r}.json"
+      sleep "$ROUND_SLEEP"
+    done
+
+    prev_count=$svc_count
   done
 
   info "Service scale tests complete"
+}
+
+# Helper: collect iptables/BPF rules count at a given scale point
+_collect_rules_at_scale() {
+  local d="$1" svc_count="$2"
+  if [[ "$CLUSTER_TYPE" == "kubeproxy-iptables" ]]; then
+    local kp_pod
+    kp_pod=$(kubectl get pod -n kube-system -l k8s-app=kube-proxy -o name 2>/dev/null | head -1)
+    kp_pod="${kp_pod#pod/}"
+    if [[ -n "$kp_pod" ]]; then
+      kubectl exec -n kube-system "$kp_pod" -- iptables-save 2>/dev/null | wc -l | tr -d ' ' \
+        >"$d/iptables_rules_at_${svc_count}svc.txt" || true
+    fi
+  elif [[ "$CLUSTER_TYPE" == cilium-* ]]; then
+    kubectl exec -n kube-system ds/cilium -- cilium bpf lb list 2>/dev/null | wc -l | tr -d ' ' \
+      >"$d/lb_entries_at_${svc_count}svc.txt" || true
+  fi
 }
 
 # ─── Hubble Overhead Test ────────────────────────────────────────────────────
@@ -952,7 +990,7 @@ run_networkpolicy_test() {
     info "Skipping NetworkPolicy test (not a Cilium cluster)"
     return 0
   fi
-  step "Running NetworkPolicy L3/L4 Overhead Test"
+  step "Running NetworkPolicy L3/L4 + L7 Overhead Test"
   local d="$OUTPUT_DIR/networkpolicy"
   mkdir -p "$d"
 
@@ -989,10 +1027,46 @@ CNPEOF
 
   _run_fortio "L3/L4 policy (keepalive)" "http://${fs_ip}:8080/echo?size=512" 64 true "$d" "l3l4_policy.json"
 
-  # Cleanup policy
-  info "Removing CiliumNetworkPolicy..."
+  # Cleanup L3/L4 policy
+  info "Removing L3/L4 CiliumNetworkPolicy..."
   kubectl delete -n "$NS" ciliumnetworkpolicy allow-fortio-benchmark --ignore-not-found >/dev/null 2>&1
   sleep 5
+
+  # Phase 3: apply L7 CiliumNetworkPolicy (HTTP method filtering → Envoy proxy)
+  info "Applying L7 CiliumNetworkPolicy (HTTP)..."
+  kubectl apply -n "$NS" -f - <<'L7EOF'
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-fortio-benchmark-l7
+spec:
+  endpointSelector:
+    matchLabels:
+      app: benchmark
+      role: fortio-server
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app: benchmark
+        role: fortio-client
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+      rules:
+        http:
+        - method: "GET"
+L7EOF
+  # L7 policy triggers Envoy proxy injection — needs more time than L3/L4.
+  info "Waiting 30s for Envoy proxy initialization..."
+  sleep 30
+
+  _run_fortio "L7 policy (keepalive)" "http://${fs_ip}:8080/echo?size=512" 64 true "$d" "l7_policy.json"
+
+  # Cleanup L7 policy
+  info "Removing L7 CiliumNetworkPolicy..."
+  kubectl delete -n "$NS" ciliumnetworkpolicy allow-fortio-benchmark-l7 --ignore-not-found >/dev/null 2>&1
+  sleep 10  # wait for Envoy proxy teardown
 
   info "NetworkPolicy overhead test complete"
 }
@@ -1023,6 +1097,42 @@ collect_component_metrics() {
     kubectl exec -n kube-system ds/cilium -- cilium bpf lb list 2>/dev/null | wc -l >"$rd/lb_entries_count.txt" || true
     kubectl exec -n kube-system ds/cilium -- cilium bpf ct list global 2>/dev/null | wc -l >"$rd/ct_entries_count.txt" || true
     kubectl exec -n kube-system ds/cilium -- cilium identity list 2>/dev/null | wc -l >"$rd/identity_count.txt" || true
+
+    # Parse BPF map memory from bpf_map_info.json (locally with python3)
+    if [[ -s "$rd/bpf_map_info.json" ]]; then
+      python3 -c "
+import json, sys
+try:
+    with open('$rd/bpf_map_info.json') as f:
+        maps = json.load(f)
+    result = {'maps': [], 'total_bytes': 0, 'map_count': len(maps)}
+    for m in maps:
+        name = m.get('name', 'unnamed')
+        # Prefer bytes_memlock (kernel 5.11+); fallback to key/value * max_entries estimate
+        mem = m.get('bytes_memlock', 0)
+        if not mem:
+            ks = m.get('bytes_key', m.get('key_size', 0))
+            vs = m.get('bytes_value', m.get('value_size', 0))
+            me = m.get('max_entries', 0)
+            mem = (ks + vs) * me
+        result['maps'].append({'name': name, 'bytes': mem, 'max_entries': m.get('max_entries', 0)})
+        result['total_bytes'] += mem
+    # Sort by memory descending, keep top 10
+    result['maps'].sort(key=lambda x: x['bytes'], reverse=True)
+    result['top_maps'] = result['maps'][:10]
+    del result['maps']
+    result['total_mb'] = round(result['total_bytes'] / 1024 / 1024, 1)
+    with open('$rd/bpf_map_memory.json', 'w') as f:
+        json.dump(result, f, indent=2)
+except Exception as e:
+    print(f'WARN: BPF map memory parse failed: {e}', file=sys.stderr)
+" 2>/dev/null || true
+    fi
+
+    # Collect Cilium Agent RSS (VmRSS from /proc)
+    kubectl exec -n kube-system ds/cilium -- sh -c \
+      'cat /proc/1/status 2>/dev/null | grep -E "^(VmRSS|VmSize):"' \
+      >"$rd/cilium_agent_proc_status.txt" 2>/dev/null || true
 
   elif [[ "$CLUSTER_TYPE" == kubeproxy-* ]]; then
     info "Collecting kube-proxy metrics..."
@@ -1163,34 +1273,66 @@ if hfs:
                 break
     except: pass
 
-# Service scale — compare keepalive and short-connection with their baselines
+# Service scale — multi-step: parse ka_at_{N}svc_r*.json and short_at_{N}svc_r*.json
 summary["service_scale"] = {}
-# Read svc_count from file
-svc_count_file = os.path.join(basedir, "service-scale", "dummy_services_count.txt")
-if os.path.exists(svc_count_file):
-    with open(svc_count_file) as f:
-        summary["service_scale"]["svc_count"] = int(f.read().strip())
-# Keepalive
-scale_ka = parse_fortio("service-scale/svc_1k_svc_r*.json")
 baseline_ka = summary.get("rps", {}).get("svc_c64", {}).get("avg_qps")
-if scale_ka and baseline_ka and baseline_ka > 0:
-    summary["service_scale"]["keepalive_baseline_qps"] = baseline_ka
-    summary["service_scale"]["keepalive_1k_svc_qps"] = scale_ka["avg_qps"]
-    summary["service_scale"]["keepalive_degradation_pct"] = round((scale_ka["avg_qps"] - baseline_ka) / baseline_ka * 100, 1)
-# Short-connection
-scale_short = parse_fortio("service-scale/short_conn_1k_svc_r*.json")
 baseline_short = summary.get("rps", {}).get("svc_short_c64", {}).get("avg_qps")
-if scale_short and baseline_short and baseline_short > 0:
-    summary["service_scale"]["short_conn_baseline_qps"] = baseline_short
-    summary["service_scale"]["short_conn_1k_svc_qps"] = scale_short["avg_qps"]
-    summary["service_scale"]["short_conn_degradation_pct"] = round((scale_short["avg_qps"] - baseline_short) / baseline_short * 100, 1)
+if baseline_ka: summary["service_scale"]["keepalive_baseline_qps"] = baseline_ka
+if baseline_short: summary["service_scale"]["short_conn_baseline_qps"] = baseline_short
 
-# Rules count
-for cf_key in ["iptables_rules_count.txt", "ipvs_rules_count.txt"]:
-    cf = os.path.join(basedir, "resources", cf_key)
-    if os.path.exists(cf):
-        with open(cf) as f:
-            summary["service_scale"][cf_key.replace("_count.txt", "_rules")] = int(f.read().strip())
+# Read scale steps
+steps_file = os.path.join(basedir, "service-scale", "scale_steps.txt")
+scale_steps = []
+if os.path.exists(steps_file):
+    with open(steps_file) as f:
+        scale_steps = [int(x.strip()) for x in f.read().strip().split(',') if x.strip()]
+
+# Also detect steps from file names if scale_steps.txt is missing (backward compat)
+if not scale_steps:
+    for fn in sorted(glob.glob(os.path.join(basedir, "service-scale", "ka_at_*svc_r1.json"))):
+        bn = os.path.basename(fn)
+        try:
+            n = int(bn.split('_at_')[1].split('svc_')[0])
+            if n not in scale_steps: scale_steps.append(n)
+        except: pass
+    # Backward compat: old single-step format (svc_1k_svc_r*.json)
+    if not scale_steps:
+        old_ka = parse_fortio("service-scale/svc_1k_svc_r*.json")
+        old_short = parse_fortio("service-scale/short_conn_1k_svc_r*.json")
+        svc_count_file = os.path.join(basedir, "service-scale", "dummy_services_count.txt")
+        old_count = None
+        if os.path.exists(svc_count_file):
+            with open(svc_count_file) as f:
+                old_count = int(f.read().strip())
+        if old_ka and old_count and baseline_ka and baseline_ka > 0:
+            step_data = {"svc_count": old_count, "keepalive_qps": old_ka["avg_qps"],
+                         "keepalive_degradation_pct": round((old_ka["avg_qps"] - baseline_ka) / baseline_ka * 100, 1)}
+            if old_short and baseline_short and baseline_short > 0:
+                step_data["short_conn_qps"] = old_short["avg_qps"]
+                step_data["short_conn_degradation_pct"] = round((old_short["avg_qps"] - baseline_short) / baseline_short * 100, 1)
+            summary["service_scale"]["steps"] = [step_data]
+
+if scale_steps:
+    steps_data = []
+    for sc in sorted(scale_steps):
+        step_data = {"svc_count": sc}
+        ka = parse_fortio(f"service-scale/ka_at_{sc}svc_r*.json")
+        short = parse_fortio(f"service-scale/short_at_{sc}svc_r*.json")
+        if ka and baseline_ka and baseline_ka > 0:
+            step_data["keepalive_qps"] = ka["avg_qps"]
+            step_data["keepalive_degradation_pct"] = round((ka["avg_qps"] - baseline_ka) / baseline_ka * 100, 1)
+        if short and baseline_short and baseline_short > 0:
+            step_data["short_conn_qps"] = short["avg_qps"]
+            step_data["short_conn_degradation_pct"] = round((short["avg_qps"] - baseline_short) / baseline_short * 100, 1)
+        # Rules count at this scale
+        for pat in [f"service-scale/iptables_rules_at_{sc}svc.txt", f"service-scale/lb_entries_at_{sc}svc.txt"]:
+            fp = os.path.join(basedir, pat)
+            if os.path.exists(fp):
+                with open(fp) as f:
+                    val = f.read().strip()
+                    if val: step_data["rules_count"] = int(val)
+        steps_data.append(step_data)
+    summary["service_scale"]["steps"] = steps_data
 
 # Resources
 def parse_csv(pattern):
@@ -1240,15 +1382,38 @@ if hubble_on and hubble_off and hubble_off > 0:
         "overhead_pct": round((hubble_on - hubble_off) / hubble_off * 100, 1)
     }
 
-# NetworkPolicy overhead
+# NetworkPolicy overhead (L3/L4 + L7)
 np_baseline = parse_single_fortio("networkpolicy/no_policy.json")
 np_l3l4 = parse_single_fortio("networkpolicy/l3l4_policy.json")
-if np_baseline and np_l3l4 and np_baseline > 0:
-    summary["networkpolicy"] = {
-        "baseline_qps": np_baseline,
-        "l3l4_qps": np_l3l4,
-        "l3l4_overhead_pct": round((np_l3l4 - np_baseline) / np_baseline * 100, 1)
-    }
+np_l7 = parse_single_fortio("networkpolicy/l7_policy.json")
+if np_baseline and np_baseline > 0:
+    np_data = {"baseline_qps": np_baseline}
+    if np_l3l4:
+        np_data["l3l4_qps"] = np_l3l4
+        np_data["l3l4_overhead_pct"] = round((np_l3l4 - np_baseline) / np_baseline * 100, 1)
+    if np_l7:
+        np_data["l7_qps"] = np_l7
+        np_data["l7_overhead_pct"] = round((np_l7 - np_baseline) / np_baseline * 100, 1)
+    summary["networkpolicy"] = np_data
+
+# BPF map memory
+bpf_mem_file = os.path.join(basedir, "resources", "bpf_map_memory.json")
+if os.path.exists(bpf_mem_file):
+    try:
+        with open(bpf_mem_file) as f:
+            summary["resources"]["bpf_maps"] = json.load(f)
+    except: pass
+
+# Cilium Agent RSS from /proc
+proc_file = os.path.join(basedir, "resources", "cilium_agent_proc_status.txt")
+if os.path.exists(proc_file):
+    try:
+        with open(proc_file) as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    rss_kb = int(line.split()[1])
+                    summary["resources"]["cilium_agent_rss_mb"] = round(rss_kb / 1024, 1)
+    except: pass
 
 # Write
 out = os.path.join(basedir, "benchmark-summary.json")
@@ -1299,16 +1464,22 @@ if l:
     print()
 ss = d.get('service_scale', {})
 if ss:
-    svc_count = ss.get('svc_count', '?')
-    print(f"  ── Service Scale ({svc_count} Services) ──")
-    if 'keepalive_baseline_qps' in ss:
-        print(f"    keepalive baseline:    {ss['keepalive_baseline_qps']} req/s")
-        print(f"    keepalive {svc_count} svc: {ss['keepalive_1k_svc_qps']} req/s")
-        print(f"    keepalive degrade:     {ss['keepalive_degradation_pct']}%")
-    if 'short_conn_baseline_qps' in ss:
-        print(f"    short-conn baseline:    {ss['short_conn_baseline_qps']} req/s")
-        print(f"    short-conn {svc_count} svc: {ss['short_conn_1k_svc_qps']} req/s")
-        print(f"    short-conn degrade:     {ss['short_conn_degradation_pct']}%")
+    steps = ss.get('steps', [])
+    if steps:
+        print("  ── Service Scale ──")
+        if 'keepalive_baseline_qps' in ss:
+            print(f"    keepalive baseline:    {ss['keepalive_baseline_qps']} req/s")
+        if 'short_conn_baseline_qps' in ss:
+            print(f"    short-conn baseline:   {ss['short_conn_baseline_qps']} req/s")
+        for step in steps:
+            sc = step.get('svc_count', '?')
+            print(f"    ── {sc} Services ──")
+            if 'keepalive_qps' in step:
+                print(f"      keepalive:     {step['keepalive_qps']} req/s ({step.get('keepalive_degradation_pct', '?')}%)")
+            if 'short_conn_qps' in step:
+                print(f"      short-conn:    {step['short_conn_qps']} req/s ({step.get('short_conn_degradation_pct', '?')}%)")
+            if 'rules_count' in step:
+                print(f"      rules/entries: {step['rules_count']}")
     print()
 hb = d.get('hubble', {})
 if hb:
@@ -1319,10 +1490,27 @@ if hb:
     print()
 np = d.get('networkpolicy', {})
 if np:
-    print("  ── NetworkPolicy L3/L4 Overhead ──")
-    print(f"    no policy:  {np.get('baseline_qps', '?')} req/s")
-    print(f"    L3/L4 CNP:  {np.get('l3l4_qps', '?')} req/s")
-    print(f"    overhead:   {np.get('l3l4_overhead_pct', '?')}%")
+    print("  ── NetworkPolicy Overhead ──")
+    print(f"    no policy:     {np.get('baseline_qps', '?')} req/s")
+    if 'l3l4_qps' in np:
+        print(f"    L3/L4 CNP:     {np.get('l3l4_qps', '?')} req/s (overhead: {np.get('l3l4_overhead_pct', '?')}%)")
+    if 'l7_qps' in np:
+        print(f"    L7 CNP (HTTP): {np.get('l7_qps', '?')} req/s (overhead: {np.get('l7_overhead_pct', '?')}%)")
+    print()
+res = d.get('resources', {})
+bpf = res.get('bpf_maps', {})
+if bpf:
+    print("  ── BPF Map Memory ──")
+    print(f"    total: {bpf.get('total_mb', '?')} MB ({bpf.get('map_count', '?')} maps)")
+    tops = bpf.get('top_maps', [])
+    if tops:
+        print("    top maps:")
+        for m in tops[:5]:
+            mb = round(m.get('bytes', 0) / 1024 / 1024, 1)
+            print(f"      {m.get('name', '?'):30s} {mb:>6.1f} MB  (max_entries: {m.get('max_entries', '?')})")
+    print()
+if 'cilium_agent_rss_mb' in res:
+    print(f"  Cilium Agent RSS: {res['cilium_agent_rss_mb']} MB")
     print()
 PYEOF
   python3 "$pyfile" "$f" 2>/dev/null || true

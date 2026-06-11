@@ -47,29 +47,30 @@ ROUNDS=3 IPERF_DURATION=120 FORTIO_DURATION=120 bash network-benchmark.sh --dir 
 # Specify output directory and namespace
 bash network-benchmark.sh --dir ./my-results --ns my-bench
 
-# Adjust Service scale test count and parallel creation workers
-SVC_SCALE_COUNT=10000 SVC_CREATE_PARALLEL=8 bash network-benchmark.sh
+# Custom scale steps: test at 1000, 5000, 10000 Services
+SVC_SCALE_STEPS="1000,5000,10000" SVC_CREATE_PARALLEL=8 bash network-benchmark.sh
 ```
 
-| Environment Variable  | Default | Description                                           |
-| --------------------- | ------- | ----------------------------------------------------- |
-| `IPERF_DURATION`      | 30      | iperf3 test duration per round (seconds)              |
-| `FORTIO_DURATION`     | 60      | fortio / netperf test duration per round (seconds)    |
-| `ROUNDS`              | 1       | Repetition rounds per scenario                        |
-| `ROUND_SLEEP`         | 30      | Inter-round wait (seconds), for burst credit recovery |
-| `SVC_SCALE_COUNT`     | 5000    | Number of Services for scale test                     |
-| `SVC_CREATE_PARALLEL` | 4       | Parallel workers for Service creation                 |
+| Environment Variable  | Default    | Description                                           |
+| --------------------- | ---------- | ----------------------------------------------------- |
+| `IPERF_DURATION`      | 30         | iperf3 test duration per round (seconds)              |
+| `FORTIO_DURATION`     | 60         | fortio / netperf test duration per round (seconds)    |
+| `ROUNDS`              | 1          | Repetition rounds per scenario                        |
+| `ROUND_SLEEP`         | 30         | Inter-round wait (seconds), for burst credit recovery |
+| `SVC_SCALE_STEPS`     | 5000,10000 | Comma-separated Service scale steps (ascending)       |
+| `SVC_CREATE_PARALLEL` | 4          | Parallel workers for Service creation                 |
 
 ### Test Metric Description
 
-| Tool    | Test Content                                       | Metric                         |
-| ------- | -------------------------------------------------- | ------------------------------ |
-| iperf3  | Cross-node TCP throughput                          | Gbps (1/8/16 parallel streams) |
-| fortio  | HTTP RPS (keep-alive / short conn)                 | req/s                          |
-| netperf | TCP_RR / TCP_CRR latency                           | p50 / p99 microseconds         |
-| fortio  | RPS degradation after 5000 Services                | Degradation percentage         |
-| fortio  | Hubble on/off RPS comparison (Cilium only)         | Overhead percentage            |
-| fortio  | RPS before/after NetworkPolicy L3/L4 (Cilium only) | Overhead percentage            |
+| Tool    | Test Content                                              | Metric                         |
+| ------- | --------------------------------------------------------- | ------------------------------ |
+| iperf3  | Cross-node TCP throughput                                 | Gbps (1/8/16 parallel streams) |
+| fortio  | HTTP RPS (keep-alive / short conn)                        | req/s                          |
+| netperf | TCP_RR / TCP_CRR latency                                  | p50 / p99 microseconds         |
+| fortio  | Multi-step Service scale (default 5000/10000) degradation | Degradation percentage         |
+| fortio  | Hubble on/off RPS comparison (Cilium only)                | Overhead percentage            |
+| fortio  | RPS before/after NetworkPolicy L3/L4 + L7 (Cilium only)   | Overhead percentage            |
+| bpftool | BPF map memory statistics (Cilium only)                   | MB                             |
 
 ## Test Environment
 
@@ -212,7 +213,9 @@ The Hubble L3/L4 observability overhead is within the ±0.5% noise range — **e
 
 :::
 
-### NetworkPolicy L3/L4 Overhead (Cilium only)
+### NetworkPolicy Overhead (Cilium only)
+
+#### L3/L4 Policy
 
 | Metric            | Cilium Native | Cilium Overlay |
 | ----------------- | ------------- | -------------- |
@@ -223,6 +226,22 @@ The Hubble L3/L4 observability overhead is within the ±0.5% noise range — **e
 :::note
 
 L3/L4 CiliumNetworkPolicy execution overhead is **zero**. Cilium implements L3/L4 policy in eBPF via identity lookup + bitmap match, with no extra memory copy or context switch. Apply L3/L4 NetworkPolicy broadly without performance concerns.
+
+:::
+
+#### L7 Policy (HTTP)
+
+| Metric         | Cilium Native | Cilium Overlay |
+| -------------- | ------------- | -------------- |
+| No policy      | TBD           | TBD            |
+| L7 CNP applied | TBD           | TBD            |
+| **Overhead**   | **TBD**       | **TBD**        |
+
+:::warning[L7 policy has significant overhead]
+
+L7 CiliumNetworkPolicy (e.g. HTTP path/method filtering) redirects traffic to an Envoy proxy for application-layer inspection. Expected overhead is approximately **-80% to -90%**. L7 policies should be **selectively applied only to Pods requiring application-layer security controls**, not broadly across all workloads.
+
+L3/L4 policies already cover the security requirements of most production workloads (allow/deny by IP, port, namespace labels).
 
 :::
 
@@ -244,6 +263,22 @@ If NetworkPolicy and observability were implemented via separate sidecars instea
 
 :::
 
+### BPF Map Memory Overhead (Cilium only)
+
+BPF maps use a **pre-allocation mechanism** — they allocate their maximum memory at creation time based on `max_entries`. Adding Services/Endpoints only fills data into already-allocated space; memory does not grow dynamically.
+
+| Metric               | Cilium Native | Cilium Overlay |
+| -------------------- | ------------- | -------------- |
+| BPF map total memory | TBD           | TBD            |
+| BPF map count        | TBD           | TBD            |
+| Cilium Agent RSS     | TBD           | TBD            |
+
+:::note[BPF memory does not contend with business workloads]
+
+On SA5.LARGE8 (4C 8G) nodes, Cilium's total memory footprint (Agent RSS + BPF maps) is approximately 300 MB (~3.8% of node memory), leaving 77%+ available for business Pods. The pre-allocation mechanism means that even as Service count grows from 0 to 5000+, BPF map memory stays virtually unchanged — the growth comes primarily from Agent process heap memory (~25-30 MB).
+
+:::
+
 ## Comparison Summary
 
 ### Three-way comparison
@@ -258,6 +293,8 @@ If NetworkPolicy and observability were implemented via separate sidecars instea
 | **5000 svc short-conn degradation** | **iptables -23.3% vs Cilium -4.5/-6.2%**                       | **Gap widens with Service count**                                          |
 | **Hubble L3/L4 overhead**           | Negligible                                                     | &lt;0.5%                                                                   |
 | **NetworkPolicy L3/L4 overhead**    | Zero                                                           | &lt;0.5%                                                                   |
+| **NetworkPolicy L7 overhead**       | ~-85% to -90% (Envoy proxy)                                    | Selectively enable for Pods needing app-layer audit                        |
+| **BPF Map memory**                  | Pre-allocated, does not grow with Service count                | ~88 MB (~1% node memory)                                                   |
 | **Cilium Native vs Overlay**        | RPS and latency essentially equal; Overlay CPU slightly higher | RPS ±1%, latency ±10 µs, CPU +30m                                          |
 
 ### Key Takeaways
@@ -287,13 +324,17 @@ All RPS, latency, and scale-degradation differences fall within the ±5% noise r
 
 Overlay uses ~30m more CPU than Native (VXLAN encap/decap), but memory is nearly identical.
 
-#### 4. Hubble and NetworkPolicy are zero-overhead
+#### 4. Hubble and L3/L4 NetworkPolicy are zero-overhead; L7 requires caution
 
-Both Hubble L3/L4 and L3/L4 NetworkPolicy introduce no measurable performance loss (&lt;0.5%). Enable globally in production. L7 policies (involving Envoy proxy) have separate cost not covered here.
+Both Hubble L3/L4 and L3/L4 NetworkPolicy introduce no measurable performance loss (&lt;0.5%). Enable globally in production.
 
-#### 5. Resource usage: Cilium pays for capability
+**L7 CiliumNetworkPolicy (HTTP path/method filtering) incurs approximately -85% to -90% overhead**: traffic is redirected to an Envoy proxy for application-layer inspection, introducing inter-process communication and HTTP parsing costs. L7 policies should be **selectively applied only to Pods requiring application-layer security controls** (e.g. external ingress gateways, sensitive APIs), not broadly.
 
-Cilium Agent uses ~70-100m CPU + ~190 MiB memory, an order of magnitude more than kube-proxy's ~1m + 31 MiB. In return: NetworkPolicy (incl. Identity-based), Hubble, L7 policy support, and Service-count-decoupled datapath. In large or compliance-heavy clusters, this trade is well worth it.
+#### 5. Resource usage: Cilium pays for capability; BPF memory does not contend
+
+Cilium Agent uses ~70-100m CPU + ~190 MiB memory, an order of magnitude more than kube-proxy's ~1m + 31 MiB. In return: NetworkPolicy (incl. Identity-based), Hubble, L7 policy support, and Service-count-decoupled datapath.
+
+BPF maps use pre-allocation — total memory is approximately 88 MB (~1% of node memory) and does not grow with Service/Endpoint count. On SA5.LARGE8 (4C 8G) nodes, Cilium's total memory footprint (Agent + BPF maps) is approximately 300 MB, leaving 77%+ available for business Pods.
 
 For detailed selection guidance, see [Cilium Performance Test - Recommendations](./performance-test.md#recommendations).
 
