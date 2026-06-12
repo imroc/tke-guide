@@ -1,18 +1,24 @@
 # Cilium Network Performance Benchmark
 
-This article uses the [`network-benchmark.sh`](https://imroc.cc/tke/scripts/network-benchmark.sh) one-click script to perform a comprehensive performance comparison of **iptables/kube-proxy**, **Cilium Native Routing**, and **Cilium Overlay**, covering throughput, HTTP RPS, TCP latency, Service scale degradation, Hubble overhead, NetworkPolicy overhead, and component resource consumption.
+This article uses the [`network-benchmark.sh`](https://imroc.cc/tke/scripts/network-benchmark.sh) one-click script to perform a comprehensive performance comparison of three TKE networking solutions under **identical hardware, kernel, and VPC environments**:
 
-:::tip[Difference from cilium connectivity perf]
+- **Cluster A — VPC-CNI + kube-proxy iptables**: the traditional approach, used as the performance baseline
+- **Cluster B — VPC-CNI + Cilium Native Routing**: Cilium plugs into VPC-CNI via cni-chaining; Pod IPs remain legitimate VPC IPs
+- **Cluster C — VPC-CNI + Cilium Overlay (VXLAN)**: Cilium is the sole Pod CNI; Pods use an independent overlay CIDR
 
-[Cilium Performance Test](./performance-test.md) uses `cilium connectivity perf` (based on netperf) to test TCP_RR latency and TCP_STREAM throughput. The `network-benchmark.sh` script in this article additionally covers:
+Coverage: throughput, HTTP RPS, TCP latency, Service-scale degradation (0→5000→10000), Hubble overhead, NetworkPolicy L3/L4 and L7 overhead, BPF memory, and component resource consumption.
 
-- **HTTP layer**: fortio full-speed RPS benchmarking (keep-alive / short connections)
-- **Service path**: throughput and RPS via ClusterIP Service
-- **Large-scale Service degradation**: RPS degradation comparison after 5000 Services (O(1) vs O(n))
-- **Hubble / NetworkPolicy overhead**: quantifying the performance impact of observability and policy enforcement
-- **iptables baseline**: includes kube-proxy iptables mode without Cilium as a reference
+:::tip[Three questions this article answers]
 
-These two articles are complementary — read them together.
+1. **iptables vs Cilium**: Does switching to Cilium improve or degrade performance? Where's the cost, where's the benefit?
+2. **Cilium Native vs Overlay**: How much do the two Cilium deployment modes differ? How to choose?
+3. **Small scale vs large scale Services**: As Service count grows from 5000 to 10000, how do the degradation curves compare?
+
+:::
+
+:::note[Difference from cilium connectivity perf]
+
+[Cilium Performance Test](./performance-test.md) uses `cilium connectivity perf` (based on netperf) for TCP_RR latency and TCP_STREAM throughput. The `network-benchmark.sh` script here additionally covers HTTP-layer RPS, the Service path, large-scale Service degradation, Hubble / NetworkPolicy overhead, BPF memory, and adds an iptables baseline. The two articles are complementary — read them together.
 
 :::
 
@@ -44,10 +50,7 @@ bash -c "$(curl -sfL https://imroc.cc/tke/scripts/network-benchmark.sh)"
 # Multiple rounds (for large instances without QoS concerns)
 ROUNDS=3 IPERF_DURATION=120 FORTIO_DURATION=120 bash network-benchmark.sh --dir ./bench
 
-# Specify output directory and namespace
-bash network-benchmark.sh --dir ./my-results --ns my-bench
-
-# Custom scale steps: test at 1000, 5000, 10000 Services
+# Custom Service scale steps
 SVC_SCALE_STEPS="1000,5000,10000" SVC_CREATE_PARALLEL=8 bash network-benchmark.sh
 ```
 
@@ -60,286 +63,307 @@ SVC_SCALE_STEPS="1000,5000,10000" SVC_CREATE_PARALLEL=8 bash network-benchmark.s
 | `SVC_SCALE_STEPS`     | 5000,10000 | Comma-separated Service scale steps (ascending)       |
 | `SVC_CREATE_PARALLEL` | 4          | Parallel workers for Service creation                 |
 
-### Test Metric Description
+### Tools and Metrics
 
-| Tool    | Test Content                                              | Metric                         |
-| ------- | --------------------------------------------------------- | ------------------------------ |
-| iperf3  | Cross-node TCP throughput                                 | Gbps (1/8/16 parallel streams) |
-| fortio  | HTTP RPS (keep-alive / short conn)                        | req/s                          |
-| netperf | TCP_RR / TCP_CRR latency                                  | p50 / p99 microseconds         |
-| fortio  | Multi-step Service scale (default 5000/10000) degradation | Degradation percentage         |
-| fortio  | Hubble on/off RPS comparison (Cilium only)                | Overhead percentage            |
-| fortio  | RPS before/after NetworkPolicy L3/L4 + L7 (Cilium only)   | Overhead percentage            |
-| bpftool | BPF map memory statistics (Cilium only)                   | MB                             |
+| Tool    | Test Content                                          | Metric                         |
+| ------- | ----------------------------------------------------- | ------------------------------ |
+| iperf3  | Cross-node TCP throughput                             | Gbps (1/8/16 parallel streams) |
+| fortio  | HTTP RPS (keep-alive / short conn)                    | req/s                          |
+| netperf | TCP_RR / TCP_CRR latency                              | p50 / p99 microseconds         |
+| fortio  | Multi-step Service scale (5000/10000) degradation     | Degradation percentage         |
+| fortio  | Hubble on/off RPS comparison (Cilium only)            | Overhead percentage            |
+| fortio  | NetworkPolicy L3/L4 + L7 RPS comparison (Cilium only) | Overhead percentage            |
+| bpftool | BPF map memory statistics (Cilium only)               | MB                             |
 
 ## Test Environment
 
-| Item               | Cluster A (iptables)          | Cluster B (Cilium Native)                      | Cluster C (Cilium Overlay)                    |
-| ------------------ | ----------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| Network Solution   | VPC-CNI + kube-proxy iptables | VPC-CNI + Cilium cni-chaining (Native Routing) | Cilium VXLAN Overlay (Cilium as sole Pod CNI) |
-| Kubernetes Version | v1.34.1                       | v1.34.1                                        | v1.34.1                                       |
-| Cilium Version     | N/A                           | v1.19.4                                        | v1.19.4                                       |
-| Node OS            | TencentOS Server 4            | TencentOS Server 4                             | TencentOS Server 4                            |
-| Kernel Version     | 6.6.117                       | 6.6.117                                        | 6.6.117                                       |
-| Node Spec          | SA5.LARGE8 (4C 8G)            | SA5.LARGE8 (4C 8G)                             | SA5.LARGE8 (4C 8G)                            |
-| Node Count         | 3                             | 3                                              | 3                                             |
+| Item                | Cluster A (iptables)          | Cluster B (Cilium Native)                      | Cluster C (Cilium Overlay)                    |
+| ------------------- | ----------------------------- | ---------------------------------------------- | --------------------------------------------- |
+| Network Solution    | VPC-CNI + kube-proxy iptables | VPC-CNI + Cilium cni-chaining (Native Routing) | Cilium VXLAN Overlay (Cilium as sole Pod CNI) |
+| Kubernetes Version  | v1.34.1-tke.5                 | v1.34.1-tke.5                                  | v1.34.1-tke.5                                 |
+| Cilium Version      | N/A                           | v1.19.4                                        | v1.19.4                                       |
+| kube-proxy replaced | No (iptables mode)            | Yes (eBPF)                                     | Yes (eBPF)                                    |
+| Node OS             | TencentOS Server 4            | TencentOS Server 4                             | TencentOS Server 4                            |
+| Kernel Version      | 6.6.117                       | 6.6.117                                        | 6.6.117                                       |
+| Node Spec           | SA5.LARGE8 (4C 8G)            | SA5.LARGE8 (4C 8G)                             | SA5.LARGE8 (4C 8G)                            |
+| Node Count          | 3                             | 3                                              | 3                                             |
 
-All three clusters are in the same VPC, with identical hardware spec and kernel version, ensuring a fair comparison.
+All three clusters are in the same VPC, with identical hardware spec and kernel version, ensuring a fair comparison. All RPS / latency tests are cross-node (different Workers).
 
-## Test Results
+## At a Glance
 
-### Throughput (iperf3, 30s, cross-node)
+| Dimension                      | iptables   | Cilium Native | Cilium Overlay | Key Takeaway                         |
+| ------------------------------ | ---------- | ------------- | -------------- | ------------------------------------ |
+| Pod2Pod throughput (8 streams) | 10.43 Gbps | 10.43 Gbps    | 10.77 Gbps     | All hit burst ceiling, no difference |
+| RPS keepalive (c64)            | 90,164     | 74,684        | 76,384         | iptables ~20% higher                 |
+| RPS short conn (c64)           | 22,313     | 10,258        | 10,537         | iptables ~115% higher                |
+| TCP_RR p99                     | 121 µs     | 135 µs        | 129 µs         | Cilium ~10-15 µs higher              |
+| HTTP p99 @1000 QPS             | 0.99 ms    | 0.99 ms       | 0.99 ms        | **Identical under realistic load**   |
+| 10000 svc short-conn degrade   | **-37.3%** | **-9.0%**     | **-8.4%**      | **iptables O(n), Cilium near O(1)**  |
+| L3/L4 NetworkPolicy overhead   | N/A        | -0.5%         | -0.1%          | Zero overhead                        |
+| L7 NetworkPolicy overhead      | N/A        | -85.2%        | -86.3%         | Envoy proxy; enable selectively      |
+| Hubble L3/L4 overhead          | N/A        | -0.4%         | -0.1%          | Zero overhead                        |
+| BPF map memory / node          | N/A        | 92.8 MB       | 92.7 MB        | Pre-allocated, doesn't grow with svc |
+| Datapath component mem / node  | 31.5 MB    | 391 MB        | 321 MB         | Cilium pays for capability           |
+
+Details below, by dimension.
+
+## 1. Throughput (iperf3, 30s, cross-node)
 
 | Scenario                 | iptables   | Cilium Native | Cilium Overlay |
 | ------------------------ | ---------- | ------------- | -------------- |
 | Node hostNet (8 streams) | 10.44 Gbps | 10.44 Gbps    | 10.82 Gbps     |
-| Pod-to-Pod (single)      | 10.43 Gbps | 10.43 Gbps    | 10.63 Gbps     |
+| Pod-to-Pod (single)      | 10.43 Gbps | 10.42 Gbps    | 10.76 Gbps     |
 | Pod-to-Pod (8 streams)   | 10.43 Gbps | 10.43 Gbps    | 10.77 Gbps     |
 | Pod-to-Pod (16 streams)  | 10.43 Gbps | 10.43 Gbps    | 10.77 Gbps     |
-| Via Service (8 streams)  | 10.38 Gbps | 10.43 Gbps    | 10.77 Gbps     |
+| Via Service (8 streams)  | 10.43 Gbps | 10.43 Gbps    | 10.60 Gbps     |
 
-:::note
+:::note[Throughput is equivalent across all three]
 
-All three solutions saturate ~10 Gbps, close to the SA5.LARGE8 instance burst bandwidth ceiling. **Throughput is effectively identical across the three solutions.** The ±4% inter-cluster variance is VPC burst bandwidth fluctuation and physical-node path differences, not solution differences. 16 streams matches 8 streams, confirming 8 parallel streams already saturate the NIC. Overlay being slightly above Native is incidental VPC bandwidth fluctuation during the test window, unrelated to VXLAN encapsulation.
+All three solutions saturate ~10.4-10.8 Gbps, approaching the SA5.LARGE8 instance burst bandwidth ceiling — **throughput is effectively equivalent**. The ±4% inter-cluster variance is VPC burst bandwidth fluctuation and physical-node path differences, not solution quality. 16 streams matches 8 streams, confirming 8 parallel streams already saturate the NIC.
 
-:::
-
-### RPS (fortio, 60s, max QPS, cross-node)
-
-| Scenario                   | iptables         | Cilium Native    | Cilium Overlay   | Cilium vs iptables |
-| -------------------------- | ---------------- | ---------------- | ---------------- | ------------------ |
-| Pod-to-Pod c64 keepalive   | 91,698 req/s     | 75,785 req/s     | 75,252 req/s     | -17% ~ -18%        |
-| Via Svc c64 keepalive      | 91,896 req/s     | 75,272 req/s     | 75,191 req/s     | -18%               |
-| Via Svc c256 keepalive     | 93,882 req/s     | 77,126 req/s     | 76,279 req/s     | -18%               |
-| **Via Svc c64 short conn** | **22,846** req/s | **10,194** req/s | **10,554** req/s | **-54% ~ -55%**    |
-
-:::tip[RPS difference: why iptables exceeds Cilium]
-
-**Cilium Native: cni-chaining + per-endpoint routing (-18% / -55%)**
-
-VPC-CNI is the primary Pod CNI (assigning VPC IPs); Cilium plugs in via cni-chaining to provide policy and observability features. This architecture forces per-endpoint routing (`endpointRoutes=true`), so Pod traffic bypasses the `cilium_host` device and must traverse the kernel network stack (netfilter + FIB lookup) at both Pod ingress and egress; meanwhile Cilium eBPF still performs conntrack + Service resolution + Policy checks. This is the root cause of Native's ~18% keepalive RPS deficit and ~55% short-conn deficit relative to iptables — every packet picks up an extra eBPF processing layer without saving the kernel-stack pass.
-
-**Cilium Overlay: Cilium is the sole Pod CNI; VXLAN encap/decap is the dominant cost**
-
-In Overlay mode, Cilium assigns Pod IPs from its own PodCIDR and connects nodes via VXLAN tunnels — Cilium is the only Pod CNI; there is no cni-chaining. Pod traffic flows through `cilium_host` and `cilium_vxlan`, and BPF Host Routing operates normally (given `kubeProxyReplacement=true` + `bpf.masquerade=true`). However, every cross-node packet undergoes VXLAN encap (egress) + decap (ingress): the 50-byte header construction, UDP checksum, and inner metadata bookkeeping form the dominant cost.
-
-In the test, Native and Overlay land on nearly identical RPS (differing &lt;1%), but their datapaths and cost structures are completely different:
-
-| Cluster                              | Pod CNI Relationship             | Main Cost Source                    |
-| ------------------------------------ | -------------------------------- | ----------------------------------- |
-| Cilium Native (VPC-CNI cni-chaining) | VPC-CNI primary + Cilium chained | per-endpoint routing + kernel stack |
-| Cilium Overlay                       | Cilium alone                     | VXLAN encap/decap                   |
-
-**Why does iptables come out higher?**
-
-In iptables mode at small Service scale, the data path is the shortest: every packet traverses the kernel network stack once, kube-proxy's NAT rules are just a handful of matches on PREROUTING/POSTROUTING, and there is no extra eBPF processing or encapsulation cost. Cilium — in either Native or Overlay — introduces one inevitable extra processing layer, so iptables takes the absolute lead at small-scale, saturation benchmarks.
-
-**Key insight**: iptables's small-scale RPS advantage is a local optimum for ClusterIP Service in a simple architecture. Once Service count grows, iptables's O(n) degradation (see Service Scale section below) quickly eats up that lead. The Cilium clusters in this test integrate with the cloud provider's VPC-CNI, which is the most common deployment shape for TKE customers; only when Cilium fully manages Pod CIDR (e.g. Overlay mode, or pure Cilium clusters with Cluster Pool IPAM + auto-direct-node-routes/BGP) does cni-chaining go away — but then the VPC-routable Pod IP advantage is also lost.
+Notably, Overlay (with VXLAN encapsulation) even shows slightly higher large-packet throughput — the 50-byte encapsulation header is negligible at MTU-level packet sizes. VXLAN's cost manifests mainly in small-packet, high-frequency scenarios (see RPS section).
 
 :::
 
-### Latency (netperf TCP_RR / TCP_CRR + fortio HTTP, cross-node)
+## 2. RPS (fortio, 60s, max QPS, cross-node)
+
+This is the dimension with the largest differences.
+
+| Scenario                   | iptables         | Cilium Native    | Cilium Overlay   |
+| -------------------------- | ---------------- | ---------------- | ---------------- |
+| Pod-to-Pod c64 keepalive   | 90,097 req/s     | 74,454 req/s     | 76,341 req/s     |
+| Via Svc c64 keepalive      | 90,164 req/s     | 74,684 req/s     | 76,384 req/s     |
+| Via Svc c256 keepalive     | 91,649 req/s     | 76,534 req/s     | 77,768 req/s     |
+| **Via Svc c64 short conn** | **22,313** req/s | **10,258** req/s | **10,537** req/s |
+
+### Why is iptables RPS actually higher?
+
+This is the most counter-intuitive result. Cilium replaces iptables with eBPF and "should be faster," yet in small-scale Service saturation benchmarks iptables leads by ~20% (keepalive) to ~115% (short conn). The reason differs between the two Cilium modes:
+
+**Cilium Native: cni-chaining + per-endpoint routing**
+
+VPC-CNI is the primary Pod CNI (assigning VPC IPs); Cilium plugs in via cni-chaining to provide policy and observability. This architecture forces per-endpoint routing (`endpointRoutes=true`), so Pod traffic uses dedicated veth routes and bypasses the `cilium_host` device — it traverses the full kernel network stack (netfilter + FIB lookup) _and_ layers on eBPF's conntrack + Service resolution + Policy checks. Each packet picks up an extra eBPF processing layer without saving the kernel-stack pass.
+
+**Cilium Overlay: VXLAN encap/decap**
+
+In Overlay mode Cilium is the sole Pod CNI, BPF Host Routing works normally and skips part of the kernel stack. But every cross-node packet must do VXLAN encap (egress) + decap (ingress): header construction, UDP checksum, and inner metadata bookkeeping form the dominant cost.
+
+**iptables has the shortest path**
+
+At small Service scale, every packet in iptables mode traverses the kernel stack once, and kube-proxy's NAT rules are just a handful of matches on PREROUTING/POSTROUTING — no eBPF processing, no encapsulation. So iptables takes the absolute lead in small-scale saturation benchmarks.
+
+:::tip[Key insight: this is a local optimum, not a global one]
+
+iptables's small-scale RPS advantage only holds under the specific condition of "few Services + saturation benchmark." Once Service count grows, iptables's O(n) degradation quickly erodes this lead (see [Section 5](#5-service-scale-degradation-0--5000--10000)).
+
+Moreover — **this difference is invisible to real workloads.** All three solutions' absolute RPS (74K-90K) far exceed the load needs of a typical microservice Pod (usually < 10K). Under realistic load (see HTTP p99 @1000 QPS in the latency section), all three perform identically.
+
+:::
+
+### Native vs Overlay: nearly identical
+
+Native (74,684) and Overlay (76,384) differ by < 3% on keepalive RPS, and < 3% on short conn (10,258 vs 10,537). Their datapath cost structures differ (one is cni-chaining double-processing, the other is VXLAN encapsulation), but the magnitudes happen to match.
+
+## 3. Latency (netperf TCP_RR / TCP_CRR + fortio HTTP, cross-node)
 
 | Metric             | iptables | Cilium Native | Cilium Overlay |
 | ------------------ | -------- | ------------- | -------------- |
-| TCP_RR p50         | 92 µs    | 114 µs        | 105 µs         |
-| TCP_RR p99         | 112 µs   | 136 µs        | 130 µs         |
-| TCP_CRR p99        | 427 µs   | 641 µs        | 605 µs         |
+| TCP_RR p50         | 99 µs    | 106 µs        | 105 µs         |
+| TCP_RR p99         | 121 µs   | 135 µs        | 129 µs         |
+| TCP_CRR p99        | 467 µs   | 623 µs        | 608 µs         |
 | HTTP p99 @1000 QPS | 0.99 ms  | 0.99 ms       | 0.99 ms        |
 
-:::tip[Latency analysis]
+:::tip[Latency differences vanish under realistic load]
 
-- **TCP_RR** (keepalive request-response): Cilium adds ~18-22 µs over iptables — the inherent cost of eBPF datapath conntrack lookup + policy check. Sub-millisecond, invisible at the application layer.
-- **TCP_CRR** (per-connection setup): Cilium adds ~180-210 µs — every new connection's SYN packet performs BPF conntrack creation + Service resolution + a full kernel-stack pass.
-- **HTTP p99 @1000 QPS**: Under realistic application load, all three are **identical** at 0.99 ms — microsecond differences are dwarfed by application processing time.
-- **Native vs Overlay**: cross-node latency differs &lt;10 µs. The two clusters take different datapaths (Native uses per-endpoint routing + kernel stack under cni-chaining, Overlay uses BPF Host Routing + VXLAN encap/decap), but the latency cost happens to be numerically comparable.
+- **TCP_RR** (keepalive request-response): Cilium adds ~10-15 µs over iptables — the inherent cost of eBPF datapath conntrack lookup + policy check. Sub-millisecond, invisible at the application layer.
+- **TCP_CRR** (per-connection setup): Cilium adds ~140-155 µs because every new connection's SYN does BPF conntrack creation + Service resolution + a full kernel-stack pass.
+- **HTTP p99 @1000 QPS**: under realistic request rates (1000 QPS), all three are **identical** at 0.99 ms. Microsecond differences are completely masked by application processing time.
 
-**Key insight**: The microsecond-level latency gap visible in saturating benchmarks (wrk/fortio with empty HTTP responses) disappears once the application performs any meaningful work (DB query, JSON serialization). Network-layer µs differences are completely masked.
-
-:::
-
-### Service Scale (RPS degradation after 5000 Services)
-
-Test method: create 5000 dummy ClusterIP Services (each with 5 endpoints), wait 60s for sync, then re-run RPS under identical load and compare degradation.
-
-#### Full results @5000 Services
-
-| Metric                     | iptables         | Cilium Native | Cilium Overlay |
-| -------------------------- | ---------------- | ------------- | -------------- |
-| iptables rule count        | **30,142 rules** | -             | -              |
-| keepalive RPS baseline     | 91,896 req/s     | 75,272 req/s  | 75,191 req/s   |
-| keepalive RPS @5000 svc    | 91,528 req/s     | 76,341 req/s  | 75,181 req/s   |
-| **keepalive degradation**  | -0.4%            | +1.4%         | -0.0%          |
-| short-conn RPS baseline    | 22,846 req/s     | 10,194 req/s  | 10,554 req/s   |
-| short-conn RPS @5000 svc   | 17,528 req/s     | 9,738 req/s   | 9,897 req/s    |
-| **short-conn degradation** | **-23.3%**       | **-4.5%**     | **-6.2%**      |
-
-#### Small scale vs Large scale: iptables degradation accelerates while Cilium stays bounded
-
-Combining the 5000-svc results with earlier 1000-svc data on the same environment shows the architectural divergence clearly:
-
-| Metric                                | iptables (1000→5000)    | Cilium Native (1000→5000) | Cilium Overlay (1000→5000) |
-| ------------------------------------- | ----------------------- | ------------------------- | -------------------------- |
-| iptables rule count                   | 6,142 → **30,142** (×5) | -                         | -                          |
-| keepalive degradation                 | -0.4% → -0.4%           | -0.2% → +1.4%             | 0.0% → -0.0%               |
-| **short-conn degradation**            | **-5.9% → -23.3%**      | **-1.6% → -4.5%**         | **-4.1% → -6.2%**          |
-| short-conn degradation scaling factor | **× 4** (linear)        | × 2.8 (sub-linear, noisy) | × 1.5 (sub-linear)         |
-
-:::tip[O(1) vs O(n): the gap widens at scale]
-
-**No degradation in keepalive across all three solutions**: conntrack caches the first-packet decision; subsequent packets hit cache, never re-traversing the rule chain or BPF map. This is why most production workloads (using connection pools or HTTP keepalive) don't feel Service-scale impact.
-
-**Short connections expose the real difference**: every new TCP connection's SYN must repeat Service selection from scratch:
-
-- **iptables O(n) sequential scan**: 5.9% degradation @1000 svc, **23.3% @5000 svc** — rules ×5 → degradation ×4, almost linear. This is the inherent cost of sequentially matching the KUBE-SERVICES → KUBE-SVC-XXX → KUBE-SEP-XXX three-level rule chain.
-- **Cilium BPF hash map O(1) lookup**: 1.6% @1000 svc, **4.5% @5000 svc** — rules ×5 but degradation only ×~3. **The residual degradation is not from the lookup itself**, but from cilium-agent control-plane pressure (BPF map writes for 5000 svc) + conntrack table churn (5000 svc × multiple endpoints × frequent short-conn create/teardown) on the datapath, which is not strictly linear with Service count.
-- **Overlay slightly higher than Native**: VXLAN encap/decap code path maintains conntrack entries more densely, but the magnitude is still far below iptables.
-
-**Extrapolating to 10000+ Services**: iptables short-conn degradation will approach 50% (linear), while Cilium remains under 10%. This is the core value of replacing kube-proxy with Cilium in large clusters.
+**This is the single most important table in this article**: the µs-level differences exposed by saturation benchmarks only appear in fortio/wrk-style empty-response, CPU-saturating scenarios. Once the application does any real work (DB query, JSON serialization, business logic), network-layer microsecond differences are entirely invisible.
 
 :::
 
-### Hubble Observability Overhead (Cilium only)
-
-| Metric       | Cilium Native | Cilium Overlay |
-| ------------ | ------------- | -------------- |
-| Hubble ON    | 75,604 req/s  | 74,913 req/s   |
-| Hubble OFF   | 75,676 req/s  | 74,621 req/s   |
-| **Overhead** | **-0.1%**     | **+0.4%**      |
-
-:::note
-
-The Hubble L3/L4 observability overhead is within the ±0.5% noise range — **effectively zero**. Hubble only samples events into a ring buffer in the datapath; it does not participate in forwarding decisions. You can safely enable Hubble L3/L4 observability across production environments.
-
-:::
-
-### NetworkPolicy Overhead (Cilium only)
-
-#### L3/L4 Policy
-
-| Metric            | Cilium Native | Cilium Overlay |
-| ----------------- | ------------- | -------------- |
-| No policy         | 75,573 req/s  | 74,900 req/s   |
-| L3/L4 CNP applied | 75,675 req/s  | 74,910 req/s   |
-| **Overhead**      | **+0.1%**     | **+0.0%**      |
-
-:::note
-
-L3/L4 CiliumNetworkPolicy execution overhead is **zero**. Cilium implements L3/L4 policy in eBPF via identity lookup + bitmap match, with no extra memory copy or context switch. Apply L3/L4 NetworkPolicy broadly without performance concerns.
-
-:::
-
-#### L7 Policy (HTTP)
-
-| Metric         | Cilium Native | Cilium Overlay |
-| -------------- | ------------- | -------------- |
-| No policy      | TBD           | TBD            |
-| L7 CNP applied | TBD           | TBD            |
-| **Overhead**   | **TBD**       | **TBD**        |
-
-:::warning[L7 policy has significant overhead]
-
-L7 CiliumNetworkPolicy (e.g. HTTP path/method filtering) redirects traffic to an Envoy proxy for application-layer inspection. Expected overhead is approximately **-80% to -90%**. L7 policies should be **selectively applied only to Pods requiring application-layer security controls**, not broadly across all workloads.
-
-L3/L4 policies already cover the security requirements of most production workloads (allow/deny by IP, port, namespace labels).
-
-:::
-
-### Resource Consumption
-
-| Component              | CPU avg | Memory avg |
-| ---------------------- | ------- | ---------- |
-| kube-proxy (iptables)  | 1.0 m   | 31.1 MiB   |
-| Cilium Agent (Native)  | 67.9 m  | 188.1 MiB  |
-| Cilium Agent (Overlay) | 96.8 m  | 192.0 MiB  |
-
-:::note
-
-- **kube-proxy only syncs Services** — its CPU/memory is minimal, but the resulting iptables rule explosion and scan cost is shifted onto the datapath.
-- **Cilium Agent does much more than replace kube-proxy** — it also handles NetworkPolicy compilation, Hubble flow capture, Identity allocation, BPF map maintenance, etc. Higher resource usage is expected, but the datapath cost decouples from Service scale (O(1)).
-- **Overlay uses ~30m more CPU than Native**: from VXLAN encap/decap computation in BPF programs.
-
-If NetworkPolicy and observability were implemented via separate sidecars instead, total overhead would far exceed Cilium Agent's ~190 MiB.
-
-:::
-
-### BPF Map Memory Overhead (Cilium only)
-
-BPF maps use a **pre-allocation mechanism** — they allocate their maximum memory at creation time based on `max_entries`. Adding Services/Endpoints only fills data into already-allocated space; memory does not grow dynamically.
-
-| Metric               | Cilium Native | Cilium Overlay |
-| -------------------- | ------------- | -------------- |
-| BPF map total memory | TBD           | TBD            |
-| BPF map count        | TBD           | TBD            |
-| Cilium Agent RSS     | TBD           | TBD            |
-
-:::note[BPF memory does not contend with business workloads]
-
-On SA5.LARGE8 (4C 8G) nodes, Cilium's total memory footprint (Agent RSS + BPF maps) is approximately 300 MB (~3.8% of node memory), leaving 77%+ available for business Pods. The pre-allocation mechanism means that even as Service count grows from 0 to 5000+, BPF map memory stays virtually unchanged — the growth comes primarily from Agent process heap memory (~25-30 MB).
-
-:::
-
-## Comparison Summary
-
-### Three-way comparison
-
-| Dimension                           | Conclusion                                                     | Quantified Difference                                                      |
-| ----------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| **Throughput**                      | All three identical                                            | All hit ~10 Gbps burst ceiling                                             |
-| **RPS keepalive**                   | iptables ~18% higher than Cilium                               | 92K vs 75K (cni-chaining / VXLAN extra overhead)                           |
-| **RPS short conn**                  | iptables ~55% higher than Cilium                               | 23K vs 10K (same cause; absolute values still far exceed production needs) |
-| **TCP_RR p99**                      | Cilium ~20 µs higher than iptables                             | Application-layer invisible                                                |
-| **HTTP p99 @1000 QPS**              | **All three identical**                                        | All 0.99 ms                                                                |
-| **5000 svc short-conn degradation** | **iptables -23.3% vs Cilium -4.5/-6.2%**                       | **Gap widens with Service count**                                          |
-| **Hubble L3/L4 overhead**           | Negligible                                                     | &lt;0.5%                                                                   |
-| **NetworkPolicy L3/L4 overhead**    | Zero                                                           | &lt;0.5%                                                                   |
-| **NetworkPolicy L7 overhead**       | ~-85% to -90% (Envoy proxy)                                    | Selectively enable for Pods needing app-layer audit                        |
-| **BPF Map memory**                  | Pre-allocated, does not grow with Service count                | ~88 MB (~1% node memory)                                                   |
-| **Cilium Native vs Overlay**        | RPS and latency essentially equal; Overlay CPU slightly higher | RPS ±1%, latency ±10 µs, CPU +30m                                          |
-
-### Key Takeaways
-
-#### 1. All three are equivalent under realistic workloads
-
-HTTP p99 @1000 QPS is 0.99 ms across all three. The differences exposed by extreme benchmarks only appear in fortio/wrk-style empty-response scenarios, with no production-application impact.
-
-#### 2. iptables wins at small scale but loses badly at large scale
-
-iptables has **~18% absolute RPS lead over Cilium** at small Service counts (under a thousand). The Native gap comes from cni-chaining + per-endpoint routing forcing each packet through the kernel stack on top of eBPF processing; the Overlay gap comes from VXLAN encap/decap. Either way, Cilium adds an extra processing layer that iptables doesn't have at small scale — this is architectural cost, not a Cilium flaw.
-
-But the cost is that iptables datapath performance scales with Service count:
-
-- 1000 svc short-conn degradation: 5.9%
-- **5000 svc short-conn degradation: 23.3%** (linear ~4× scaling)
-- Extrapolated 10000 svc: approaching 50%
-
-Cilium's degradation curve is far sub-linear (only 4.5%~6.2% @5000 svc). **At cluster Service count ≥ several thousand, Cilium overtakes iptables.**
-
-#### 3. Cilium Native vs Overlay are essentially equivalent
+## 4. Cilium Native vs Overlay: How to Choose
 
 All RPS, latency, and scale-degradation differences fall within the ±5% noise range. **Choose based on network architecture, not performance**:
 
-- Pod IP must be VPC-routable (direct ELB attach, cross-cluster connectivity, legacy monitoring directly hitting Pods) → **Native**
-- Pod CIDR decoupled from VPC (IP scarcity, cross-VPC CIDR reuse, Pod count far exceeding ENI capacity) → **Overlay**
+| Dimension      | Cilium Native                                    | Cilium Overlay                                         |
+| -------------- | ------------------------------------------------ | ------------------------------------------------------ |
+| Pod IP         | Legitimate VPC IP, directly routable in VPC      | Independent overlay CIDR, decoupled from VPC           |
+| Best for       | Direct CLB, cross-cluster/VPC, legacy monitoring | IP scarcity, cross-VPC CIDR reuse, Pods > ENI capacity |
+| Datapath CPU   | ~102 m                                           | ~89 m                                                  |
+| Cross-node lat | TCP_RR p99 135 µs                                | TCP_RR p99 129 µs                                      |
+| MTU            | No extra overhead                                | VXLAN takes 50 bytes (enable jumbo frames to mitigate) |
 
-Overlay uses ~30m more CPU than Native (VXLAN encap/decap), but memory is nearly identical.
+In practice both perform nearly identically. Native's datapath CPU is slightly higher (cni-chaining double-processing); Overlay is slightly lower (BPF Host Routing active) but bears the VXLAN MTU overhead. **The core criterion is whether Pod IP needs to be directly routable in the VPC.**
 
-#### 4. Hubble and L3/L4 NetworkPolicy are zero-overhead; L7 requires caution
+> For why BPF Host Routing isn't actually hit in Native mode, and the commonality of cloud-provider Native IPAM, see [VPC-CNI Native Routing Details](./native-routing.md).
 
-Both Hubble L3/L4 and L3/L4 NetworkPolicy introduce no measurable performance loss (&lt;0.5%). Enable globally in production.
+## 5. Service Scale Degradation (0 → 5000 → 10000)
 
-**L7 CiliumNetworkPolicy (HTTP path/method filtering) incurs approximately -85% to -90% overhead**: traffic is redirected to an Envoy proxy for application-layer inspection, introducing inter-process communication and HTTP parsing costs. L7 policies should be **selectively applied only to Pods requiring application-layer security controls** (e.g. external ingress gateways, sensitive APIs), not broadly.
+Test method: create N dummy ClusterIP Services (each with endpoints), wait 60s for sync, then compare RPS degradation under identical load. This is the core value of replacing kube-proxy with Cilium.
 
-#### 5. Resource usage: Cilium pays for capability; BPF memory does not contend
+### Keepalive: virtually no degradation for any
 
-Cilium Agent uses ~70-100m CPU + ~190 MiB memory, an order of magnitude more than kube-proxy's ~1m + 31 MiB. In return: NetworkPolicy (incl. Identity-based), Hubble, L7 policy support, and Service-count-decoupled datapath.
+| Service count | iptables | Cilium Native | Cilium Overlay |
+| ------------- | -------- | ------------- | -------------- |
+| Baseline (0)  | 90,164   | 74,684        | 76,384         |
+| 5000          | -1.3%    | -0.2%         | -0.2%          |
+| 10000         | -0.8%    | -0.6%         | -0.9%          |
 
-BPF maps use pre-allocation — total memory is approximately 88 MB (~1% of node memory) and does not grow with Service/Endpoint count. On SA5.LARGE8 (4C 8G) nodes, Cilium's total memory footprint (Agent + BPF maps) is approximately 300 MB, leaving 77%+ available for business Pods.
+In keepalive scenarios all three show no meaningful degradation — conntrack caches the first-packet forwarding decision; subsequent packets hit cache without re-traversing rule chains or BPF maps. **This is why production workloads using connection pools or HTTP keepalive barely feel Service-scale impact.**
+
+### Short connections: iptables degrades linearly, Cilium stays near-constant
+
+| Service count  | iptables            | Cilium Native     | Cilium Overlay    |
+| -------------- | ------------------- | ----------------- | ----------------- |
+| Baseline (0)   | 22,313 req/s        | 10,258 req/s      | 10,537 req/s      |
+| 5000           | 17,336 (-22.3%)     | 9,582 (-6.6%)     | 9,915 (-5.9%)     |
+| 10000          | 13,994 (**-37.3%**) | 9,331 (**-9.0%**) | 9,653 (**-8.4%**) |
+| iptables rules | 30136 → 60118       | -                 | -                 |
+
+:::tip[O(1) vs O(n): the gap widens with scale]
+
+**Short connections are the real test**: every new TCP connection's SYN must redo Service selection and cannot hit the conntrack cache.
+
+- **iptables is O(n) sequential traversal**: each SYN packet sequentially matches the KUBE-SERVICES → KUBE-SVC-XXX → KUBE-SEP-XXX rule chain. At 5000 svc: 30136 rules, -22.3%; at 10000 svc: 60118 rules (doubled), **-37.3%**. Degradation worsens almost linearly with rule count.
+- **Cilium is O(1) BPF hash map lookup**: constant lookup time regardless of Service count. Native goes from -6.6% (5000) to -9.0% (10000); Overlay from -5.9% to -8.4% — both sub-linear.
+
+**The residual degradation isn't from the lookup itself**, but from cilium-agent control-plane pressure (BPF map writes during 5000→10000 svc sync) + conntrack table churn (frequent short-conn create/teardown) on the datapath, which doesn't scale linearly with Service count.
+
+**Extrapolation**: iptables short-conn degradation grows linearly with rule count, already at -37.3% by 10000 svc and heading toward halving. Cilium stays under -10% in both modes. **At cluster Service counts of several thousand or more, Cilium's short-connection performance overtakes iptables across the board.**
+
+:::
+
+### Small scale vs large scale: in one sentence
+
+- **Small scale (under a thousand)**: iptables leads in absolute terms — shortest path, no eBPF/encapsulation overhead.
+- **Large scale (several thousand+)**: Cilium overtakes — O(1) lookup doesn't degrade with scale, while iptables's O(n) traversal worsens linearly.
+- **Keepalive is unaffected throughout**: regardless of solution or scale, keepalive workloads are immune.
+
+## 6. Hubble Observability Overhead (Cilium only)
+
+| Metric       | Cilium Native | Cilium Overlay |
+| ------------ | ------------- | -------------- |
+| Hubble ON    | 74,096 req/s  | 76,006 req/s   |
+| Hubble OFF   | 74,392 req/s  | 76,067 req/s   |
+| **Overhead** | **-0.4%**     | **-0.1%**      |
+
+:::note
+
+Hubble L3/L4 observability overhead is within the ±0.5% noise range — **effectively zero**. Hubble only samples events into a ring buffer in the datapath; it does not participate in forwarding decisions. You can safely enable Hubble L3/L4 flow observation across production.
+
+:::
+
+## 7. NetworkPolicy Overhead (Cilium only)
+
+### L3/L4 policy: zero overhead
+
+| Metric            | Cilium Native | Cilium Overlay |
+| ----------------- | ------------- | -------------- |
+| No policy         | 74,576 req/s  | 76,132 req/s   |
+| L3/L4 CNP applied | 74,202 req/s  | 76,064 req/s   |
+| **Overhead**      | **-0.5%**     | **-0.1%**      |
+
+L3/L4 CiliumNetworkPolicy execution overhead is **zero**. Cilium implements L3/L4 policy in eBPF via identity lookup + bitmap match, with no extra memory copy or context switch. **Apply L3/L4 NetworkPolicy broadly across all workloads without concern.**
+
+### L7 policy (HTTP): large overhead, use with caution
+
+| Metric         | Cilium Native | Cilium Overlay |
+| -------------- | ------------- | -------------- |
+| No policy      | 74,576 req/s  | 76,132 req/s   |
+| L7 CNP applied | 11,048 req/s  | 10,439 req/s   |
+| **Overhead**   | **-85.2%**    | **-86.3%**     |
+
+:::warning[Enable L7 policy only on Pods that need it]
+
+L7 CiliumNetworkPolicy (e.g. HTTP path/method filtering) redirects traffic to an **Envoy proxy** for application-layer parsing, introducing inter-process communication and HTTP parsing costs — measured RPS drops by **85%+**.
+
+This is not a Cilium flaw, but the inherent cost of L7 visibility (any L7 policy / Service Mesh solution has comparable cost). The correct usage:
+
+- **L3/L4 policy**: covers the vast majority of production security needs (allow/deny by IP, port, namespace labels), zero overhead, enable broadly.
+- **L7 policy**: enable selectively only on Pods that genuinely need application-layer control (e.g. external ingress gateways, sensitive API auditing). Don't roll it out broadly.
+
+:::
+
+## 8. Resource Consumption
+
+### CPU / Memory
+
+| Component              | CPU avg | Memory avg |
+| ---------------------- | ------- | ---------- |
+| kube-proxy (iptables)  | 1.0 m   | 31.5 MiB   |
+| Cilium Agent (Native)  | 102.5 m | 237.7 MiB  |
+| Cilium Agent (Overlay) | 88.8 m  | 209.9 MiB  |
+
+kube-proxy only syncs Services, so its CPU/memory is minimal; but it shifts the iptables rule explosion and scan cost onto the datapath (see Section 5). Cilium Agent does much more than replace kube-proxy — it also handles NetworkPolicy compilation, Hubble flow capture, Identity allocation, BPF map maintenance, etc. Higher resource usage is expected — **but in return you get a Service-scale-decoupled datapath (O(1)) and a full set of enterprise capabilities.**
+
+### BPF Map Memory: pre-allocated, doesn't grow with scale
+
+| Metric           | Cilium Native | Cilium Overlay |
+| ---------------- | ------------- | -------------- |
+| BPF map total    | 92.8 MB       | 92.7 MB        |
+| BPF map count    | 76            | 47             |
+| Cilium Agent RSS | 391 MB        | 321 MB         |
+
+Top BPF map memory consumers (nearly identical across clusters):
+
+| Map name (truncated) | Max Entries | Memory  |
+| -------------------- | ----------- | ------- |
+| cilium_ct4_global    | 131,072     | 17.0 MB |
+| cilium_snat_v4       | 131,072     | 15.0 MB |
+| cilium_nodeport      | 131,072     | 10.0 MB |
+| cilium_policymap     | 65,536      | 9.5 MB  |
+| cilium_ct_any4       | 65,536      | 8.5 MB  |
+
+:::note[BPF memory does not contend with business workloads]
+
+**Key mechanism: BPF maps use pre-allocation** — they allocate maximum memory at creation based on `max_entries`. Adding Services/Endpoints only fills already-allocated space; memory doesn't grow dynamically. That's why even as Services grew from 0 to 10000 in this test, BPF map total memory stayed steady at ~92.7 MB.
+
+Memory budget on a SA5.LARGE8 (4C 8G) node:
+
+```text
+Total node memory:    8,192 MB
+  System reserved:    ~1,024 MB
+  kubelet / runtime:  ~512 MB
+  Cilium Agent RSS:   ~320-390 MB
+  BPF Maps (memlock): ~93 MB
+  ────────────────────────────
+  Cilium total:       ~410-480 MB (~5-6% of 8G)
+  Available for Pods: ~6,000+ MB (73%+)
+```
+
+Even with 10000 Services + NetworkPolicy + active connections, Cilium's memory footprint has no material impact on business workloads. Native's RSS (391 MB) is slightly above Overlay's (321 MB), due to more endpoint routing state under cni-chaining.
+
+:::
+
+## Summary
+
+### iptables vs Cilium
+
+| Angle           | Conclusion                                                                           |
+| --------------- | ------------------------------------------------------------------------------------ |
+| Small-scale RPS | iptables leads (shortest path, no eBPF/encap overhead), but this is a local optimum  |
+| Large-scale RPS | Cilium overtakes (O(1) vs iptables O(n)); 10000 svc short-conn degrades 37% vs 9%    |
+| Realistic load  | **No difference** (HTTP p99 @1000 QPS is 0.99 ms for all three)                      |
+| Capabilities    | Cilium provides NetworkPolicy, Hubble, Identity security, L7 — things iptables lacks |
+| Resources       | Cilium uses ~300 MB more memory/node, but BPF pre-allocation doesn't grow with scale |
+
+**The cost of switching to Cilium**: ~20% RPS and ~15 µs latency in small-scale saturation benchmarks (invisible under real load) + ~300 MB memory. **The benefit**: O(1) performance at large Service scale, zero-overhead L3/L4 NetworkPolicy and Hubble observability, Identity-based security policies. For medium-to-large clusters or those with security/compliance needs, this trade is well worth it.
+
+### Cilium Native vs Overlay
+
+Performance is essentially identical (< 5% difference). **Choose by network architecture, not performance**: pick Native if Pod IPs need to be directly routable in the VPC; pick Overlay if Pod CIDR needs to be decoupled from the VPC.
+
+### Small scale vs large scale Services
+
+iptables performance is strongly correlated with Service count (O(n)) — short-conn degradation worsens from 22% to 37% going from 5000 to 10000 svc. Cilium is decoupled from Service count (O(1)), staying under 10% throughout. **This is the core reason large-scale clusters choose Cilium to replace kube-proxy.**
 
 For detailed selection guidance, see [Cilium Performance Test - Recommendations](./performance-test.md#recommendations).
 
 ## References
 
 - [Cilium Performance Test (cilium connectivity perf)](./performance-test.md)
-- [VPC-CNI Native Routing Mode Explained](./native-routing.md)
+- [VPC-CNI Native Routing Details](./native-routing.md)
 - [Install Cilium](../install.md)

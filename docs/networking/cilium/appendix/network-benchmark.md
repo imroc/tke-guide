@@ -1,18 +1,24 @@
 # Cilium 网络性能 Benchmark
 
-本文使用 [`network-benchmark.sh`](https://imroc.cc/tke/scripts/network-benchmark.sh) 一键脚本对 **iptables/kube-proxy**、**Cilium Native Routing** 和 **Cilium Overlay** 三种网络方案进行全方位性能对比，覆盖吞吐量、HTTP RPS、TCP 延迟、Service 规模化退化、Hubble 开销、NetworkPolicy 开销、组件资源消耗等维度。
+本文使用 [`network-benchmark.sh`](https://imroc.cc/tke/scripts/network-benchmark.sh) 一键脚本，在**完全相同的硬件、内核、VPC 环境**下对三种 TKE 网络方案做全方位性能对比：
 
-:::tip[与 cilium connectivity perf 的区别]
+- **Cluster A — VPC-CNI + kube-proxy iptables**：传统方案，作为性能基线
+- **Cluster B — VPC-CNI + Cilium Native Routing**：Cilium 以 cni-chaining 接在 VPC-CNI 之上，Pod IP 仍是 VPC 合法 IP
+- **Cluster C — VPC-CNI + Cilium Overlay (VXLAN)**：Cilium 独占 Pod CNI，Pod 走独立 overlay 网段
 
-[Cilium 性能测试](./performance-test.md) 使用 `cilium connectivity perf`（基于 netperf）测试 TCP_RR 延迟和 TCP_STREAM 吞吐。本文的 `network-benchmark.sh` 脚本额外覆盖：
+覆盖吞吐量、HTTP RPS、TCP 延迟、Service 规模化退化（0→5000→10000）、Hubble 开销、NetworkPolicy L3/L4 与 L7 开销、BPF 内存、组件资源消耗等维度。
 
-- **HTTP 层面**：fortio 全速压测 RPS（长连接 / 短连接）
-- **Service 路径**：经 ClusterIP Service 的吞吐和 RPS
-- **大规模 Service 退化**：5000 Services 后的 RPS 退化对比（O(1) vs O(n)）
-- **Hubble / NetworkPolicy 开销**：量化可观测性和策略执行的性能影响
-- **iptables 基线**：加入无 Cilium 的 kube-proxy iptables 模式作为参照
+:::tip[本文想回答的三个问题]
 
-两篇文档互补，建议结合阅读。
+1. **iptables vs Cilium**：换成 Cilium 后性能是涨还是跌？代价在哪、收益在哪？
+2. **Cilium Native vs Overlay**：两种 Cilium 部署形态性能差多少？怎么选？
+3. **小规模 vs 大规模 Service**：Service 数量从 5000 涨到 10000，三种方案的退化曲线如何？
+
+:::
+
+:::note[与 cilium connectivity perf 的区别]
+
+[Cilium 性能测试](./performance-test.md) 使用 `cilium connectivity perf`（基于 netperf）测 TCP_RR 延迟和 TCP_STREAM 吞吐。本文的 `network-benchmark.sh` 额外覆盖 HTTP 层 RPS、经 Service 路径、大规模 Service 退化、Hubble / NetworkPolicy 开销、BPF 内存等维度，并加入 iptables 基线对照。两篇互补，建议结合阅读。
 
 :::
 
@@ -44,9 +50,6 @@ bash -c "$(curl -sfL https://imroc.cc/tke/scripts/network-benchmark.sh)"
 # 多轮测试（大规格实例无 QoS 顾虑时）
 ROUNDS=3 IPERF_DURATION=120 FORTIO_DURATION=120 bash network-benchmark.sh --dir ./bench
 
-# 指定输出目录和 namespace
-bash network-benchmark.sh --dir ./my-results --ns my-bench
-
 # 自定义 Service 规模化测试档位
 SVC_SCALE_STEPS="1000,5000,10000" SVC_CREATE_PARALLEL=8 bash network-benchmark.sh
 ```
@@ -60,14 +63,14 @@ SVC_SCALE_STEPS="1000,5000,10000" SVC_CREATE_PARALLEL=8 bash network-benchmark.s
 | `SVC_SCALE_STEPS`     | 5000,10000 | Service 规模化测试档位（逗号分隔，递增） |
 | `SVC_CREATE_PARALLEL` | 4          | 并发创建 Service 的 worker 数            |
 
-### 测试指标说明
+### 测试工具与指标
 
 | 工具    | 测试内容                                            | 指标                  |
 | ------- | --------------------------------------------------- | --------------------- |
 | iperf3  | 跨节点 TCP 吞吐                                     | Gbps（1/8/16 并发流） |
 | fortio  | HTTP RPS（长连接 / 短连接）                         | req/s                 |
 | netperf | TCP_RR / TCP_CRR 延迟                               | p50 / p99 微秒        |
-| fortio  | 多档 Service 规模（默认 5000/10000）后 RPS 退化     | 退化百分比            |
+| fortio  | 多档 Service 规模（5000/10000）后 RPS 退化          | 退化百分比            |
 | fortio  | Hubble on/off RPS 对比（仅 Cilium）                 | 开销百分比            |
 | fortio  | NetworkPolicy L3/L4 + L7 前后 RPS 对比（仅 Cilium） | 开销百分比            |
 | bpftool | BPF map 内存占用统计（仅 Cilium）                   | MB                    |
@@ -77,264 +80,285 @@ SVC_SCALE_STEPS="1000,5000,10000" SVC_CREATE_PARALLEL=8 bash network-benchmark.s
 | 项              | Cluster A (iptables)          | Cluster B (Cilium Native)                       | Cluster C (Cilium Overlay)           |
 | --------------- | ----------------------------- | ----------------------------------------------- | ------------------------------------ |
 | 网络方案        | VPC-CNI + kube-proxy iptables | VPC-CNI + Cilium cni-chaining（Native Routing） | Cilium VXLAN Overlay（独占 Pod CNI） |
-| Kubernetes 版本 | v1.34.1                       | v1.34.1                                         | v1.34.1                              |
+| Kubernetes 版本 | v1.34.1-tke.5                 | v1.34.1-tke.5                                   | v1.34.1-tke.5                        |
 | Cilium 版本     | N/A                           | v1.19.4                                         | v1.19.4                              |
+| kube-proxy 替代 | 否（iptables 模式）           | 是（eBPF）                                      | 是（eBPF）                           |
 | 节点 OS         | TencentOS Server 4            | TencentOS Server 4                              | TencentOS Server 4                   |
 | 内核版本        | 6.6.117                       | 6.6.117                                         | 6.6.117                              |
 | 节点规格        | SA5.LARGE8（4C 8G）           | SA5.LARGE8（4C 8G）                             | SA5.LARGE8（4C 8G）                  |
 | 节点数量        | 3                             | 3                                               | 3                                    |
 
-三个集群位于同一 VPC、相同规格硬件、相同内核版本，保证公平对比。
+三个集群位于同一 VPC、相同规格硬件、相同内核版本，保证公平对比。所有 RPS / 延迟测试均为跨节点（不同 Worker）。
 
-## 测试结果
+## 一图速览
 
-### 吞吐量（iperf3, 30s, 跨节点）
+| 维度                      | iptables   | Cilium Native | Cilium Overlay | 关键结论                          |
+| ------------------------- | ---------- | ------------- | -------------- | --------------------------------- |
+| Pod2Pod 吞吐（8 streams） | 10.43 Gbps | 10.43 Gbps    | 10.77 Gbps     | 三者均达突发上限，无差异          |
+| RPS 长连接（c64）         | 90,164     | 74,684        | 76,384         | iptables 高 ~20%                  |
+| RPS 短连接（c64）         | 22,313     | 10,258        | 10,537         | iptables 高 ~115%                 |
+| TCP_RR p99                | 121 µs     | 135 µs        | 129 µs         | Cilium 高 ~10-15 µs               |
+| HTTP p99 @1000 QPS        | 0.99 ms    | 0.99 ms       | 0.99 ms        | **真实负载下三者完全相同**        |
+| 10000 svc 短连接退化      | **-37.3%** | **-9.0%**     | **-8.4%**      | **iptables O(n)，Cilium 近 O(1)** |
+| L3/L4 NetworkPolicy 开销  | N/A        | -0.5%         | -0.1%          | 零开销                            |
+| L7 NetworkPolicy 开销     | N/A        | -85.2%        | -86.3%         | Envoy 代理，需选择性启用          |
+| Hubble L3/L4 开销         | N/A        | -0.4%         | -0.1%          | 零开销                            |
+| BPF map 内存 / 节点       | N/A        | 92.8 MB       | 92.7 MB        | 预分配，不随 svc 增长             |
+| 数据面组件内存 / 节点     | 31.5 MB    | 391 MB        | 321 MB         | Cilium 换来了能力                 |
+
+下面分维度展开。
+
+## 一、吞吐量（iperf3, 30s, 跨节点）
 
 | 场景                      | iptables   | Cilium Native | Cilium Overlay |
 | ------------------------- | ---------- | ------------- | -------------- |
 | Node hostNet（8 streams） | 10.44 Gbps | 10.44 Gbps    | 10.82 Gbps     |
-| Pod-to-Pod（single）      | 10.43 Gbps | 10.43 Gbps    | 10.63 Gbps     |
+| Pod-to-Pod（single）      | 10.43 Gbps | 10.42 Gbps    | 10.76 Gbps     |
 | Pod-to-Pod（8 streams）   | 10.43 Gbps | 10.43 Gbps    | 10.77 Gbps     |
 | Pod-to-Pod（16 streams）  | 10.43 Gbps | 10.43 Gbps    | 10.77 Gbps     |
-| Via Service（8 streams）  | 10.38 Gbps | 10.43 Gbps    | 10.77 Gbps     |
+| Via Service（8 streams）  | 10.43 Gbps | 10.43 Gbps    | 10.60 Gbps     |
 
-:::note
+:::note[吞吐量三者等价]
 
-三者均跑满 10 Gbps 接近 SA5.LARGE8 实例突发带宽上限，**吞吐量层面三种方案完全等价**。集群间 ±4% 差异属于 VPC 突发带宽波动和不同物理节点间网络路径差异，不代表方案差异。16 streams 与 8 streams 吞吐一致，说明 8 并发流已饱和网卡。Overlay 略高于 Native 是测试时段 VPC 带宽波动的偶然结果，与 VXLAN 封装无关。
+三种方案均跑满 ~10.4-10.8 Gbps，逼近 SA5.LARGE8 实例的突发带宽上限——**吞吐量层面三者完全等价**。集群间的 ±4% 差异是 VPC 突发带宽波动和物理节点路径差异，不代表方案优劣。16 streams 与 8 streams 持平，说明 8 并发流已饱和网卡。
 
-:::
-
-### RPS（fortio, 60s, max QPS, 跨节点）
-
-| 场景                     | iptables         | Cilium Native    | Cilium Overlay   | Cilium vs iptables |
-| ------------------------ | ---------------- | ---------------- | ---------------- | ------------------ |
-| Pod-to-Pod c64 keepalive | 91,698 req/s     | 75,785 req/s     | 75,252 req/s     | -17% ~ -18%        |
-| Via Svc c64 keepalive    | 91,896 req/s     | 75,272 req/s     | 75,191 req/s     | -18%               |
-| Via Svc c256 keepalive   | 93,882 req/s     | 77,126 req/s     | 76,279 req/s     | -18%               |
-| **Via Svc c64 短连接**   | **22,846** req/s | **10,194** req/s | **10,554** req/s | **-54% ~ -55%**    |
-
-:::tip[RPS 差异解读：iptables 高于 Cilium 的根因]
-
-**Cilium Native：cni-chaining + per-endpoint 路由（-18% / -55%）**
-
-VPC-CNI 是 Pod 网络的主 CNI（分配 VPC IP），Cilium 以 cni-chaining 方式接在其上提供策略与可观测性能力。这种架构下 Pod 流量必须走 per-endpoint 路由（`endpointRoutes=true`），数据包绕过 `cilium_host` 设备，进入 Pod 前后都要穿越内核网络栈（netfilter + FIB lookup）；Cilium eBPF 也要做 conntrack + Service 解析 + Policy 检查。这就是测试中 Native 长连接 RPS 比 iptables 低 ~18%、短连接低 ~55% 的根本原因——每个包多走了一层 eBPF 处理但内核栈没省下来。
-
-**Cilium Overlay：Cilium 是唯一 Pod CNI，VXLAN encap/decap 是主要代价**
-
-Overlay 模式下 Cilium 自己分配 Pod IP（独立 PodCIDR），节点间通过 VXLAN 隧道互通——Cilium 是唯一 Pod CNI，不存在 cni-chaining。Pod 流量走 `cilium_host` 与 `cilium_vxlan` 设备，BPF Host Routing 可正常生效（满足 `kubeProxyReplacement=true` + `bpf.masquerade=true`）。但跨节点包必须做 VXLAN encap（出口）+ decap（入口），50 字节封包构造、UDP checksum、内层 metadata 维护构成主要开销。
-
-测试结果上 Native 和 Overlay RPS 几乎持平（差异 &lt; 1%），但路径与代价完全不同：
-
-| 集群                                  | Pod CNI 关系           | 主要开销来源               |
-| ------------------------------------- | ---------------------- | -------------------------- |
-| Cilium Native（VPC-CNI cni-chaining） | VPC-CNI 主 + Cilium 链 | per-endpoint 路由 + 内核栈 |
-| Cilium Overlay                        | Cilium 独占            | VXLAN encap/decap          |
-
-**为什么 iptables 反而更高？**
-
-iptables 模式在小规模 Service 下数据路径最短：每个包只走一次内核协议栈，kube-proxy 的 NAT 规则只是 PREROUTING/POSTROUTING 链上的几条规则匹配，没有额外的 eBPF 处理或封装代价。Cilium 无论 Native 还是 Overlay，都引入了一层不可省的处理，因此在小规模、极限压测场景下 iptables 取得绝对值领先。
-
-**关键认知**：iptables 的小规模 RPS 优势只是 ClusterIP Service 在简单架构下的局部最优。一旦 Service 数量增长，iptables 的 O(n) 退化（见后续 Service Scale 章节）会迅速吞噬这部分优势。本测试中 Cilium 与云厂商 VPC-CNI 集成，是 TKE 客户最常见的部署形态；只有当 Cilium 完全自管 Pod CIDR（如 Overlay 模式或纯 Cilium 自建集群的 Cluster Pool IPAM + auto-direct-node-routes/BGP）才能避免 cni-chaining，但相应也不再继承 VPC-CNI 的 VPC 直接可路由优势。
+值得注意的是 Overlay 即使带 VXLAN 封装，大包吞吐反而略高——说明 50 字节封装头在大包（MTU 级别）场景下占比极小，对吞吐无实质影响。VXLAN 的代价主要体现在小包高频场景（见 RPS 章节）。
 
 :::
 
-### 延迟（netperf TCP_RR / TCP_CRR + fortio HTTP, 跨节点）
+## 二、RPS（fortio, 60s, max QPS, 跨节点）
+
+这是本测试中差异最大的维度。
+
+| 场景                   | iptables         | Cilium Native    | Cilium Overlay   |
+| ---------------------- | ---------------- | ---------------- | ---------------- |
+| Pod-to-Pod c64 长连接  | 90,097 req/s     | 74,454 req/s     | 76,341 req/s     |
+| Via Svc c64 长连接     | 90,164 req/s     | 74,684 req/s     | 76,384 req/s     |
+| Via Svc c256 长连接    | 91,649 req/s     | 76,534 req/s     | 77,768 req/s     |
+| **Via Svc c64 短连接** | **22,313** req/s | **10,258** req/s | **10,537** req/s |
+
+### 为什么 iptables 的 RPS 反而更高？
+
+这是最反直觉的结论。Cilium 用 eBPF 替代 iptables，"应该更快"，但在小规模 Service 的极限 RPS 压测中 iptables 领先 ~20%（长连接）到 ~115%（短连接）。原因要分两种 Cilium 形态分别看：
+
+**Cilium Native：cni-chaining + per-endpoint 路由**
+
+VPC-CNI 是 Pod 网络的主 CNI（分配 VPC IP），Cilium 以 cni-chaining 方式接在其上提供策略与可观测能力。这种架构强制开启 per-endpoint 路由（`endpointRoutes=true`），Pod 流量走单独的 veth 路由、不经过 `cilium_host` 设备——既要走完整内核网络栈（netfilter + FIB lookup），又要叠加 eBPF 的 conntrack + Service 解析 + Policy 检查。每个包多了一层 eBPF 处理，却没省下内核栈那一层。
+
+**Cilium Overlay：VXLAN encap/decap**
+
+Overlay 模式下 Cilium 是唯一 Pod CNI，BPF Host Routing 可正常生效，跳过了部分内核栈。但每个跨节点包都要做 VXLAN encap（出口）+ decap（入口）：封包构造、UDP checksum、内层 metadata 维护构成主要开销。
+
+**iptables 路径最短**
+
+小规模 Service 下，iptables 模式每个包只走一次内核协议栈，kube-proxy 的 NAT 规则只是 PREROUTING/POSTROUTING 上的几条匹配，没有 eBPF 处理也没有封装。所以在小规模、极限压测下 iptables 取得绝对值领先。
+
+:::tip[关键认知：这是局部最优，不是全局最优]
+
+iptables 的小规模 RPS 优势只在"Service 数量少 + 极限压测"这个特定条件下成立。一旦 Service 数量增长，iptables 的 O(n) 退化会迅速吞掉这部分优势（见[第五节](#五service-规模化退化0--5000--10000)）。
+
+而且——**这个差异对真实业务无感知**。所有三种方案的绝对 RPS（74K-90K）都远超典型微服务单 Pod 的负载需求（通常 < 10K）。在真实负载下（见下方延迟章节的 HTTP p99 @1000 QPS），三者表现完全一致。
+
+:::
+
+### Native vs Overlay：几乎持平
+
+Native（74,684）和 Overlay（76,384）长连接 RPS 差异 < 3%，短连接（10,258 vs 10,537）差异 < 3%。两者数据面开销构成不同（一个是 cni-chaining 双层处理，一个是 VXLAN 封装），但量级恰好相当。
+
+## 三、延迟（netperf TCP_RR / TCP_CRR + fortio HTTP, 跨节点）
 
 | 指标               | iptables | Cilium Native | Cilium Overlay |
 | ------------------ | -------- | ------------- | -------------- |
-| TCP_RR p50         | 92 µs    | 114 µs        | 105 µs         |
-| TCP_RR p99         | 112 µs   | 136 µs        | 130 µs         |
-| TCP_CRR p99        | 427 µs   | 641 µs        | 605 µs         |
+| TCP_RR p50         | 99 µs    | 106 µs        | 105 µs         |
+| TCP_RR p99         | 121 µs   | 135 µs        | 129 µs         |
+| TCP_CRR p99        | 467 µs   | 623 µs        | 608 µs         |
 | HTTP p99 @1000 QPS | 0.99 ms  | 0.99 ms       | 0.99 ms        |
 
-:::tip[延迟差异解读]
+:::tip[延迟差异在真实负载下消失]
 
-- **TCP_RR**（keepalive 请求-响应）：Cilium 比 iptables 多 ~18-22 µs，是 eBPF 数据面 conntrack lookup + policy check 的固有开销。亚毫秒级，应用层无感知。
-- **TCP_CRR**（每次新建连接）：Cilium 比 iptables 多 ~180-210 µs，新连接的 SYN 包需要做 BPF conntrack 创建 + Service 解析 + 完整内核栈穿越。
-- **HTTP p99 @1000 QPS**：在真实业务负载下，三者**完全相同**（0.99 ms）—— 微秒级差异被应用层处理时间淹没。
-- **Native vs Overlay**：跨节点延迟差异 < 10 µs。两者 datapath 不同（Native 是 cni-chaining 下的 per-endpoint 路由 + 内核栈，Overlay 是 BPF Host Routing + VXLAN encap/decap），但延迟代价数值上恰好相当。
+- **TCP_RR**（长连接请求-响应）：Cilium 比 iptables 多 ~10-15 µs，是 eBPF 数据面 conntrack lookup + policy check 的固有开销。亚毫秒级，应用层无感知。
+- **TCP_CRR**（每次新建连接）：Cilium 比 iptables 多 ~140-155 µs，因新连接的 SYN 包要做 BPF conntrack 创建 + Service 解析 + 完整内核栈穿越。
+- **HTTP p99 @1000 QPS**：在真实业务速率（1000 QPS）下，三者**完全相同**（0.99 ms）。微秒级差异被应用层处理时间彻底淹没。
 
-**关键结论**：极限压测的延迟差异（µs 级）只在 wrk/fortio 这种空 HTTP 响应场景下可见。一旦应用本身有任何处理逻辑（数据库查询、JSON 序列化等），网络层的 µs 差异完全被掩盖。
-
-:::
-
-### Service 规模化（5000 Services 后 RPS 退化）
-
-测试方法：先创建 5000 个 dummy ClusterIP Service（每个含 5 个 endpoint），等待 60s 同步完成后，在相同负载下对比退化幅度。
-
-#### 5000 Services 全量结果
-
-| 指标                    | iptables      | Cilium Native | Cilium Overlay |
-| ----------------------- | ------------- | ------------- | -------------- |
-| iptables 规则总数       | **30,142 条** | -             | -              |
-| keepalive RPS 基线      | 91,896 req/s  | 75,272 req/s  | 75,191 req/s   |
-| keepalive RPS @5000 svc | 91,528 req/s  | 76,341 req/s  | 75,181 req/s   |
-| **keepalive 退化**      | -0.4%         | +1.4%         | -0.0%          |
-| 短连接 RPS 基线         | 22,846 req/s  | 10,194 req/s  | 10,554 req/s   |
-| 短连接 RPS @5000 svc    | 17,528 req/s  | 9,738 req/s   | 9,897 req/s    |
-| **短连接退化**          | **-23.3%**    | **-4.5%**     | **-6.2%**      |
-
-#### 小规模 vs 大规模：iptables 退化加速 vs Cilium 保持恒定
-
-将本次 5000 svc 数据与早期同环境的 1000 svc 数据放在一起，能直观看到规模放大后两套架构的差异：
-
-| 指标                   | iptables（1000→5000）    | Cilium Native（1000→5000） | Cilium Overlay（1000→5000） |
-| ---------------------- | ------------------------ | -------------------------- | --------------------------- |
-| iptables 规则总数      | 6,142 → **30,142**（×5） | -                          | -                           |
-| keepalive 退化         | -0.4% → -0.4%            | -0.2% → +1.4%              | 0.0% → -0.0%                |
-| **短连接退化**         | **-5.9% → -23.3%**       | **-1.6% → -4.5%**          | **-4.1% → -6.2%**           |
-| 短连接退化随规模增长比 | **× 4** （线性放大）     | × 2.8 （亚线性，含噪声）   | × 1.5 （亚线性）            |
-
-:::tip[O(1) vs O(n)：核心差异随规模放大]
-
-**keepalive 场景三方均无退化**：conntrack 缓存了首包决策，后续包直接命中，无需再遍历规则链或查询 BPF map。这是为什么大多数生产负载（用了连接池或 HTTP keepalive）感受不到 Service 规模带来的性能影响。
-
-**短连接场景才是真正的考验**：每个新 TCP 连接的 SYN 包都必须重新完成 Service 选择：
-
-- **iptables O(n) 顺序遍历**：1000 svc 时退化 5.9%，5000 svc 时退化 23.3%，**规则数 ×5 → 退化 ×4**，几乎线性恶化。这是 KUBE-SERVICES → KUBE-SVC-XXX → KUBE-SEP-XXX 三层链表顺序匹配的固有代价，规模越大代价越明显。
-- **Cilium BPF hash map O(1) 查找**：1000 svc 时退化 1.6%，5000 svc 时退化 4.5%，规模 ×5 但退化仅放大 ~3 倍。**残余退化的来源不是查表本身**，而是 5000 svc 同步过程中 cilium-agent 控制面的 BPF map 写入压力 + conntrack 表条目膨胀（5000 svc × 多 endpoint × 短连接频繁创建/淘汰）的 datapath 副作用，与 Service 数量并非线性相关。
-- **Overlay 略高于 Native**：因为 VXLAN encap/decap 的代码路径上 conntrack 表条目维护更密集，但量级仍远低于 iptables。
-
-**外推 10000+ Services 场景**：iptables 短连接退化将逼近 50%（线性），而 Cilium 仍保持在 10% 以内。这是 Cilium 替换 kube-proxy 在大规模集群下最核心的价值。
+**这是全文最重要的一张表**：极限压测暴露的 µs 级差异，只在 fortio/wrk 这种空响应、打满 CPU 的场景下才可见。一旦应用本身有任何处理逻辑（数据库查询、JSON 序列化、业务计算），网络层的微秒差异完全不可见。
 
 :::
 
-### Hubble 可观测性开销（仅 Cilium）
+## 四、Cilium Native vs Overlay：怎么选
+
+两者在所有 RPS、延迟、规模化退化指标上的差异都在 ±5% 噪声范围内。**选型应基于网络架构需求，而非性能**：
+
+| 维度       | Cilium Native                              | Cilium Overlay                                  |
+| ---------- | ------------------------------------------ | ----------------------------------------------- |
+| Pod IP     | VPC 合法 IP，VPC 内直接可路由              | 独立 overlay 网段，与 VPC 解耦                  |
+| 适用场景   | 直连 CLB、跨集群/跨 VPC 互通、传统监控直采 | IP 资源紧张、跨 VPC 复用 CIDR、Pod 数超弹性网卡 |
+| 数据面 CPU | ~102 m                                     | ~89 m                                           |
+| 跨节点延迟 | TCP_RR p99 135 µs                          | TCP_RR p99 129 µs                               |
+| MTU        | 无额外开销                                 | VXLAN 占用 50 字节（建议开启巨型帧缓解）        |
+
+实测两者性能基本一致，Native 数据面 CPU 反而略高（cni-chaining 双层处理），Overlay 略低（BPF Host Routing 生效）但需承担 VXLAN 封装的 MTU 开销。**核心判据是 Pod IP 是否需要在 VPC 内直接可路由。**
+
+> 关于为什么 Native 模式下 BPF Host Routing 实际不命中、以及云厂商 Native IPAM 的共性，详见 [VPC-CNI Native Routing 模式详解](./native-routing.md)。
+
+## 五、Service 规模化退化（0 → 5000 → 10000）
+
+测试方法：创建 N 个 dummy ClusterIP Service（各含 endpoint），等待 60s 同步后，在相同负载下对比 RPS 退化。这是 Cilium 替换 kube-proxy 最核心的价值所在。
+
+### 长连接：三者都几乎无退化
+
+| Service 数 | iptables | Cilium Native | Cilium Overlay |
+| ---------- | -------- | ------------- | -------------- |
+| 基线（0）  | 90,164   | 74,684        | 76,384         |
+| 5000       | -1.3%    | -0.2%         | -0.2%          |
+| 10000      | -0.8%    | -0.6%         | -0.9%          |
+
+长连接场景三者均无明显退化——conntrack 缓存了首包的转发决策，后续包直接命中，无需再遍历规则链或查 BPF map。**这就是为什么用了连接池或 HTTP keepalive 的生产业务，基本感受不到 Service 规模的影响。**
+
+### 短连接：iptables 线性恶化，Cilium 近乎恒定
+
+| Service 数      | iptables             | Cilium Native      | Cilium Overlay     |
+| --------------- | -------------------- | ------------------ | ------------------ |
+| 基线（0）       | 22,313 req/s         | 10,258 req/s       | 10,537 req/s       |
+| 5000            | 17,336（-22.3%）     | 9,582（-6.6%）     | 9,915（-5.9%）     |
+| 10000           | 13,994（**-37.3%**） | 9,331（**-9.0%**） | 9,653（**-8.4%**） |
+| iptables 规则数 | 30136 → 60118        | -                  | -                  |
+
+:::tip[O(1) vs O(n)：差距随规模放大]
+
+**短连接才是真正的考验**：每个新 TCP 连接的 SYN 包都要重新完成 Service 选择，无法命中 conntrack 缓存。
+
+- **iptables 是 O(n) 顺序遍历**：每个 SYN 包要顺序匹配 KUBE-SERVICES → KUBE-SVC-XXX → KUBE-SEP-XXX 规则链。5000 svc 时 30136 条规则、退化 22.3%；10000 svc 时 60118 条规则（翻倍）、退化 **37.3%**。退化随规则数近乎线性恶化。
+- **Cilium 是 O(1) BPF hash map 查找**：无论多少 Service，单次查表耗时恒定。Native 从 -6.6%（5000）到 -9.0%（10000）、Overlay 从 -5.9% 到 -8.4%，均为亚线性增长。
+
+**残余退化的来源不是查表本身**，而是 5000→10000 svc 同步过程中 cilium-agent 控制面的 BPF map 写入压力 + conntrack 表条目膨胀（短连接频繁创建/淘汰）的 datapath 副作用，与 Service 数量并非线性相关。
+
+**外推趋势**：iptables 短连接退化按规则数线性增长，10000 svc 已达 -37.3%，继续增长会逼近腰斩；而 Cilium 两种模式都稳定在 -10% 以内。**当集群 Service 数达数千以上，Cilium 的短连接表现将全面反超 iptables。**
+
+:::
+
+### 小规模 vs 大规模：一句话总结
+
+- **小规模（千以下）**：iptables 绝对值领先，因为路径最短、没有 eBPF/封装开销。
+- **大规模（数千以上）**：Cilium 反超，因为 O(1) 查找不随规模退化，而 iptables 的 O(n) 遍历线性恶化。
+- **长连接全程无感**：无论哪种方案、无论规模多大，长连接业务都不受影响。
+
+## 六、Hubble 可观测性开销（仅 Cilium）
 
 | 指标       | Cilium Native | Cilium Overlay |
 | ---------- | ------------- | -------------- |
-| Hubble ON  | 75,604 req/s  | 74,913 req/s   |
-| Hubble OFF | 75,676 req/s  | 74,621 req/s   |
-| **开销**   | **-0.1%**     | **+0.4%**      |
+| Hubble ON  | 74,096 req/s  | 76,006 req/s   |
+| Hubble OFF | 74,392 req/s  | 76,067 req/s   |
+| **开销**   | **-0.4%**     | **-0.1%**      |
 
 :::note
 
-Hubble L3/L4 可观测性的性能开销在 ±0.5% 噪声范围内，**实质为零**。Hubble 在 datapath 上仅做事件采样和 ring buffer 写入，不参与转发决策。可放心在生产环境全量启用 Hubble L3/L4 模式。
+Hubble L3/L4 可观测性开销在 ±0.5% 噪声范围内，**实质为零**。Hubble 在 datapath 上仅做事件采样和 ring buffer 写入，不参与转发决策。可放心在生产环境全量启用 Hubble L3/L4 流量观测。
 
 :::
 
-### NetworkPolicy 开销（仅 Cilium）
+## 七、NetworkPolicy 开销（仅 Cilium）
 
-#### L3/L4 策略
+### L3/L4 策略：零开销
 
 | 指标             | Cilium Native | Cilium Overlay |
 | ---------------- | ------------- | -------------- |
-| 无策略           | 75,573 req/s  | 74,900 req/s   |
-| L3/L4 CNP 生效后 | 75,675 req/s  | 74,910 req/s   |
-| **开销**         | **+0.1%**     | **+0.0%**      |
+| 无策略           | 74,576 req/s  | 76,132 req/s   |
+| L3/L4 CNP 生效后 | 74,202 req/s  | 76,064 req/s   |
+| **开销**         | **-0.5%**     | **-0.1%**      |
 
-:::note
+L3/L4 CiliumNetworkPolicy 的执行开销**为零**。Cilium 的 L3/L4 策略在 eBPF 程序中通过 identity lookup + bitmap 匹配实现，不引入额外的内存拷贝或上下文切换。**可放心对所有工作负载批量应用 L3/L4 NetworkPolicy。**
 
-L3/L4 CiliumNetworkPolicy 的执行开销**为零**。Cilium 的 L3/L4 策略在 eBPF 程序中通过 identity lookup + bitmap 匹配实现，不引入额外的内存拷贝或上下文切换。可放心对所有工作负载批量应用 L3/L4 NetworkPolicy。
-
-:::
-
-#### L7 策略（HTTP）
+### L7 策略（HTTP）：开销巨大，需谨慎
 
 | 指标          | Cilium Native | Cilium Overlay |
 | ------------- | ------------- | -------------- |
-| 无策略        | 待测          | 待测           |
-| L7 CNP 生效后 | 待测          | 待测           |
-| **开销**      | **待测**      | **待测**       |
+| 无策略        | 74,576 req/s  | 76,132 req/s   |
+| L7 CNP 生效后 | 11,048 req/s  | 10,439 req/s   |
+| **开销**      | **-85.2%**    | **-86.3%**     |
 
-:::warning[L7 策略有显著开销]
+:::warning[L7 策略只对必要的 Pod 启用]
 
-L7 CiliumNetworkPolicy（如 HTTP path/method 过滤）会将流量重定向到 Envoy 代理进行应用层检查，预计开销约 **-80% ~ -90%**。L7 策略应**仅对确实需要应用层安全控制的 Pod 选择性启用**，而非全量应用。
+L7 CiliumNetworkPolicy（如 HTTP path/method 过滤）会将流量重定向到 **Envoy 代理**做应用层解析，引入进程间通信和 HTTP 解析的巨大代价——实测 RPS 下降 **85%+**。
 
-L3/L4 策略已覆盖大多数生产工作负载的安全需求（按 IP、端口、命名空间标签的 allow/deny）。
+这不是 Cilium 的缺陷，而是 L7 可见性的固有成本（任何 L7 策略/Service Mesh 方案都有类似代价）。正确用法是：
+
+- **L3/L4 策略**：覆盖绝大多数生产安全需求（按 IP、端口、命名空间标签 allow/deny），零开销，可全量启用。
+- **L7 策略**：仅对确实需要应用层管控的 Pod 选择性启用（如对外入口网关、敏感 API 审计），不要全量铺开。
 
 :::
 
-### 资源占用
+## 八、资源占用
+
+### CPU / 内存
 
 | 组件                   | CPU avg | Memory avg |
 | ---------------------- | ------- | ---------- |
-| kube-proxy (iptables)  | 1.0 m   | 31.1 MiB   |
-| Cilium Agent (Native)  | 67.9 m  | 188.1 MiB  |
-| Cilium Agent (Overlay) | 96.8 m  | 192.0 MiB  |
+| kube-proxy (iptables)  | 1.0 m   | 31.5 MiB   |
+| Cilium Agent (Native)  | 102.5 m | 237.7 MiB  |
+| Cilium Agent (Overlay) | 88.8 m  | 209.9 MiB  |
 
-:::note
+kube-proxy 仅做 Service 同步，CPU/内存极低；但它把 iptables 规则膨胀和扫描的开销转嫁到了 datapath（见第五节）。Cilium Agent 不仅替换 kube-proxy，还同时承担 NetworkPolicy 编译、Hubble 流量采集、Identity 分配、BPF map 维护等职责，资源消耗自然更高——**但换来的是与 Service 规模解耦的 datapath（O(1)）和一整套企业级能力**。
 
-- **kube-proxy 仅做 Service 同步**，CPU/内存极低；但带来的 iptables 规则膨胀和扫描开销转嫁到了 datapath。
-- **Cilium Agent 不仅替换 kube-proxy**，还同时承担 NetworkPolicy 编译、Hubble 流量采集、Identity 分配、BPF map 维护等职责，资源消耗自然更高。但 datapath 性能与 Service 规模解耦（O(1)）。
-- **Overlay 比 Native CPU 高 ~30m**：来自 VXLAN encap/decap 在 BPF 程序中的额外计算。
-
-如果 NetworkPolicy、可观测性等能力通过 sidecar 方式单独实现，总开销远高于 Cilium Agent 的 ~190 MiB。
-
-:::
-
-### BPF Map 内存开销（仅 Cilium）
-
-BPF map 使用**预分配机制**——在创建时按 `max_entries` 一次性分配最大内存，后续增删 Service / Endpoint 只是填充已分配的空间，不会动态增长。
+### BPF Map 内存：预分配，不随规模增长
 
 | 指标             | Cilium Native | Cilium Overlay |
 | ---------------- | ------------- | -------------- |
-| BPF map 总内存   | 待测          | 待测           |
-| BPF map 数量     | 待测          | 待测           |
-| Cilium Agent RSS | 待测          | 待测           |
+| BPF map 总内存   | 92.8 MB       | 92.7 MB        |
+| BPF map 数量     | 76            | 47             |
+| Cilium Agent RSS | 391 MB        | 321 MB         |
+
+Top BPF map 内存消耗（两集群基本一致）：
+
+| Map 名称（截断）  | Max Entries | 内存    |
+| ----------------- | ----------- | ------- |
+| cilium_ct4_global | 131,072     | 17.0 MB |
+| cilium_snat_v4    | 131,072     | 15.0 MB |
+| cilium_nodeport   | 131,072     | 10.0 MB |
+| cilium_policymap  | 65,536      | 9.5 MB  |
+| cilium_ct_any4    | 65,536      | 8.5 MB  |
 
 :::note[BPF 内存不会与业务争抢]
 
-在 SA5.LARGE8（4C 8G）节点上，Cilium 的全部内存占用（Agent RSS + BPF map）预计约 300 MB（约 3.8% 节点内存），剩余 77%+ 可供业务 Pod 使用。BPF map 预分配意味着即使 Service 数量从 0 增长到 5000+，BPF map 内存也几乎不会增长——增长部分主要来自 Agent 进程堆内存（约 25-30 MB）。
+**关键机制：BPF map 使用预分配**——创建时按 `max_entries` 一次性分配最大内存，后续增删 Service/Endpoint 只是填充已分配空间，不会动态增长。这就是为什么本测试中即使 Service 从 0 涨到 10000，BPF map 总内存始终稳定在 ~92.7 MB。
+
+在 SA5.LARGE8（4C 8G）节点上的内存预算：
+
+```text
+节点总内存:           8,192 MB
+  系统预留:           ~1,024 MB
+  kubelet / 运行时:   ~512 MB
+  Cilium Agent RSS:   ~320-390 MB
+  BPF Maps (memlock): ~93 MB
+  ────────────────────────────
+  Cilium 合计:        ~410-480 MB（约 5-6% of 8G）
+  业务 Pod 可用:      ~6,000+ MB（73%+）
+```
+
+即使叠加 10000 Services + NetworkPolicy + 活跃连接，Cilium 的内存占用对业务也无实质影响。Native 的 RSS（391 MB）略高于 Overlay（321 MB），来自 cni-chaining 下更多的 endpoint 路由状态。
 
 :::
 
-## 对比分析
+## 总结
 
-### 三方差异汇总
+### iptables vs Cilium
 
-| 维度                         | 结论                                     | 量化差异                                  |
-| ---------------------------- | ---------------------------------------- | ----------------------------------------- |
-| **吞吐量**                   | 三者无差异                               | 均达 10 Gbps 突发上限                     |
-| **RPS 长连接**               | iptables 比 Cilium 高 ~18%               | 92K vs 75K（cni-chaining/VXLAN 额外开销） |
-| **RPS 短连接**               | iptables 比 Cilium 高 ~55%               | 23K vs 10K（同上，绝对值仍远超生产需求）  |
-| **TCP_RR p99**               | Cilium 比 iptables 高 ~20 µs             | 应用层无感知                              |
-| **HTTP p99 @1000 QPS**       | **三者完全相同**                         | 均为 0.99 ms                              |
-| **5000 svc 短连接退化**      | **iptables -23.3% vs Cilium -4.5/-6.2%** | **规模差距随 Service 数量放大**           |
-| **Hubble L3/L4 开销**        | 可忽略                                   | < 0.5%                                    |
-| **NetworkPolicy L3/L4 开销** | 零                                       | < 0.5%                                    |
-| **NetworkPolicy L7 开销**    | 约 -85%~-90%（Envoy 代理）               | 仅对需要应用层审计的 Pod 选择性启用       |
-| **BPF Map 内存**             | 预分配，不随 Service 数增长              | ~88 MB（约 1% 节点内存）                  |
-| **Cilium Native vs Overlay** | RPS 与延迟基本一致，Overlay CPU 略高     | RPS ±1%，延迟 ±10 µs，CPU +30m            |
+| 角度       | 结论                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------ |
+| 小规模 RPS | iptables 领先（路径最短，无 eBPF/封装开销），但这是局部最优                          |
+| 大规模 RPS | Cilium 反超（O(1) 不退化 vs iptables O(n) 线性恶化），10000 svc 短连接退化 37% vs 9% |
+| 真实负载   | **完全无差异**（HTTP p99 @1000 QPS 三者均 0.99 ms）                                  |
+| 附加能力   | Cilium 提供 NetworkPolicy、Hubble、Identity 安全策略、L7 等 iptables 不具备的能力    |
+| 资源       | Cilium 多耗 ~300 MB 内存/节点，但 BPF 预分配不随规模膨胀，对 8G 节点无压力           |
 
-### 核心结论
+**换 Cilium 的代价**：小规模极限压测下 ~20% RPS、~15 µs 延迟（真实负载无感）+ ~300 MB 内存。**换来的收益**：大规模 Service 下的 O(1) 性能、零开销的 L3/L4 NetworkPolicy 与 Hubble 可观测性、Identity-based 安全策略。对中大规模或有安全合规需求的集群，这笔交易完全划算。
 
-#### 1. 真实业务负载下三方完全等价
+### Cilium Native vs Overlay
 
-HTTP p99 @1000 QPS 三者都是 0.99 ms。极限压测的差异只在 fortio/wrk 这类空响应场景下才能复现，对生产应用无感知。
+性能基本一致（差异 < 5%）。**选型看网络架构而非性能**：需要 Pod IP 在 VPC 内直接可路由选 Native，需要 Pod CIDR 与 VPC 解耦选 Overlay。
 
-#### 2. iptables 在小规模下 RPS 更高，在大规模下显著退化
+### 小规模 vs 大规模 Service
 
-iptables 在小规模 Service（千以下）的极限 RPS 测试中**绝对值领先 Cilium ~18%**。Native 的差距来自 cni-chaining + per-endpoint 路由让每个包走完整内核栈、外加 eBPF 处理；Overlay 的差距来自 VXLAN encap/decap。两种集成方式都让 Cilium 比小规模 iptables 多一层处理，这是架构代价而非 Cilium 缺陷。
-
-但代价是 iptables 的 datapath 性能与 Service 数量强相关：
-
-- 1000 svc 短连接退化 5.9%
-- **5000 svc 短连接退化 23.3%**（线性放大约 4 倍）
-- 外推 10000 svc 将逼近 50%
-
-而 Cilium 的退化曲线远缓于线性增长（5000 svc 仅 4.5%~6.2%）。**集群 Service 数 ≥ 数千时，Cilium 反超 iptables。**
-
-#### 3. Cilium Native vs Overlay 性能几乎一致
-
-两者在所有 RPS、延迟、规模化退化指标上的差异都在 ±5% 噪声范围内。**选型应基于网络架构而非性能**：
-
-- 需要 Pod IP 在 VPC 内可路由（直连 ELB、跨集群通信、传统监控直接访问 Pod）→ **Native**
-- 需要 Pod CIDR 与 VPC 解耦（IP 资源紧张、跨 VPC 复用 CIDR、Pod 数量远超弹性网卡上限）→ **Overlay**
-
-Overlay 在 CPU 上比 Native 略高 ~30m（VXLAN 封解包），但内存几乎一致。
-
-#### 4. Hubble 与 L3/L4 NetworkPolicy 零开销，L7 需谨慎
-
-L3/L4 层面的 Hubble 和 NetworkPolicy 都不引入可测量的性能损失（< 0.5%）。生产环境可放心全量启用。
-
-**L7 CiliumNetworkPolicy（HTTP path/method 过滤）预计开销 ~85-90%**：流量被重定向到 Envoy 代理做应用层检查，引入进程间通信和 HTTP 解析的巨大代价。L7 策略应**仅对确实需要应用层安全控制的 Pod 选择性启用**（如外部入口网关、敏感 API），不建议全量应用。
-
-#### 5. 资源占用：Cilium 换来了能力，BPF 内存不争抢业务
-
-Cilium Agent 占用 ~70-100m CPU + ~190 MiB 内存，相比 kube-proxy 的 ~1m + 31MiB 多一个数量级。但获得了 NetworkPolicy（含 Identity-based）、Hubble、L7 策略支持、与 Service 数量解耦的 datapath 等能力。
-
-BPF map 使用预分配机制，总内存约 88 MB（约 1% 节点内存），不会随 Service/Endpoint 数量增长而膨胀。在 SA5.LARGE8（4C 8G）节点上，Cilium 全部内存占用（Agent + BPF map）约 300 MB，剩余 77%+ 可供业务 Pod 使用。
+iptables 的性能与 Service 数量强相关（O(n)），从 5000 到 10000 svc 短连接退化从 22% 恶化到 37%；Cilium 与 Service 数量解耦（O(1)），全程稳定在 10% 以内。**这是大规模集群选择 Cilium 替换 kube-proxy 的最核心理由。**
 
 详细选型建议参见 [Cilium 性能测试 - 选型建议](./performance-test.md#选型建议)。
 
