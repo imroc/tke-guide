@@ -35,6 +35,7 @@ set -uo pipefail
 #   ROUNDS             repetitions per scenario (default: 1)
 #   ROUND_SLEEP        seconds between rounds (default: 30)
 #   SVC_SCALE_STEPS    comma-separated Service counts for scale test (default: "5000,10000")
+#   SVC_ENDPOINTS      endpoints per dummy Service (default: 10, simulates multi-replica)
 #   SVC_CREATE_PARALLEL parallel workers when creating dummy Services (default: 4)
 #   KUBECTL_TIMEOUT    timeout for kubectl exec/cp calls (default: 180)
 #
@@ -159,6 +160,7 @@ Environment Variables:
   ROUNDS             repetitions per scenario (default: 1)
   ROUND_SLEEP        seconds between rounds (default: 30)
   SVC_SCALE_STEPS    comma-separated Service counts for scale test (default: "5000,10000")
+  SVC_ENDPOINTS      endpoints per dummy Service (default: 10, simulates multi-replica)
   SVC_CREATE_PARALLEL parallel workers when creating dummy Services (default: 4)
   KUBECTL_TIMEOUT    timeout for kubectl exec/cp calls (default: 180)
 
@@ -619,6 +621,41 @@ run_throughput_tests() {
 
 # ─── fortio RPS Tests ───────────────────────────────────────────────────────
 
+# Run fortio inside the pod writing JSON to a file, then kubectl cp it out.
+# This is the robust pattern (same as iperf): the kubectl exec WebSocket
+# carries almost nothing (-quiet suppresses fortio's per-thread stderr logs,
+# -json <file> keeps the result off stdout), so it never triggers the
+# "websocket close 1006 (abnormal closure)" that live-streaming a 30-60s
+# fortio run over exec does — especially under heavy Service-scale load.
+# Args: connections keepalive duration url out_local
+# Returns 0 on success (valid JSON in $out_local), 1 otherwise.
+_fortio_exec_file() {
+  local connections="$1" ka="$2" duration="$3" url="$4" out="$5"
+  local pod_file="/tmp/fortio_$$_$(basename "$out")"
+  local ka_arg=""
+  [[ "$ka" == "false" ]] && ka_arg="-keepalive=false"
+  local attempt max_attempts=3
+  for attempt in $(seq 1 $max_attempts); do
+    kubectl exec -n "$NS" fortio-client -- rm -f "$pod_file" >/dev/null 2>&1 || true
+    # -quiet: only log errors (suppresses per-thread progress flooding stderr)
+    # -json <file>: write result to pod-local file (empty stdout)
+    timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
+      fortio load -quiet -qps 0 -c "$connections" -t "${duration}s" $ka_arg -json "$pod_file" "$url" \
+      >/dev/null 2>&1 || true
+    if timeout 60 kubectl cp -n "$NS" "fortio-client:${pod_file}" "$out" >/dev/null 2>&1 \
+        && [[ -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; then
+      kubectl exec -n "$NS" fortio-client -- rm -f "$pod_file" >/dev/null 2>&1 || true
+      return 0
+    fi
+    rm -f "$out"
+    if [[ $attempt -lt $max_attempts ]]; then
+      warn "  attempt $attempt failed, retrying in 10s..."
+      sleep 10
+    fi
+  done
+  return 1
+}
+
 _run_fortio() {
   local label="$1" url="$2" connections="$3" keepalive="$4"
   local output_dir="$5" result_file="$6"
@@ -627,36 +664,13 @@ _run_fortio() {
   info "Running: $label (c=$connections, keepalive=$keepalive)"
 
   if [[ "$keepalive" == "false" ]]; then
-    # Short-connection mode: must use kubectl exec (REST API doesn't support
-    # disabling keepalive). Use shorter duration than keepalive (30s vs 60s) —
-    # short-conn QPS is ~10K so 30s yields 300K requests (statistically sound),
-    # while halving the stdout JSON size reduces WebSocket close 1006 risk.
-    # Especially important under 5000+ Service load where the node is busier.
-    local attempt max_attempts=3
-    local duration=$((FORTIO_DURATION > 30 ? 30 : FORTIO_DURATION))
-    for attempt in $(seq 1 $max_attempts); do
-      local rc=0
-      timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-        fortio load -qps 0 -c "$connections" -t "${duration}s" -keepalive=false -json - "$url" \
-        >"$out" 2>"${out}.err" || rc=$?
-      [[ ! -s "${out}.err" ]] && rm -f "${out}.err"
-      if [[ -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; then
-        break
-      fi
-      if [[ $attempt -lt $max_attempts ]]; then
-        warn "  attempt $attempt failed, retrying in 10s with shorter duration..."
-        rm -f "$out" "${out}.err"
-        sleep 10
-        duration=$((duration > 15 ? 15 : 10))
-      else
-        warn "  fortio failed after $max_attempts attempts"
-        [[ -s "${out}.err" ]] && warn "  stderr: $(tail -3 "${out}.err")"
-      fi
-    done
+    # Short-connection mode: file-based exec (REST API can't disable keepalive).
+    if ! _fortio_exec_file "$connections" false "$FORTIO_DURATION" "$url" "$out"; then
+      warn "  fortio short-conn failed after retries for $result_file"
+    fi
   else
-    # Keepalive mode: use fortio REST API via port-forward. This bypasses
-    # kubectl exec WebSocket entirely — high-throughput keepalive tests
-    # (80K+ req/s) always triggered WebSocket close 1006 via exec.
+    # Keepalive mode: prefer fortio REST API via port-forward (proven reliable
+    # for high-throughput 80K+ req/s). Fall back to file-based exec if it fails.
     local pf_pid=""
     local local_port=$((19000 + RANDOM % 1000))
     kubectl port-forward -n "$NS" pod/fortio-client ${local_port}:9999 >/dev/null 2>&1 &
@@ -673,34 +687,15 @@ _run_fortio() {
     kill "$pf_pid" 2>/dev/null || true
     wait "$pf_pid" 2>/dev/null || true
 
-    # If REST API failed, fall back to kubectl exec with retry
+    # If REST API failed, fall back to file-based exec
     if ! { [[ -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; }; then
-      warn "  REST API failed (rc=$rc), falling back to kubectl exec..."
+      warn "  REST API failed (rc=$rc), falling back to file-based exec..."
       rm -f "$out"
-      local attempt max_attempts=3
-      local duration="$FORTIO_DURATION"
-      for attempt in $(seq 1 $max_attempts); do
-        rc=0
-        timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-          fortio load -qps 0 -c "$connections" -t "${duration}s" -json - "$url" \
-          >"$out" 2>"${out}.err" || rc=$?
-        [[ ! -s "${out}.err" ]] && rm -f "${out}.err"
-        if [[ -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; then
-          break
-        fi
-        if [[ $attempt -lt $max_attempts ]]; then
-          warn "  attempt $attempt failed, retrying in 10s with shorter duration..."
-          rm -f "$out" "${out}.err"
-          sleep 10
-          duration=30
-        else
-          warn "  fortio failed after $max_attempts attempts"
-          [[ -s "${out}.err" ]] && warn "  stderr: $(tail -3 "${out}.err")"
-        fi
-      done
+      if ! _fortio_exec_file "$connections" true "$FORTIO_DURATION" "$url" "$out"; then
+        warn "  fortio keepalive failed after retries for $result_file"
+      fi
     fi
   fi
-  [[ -f "${out}.err" && ! -s "${out}.err" ]] && rm -f "${out}.err"
 
   # Parse result if we got valid output
   if [[ ! -s "$out" ]]; then
@@ -827,6 +822,12 @@ run_service_scale_test() {
   local -a steps
   IFS=',' read -ra steps <<< "$steps_str"
 
+  # Endpoints per dummy Service. Real-world Services have multiple backend
+  # Pods; each Endpoint adds a KUBE-SEP rule in iptables (worsening O(n)),
+  # while Cilium's BPF map lookup stays O(1). Default 10 simulates a typical
+  # multi-replica Deployment.
+  local eps_per_svc="${SVC_ENDPOINTS:-10}"
+
   local max_svc="${steps[${#steps[@]}-1]}"
   step "Running Service Scale Test (steps: ${steps_str})"
   local d="$OUTPUT_DIR/service-scale"
@@ -837,6 +838,7 @@ run_service_scale_test() {
 
   # Save scale steps metadata
   printf '%s\n' "${steps[@]}" | paste -sd',' - >"$d/scale_steps.txt"
+  echo "$eps_per_svc" >"$d/endpoints_per_svc.txt"
 
   kubectl create namespace test-services --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null
 
@@ -853,7 +855,7 @@ run_service_scale_test() {
       continue
     fi
 
-    info "Creating dummy Services ${start_idx}..${svc_count} (${create_count} new)..."
+    info "Creating dummy Services ${start_idx}..${svc_count} (${create_count} new, ${eps_per_svc} endpoints each)..."
     local tmpdir
     tmpdir=$(mktemp -d)
 
@@ -864,8 +866,6 @@ run_service_scale_test() {
       local batch_file="$tmpdir/batch_${batch_idx}.yaml"
       local first=true
       for i in $(seq $s $e); do
-        local o3=$(((i - 1) / 254))
-        local o4=$(((i - 1) % 254 + 1))
         if [[ "$first" == "true" ]]; then
           first=false
         else
@@ -890,7 +890,19 @@ metadata:
   namespace: test-services
 subsets:
 - addresses:
-  - ip: 10.99.${o3}.${o4}
+EOF
+        # Generate eps_per_svc distinct endpoint IPs. Global endpoint index
+        # g maps into 10.(100+g/64516).(g/254%254).(g%254+1), giving ~16M
+        # addresses of headroom (enough for 10000 svc × 100+ endpoints).
+        local ep
+        for ((ep = 0; ep < eps_per_svc; ep++)); do
+          local g=$(((i - 1) * eps_per_svc + ep))
+          local a=$((100 + g / 64516))
+          local b=$(((g / 254) % 254))
+          local c=$((g % 254 + 1))
+          echo "  - ip: 10.${a}.${b}.${c}" >>"$batch_file"
+        done
+        cat <<EOF >>"$batch_file"
   ports:
   - port: 80
     protocol: TCP
@@ -909,8 +921,14 @@ EOF
     info "  Created ${create_count} services in ${elapsed}s (total: ${svc_count})"
     rm -rf "$tmpdir"
 
-    info "Waiting 60s for sync..."
-    sleep 60
+    # Wait for datapath sync. Scale with total endpoint count: more endpoints
+    # = more iptables rules / BPF entries to program. ~60s base + 1s per 1000
+    # endpoints, capped at 180s.
+    local total_eps=$((svc_count * eps_per_svc))
+    local sync_wait=$((60 + total_eps / 1000))
+    [[ $sync_wait -gt 180 ]] && sync_wait=180
+    info "Waiting ${sync_wait}s for datapath sync (${total_eps} endpoints)..."
+    sleep "$sync_wait"
 
     # Collect rules count at this scale point
     _collect_rules_at_scale "$d" "$svc_count"
@@ -1280,6 +1298,14 @@ baseline_short = summary.get("rps", {}).get("svc_short_c64", {}).get("avg_qps")
 if baseline_ka: summary["service_scale"]["keepalive_baseline_qps"] = baseline_ka
 if baseline_short: summary["service_scale"]["short_conn_baseline_qps"] = baseline_short
 
+# Endpoints per dummy Service
+eps_file = os.path.join(basedir, "service-scale", "endpoints_per_svc.txt")
+if os.path.exists(eps_file):
+    try:
+        with open(eps_file) as f:
+            summary["service_scale"]["endpoints_per_svc"] = int(f.read().strip())
+    except: pass
+
 # Read scale steps
 steps_file = os.path.join(basedir, "service-scale", "scale_steps.txt")
 scale_steps = []
@@ -1466,7 +1492,9 @@ ss = d.get('service_scale', {})
 if ss:
     steps = ss.get('steps', [])
     if steps:
-        print("  ── Service Scale ──")
+        eps = ss.get('endpoints_per_svc')
+        hdr = "  ── Service Scale ──" if not eps else f"  ── Service Scale ({eps} endpoints/svc) ──"
+        print(hdr)
         if 'keepalive_baseline_qps' in ss:
             print(f"    keepalive baseline:    {ss['keepalive_baseline_qps']} req/s")
         if 'short_conn_baseline_qps' in ss:
