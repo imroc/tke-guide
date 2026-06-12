@@ -232,14 +232,22 @@ In keepalive scenarios all three show no meaningful degradation — conntrack ca
 
 **The residual degradation isn't from the lookup itself**, but from cilium-agent control-plane pressure (BPF map writes during 5000→10000 svc sync) + conntrack table churn (frequent short-conn create/teardown) on the datapath, which doesn't scale linearly with Service count.
 
-**Extrapolation**: iptables short-conn degradation grows linearly with rule count, already at -37.3% by 10000 svc and heading toward halving. Cilium stays under -10% in both modes. **At cluster Service counts of several thousand or more, Cilium's short-connection performance overtakes iptables across the board.**
+**Mind the absolute values**: even at 10000 svc, iptables's absolute short-conn RPS (13,994) is still higher than Cilium's (~9,500) — the lead has merely narrowed from 2.1x at baseline to 1.45x. **iptables has not yet been overtaken, but the trend is unmistakable**: iptables degrades linearly with rule count (~15 percentage points deeper per 5000 svc), while Cilium stays under -10%. Linear extrapolation puts the crossover at roughly 15000-20000 svc, after which Cilium pulls ahead.
+
+:::
+
+:::warning[On the dummy Service simplification]
+
+Each dummy Service in this test has only **1 Endpoint**. Real-world Services often have multiple backend Pods (multiple Endpoints), and in iptables mode each Endpoint generates an additional KUBE-SEP rule — **the more Endpoints, the longer the iptables rule chain and the worse the O(n) degradation**, so the crossover point arrives earlier than the 15000-20000 svc extrapolated here. Cilium's BPF map lookup is unaffected by Endpoint count and remains O(1).
+
+This means our estimate of iptables's large-scale degradation is **conservative**: in real multi-Endpoint scenarios, iptables's disadvantage surfaces earlier and more sharply.
 
 :::
 
 ### Small scale vs large scale: in one sentence
 
 - **Small scale (under a thousand)**: iptables leads in absolute terms — shortest path, no eBPF/encapsulation overhead.
-- **Large scale (several thousand+)**: Cilium overtakes — O(1) lookup doesn't degrade with scale, while iptables's O(n) traversal worsens linearly.
+- **Large scale (thousands to tens of thousands)**: iptables still leads, but the lead narrows fast as rules grow (short-conn lead drops from 2.1x to 1.45x). Cilium's O(1) doesn't degrade while iptables's O(n) worsens linearly; extrapolating the slope, Cilium overtakes around 15000-20000 svc (earlier in real multi-Endpoint scenarios).
 - **Keepalive is unaffected throughout**: regardless of solution or scale, keepalive workloads are immune.
 
 ## 6. Hubble Observability Overhead (Cilium only)
@@ -342,13 +350,13 @@ Even with 10000 Services + NetworkPolicy + active connections, Cilium's memory f
 
 ### iptables vs Cilium
 
-| Angle           | Conclusion                                                                           |
-| --------------- | ------------------------------------------------------------------------------------ |
-| Small-scale RPS | iptables leads (shortest path, no eBPF/encap overhead), but this is a local optimum  |
-| Large-scale RPS | Cilium overtakes (O(1) vs iptables O(n)); 10000 svc short-conn degrades 37% vs 9%    |
-| Realistic load  | **No difference** (HTTP p99 @1000 QPS is 0.99 ms for all three)                      |
-| Capabilities    | Cilium provides NetworkPolicy, Hubble, Identity security, L7 — things iptables lacks |
-| Resources       | Cilium uses ~300 MB more memory/node, but BPF pre-allocation doesn't grow with scale |
+| Angle           | Conclusion                                                                                                                          |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Small-scale RPS | iptables leads (shortest path, no eBPF/encap overhead), but this is a local optimum                                                 |
+| Large-scale RPS | iptables still leads but the lead narrows fast (short-conn 2.1x→1.45x); under O(1) vs O(n), Cilium overtakes around 15000-20000 svc |
+| Realistic load  | **No difference** (HTTP p99 @1000 QPS is 0.99 ms for all three)                                                                     |
+| Capabilities    | Cilium provides NetworkPolicy, Hubble, Identity security, L7 — things iptables lacks                                                |
+| Resources       | Cilium uses ~300 MB more memory/node, but BPF pre-allocation doesn't grow with scale                                                |
 
 **The cost of switching to Cilium**: ~20% RPS and ~15 µs latency in small-scale saturation benchmarks (invisible under real load) + ~300 MB memory. **The benefit**: O(1) performance at large Service scale, zero-overhead L3/L4 NetworkPolicy and Hubble observability, Identity-based security policies. For medium-to-large clusters or those with security/compliance needs, this trade is well worth it.
 
