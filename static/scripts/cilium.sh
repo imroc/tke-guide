@@ -1423,9 +1423,9 @@ print_replay_command() {
 # nodes are added would just hang or fail.
 cmd_install_cilium() {
   echo ""
-  echo -e "${BLUE}╔══════════════════════════════════════╗${NC}"
+  echo -e "${BLUE}╔═════════════════════════════════════╗${NC}"
   echo -e "${BLUE}║      TKE Cilium Install Wizard      ║${NC}"
-  echo -e "${BLUE}╚══════════════════════════════════════╝${NC}"
+  echo -e "${BLUE}╚═════════════════════════════════════╝${NC}"
   echo ""
 
   check_prerequisites
