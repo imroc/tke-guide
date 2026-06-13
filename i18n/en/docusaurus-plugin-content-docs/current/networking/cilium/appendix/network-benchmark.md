@@ -13,8 +13,8 @@ Coverage: throughput, HTTP RPS (keepalive/short conn), TCP latency, Service-scal
 :::tip[Conclusions first]
 
 - **Throughput and real-workload latency (HTTP p99 @1000 QPS) are identical across all three** — networking-solution differences are invisible under realistic load.
-- **Small-scale saturation benchmarks**: iptables RPS still leads Cilium (keepalive ~6-11%, short conn ~2.2x), because it has the shortest path.
-- **Large-scale Services**: iptables short-connection performance **collapses linearly** with rule count (10000 Services × 10 Endpoints = 420K rules, short-conn degrades 43%), while Cilium barely degrades (~11-13%). The larger the scale, the more the balance tips toward Cilium.
+- **Small-scale saturation benchmarks**: iptables RPS still leads Cilium (keepalive ~5-11%, short conn ~2.2x), because it has the shortest path.
+- **Large-scale Services**: iptables short-connection performance **collapses linearly** with rule count (10000 Services × 10 Endpoints = 420K rules, short-conn degrades 42%), while Cilium barely degrades (~11-13%). The larger the scale, the more the balance tips toward Cilium.
 - **Latency reversal**: on this newer kernel (6.6.117-45.11.2), Cilium's TCP_RR latency is actually **lower** than iptables — the opposite of the old-kernel result.
 - **L7 NetworkPolicy is the one performance cliff**: ~87-88% overhead, enable selectively; L3/L4 policy and Hubble are zero-overhead.
 
@@ -108,18 +108,18 @@ All three clusters share the same VPC, hardware spec, kernel version (6.6.117-45
 | Dimension                      | iptables   | Cilium Native | Cilium Overlay | Winner                                   |
 | ------------------------------ | ---------- | ------------- | -------------- | ---------------------------------------- |
 | Pod2Pod throughput (8 streams) | 10.43 Gbps | 10.43 Gbps    | 10.77 Gbps     | Tie                                      |
-| RPS keepalive (c64)            | 111,673    | 105,070       | 100,084        | iptables (+6~11%)                        |
-| RPS short conn (c64, small)    | 30,576     | 13,786        | 14,263         | iptables (+2.2x)                         |
-| TCP_RR p99                     | 109 µs     | 96 µs         | 95 µs          | **Cilium (lower)**                       |
+| RPS keepalive (c64)            | 110,838    | 105,070       | 100,084        | iptables (+5~11%)                        |
+| RPS short conn (c64, small)    | 30,413     | 13,786        | 14,263         | iptables (+2.2x)                         |
+| TCP_RR p99                     | 111 µs     | 96 µs         | 95 µs          | **Cilium (lower)**                       |
 | TCP_CRR p99                    | 499 µs     | 558 µs        | 537 µs         | iptables (slightly lower)                |
 | HTTP p99 @1000 QPS             | 0.99 ms    | 0.99 ms       | 0.99 ms        | Tie                                      |
-| 10000 svc short-conn degrade   | **-43.2%** | **-13.2%**    | **-11.5%**     | **Cilium (gap widens w/ scale)**         |
-| 10000 svc rules/LB entries     | 419,891    | 119,832       | 119,888        | -                                        |
+| 10000 svc short-conn degrade   | **-42.3%** | **-13.2%**    | **-11.5%**     | **Cilium (gap widens w/ scale)**         |
+| 10000 svc rules/LB entries     | 419,681    | 119,832       | 119,888        | -                                        |
 | L3/L4 NetworkPolicy overhead   | N/A        | -0.7%         | +0.4%          | Zero overhead                            |
 | L7 NetworkPolicy overhead      | N/A        | -87.0%        | -88.0%         | Perf cliff, enable selectively           |
 | Hubble L3/L4 overhead          | N/A        | -0.5%         | +0.3%          | Zero overhead                            |
 | BPF map memory / node          | N/A        | 142.5 MB      | 142.6 MB       | Pre-allocated, doesn't grow              |
-| Datapath component mem / node  | 204 MB     | 153 MB        | 165 MB         | See [Section 6](#6-resource-consumption) |
+| Datapath component mem / node  | 278 MB     | 153 MB        | 165 MB         | See [Section 6](#6-resource-consumption) |
 
 Details below, with deep dives on the counter-intuitive points.
 
@@ -141,12 +141,12 @@ Overlay's large-packet throughput is even slightly higher despite VXLAN — the 
 
 | Scenario                   | iptables         | Cilium Native    | Cilium Overlay   |
 | -------------------------- | ---------------- | ---------------- | ---------------- |
-| Pod-to-Pod c64 keepalive   | 111,593 req/s    | 105,378 req/s    | 100,836 req/s    |
-| Via Svc c64 keepalive      | 111,673 req/s    | 105,070 req/s    | 100,084 req/s    |
-| Via Svc c256 keepalive     | 115,206 req/s    | 107,692 req/s    | 102,554 req/s    |
-| **Via Svc c64 short conn** | **30,576** req/s | **13,786** req/s | **14,263** req/s |
+| Pod-to-Pod c64 keepalive   | 110,910 req/s    | 105,378 req/s    | 100,836 req/s    |
+| Via Svc c64 keepalive      | 110,838 req/s    | 105,070 req/s    | 100,084 req/s    |
+| Via Svc c256 keepalive     | 114,704 req/s    | 107,692 req/s    | 102,554 req/s    |
+| **Via Svc c64 short conn** | **30,413** req/s | **13,786** req/s | **14,263** req/s |
 
-### Keepalive: iptables leads by 6-11%
+### Keepalive: iptables leads by 5-11%
 
 iptables (111K) > Native (105K) > Overlay (100K). The gap is small but consistent, due to **path length**:
 
@@ -156,7 +156,7 @@ iptables (111K) > Native (105K) > Overlay (100K). The gap is small but consisten
 
 ### Short conn: iptables leads by 2.2x — why so much?
 
-The short-conn baseline iptables (30,576) is **2.2x** Cilium (~14,000), far larger than the keepalive gap. The root cause is that **keepalive and short-conn hit completely different code paths**:
+The short-conn baseline iptables (30,413) is **2.2x** Cilium (~14,000), far larger than the keepalive gap. The root cause is that **keepalive and short-conn hit completely different code paths**:
 
 - **Keepalive**: once the connection is established, every request reuses the same TCP connection; the forwarding decision is conntrack-cached, and subsequent packets hit cache — all three are just "conntrack lookup + forward", differing only by that one fixed layer.
 - **Short conn**: every request opens a new TCP connection; every SYN must **fully redo Service selection + conntrack entry creation**. Cilium's disadvantage is amplified here:
@@ -175,8 +175,8 @@ All three solutions' absolute RPS (short conn 14K-30K, keepalive 100K-115K) **fa
 
 | Metric             | iptables | Cilium Native | Cilium Overlay |
 | ------------------ | -------- | ------------- | -------------- |
-| TCP_RR p50         | 90 µs    | 79 µs         | 76 µs          |
-| TCP_RR p99         | 109 µs   | 96 µs         | 95 µs          |
+| TCP_RR p50         | 91 µs    | 79 µs         | 76 µs          |
+| TCP_RR p99         | 111 µs   | 96 µs         | 95 µs          |
 | TCP_CRR p99        | 499 µs   | 558 µs        | 537 µs         |
 | HTTP p99 @1000 QPS | 0.99 ms  | 0.99 ms       | 0.99 ms        |
 
@@ -186,7 +186,7 @@ All three solutions' absolute RPS (short conn 14K-30K, keepalive 100K-115K) **fa
 
 ### TCP_RR: Cilium is actually lower than iptables (opposite of old kernel)
 
-Worth calling out: in this test Cilium's TCP_RR (keepalive request-response latency) p99 is 95-96 µs, **lower** than iptables's 109 µs.
+Worth calling out: in this test Cilium's TCP_RR (keepalive request-response latency) p99 is 95-96 µs, **lower** than iptables's 111 µs.
 
 This is the opposite of our earlier result on an older kernel (6.6.117-45.7.3), where Cilium was **~15 µs higher**. This time all three clusters run on the newer 6.6.117-45.11.2 kernel; all solutions' absolute latencies dropped, but Cilium dropped more, hence the reversal.
 
@@ -210,8 +210,8 @@ This is where replacing kube-proxy with Cilium pays off most. Method: incrementa
 
 | Service count | iptables | Cilium Native | Cilium Overlay |
 | ------------- | -------- | ------------- | -------------- |
-| 5000          | -0.6%    | -0.9%         | -0.0%          |
-| 10000         | -0.7%    | -1.2%         | -0.1%          |
+| 5000          | -1.4%    | -0.9%         | -0.0%          |
+| 10000         | -0.5%    | -1.2%         | -0.1%          |
 
 All three barely degrade on keepalive — conntrack caches the first-packet decision, subsequent packets skip rule chains / BPF maps. **Production workloads using connection pools or HTTP keepalive are largely immune to Service scale.**
 
@@ -219,25 +219,25 @@ All three barely degrade on keepalive — conntrack caches the first-packet deci
 
 | Service count    | iptables              | Cilium Native       | Cilium Overlay      |
 | ---------------- | --------------------- | ------------------- | ------------------- |
-| Baseline (small) | 30,576 req/s          | 13,786 req/s        | 14,263 req/s        |
-| 5000             | 21,286 (-30.4%)       | 12,473 (-9.5%)      | 13,149 (-7.8%)      |
-| 10000            | 17,358 (**-43.2%**)   | 11,963 (**-13.2%**) | 12,618 (**-11.5%**) |
-| rules/LB entries | 210,142 → **419,891** | 60,006 → 119,832    | 60,030 → 119,888    |
+| Baseline (small) | 30,413 req/s          | 13,786 req/s        | 14,263 req/s        |
+| 5000             | 21,740 (-28.5%)       | 12,473 (-9.5%)      | 13,149 (-7.8%)      |
+| 10000            | 17,558 (**-42.3%**)   | 11,963 (**-13.2%**) | 12,618 (**-11.5%**) |
+| rules/LB entries | 210,058 → **419,681** | 60,006 → 119,832    | 60,030 → 119,888    |
 
 :::tip[O(n) vs O(1): 10 Endpoints make the gap visible]
 
 Short connections are the real test — every new connection's SYN must redo Service selection, missing the conntrack cache.
 
-- **iptables is O(n) sequential traversal**: each SYN sequentially matches the KUBE-SERVICES → KUBE-SVC-XXX → KUBE-SEP-XXX chain. **Each Endpoint adds a KUBE-SEP rule**, so 10000 svc × 10 ep yields **420K rules**. Short-conn degradation worsens from -30.4% at 5000 svc to -43.2% at 10000 svc, collapsing nearly linearly with rule count.
+- **iptables is O(n) sequential traversal**: each SYN sequentially matches the KUBE-SERVICES → KUBE-SVC-XXX → KUBE-SEP-XXX chain. **Each Endpoint adds a KUBE-SEP rule**, so 10000 svc × 10 ep yields **420K rules**. Short-conn degradation worsens from -28.5% at 5000 svc to -42.3% at 10000 svc, collapsing nearly linearly with rule count.
 - **Cilium is O(1) BPF hash map lookup**: lookup time is independent of Service/Endpoint count. Native goes -9.5% → -13.2%, Overlay -7.8% → -11.5%, degrading gently. **Note Cilium's LB entries (119K) vs iptables's rules (420K) differ 3.5x at the same svc scale** — Cilium's backends are map values, not standalone rules, so Endpoint growth doesn't lengthen the lookup path.
 
-**Compared to the single-Endpoint test**: earlier with 1 Endpoint per svc, iptables 10000 svc short-conn degraded -37% with 60K rules. With 10 Endpoints it deepens to -43% with 420K rules — **the more Endpoints, the worse iptables's O(n) disadvantage**, which is closer to real workloads (real Services are commonly multi-replica).
+**Compared to the single-Endpoint test**: earlier with 1 Endpoint per svc, iptables 10000 svc short-conn degraded -37% with 60K rules. With 10 Endpoints it deepens to -42% with 420K rules — **the more Endpoints, the worse iptables's O(n) disadvantage**, which is closer to real workloads (real Services are commonly multi-replica).
 
 :::
 
 ### So when does Cilium overtake iptables?
 
-Mind the absolute values: **even at 10000 svc, iptables short-conn (17,358) is still higher than Cilium (~12,600)**. But the lead has narrowed from 2.2x at baseline to 1.38x.
+Mind the absolute values: **even at 10000 svc, iptables short-conn (17,558) is still higher than Cilium (~12,300)**. But the lead has narrowed from 2.1x at baseline to 1.43x.
 
 Linearly extrapolating the 5000→10000 slope, iptables short-conn RPS drops below Cilium at around **15-16K Services**, then gets overtaken. Since real Services usually have more Endpoints (longer rule chains) than these dummy svc, **the actual crossover comes earlier**.
 
@@ -290,15 +290,15 @@ Correct usage:
 
 | Component              | CPU avg | Memory avg |
 | ---------------------- | ------- | ---------- |
-| kube-proxy (iptables)  | 29.7 m  | 203.8 MiB  |
+| kube-proxy (iptables)  | 111.5 m | 278.4 MiB  |
 | Cilium Agent (Native)  | 113.3 m | 152.5 MiB  |
 | Cilium Agent (Overlay) | 94.3 m  | 165.0 MiB  |
 
 :::note[kube-proxy uses more memory than Cilium?]
 
-A counter-intuitive result: at full load (10000 svc × 10 ep), **kube-proxy memory (204 MB) is actually higher than Cilium Agent (153-165 MB)**.
+A counter-intuitive result: at full load (10000 svc × 10 ep), **kube-proxy memory (278 MB) is actually higher than Cilium Agent (153-165 MB)**, and its CPU (112m) is on par with Cilium Agent too.
 
-The reason is that kube-proxy maintains the full in-memory representation of those **420K iptables rules** in user space, doing rule diffs and full reflushes on every Service/Endpoint change — the more rules, the more memory and CPU. This also explains why iptables-mode kube-proxy memory ballooned from ~31 MB earlier (single Endpoint, 60K rules) to 204 MB now (420K rules).
+The reason is that kube-proxy maintains the full in-memory representation of those **420K iptables rules** in user space, doing rule diffs and full reflushes on every Service/Endpoint change — the more rules, the more memory and CPU. This also explains why iptables-mode kube-proxy memory ballooned from ~31 MB earlier (single Endpoint, 60K rules) to 278 MB now (420K rules).
 
 Cilium Agent memory is mainly BPF maps (pre-allocated, fixed) + endpoint/identity state, **decoupled from rule count**, not growing linearly with Service scale.
 
@@ -350,11 +350,11 @@ Even with 10000 Services × 10 Endpoints + NetworkPolicy + active connections, C
 | Your situation                                       | Recommendation                                                                                    |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Few Services (sub-thousand), chasing peak RPS        | iptables leads small-scale RPS, keep it; but the gap is invisible under real load                 |
-| Many Services (ten-thousand), heavy short-conn       | **Cilium**: iptables short conn collapses with rule count (420K rules, -43%), Cilium stays stable |
+| Many Services (ten-thousand), heavy short-conn       | **Cilium**: iptables short conn collapses with rule count (420K rules, -42%), Cilium stays stable |
 | Need NetworkPolicy / Hubble observability / Identity | **Cilium**: L3/L4 policy and Hubble are zero-overhead, iptables lacks them                        |
 | Only keepalive workloads (connection pool/keepalive) | Either: keepalive is insensitive to scale and solution                                            |
 
-Core trade-off: **switching to Cilium loses ~6-11% keepalive RPS in small-scale saturation benchmarks (invisible under real load), in exchange for non-collapsing short-connection performance at scale + zero-overhead security and observability.** For medium-to-large clusters or those with security/compliance needs, this trade is worth it.
+Core trade-off: **switching to Cilium loses ~5-11% keepalive RPS in small-scale saturation benchmarks (invisible under real load), in exchange for non-collapsing short-connection performance at scale + zero-overhead security and observability.** For medium-to-large clusters or those with security/compliance needs, this trade is worth it.
 
 ### Cilium Native vs Overlay: architecture, not performance
 
