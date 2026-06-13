@@ -621,30 +621,28 @@ run_throughput_tests() {
 
 # ─── fortio RPS Tests ───────────────────────────────────────────────────────
 
-# Run fortio inside the pod writing JSON to a file, then kubectl cp it out.
-# This is the robust pattern (same as iperf): the kubectl exec WebSocket
-# carries almost nothing (-quiet suppresses fortio's per-thread stderr logs,
-# -json <file> keeps the result off stdout), so it never triggers the
-# "websocket close 1006 (abnormal closure)" that live-streaming a 30-60s
-# fortio run over exec does — especially under heavy Service-scale load.
+# Run fortio inside the pod, streaming the result JSON over stdout.
+# NOTE: the fortio image is distroless — it has no `tar`, so `kubectl cp`
+# does NOT work against it. We must stream over the exec channel.
+# The previous flakiness (websocket close 1006) was caused by fortio's
+# per-thread progress logs continuously flooding stderr during a 60s run;
+# under a busy node the WebSocket couldn't keep both channels pumping.
+# Fix: `-quiet` silences those logs, and we discard stderr (2>/dev/null),
+# so the exec channel only delivers one final JSON blob on stdout.
 # Args: connections keepalive duration url out_local
 # Returns 0 on success (valid JSON in $out_local), 1 otherwise.
-_fortio_exec_file() {
+_fortio_exec_stream() {
   local connections="$1" ka="$2" duration="$3" url="$4" out="$5"
-  local pod_file="/tmp/fortio_$$_$(basename "$out")"
   local ka_arg=""
   [[ "$ka" == "false" ]] && ka_arg="-keepalive=false"
   local attempt max_attempts=3
   for attempt in $(seq 1 $max_attempts); do
-    kubectl exec -n "$NS" fortio-client -- rm -f "$pod_file" >/dev/null 2>&1 || true
-    # -quiet: only log errors (suppresses per-thread progress flooding stderr)
-    # -json <file>: write result to pod-local file (empty stdout)
+    # -quiet: loglevel=Error, suppresses per-thread progress flooding stderr
+    # -json -: write result JSON to stdout (single blob at end of run)
     timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" fortio-client -- \
-      fortio load -quiet -qps 0 -c "$connections" -t "${duration}s" $ka_arg -json "$pod_file" "$url" \
-      >/dev/null 2>&1 || true
-    if timeout 60 kubectl cp -n "$NS" "fortio-client:${pod_file}" "$out" >/dev/null 2>&1 \
-        && [[ -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; then
-      kubectl exec -n "$NS" fortio-client -- rm -f "$pod_file" >/dev/null 2>&1 || true
+      fortio load -quiet -qps 0 -c "$connections" -t "${duration}s" $ka_arg -json - "$url" \
+      >"$out" 2>/dev/null || true
+    if [[ -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; then
       return 0
     fi
     rm -f "$out"
@@ -664,13 +662,13 @@ _run_fortio() {
   info "Running: $label (c=$connections, keepalive=$keepalive)"
 
   if [[ "$keepalive" == "false" ]]; then
-    # Short-connection mode: file-based exec (REST API can't disable keepalive).
-    if ! _fortio_exec_file "$connections" false "$FORTIO_DURATION" "$url" "$out"; then
+    # Short-connection mode: stream over exec (REST API can't disable keepalive).
+    if ! _fortio_exec_stream "$connections" false "$FORTIO_DURATION" "$url" "$out"; then
       warn "  fortio short-conn failed after retries for $result_file"
     fi
   else
     # Keepalive mode: prefer fortio REST API via port-forward (proven reliable
-    # for high-throughput 80K+ req/s). Fall back to file-based exec if it fails.
+    # for high-throughput 80K+ req/s). Fall back to streaming exec if it fails.
     local pf_pid=""
     local local_port=$((19000 + RANDOM % 1000))
     kubectl port-forward -n "$NS" pod/fortio-client ${local_port}:9999 >/dev/null 2>&1 &
@@ -687,11 +685,11 @@ _run_fortio() {
     kill "$pf_pid" 2>/dev/null || true
     wait "$pf_pid" 2>/dev/null || true
 
-    # If REST API failed, fall back to file-based exec
+    # If REST API failed, fall back to streaming exec
     if ! { [[ -s "$out" ]] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$out" 2>/dev/null; }; then
-      warn "  REST API failed (rc=$rc), falling back to file-based exec..."
+      warn "  REST API failed (rc=$rc), falling back to streaming exec..."
       rm -f "$out"
-      if ! _fortio_exec_file "$connections" true "$FORTIO_DURATION" "$url" "$out"; then
+      if ! _fortio_exec_stream "$connections" true "$FORTIO_DURATION" "$url" "$out"; then
         warn "  fortio keepalive failed after retries for $result_file"
       fi
     fi
