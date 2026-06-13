@@ -834,6 +834,30 @@ run_service_scale_test() {
   local fs_ip
   fs_ip=$(kubectl get svc -n "$NS" fortio-service -o jsonpath='{.spec.clusterIP}')
 
+  # Preflight: warn if Cilium's LB map capacity is too small for the test.
+  # Each Service needs ~(1 frontend + eps_per_svc backend) LB entries; if the
+  # total exceeds bpf-lb-map-max (default 65536) the map silently truncates,
+  # causing forwarding failures and bogus "degradation" numbers (not O(n)).
+  if [[ "$CLUSTER_TYPE" == cilium-* ]]; then
+    local lb_max
+    lb_max=$(kubectl -n kube-system get cm cilium-config -o jsonpath='{.data.bpf-lb-map-max}' 2>/dev/null)
+    [[ -z "$lb_max" ]] && lb_max=65536  # Cilium default
+    local needed=$((max_svc * (eps_per_svc + 1)))
+    echo "$lb_max" >"$d/bpf_lb_map_max.txt"
+    if [[ $needed -gt $lb_max ]]; then
+      warn "═══════════════════════════════════════════════════════════════"
+      warn "LB MAP CAPACITY WARNING"
+      warn "  Test needs ~${needed} LB entries (${max_svc} svc × $((eps_per_svc + 1)))"
+      warn "  but bpf-lb-map-max=${lb_max}. The LB map will OVERFLOW."
+      warn "  Large-scale results will be INVALID (forwarding failures, not O(n))."
+      warn "  Fix: set bpf-lb-map-max>=$((needed * 2)) in cilium-config and restart cilium,"
+      warn "       or reduce SVC_ENDPOINTS / SVC_SCALE_STEPS."
+      warn "═══════════════════════════════════════════════════════════════"
+    else
+      info "LB map capacity OK: need ~${needed}, limit ${lb_max}"
+    fi
+  fi
+
   # Save scale steps metadata
   printf '%s\n' "${steps[@]}" | paste -sd',' - >"$d/scale_steps.txt"
   echo "$eps_per_svc" >"$d/endpoints_per_svc.txt"

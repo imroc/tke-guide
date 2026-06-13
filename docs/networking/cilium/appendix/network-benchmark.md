@@ -61,7 +61,24 @@ SVC_SCALE_STEPS="1000,5000,10000" SVC_CREATE_PARALLEL=8 bash network-benchmark.s
 | `ROUNDS`              | 1          | 每个场景重复轮次                         |
 | `ROUND_SLEEP`         | 30         | 轮间等待（秒），用于 burst credit 恢复   |
 | `SVC_SCALE_STEPS`     | 5000,10000 | Service 规模化测试档位（逗号分隔，递增） |
+| `SVC_ENDPOINTS`       | 10         | 每个 dummy Service 的 endpoint 数        |
 | `SVC_CREATE_PARALLEL` | 4          | 并发创建 Service 的 worker 数            |
+
+:::warning[大规模测试需调大 Cilium LB map 上限]
+
+Cilium 的 Service 负载均衡 BPF map 默认上限是 `bpf-lb-map-max=65536`。每个 Service 约占用 `1 + endpoint 数` 个 LB 条目，因此 **10000 Service × 10 endpoint ≈ 11 万条目会超出默认上限导致 map 溢出**——表现为大规模下 RPS 异常暴跌（这是转发失败，不是 O(n) 退化，会污染测试结论）。
+
+跑大规模测试前，先调大该上限并重启 cilium：
+
+```bash
+kubectl -n kube-system patch configmap cilium-config --type merge \
+  -p '{"data":{"bpf-lb-map-max":"262144"}}'
+kubectl -n kube-system rollout restart ds/cilium
+```
+
+脚本在 Service Scale 测试前会自动预检容量并在不足时打印 `LB MAP CAPACITY WARNING`。
+
+:::
 
 ### 测试工具与指标
 

@@ -61,7 +61,24 @@ SVC_SCALE_STEPS="1000,5000,10000" SVC_CREATE_PARALLEL=8 bash network-benchmark.s
 | `ROUNDS`              | 1          | Repetition rounds per scenario                        |
 | `ROUND_SLEEP`         | 30         | Inter-round wait (seconds), for burst credit recovery |
 | `SVC_SCALE_STEPS`     | 5000,10000 | Comma-separated Service scale steps (ascending)       |
+| `SVC_ENDPOINTS`       | 10         | Endpoints per dummy Service                           |
 | `SVC_CREATE_PARALLEL` | 4          | Parallel workers for Service creation                 |
+
+:::warning[Large-scale tests require raising Cilium's LB map limit]
+
+Cilium's Service load-balancing BPF map defaults to `bpf-lb-map-max=65536`. Each Service consumes roughly `1 + endpoint count` LB entries, so **10000 Services × 10 endpoints ≈ 110K entries will exceed the default and overflow the map** — manifesting as an abnormal RPS collapse at large scale (this is forwarding failure, not O(n) degradation, and pollutes the conclusions).
+
+Before running large-scale tests, raise the limit and restart cilium:
+
+```bash
+kubectl -n kube-system patch configmap cilium-config --type merge \
+  -p '{"data":{"bpf-lb-map-max":"262144"}}'
+kubectl -n kube-system rollout restart ds/cilium
+```
+
+The script automatically preflight-checks capacity before the Service Scale test and prints `LB MAP CAPACITY WARNING` if insufficient.
+
+:::
 
 ### Tools and Metrics
 
