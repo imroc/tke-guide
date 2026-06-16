@@ -9,7 +9,7 @@ VPC-CNI clusters support both modes; GR clusters only support Overlay mode. **VP
 
 :::tip[Native and Overlay perform almost identically — choose by architecture, not performance]
 
-Benchmarks show the **performance difference between Native Routing and Overlay is within noise** (both hit line-rate throughput, identical real-workload latency, and at large Service scale both degrade far less than iptables). The old impression that "Native performs better" does not hold. Their VXLAN-encap vs double-processing overheads are comparable in magnitude and only visible under saturation benchmarks — invisible to real workloads. **So choose based on network architecture needs (does Pod IP need to be VPC-routable, does CLB need to reach Pods directly, is IP supply tight), not performance.** Full data: [Cilium Network Performance Benchmark](./appendix/network-benchmark.md).
+Benchmarks show the **performance difference between Native Routing and Overlay is within noise**: both hit line-rate throughput, identical real-workload latency, and at large Service scale both degrade far less than iptables. Their VXLAN-encap vs double-processing overheads are comparable in magnitude and only visible under saturation benchmarks — invisible to real workloads. **So choose based on network architecture needs (does Pod IP need to be VPC-routable, does CLB need to reach Pods directly, is IP supply tight), not performance.** Full data: [Cilium Network Performance Benchmark](./appendix/network-benchmark.md).
 
 :::
 
