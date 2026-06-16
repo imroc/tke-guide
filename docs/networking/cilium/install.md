@@ -5,13 +5,19 @@
 - **Native Routing（原生路由）**：与 TKE CNI 共存，Pod 使用 TKE 分配的 IP，cilium 提供 NetworkPolicy、可观测性、kube-proxy 替代等增强能力。
 - **Overlay（vxlan 隧道）**：完全替代 TKE 所有 CNI，Pod IP 不占用 underlay 的 IP，可用于 IP 申请困难的场景，也可用于替代 TKE 内置的 CiliumOverlay 网络模式以获得满血功能。
 
-VPC-CNI 集群两种模式都支持；GR 集群仅支持 Overlay 模式。**推荐使用 VPC-CNI 集群**——性能更好、无节点数量限制，且不会像 GR 那样白白占用一段 VPC 辅助网段（详见 FAQ [为什么不推荐使用 GR 集群？](#为什么不推荐使用-gr-集群)）。
+VPC-CNI 集群两种模式都支持；GR 集群仅支持 Overlay 模式。**推荐使用 VPC-CNI 集群**——无节点数量限制，且不会像 GR 那样白白占用一段 VPC 辅助网段（详见 FAQ [为什么不推荐使用 GR 集群？](#为什么不推荐使用-gr-集群)）。
+
+:::tip[Native 和 Overlay 性能几乎一致，选型看架构而非性能]
+
+实测表明 **Native Routing 和 Overlay 的性能差异在噪声范围内**（吞吐均达线速、真实业务延迟完全相同、大规模 Service 退化两者都远好于 iptables），过去"Native 性能更优"的印象并不成立。两者的 VXLAN 封装/双层处理开销量级相当，且都只在极限压测下可见，对真实业务无感知。**因此选型应基于网络架构需求（Pod IP 是否需要 VPC 可路由、CLB 是否直连 Pod、IP 资源是否紧张），而不是性能。** 完整数据见 [Cilium 网络性能 Benchmark](./appendix/network-benchmark.md)。
+
+:::
 
 :::note[如何选择]
 
 | 对比项               | Native Routing (VPC-CNI) ⭐  | Overlay (VPC-CNI) ⭐                               | Overlay (GR)                                                                                                                                                                           |
 | -------------------- | ---------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 网络性能             | ✅ 最优                      | 略有开销（vxlan 封装）                             | 略有开销（vxlan 封装）                                                                                                                                                                 |
+| 网络性能             | ✅ 与 Overlay 相当           | ✅ 与 Native 相当（VXLAN 开销可忽略）              | ✅ 与 Native 相当（VXLAN 开销可忽略）                                                                                                                                                  |
 | Pod IP 范围          | VPC IP（含辅助 CIDR 的 IP）  | 独立 CIDR，不占用 VPC IP                           | 独立 CIDR，不占用 VPC IP                                                                                                                                                               |
 | VPC 辅助网段消耗     | ✅ 无                        | ✅ 无                                              | ⚠️ GR 集群创建时**强制绑定一段 VPC 辅助网段**作为 ClusterCIDR，即使 Overlay 模式下 Pod IP 来自独立 CIDR、不会真正用到这段，这段辅助网段仍被占住无法被其它资源使用（GR 集群本身的限制） |
 | IP 容量扩容          | ✅ 支持（新增 VPC-CNI 子网） | ✅ 支持（追加 CIDR 到 clusterPoolIPv4PodCIDRList） | ✅ 支持（追加 CIDR 到 clusterPoolIPv4PodCIDRList）                                                                                                                                     |
