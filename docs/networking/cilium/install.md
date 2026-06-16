@@ -3,7 +3,7 @@
 本文介绍如何在 TKE 集群中安装 cilium，支持以下网络模式：
 
 - **Native Routing（原生路由）**：与 TKE CNI 共存，Pod 使用 TKE 分配的 IP，cilium 提供 NetworkPolicy、可观测性、kube-proxy 替代等增强能力。
-- **Overlay（vxlan 隧道）**：完全替代 TKE 所有 CNI，Pod IP 不占用 underlay 的 IP，可用于 IP 申请困难的场景，也可用于替代 TKE 内置的 CiliumOverlay 网络模式以获得满血功能。
+- **Overlay（vxlan 隧道）**：完全替代 TKE 所有 CNI，Pod IP 不占用 underlay 的 IP，可用于 IP 申请困难的场景，也可用于替代 TKE 内置的 CiliumOverlay 网络模式，纳管 IDC 机器并使用最新 Cilium 满血功能。
 
 VPC-CNI 集群两种模式都支持；GR 集群仅支持 Overlay 模式。**推荐使用 VPC-CNI 集群**——无节点数量限制，且不会像 GR 那样白白占用一段 VPC 辅助网段（详见 FAQ [为什么不推荐使用 GR 集群？](#为什么不推荐使用-gr-集群)）。
 

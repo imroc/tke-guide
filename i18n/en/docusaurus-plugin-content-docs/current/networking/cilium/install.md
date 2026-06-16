@@ -3,7 +3,7 @@
 This article describes how to install cilium in a TKE cluster, with support for the following network modes:
 
 - **Native Routing**: Coexists with TKE CNI. Pods use IPs allocated by TKE; cilium provides NetworkPolicy, observability, kube-proxy replacement, and other enhancements.
-- **Overlay (vxlan tunnel)**: Completely replaces all TKE CNIs. Pod IPs do not consume underlay IPs, suitable for scenarios where IP allocation is difficult, or as a replacement for TKE's built-in CiliumOverlay mode to get full cilium functionality.
+- **Overlay (vxlan tunnel)**: Completely replaces all TKE CNIs. Pod IPs do not consume underlay IPs, suitable for scenarios where IP allocation is difficult, or as a replacement for TKE's built-in CiliumOverlay mode — to manage IDC machines and use the latest Cilium with full functionality.
 
 VPC-CNI clusters support both modes; GR clusters only support Overlay mode. **VPC-CNI clusters are recommended** — no node count limit, and they don't waste a VPC secondary CIDR like GR does (see FAQ [Why aren't GR clusters recommended?](#why-arent-gr-clusters-recommended)).
 
