@@ -34,9 +34,13 @@ set -uo pipefail
 #   FORTIO_DURATION    fortio/netperf test duration in seconds (default: 60)
 #   ROUNDS             repetitions per scenario (default: 1)
 #   ROUND_SLEEP        seconds between rounds (default: 30)
-#   SVC_SCALE_STEPS    comma-separated Service counts for scale test (default: "5000,10000")
-#   SVC_ENDPOINTS      endpoints per dummy Service (default: 10, simulates multi-replica)
+#   SVC_SCALE_STEPS    comma-separated Service counts for scale test (default: "5000,10000,20000,30000")
+#   SVC_ENDPOINTS      endpoints per dummy Service (default: 4; degradation is driven by svc COUNT, not endpoints)
 #   SVC_CREATE_PARALLEL parallel workers when creating dummy Services (default: 4)
+#   AUTO_FIX_LB_MAP    "true" auto-raises Cilium bpf-lb-map-max without prompting
+#                      (default: ask interactively when capacity is insufficient)
+#   METRICS_SETTLE_SECS  quiesce wait before steady-state resource sampling (default: 45)
+#   METRICS_SAMPLES      resource samples to take after settle (default: 6)
 #   KUBECTL_TIMEOUT    timeout for kubectl exec/cp calls (default: 180)
 #
 # Output:
@@ -159,9 +163,12 @@ Environment Variables:
   FORTIO_DURATION    fortio/netperf test duration in seconds (default: 60)
   ROUNDS             repetitions per scenario (default: 1)
   ROUND_SLEEP        seconds between rounds (default: 30)
-  SVC_SCALE_STEPS    comma-separated Service counts for scale test (default: "5000,10000")
-  SVC_ENDPOINTS      endpoints per dummy Service (default: 10, simulates multi-replica)
+  SVC_SCALE_STEPS    comma-separated Service counts for scale test (default: "5000,10000,20000,30000")
+  SVC_ENDPOINTS      endpoints per dummy Service (default: 4; degradation is driven by svc COUNT, not endpoints)
   SVC_CREATE_PARALLEL parallel workers when creating dummy Services (default: 4)
+  AUTO_FIX_LB_MAP    "true" auto-raises Cilium bpf-lb-map-max without prompting
+  METRICS_SETTLE_SECS  quiesce wait before steady-state resource sampling (default: 45)
+  METRICS_SAMPLES      resource samples to take after settle (default: 6)
   KUBECTL_TIMEOUT    timeout for kubectl exec/cp calls (default: 180)
 
 Examples:
@@ -196,6 +203,19 @@ check_prereqs() {
 
 get_cluster_name() {
   kubectl config current-context 2>/dev/null || echo "unknown"
+}
+
+# sanitize_name — Make a string safe to use as a single path component.
+# kubeconfig context names can contain '/', '(', ')', spaces, CJK, etc.
+# (e.g. "cls-xxx(cd/roc-overlay-勿删)"), which break path construction
+# (the '/' creates nested dirs, '(' ')' are shell metachars). Replace any
+# char outside [A-Za-z0-9._-] with '-', collapse repeats, trim leading/trailing
+# dashes. Falls back to "cluster" if the result is empty.
+sanitize_name() {
+  local s="$1"
+  s=$(printf '%s' "$s" | LC_ALL=C sed -e 's/[^A-Za-z0-9._-]/-/g' -e 's/-\{2,\}/-/g' -e 's/^-//' -e 's/-$//')
+  [[ -z "$s" ]] && s="cluster"
+  printf '%s' "$s"
 }
 
 # ─── Cluster Detection ───────────────────────────────────────────────────────
@@ -258,7 +278,7 @@ collect_context_info() {
   cluster_name=$(get_cluster_name)
 
   cat >"$OUTPUT_DIR/context.yaml" <<EOF
-cluster_name: $cluster_name
+cluster_name: "$cluster_name"
 cluster_type: $CLUSTER_TYPE
 test_date: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 k8s_version: $(kubectl version -o json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('serverVersion',{}).get('gitVersion',''))" 2>/dev/null || kubectl version 2>/dev/null | awk '/Server Version/{print $NF}')
@@ -814,17 +834,85 @@ run_latency_tests() {
 
 # ─── Service Scale Test ─────────────────────────────────────────────────────
 
+# ensure_lb_map_capacity — When the planned Service-scale test would exceed
+# Cilium's bpf-lb-map-max, interactively offer to raise it and restart cilium.
+# Args: current_max needed target
+# Returns 0 if capacity is now sufficient (raised, or user-confirmed already ok),
+#         1 if the user declined / no TTY / patch failed (caller should warn).
+ensure_lb_map_capacity() {
+  local cur="$1" needed="$2" target="$3"
+
+  warn "═══════════════════════════════════════════════════════════════"
+  warn "LB MAP CAPACITY INSUFFICIENT"
+  warn "  This test needs ~${needed} LB entries (${max_svc} svc × $((eps_per_svc + 1)) per svc),"
+  warn "  but Cilium's bpf-lb-map-max=${cur}."
+  warn "  Running as-is would OVERFLOW the LB map — large-scale numbers would be"
+  warn "  bogus (forwarding failures, not real O(n) degradation)."
+  warn "═══════════════════════════════════════════════════════════════"
+  info "Proposed fix: set bpf-lb-map-max=${target} and restart all cilium pods."
+
+  local answer=""
+  if [[ "${AUTO_FIX_LB_MAP:-}" == "true" ]]; then
+    info "AUTO_FIX_LB_MAP=true — applying without prompt."
+    answer="y"
+  elif [[ -t 0 ]]; then
+    printf "Apply this fix now? cilium will restart (brief datapath churn). [y/N]: "
+    read -r answer </dev/tty || answer=""
+  else
+    # No interactive TTY and no AUTO_FIX_LB_MAP — can't safely auto-modify.
+    warn "Non-interactive shell and AUTO_FIX_LB_MAP not set; skipping auto-fix."
+    warn "Re-run with AUTO_FIX_LB_MAP=true, or manually:"
+    warn "  kubectl -n kube-system patch cm cilium-config --type merge -p '{\"data\":{\"bpf-lb-map-max\":\"${target}\"}}'"
+    warn "  kubectl -n kube-system rollout restart ds/cilium"
+    return 1
+  fi
+
+  case "$answer" in
+  y | Y | yes | YES)
+    info "Patching cilium-config: bpf-lb-map-max=${target} ..."
+    if ! kubectl -n kube-system patch configmap cilium-config --type merge \
+      -p "{\"data\":{\"bpf-lb-map-max\":\"${target}\"}}" >/dev/null 2>&1; then
+      warn "Failed to patch cilium-config."
+      return 1
+    fi
+    info "Restarting cilium DaemonSet (and operator) to apply..."
+    kubectl -n kube-system rollout restart ds/cilium >/dev/null 2>&1 || true
+    kubectl -n kube-system rollout restart deploy/cilium-operator >/dev/null 2>&1 || true
+    info "Waiting for cilium DaemonSet to become ready (timeout 300s)..."
+    if ! kubectl -n kube-system rollout status ds/cilium --timeout=300s >/dev/null 2>&1; then
+      warn "cilium rollout did not complete within timeout; check 'kubectl -n kube-system get pod -l k8s-app=cilium'."
+      return 1
+    fi
+    # Give the agents a moment to finish reprogramming BPF maps after restart.
+    sleep 10
+    local new_max
+    new_max=$(kubectl -n kube-system get cm cilium-config -o jsonpath='{.data.bpf-lb-map-max}' 2>/dev/null)
+    info "Done. bpf-lb-map-max is now ${new_max}."
+    return 0
+    ;;
+  *)
+    warn "Declined. Continuing without raising bpf-lb-map-max."
+    return 1
+    ;;
+  esac
+}
+
 run_service_scale_test() {
-  # Support multi-step scale testing: SVC_SCALE_STEPS="5000,10000" (comma-separated, ascending)
-  local steps_str="${SVC_SCALE_STEPS:-5000,10000}"
+  # Support multi-step scale testing: SVC_SCALE_STEPS="5000,10000,20000,30000"
+  # (comma-separated, ascending). The high steps are chosen to bracket the
+  # iptables-vs-Cilium short-connection crossover (~20-25k svc), so the result
+  # directly shows at what Service count Cilium's RPS overtakes iptables.
+  local steps_str="${SVC_SCALE_STEPS:-5000,10000,20000,30000}"
   local -a steps
   IFS=',' read -ra steps <<< "$steps_str"
 
-  # Endpoints per dummy Service. Real-world Services have multiple backend
-  # Pods; each Endpoint adds a KUBE-SEP rule in iptables (worsening O(n)),
-  # while Cilium's BPF map lookup stays O(1). Default 10 simulates a typical
-  # multi-replica Deployment.
-  local eps_per_svc="${SVC_ENDPOINTS:-10}"
+  # Endpoints per dummy Service. NOTE: the load test hits a SINGLE fronting
+  # Service, so its new-connection SYN traverses the KUBE-SERVICES chain whose
+  # length == number of Services (one entry per svc) — independent of how many
+  # endpoints each dummy svc has. Endpoints only inflate total rule count /
+  # LB-map usage / creation time without affecting the hot path. So we keep this
+  # small (a realistic multi-replica count) and drive degradation via svc COUNT.
+  local eps_per_svc="${SVC_ENDPOINTS:-4}"
 
   local max_svc="${steps[${#steps[@]}-1]}"
   step "Running Service Scale Test (steps: ${steps_str})"
@@ -833,29 +921,33 @@ run_service_scale_test() {
 
   local fs_ip
   fs_ip=$(kubectl get svc -n "$NS" fortio-service -o jsonpath='{.spec.clusterIP}')
+  # netperf server Pod IP for per-scale TCP_CRR / TCP_RR latency probes.
+  local np_ip
+  np_ip=$(kubectl get pod -n "$NS" netperf-server -o jsonpath='{.status.podIP}' 2>/dev/null)
 
-  # Preflight: warn if Cilium's LB map capacity is too small for the test.
+  # Preflight: ensure Cilium's LB map capacity is large enough for the test.
   # Each Service needs ~(1 frontend + eps_per_svc backend) LB entries; if the
   # total exceeds bpf-lb-map-max (default 65536) the map silently truncates,
   # causing forwarding failures and bogus "degradation" numbers (not O(n)).
+  # When insufficient, prompt the user to auto-raise the limit and restart cilium.
   if [[ "$CLUSTER_TYPE" == cilium-* ]]; then
     local lb_max
     lb_max=$(kubectl -n kube-system get cm cilium-config -o jsonpath='{.data.bpf-lb-map-max}' 2>/dev/null)
     [[ -z "$lb_max" ]] && lb_max=65536  # Cilium default
     local needed=$((max_svc * (eps_per_svc + 1)))
-    echo "$lb_max" >"$d/bpf_lb_map_max.txt"
     if [[ $needed -gt $lb_max ]]; then
-      warn "═══════════════════════════════════════════════════════════════"
-      warn "LB MAP CAPACITY WARNING"
-      warn "  Test needs ~${needed} LB entries (${max_svc} svc × $((eps_per_svc + 1)))"
-      warn "  but bpf-lb-map-max=${lb_max}. The LB map will OVERFLOW."
-      warn "  Large-scale results will be INVALID (forwarding failures, not O(n))."
-      warn "  Fix: set bpf-lb-map-max>=$((needed * 2)) in cilium-config and restart cilium,"
-      warn "       or reduce SVC_ENDPOINTS / SVC_SCALE_STEPS."
-      warn "═══════════════════════════════════════════════════════════════"
+      # Target with ~2x headroom, rounded up to a power-of-two-ish round number.
+      local target=$((needed * 2))
+      ensure_lb_map_capacity "$lb_max" "$needed" "$target" || {
+        warn "Proceeding WITHOUT raising bpf-lb-map-max — large-scale results may be INVALID."
+      }
+      # Re-read the (possibly updated) value for the record.
+      lb_max=$(kubectl -n kube-system get cm cilium-config -o jsonpath='{.data.bpf-lb-map-max}' 2>/dev/null)
+      [[ -z "$lb_max" ]] && lb_max=65536
     else
       info "LB map capacity OK: need ~${needed}, limit ${lb_max}"
     fi
+    echo "$lb_max" >"$d/bpf_lb_map_max.txt"
   fi
 
   # Save scale steps metadata
@@ -967,6 +1059,36 @@ EOF
       sleep "$ROUND_SLEEP"
     done
 
+    # Per-scale latency: TCP_CRR (new-connection RTT, the latency twin of the
+    # short-conn RPS curve) and TCP_RR (established-connection RTT, expected flat).
+    # Probes the netperf-server Pod IP directly (same target as the 0-svc baseline
+    # latency test, so the numbers are directly comparable). This still captures
+    # the iptables scan cost: in kube-proxy iptables mode EVERY new connection's
+    # first packet traverses the nat KUBE-SERVICES chain (a linear list of
+    # per-service dst-match rules) before falling through — so connect latency
+    # grows O(svc count) even for Pod-IP-destined traffic. TCP_RR reuses one
+    # connection (conntrack fast path after the first packet), so it stays flat.
+    # netperf is serial / non-saturating → p99 is clean SLO-grade latency, not a
+    # queueing artifact.
+    if [[ -n "$np_ip" ]]; then
+      for r in $(seq 1 "$ROUNDS"); do
+        info "TCP_CRR (${svc_count}svc) r$r"
+        timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" netperf-client -- \
+          netperf -H "$np_ip" -t TCP_CRR -l "$FORTIO_DURATION" -- -r 1,1 \
+          -o MIN_LATENCY,MEAN_LATENCY,P50_LATENCY,P90_LATENCY,P99_LATENCY,MAX_LATENCY,THROUGHPUT \
+          >"$d/crr_at_${svc_count}svc_r${r}.txt" 2>/dev/null || warn "  TCP_CRR (${svc_count}svc) r$r failed"
+        sleep "$ROUND_SLEEP"
+      done
+      for r in $(seq 1 "$ROUNDS"); do
+        info "TCP_RR (${svc_count}svc) r$r"
+        timeout "$KUBECTL_TIMEOUT" kubectl exec -n "$NS" netperf-client -- \
+          netperf -H "$np_ip" -t TCP_RR -l "$FORTIO_DURATION" -- -r 1,1 \
+          -o MIN_LATENCY,MEAN_LATENCY,P50_LATENCY,P90_LATENCY,P99_LATENCY,MAX_LATENCY,THROUGHPUT \
+          >"$d/rr_at_${svc_count}svc_r${r}.txt" 2>/dev/null || warn "  TCP_RR (${svc_count}svc) r$r failed"
+        sleep "$ROUND_SLEEP"
+      done
+    fi
+
     prev_count=$svc_count
   done
 
@@ -981,8 +1103,17 @@ _collect_rules_at_scale() {
     kp_pod=$(kubectl get pod -n kube-system -l k8s-app=kube-proxy -o name 2>/dev/null | head -1)
     kp_pod="${kp_pod#pod/}"
     if [[ -n "$kp_pod" ]]; then
+      # Total ruleset size (all chains). Inflated by per-endpoint KUBE-SEP rules;
+      # NOT the hot-path metric for a single fronting Service.
       kubectl exec -n kube-system "$kp_pod" -- iptables-save 2>/dev/null | wc -l | tr -d ' ' \
         >"$d/iptables_rules_at_${svc_count}svc.txt" || true
+      # KUBE-SERVICES chain length ≈ number of Services. THIS is what a new
+      # connection's SYN linearly scans, so it's the true driver of short-conn
+      # degradation (independent of endpoints-per-svc). Count rules in the
+      # nat-table KUBE-SERVICES chain.
+      kubectl exec -n kube-system "$kp_pod" -- iptables-save -t nat 2>/dev/null \
+        | grep -c '^-A KUBE-SERVICES ' | tr -d ' ' \
+        >"$d/kube_services_chain_at_${svc_count}svc.txt" || true
     fi
   elif [[ "$CLUSTER_TYPE" == cilium-* ]]; then
     kubectl exec -n kube-system ds/cilium -- cilium bpf lb list 2>/dev/null | wc -l | tr -d ' ' \
@@ -1118,17 +1249,22 @@ collect_component_metrics() {
   local rd="$OUTPUT_DIR/resources"
   mkdir -p "$rd"
 
-  if [[ "$CLUSTER_TYPE" == cilium-* ]]; then
-    info "Collecting Cilium metrics..."
+  # Settle before sampling: the Service-scale test just finished and the agent
+  # (cilium) / kube-proxy may still be reprogramming BPF maps / iptables rules.
+  # Sampling immediately captures transient CPU spikes (e.g. agent CPU jumping
+  # to >1000m mid-reprogram), which don't represent steady state. Wait for
+  # things to quiesce, then sample several times over a window and let the
+  # summary average them.
+  local settle="${METRICS_SETTLE_SECS:-45}"
+  local samples="${METRICS_SAMPLES:-6}"
+  local sample_interval="${METRICS_SAMPLE_INTERVAL:-5}"
 
-    local cilium_csv="$rd/cilium_agent_cpu_mem.csv"
-    echo "timestamp,pod,cpu_millicores,memory_mib" >"$cilium_csv"
-    for _ in 1 2 3; do
-      kubectl top pod -n kube-system -l k8s-app=cilium --no-headers 2>/dev/null | while read -r pod cpu mem rest; do
-        echo "$(date +%H:%M:%S),$pod,${cpu%%m},${mem%%Mi}" >>"$cilium_csv"
-      done
-      sleep 5
-    done
+  if [[ "$CLUSTER_TYPE" == cilium-* ]]; then
+    info "Letting datapath quiesce ${settle}s before sampling steady-state resources..."
+    sleep "$settle"
+
+    info "Collecting Cilium metrics (${samples} samples × ${sample_interval}s)..."
+    _sample_pod_resources "k8s-app=cilium" "$rd/cilium_agent_cpu_mem.csv" "$samples" "$sample_interval"
 
     info "Collecting BPF map info..."
     kubectl exec -n kube-system ds/cilium -- bpftool map list -j 2>/dev/null >"$rd/bpf_map_info.json" || true
@@ -1175,16 +1311,11 @@ except Exception as e:
       >"$rd/cilium_agent_proc_status.txt" 2>/dev/null || true
 
   elif [[ "$CLUSTER_TYPE" == kubeproxy-* ]]; then
-    info "Collecting kube-proxy metrics..."
+    info "Letting datapath quiesce ${settle}s before sampling steady-state resources..."
+    sleep "$settle"
 
-    local kp_csv="$rd/kubeproxy_cpu_mem.csv"
-    echo "timestamp,pod,cpu_millicores,memory_mib" >"$kp_csv"
-    for _ in 1 2 3; do
-      kubectl top pod -n kube-system -l k8s-app=kube-proxy --no-headers 2>/dev/null | while read -r pod cpu mem rest; do
-        echo "$(date +%H:%M:%S),$pod,${cpu%%m},${mem%%Mi}" >>"$kp_csv"
-      done
-      sleep 5
-    done
+    info "Collecting kube-proxy metrics (${samples} samples × ${sample_interval}s)..."
+    _sample_pod_resources "k8s-app=kube-proxy" "$rd/kubeproxy_cpu_mem.csv" "$samples" "$sample_interval"
 
     local kp_pod
     kp_pod=$(kubectl get pod -n kube-system -l k8s-app=kube-proxy -o name 2>/dev/null | head -1)
@@ -1200,6 +1331,22 @@ except Exception as e:
   fi
 
   info "Component metrics collected"
+}
+
+# _sample_pod_resources — Sample `kubectl top pod` for a label N times into a
+# CSV (timestamp,pod,cpu_millicores,memory_mib). Used for steady-state resource
+# capture after the datapath has settled.
+# Args: label csv_path samples interval_secs
+_sample_pod_resources() {
+  local label="$1" csv="$2" samples="$3" interval="$4"
+  echo "timestamp,pod,cpu_millicores,memory_mib" >"$csv"
+  local i
+  for ((i = 0; i < samples; i++)); do
+    kubectl top pod -n kube-system -l "$label" --no-headers 2>/dev/null | while read -r pod cpu mem rest; do
+      echo "$(date +%H:%M:%S),$pod,${cpu%%m},${mem%%Mi}" >>"$csv"
+    done
+    [[ $i -lt $((samples - 1)) ]] && sleep "$interval"
+  done
 }
 
 # ─── Generate Summary ───────────────────────────────────────────────────────
@@ -1223,7 +1370,8 @@ if os.path.exists(ctx):
         for line in f:
             if ':' in line:
                 k, v = line.strip().split(':', 1)
-                summary["cluster"][k.strip()] = v.strip()
+                # values may be quoted (e.g. cluster_name with special chars)
+                summary["cluster"][k.strip()] = v.strip().strip('"')
 
 # Throughput
 def parse_iperf(p):
@@ -1372,22 +1520,41 @@ if scale_steps:
         if short and baseline_short and baseline_short > 0:
             step_data["short_conn_qps"] = short["avg_qps"]
             step_data["short_conn_degradation_pct"] = round((short["avg_qps"] - baseline_short) / baseline_short * 100, 1)
-        # Rules count at this scale
+        # Per-scale latency: TCP_CRR p99 (new-connection RTT, tracks short-conn
+        # degradation) and TCP_RR p99 (established-connection RTT, expected flat).
+        crr99 = parse_netperf_latency(f"service-scale/crr_at_{sc}svc_r*.txt", "p99")
+        rr99 = parse_netperf_latency(f"service-scale/rr_at_{sc}svc_r*.txt", "p99")
+        if crr99: step_data["tcp_crr_p99_us"] = crr99
+        if rr99: step_data["tcp_rr_p99_us"] = rr99
+        # Rules count at this scale.
+        # rules_count = total ruleset / LB entries (size indicator).
         for pat in [f"service-scale/iptables_rules_at_{sc}svc.txt", f"service-scale/lb_entries_at_{sc}svc.txt"]:
             fp = os.path.join(basedir, pat)
             if os.path.exists(fp):
                 with open(fp) as f:
                     val = f.read().strip()
                     if val: step_data["rules_count"] = int(val)
+        # kube_services_chain = KUBE-SERVICES chain length ≈ svc count; this is
+        # the true hot-path scan length driving short-conn degradation (iptables).
+        ksp = os.path.join(basedir, f"service-scale/kube_services_chain_at_{sc}svc.txt")
+        if os.path.exists(ksp):
+            with open(ksp) as f:
+                val = f.read().strip()
+                if val: step_data["kube_services_chain"] = int(val)
         steps_data.append(step_data)
     summary["service_scale"]["steps"] = steps_data
 
 # Resources
+# Reports avg AND max across all (pod × sample) rows. Cross-pod variance is
+# real: the cilium agent doing kube-proxy-replacement / LB sync work uses more
+# CPU/mem than idle agents on other nodes, so max captures the busiest node
+# while avg captures the cluster-wide typical per-node cost.
 def parse_csv(pattern):
     fs = sorted(glob.glob(os.path.join(basedir, pattern)))
     if not fs:
-        return {}, {}
+        return {}
     cpu_vals, mem_vals = [], []
+    pods = set()
     for f in fs:
         try:
             with open(f) as fh:
@@ -1395,19 +1562,25 @@ def parse_csv(pattern):
                     try:
                         cpu_vals.append(float(row['cpu_millicores']))
                         mem_vals.append(float(row['memory_mib']))
+                        pods.add(row.get('pod', ''))
                     except: pass
         except: pass
     if not cpu_vals:
-        return {}, {}
-    return {"avg_cpu_m": round(sum(cpu_vals)/len(cpu_vals), 1)}, \
-           {"avg_mem_mb": round(sum(mem_vals)/len(mem_vals), 1)}
+        return {}
+    return {
+        "avg_cpu_m": round(sum(cpu_vals)/len(cpu_vals), 1),
+        "max_cpu_m": round(max(cpu_vals), 1),
+        "avg_mem_mb": round(sum(mem_vals)/len(mem_vals), 1),
+        "max_mem_mb": round(max(mem_vals), 1),
+        "pods_sampled": len(pods),
+    }
 
 for res_key, csv_pat in [
-    ("cilium_agent", "resources/cilium_*.csv"),
-    ("kubeproxy", "resources/kubeproxy_*.csv"),
+    ("cilium_agent", "resources/cilium_agent_cpu_mem.csv"),
+    ("kubeproxy", "resources/kubeproxy_cpu_mem.csv"),
 ]:
-    cpu_d, mem_d = parse_csv(csv_pat)
-    if cpu_d: summary["resources"][res_key] = {**cpu_d, **mem_d}
+    rd = parse_csv(csv_pat)
+    if rd: summary["resources"][res_key] = rd
 
 # Hubble overhead
 def parse_single_fortio(path):
@@ -1528,8 +1701,14 @@ if ss:
                 print(f"      keepalive:     {step['keepalive_qps']} req/s ({step.get('keepalive_degradation_pct', '?')}%)")
             if 'short_conn_qps' in step:
                 print(f"      short-conn:    {step['short_conn_qps']} req/s ({step.get('short_conn_degradation_pct', '?')}%)")
+            if 'tcp_crr_p99_us' in step:
+                print(f"      TCP_CRR p99:   {step['tcp_crr_p99_us']} µs (new-conn latency)")
+            if 'tcp_rr_p99_us' in step:
+                print(f"      TCP_RR p99:    {step['tcp_rr_p99_us']} µs (established-conn latency)")
             if 'rules_count' in step:
                 print(f"      rules/entries: {step['rules_count']}")
+            if 'kube_services_chain' in step:
+                print(f"      KUBE-SERVICES chain: {step['kube_services_chain']} (hot-path scan length)")
     print()
 hb = d.get('hubble', {})
 if hb:
@@ -1548,6 +1727,14 @@ if np:
         print(f"    L7 CNP (HTTP): {np.get('l7_qps', '?')} req/s (overhead: {np.get('l7_overhead_pct', '?')}%)")
     print()
 res = d.get('resources', {})
+for rk, rlabel in [("kubeproxy", "kube-proxy"), ("cilium_agent", "Cilium Agent")]:
+    r = res.get(rk)
+    if r:
+        print(f"  ── Resource: {rlabel} (per-pod, steady state) ──")
+        print(f"    CPU:    avg {r.get('avg_cpu_m','?')}m / max {r.get('max_cpu_m','?')}m")
+        print(f"    Memory: avg {r.get('avg_mem_mb','?')}MiB / max {r.get('max_mem_mb','?')}MiB")
+        print(f"    (sampled across {r.get('pods_sampled','?')} pod(s))")
+        print()
 bpf = res.get('bpf_maps', {})
 if bpf:
     print("  ── BPF Map Memory ──")
@@ -1589,7 +1776,9 @@ main() {
 
   local cname
   cname=$(get_cluster_name)
-  OUTPUT_DIR="${OUTPUT_DIR:-./benchmark-results-${cname}}"
+  # Derive the default output dir from a filesystem-safe form of the context
+  # name (raw context may contain '/', '(', ')', spaces, CJK that break paths).
+  OUTPUT_DIR="${OUTPUT_DIR:-./benchmark-results-$(sanitize_name "$cname")}"
   info "Output directory: $OUTPUT_DIR"
   mkdir -p "$OUTPUT_DIR/resources"
 
