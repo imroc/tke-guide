@@ -13,14 +13,14 @@ Merge the kubeconfig files of all clusters that need to be part of the Cluster M
 When installing Cilium, specify the cluster name (can be the same as the TKE cluster ID, format cls-xxx), the cluster numeric ID (1-255), and the subnet ID for the clustermesh-apiserver component's private CLB (this component exposes the current cluster's Cilium control plane to other Cilium clusters, creating a CLB via a LoadBalancer-type Service; the private CLB requires specifying the subnet ID):
 
 ```bash
-helm --kube-context=$CLUSTER1 upgrade --install cilium cilium/cilium --version 1.19.4 \
+helm --kube-context=$CLUSTER1 upgrade --install cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --set cluster.name=$CLUSTER1 \
   --set cluster.id=1 \
   --set clustermesh.apiserver.service.annotations."service\.kubernetes\.io\/qcloud\-loadbalancer\-internal\-subnetid"="$CLUSTER1_SUBNET_ID" \
   # omit other parameters
 
-helm --kube-context=$CLUSTER2 upgrade --install cilium cilium/cilium --version 1.19.4 \
+helm --kube-context=$CLUSTER2 upgrade --install cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --set cluster.name=$CLUSTER2 \
   --set cluster.id=2 \

@@ -64,7 +64,7 @@ Therefore, if you need to enable IP masquerade, it is recommended to use Cilium'
 Enable it with the following command:
 
 ```bash showLineNumbers
-helm upgrade cilium cilium/cilium --version 1.19.4 \
+helm upgrade cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --reuse-values \
   # highlight-add-start
@@ -146,7 +146,7 @@ kubectl apply -f ip-masq-agent-config.yaml
 3. Update Cilium configuration:
 
 ```bash showLineNumbers
-helm upgrade cilium cilium/cilium --version 1.19.4 \
+helm upgrade cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --reuse-values \
   # highlight-add-start

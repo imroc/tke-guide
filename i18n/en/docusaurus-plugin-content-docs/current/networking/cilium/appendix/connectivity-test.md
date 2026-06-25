@@ -180,7 +180,7 @@ If nodes have no public network access, the relevant test cases will fail. This 
 | Item             | Value                                                                                                |
 | ---------------- | ---------------------------------------------------------------------------------------------------- |
 | Kubernetes       | v1.34.1 (containerd 1.7.28)                                                                         |
-| Cilium           | v1.19.4                                                                                              |
+| Cilium           | v1.19.5                                                                                              |
 | Cilium CLI       | v0.19.4                                                                                              |
 | Node OS          | TencentOS Server 4 (kernel 6.6.117-45.7.3.tl4.x86_64)                                                |
 | Instance Type    | S5.LARGE8 (4C8G)                                                                                    |
@@ -287,7 +287,7 @@ cilium connectivity test deploys a total of 132 test cases, grouped by function 
 
 | #   | Test Case                                 | Status      | Description                                        |
 | --- | ----------------------------------------- | ----------- | -------------------------------------------------- |
-| 55  | `pod-to-pod-encryption`                   | ⏭️ Skipped  | Requires Cilium < 1.18, this test uses 1.19.4      |
+| 55  | `pod-to-pod-encryption`                   | ⏭️ Skipped  | Requires Cilium < 1.18, this test uses 1.19.5      |
 | 56  | `pod-to-pod-with-l7-policy-encryption`    | ⏭️ Skipped  | Same as above                                      |
 | 57  | `pod-to-pod-encryption-v2`                | ✅ Passed   | Verify v2 encryption path (validates empty capture when encryption is not enabled) |
 | 58  | `pod-to-pod-with-l7-policy-encryption-v2` | ⏭️ Skipped  | Feature `encryption-pod` not enabled               |
@@ -334,7 +334,7 @@ cilium connectivity test deploys a total of 132 test cases, grouped by function 
 | --- | -------------------------------------------------- | ----------- | ----------------------------------------- |
 | 67  | `echo-ingress-l7`                                  | ✅ Passed   | L7 HTTP rules (path / method matching)    |
 | 68  | `echo-ingress-l7-via-hostport`                     | ✅ Passed   | L7 via HostPort                           |
-| 69  | `echo-ingress-from-client-tiered-wildcard-pass-l7` | ⏭️ Skipped  | Requires Cilium >= 1.20, this test uses 1.19.4 |
+| 69  | `echo-ingress-from-client-tiered-wildcard-pass-l7` | ⏭️ Skipped  | Requires Cilium >= 1.20, this test uses 1.19.5 |
 | 70  | `echo-ingress-l7-named-port`                       | ✅ Passed   | L7 + named port                           |
 | 71  | `client-egress-l7-method`                          | ✅ Passed   | L7 method restriction                     |
 | 72  | `client-egress-l7-method-port-range`               | ✅ Passed   | + port range                              |
@@ -442,7 +442,7 @@ The 55 skipped test cases in this run can be categorized into 4 groups, all unre
 | Item             | Value                                                            |
 | ---------------- | ---------------------------------------------------------------- |
 | Kubernetes       | v1.34.1 (containerd 1.7.28)                                     |
-| Cilium           | v1.19.4                                                          |
+| Cilium           | v1.19.5                                                          |
 | Cilium CLI       | v0.19.4                                                          |
 | Node OS          | TencentOS Server 4 (kernel 6.6.117-45.7.3.tl4.x86_64)            |
 | Instance Type    | S5.LARGE8 (4C8G)                                                 |

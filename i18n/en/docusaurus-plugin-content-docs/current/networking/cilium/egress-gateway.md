@@ -63,7 +63,7 @@ Choose the appropriate method based on the routing mode of your current cilium i
 Cilium installation method for enabling Egress Gateway (highlighted lines are additions/modifications compared to the default installation):
 
 ```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.19.4 \
+helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -134,7 +134,7 @@ kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}'
 If you have already installed cilium using the method in [Installing Cilium](install.md) (Using Helm to Install Cilium), the command for enabling Egress Gateway can be simplified:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.4 \
+helm upgrade cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --reuse-values \
   --set egressGateway.enabled=true \
@@ -168,7 +168,7 @@ Therefore, Native Routing + Egress Gateway must use `nonMasqueradeCIDRs`. This g
 In Overlay mode, cilium already defaults to `enableIPv4Masquerade=true`, and cross-node Pod-to-Pod traffic uses vxlan encapsulation, which is not affected by BPF masquerade. Therefore, **no `nonMasqueradeCIDRs` configuration is needed or should be added**. On an Overlay cluster already installed with the default method from this guide, the command for enabling Egress Gateway is simplified to:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.4 \
+helm upgrade cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --reuse-values \
   --set egressGateway.enabled=true \

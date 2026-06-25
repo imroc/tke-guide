@@ -21,7 +21,7 @@ The prerequisite for using wireguard encryption is that the wireguard kernel mod
 To enable wireguard encryption:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.4 \
+helm upgrade cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --reuse-values \
   --set encryption.enabled=true \

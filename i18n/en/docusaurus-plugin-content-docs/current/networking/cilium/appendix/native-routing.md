@@ -206,7 +206,7 @@ kubectl -n kube-system get cm cilium-config -o jsonpath='{.data.enable-endpoint-
 # Output ""/missing: Pod traffic flows through cilium_host, BPF host routing IS hit
 ```
 
-> Source reference: `pkg/endpoint/endpoint.go:1036-1056` (v1.19.4) `NewDatapathConfiguration` comment explicitly states _"Since routing occurs via endpoint interface directly, BPF program on cilium_host interface is bypassed"_.
+> Source reference: `pkg/endpoint/endpoint.go:1036-1056` (v1.19.5) `NewDatapathConfiguration` comment explicitly states _"Since routing occurs via endpoint interface directly, BPF program on cilium_host interface is bypassed"_.
 
 ## Performance Impact
 
@@ -252,7 +252,7 @@ Even though the BPF program on cilium_host is bypassed, the following cilium cor
 Cilium's official helm chart **automatically sets** `enable-endpoint-routes: "true"` when `eni.enabled=true` (cilium managing AWS ENI IPAM):
 
 ```yaml
-# install/kubernetes/cilium/templates/cilium-configmap.yaml (v1.19.4)
+# install/kubernetes/cilium/templates/cilium-configmap.yaml (v1.19.5)
 {{- if .Values.eni.enabled }}
   {{- if not .Values.endpointRoutes.enabled }}
   enable-endpoint-routes: "true"

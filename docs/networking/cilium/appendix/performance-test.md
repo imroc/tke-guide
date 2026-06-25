@@ -93,7 +93,7 @@ cilium connectivity perf \
 | 项              | 值                                                                 |
 | --------------- | ------------------------------------------------------------------ |
 | Kubernetes 版本 | v1.34.1（containerd 1.7.28）                                       |
-| Cilium 版本     | v1.19.4                                                            |
+| Cilium 版本     | v1.19.5                                                            |
 | Cilium CLI 版本 | v0.19.4                                                            |
 | 节点 OS         | TencentOS Server 4 (kernel 6.6.117-45.7.3.tl4.x86_64)              |
 | 节点数量        | 3 个节点                                                           |

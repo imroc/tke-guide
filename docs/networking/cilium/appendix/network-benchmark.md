@@ -123,7 +123,7 @@ kubectl -n kube-system rollout restart ds/cilium
 | 网络方案        | VPC-CNI + kube-proxy iptables | VPC-CNI + Cilium cni-chaining（Native Routing） | Cilium VXLAN Overlay（独占 Pod CNI） |
 | Kubernetes 版本 | v1.34.1-tke.5                 | v1.34.1-tke.5                                   | v1.34.1-tke.5                        |
 | 集群规格        | L500                          | L500                                            | L500                                 |
-| Cilium 版本     | N/A                           | v1.19.4                                         | v1.19.4                              |
+| Cilium 版本     | N/A                           | v1.19.5                                         | v1.19.5                              |
 | kube-proxy 替代 | 否（iptables 模式）           | 是（eBPF）                                      | 是（eBPF）                           |
 | 节点 OS         | TencentOS Server 4            | TencentOS Server 4                              | TencentOS Server 4                   |
 | 内核版本        | 6.6.117-45.11.2               | 6.6.117-45.11.2                                 | 6.6.117-45.11.2                      |

@@ -116,7 +116,7 @@ The CiliumLocalRedirectPolicy feature is not enabled by default. You need to add
 If Cilium is already installed, update the Cilium configuration to enable it:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.4 \
+helm upgrade cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --reuse-values \
   --set localRedirectPolicies.enabled=true

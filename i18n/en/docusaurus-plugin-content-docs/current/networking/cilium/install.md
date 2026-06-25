@@ -160,7 +160,7 @@ With `bash -c "$(curl ...)"`, bash receives the script as a string argument and 
 If you want a fully non-interactive one-liner, set the parameters via environment variables (`bash -c` inherits them from the parent shell):
 
 ```bash
-ROUTING_MODE=native CILIUM_VERSION=1.19.4 \
+ROUTING_MODE=native CILIUM_VERSION=1.19.5 \
   bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install
 ```
 
@@ -256,7 +256,7 @@ kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook
 <TabItem value="native-vpccni" label="Native Routing (VPC-CNI)" default>
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.4 \
+helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -298,7 +298,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
 <TabItem value="overlay-gr" label="Overlay (GR)">
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.4 \
+helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -335,7 +335,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
 <TabItem value="overlay-vpccni" label="Overlay (VPC-CNI)">
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.4 \
+helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -545,7 +545,7 @@ authentication:
 For production, save the parameters to YAML files and run the same command for both install and update (just swap `--version` for upgrades):
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.4 \
+helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml
@@ -554,7 +554,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.4 \
 If you have lots of custom config, split it into multiple files (e.g. Egress Gateway config in `egress-values.yaml`, container resource requests/limits in `resources-values.yaml`) and merge them via multiple `-f` flags:
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.4 \
+helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml \
@@ -757,7 +757,7 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
 
 ### Upgrade Cilium Version
 
-Cilium minor-version upgrades (e.g. 1.19.4 → 1.19.5) are usually backward-compatible — upgrade directly with helm. **For major-version upgrades (e.g. 1.18 → 1.19), you MUST consult the corresponding version section of the official [Upgrade Guide](https://docs.cilium.io/en/stable/operations/upgrade/)** to confirm breaking changes and required parameter adjustments.
+Cilium minor-version upgrades (e.g. 1.19.5 → 1.19.5) are usually backward-compatible — upgrade directly with helm. **For major-version upgrades (e.g. 1.18 → 1.19), you MUST consult the corresponding version section of the official [Upgrade Guide](https://docs.cilium.io/en/stable/operations/upgrade/)** to confirm breaking changes and required parameter adjustments.
 
 Upgrade steps:
 
@@ -849,7 +849,7 @@ Cilium's helm chart provides a huge number of customization options. The configu
 Run this to see all options:
 
 ```bash
-helm show values cilium/cilium --version 1.19.4
+helm show values cilium/cilium --version 1.19.5
 ```
 
 ### What if I can't reach the cilium helm repo?
@@ -859,15 +859,15 @@ During `helm` installation, helm fetches chart info from the cilium helm repo. I
 Workaround: download the chart archive from a reachable environment:
 
 ```bash
-$ helm pull cilium/cilium --version 1.19.4
+$ helm pull cilium/cilium --version 1.19.5
 $ ls cilium-*.tgz
-cilium-1.19.4.tgz
+cilium-1.19.5.tgz
 ```
 
 Copy the archive to the machine running helm, then install using the local path:
 
 ```bash
-helm upgrade --install cilium ./cilium-1.19.4.tgz \
+helm upgrade --install cilium ./cilium-1.19.5.tgz \
   --namespace kube-system \
   -f values.yaml
 ```
@@ -930,7 +930,7 @@ TKE provides the mirror registry `quay.tencentcloudcr.com` for `quay.io` images 
 If you've configured many additional install parameters, more image dependencies may be involved — without address replacement these may fail to pull. The following command replaces all cilium dependencies with TKE-intranet-reachable mirrors in one shot:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.4 \
+helm upgrade cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --reuse-values \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
@@ -1001,7 +1001,7 @@ authentication:
 When updating cilium, append `-f image-values.yaml` to include the image overrides:
 
 ```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.19.4 \
+helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --namespace=kube-system \
   -f values.yaml \
   # highlight-add-line

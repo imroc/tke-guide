@@ -63,7 +63,7 @@ Overlay 集群上脚本不会问也不会注入这个配置。
 启用 Egress Gateway 的 cilium 安装方法（高亮部分为相对默认安装方案的新增/修改项）：
 
 ```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.19.4 \
+helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -134,7 +134,7 @@ kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}'
 如果你已经使用了 [安装cilium](install.md) 中 **使用 helm 安装 cilium** 给的安装方法进行了安装，启用 Egress Gateway 的命令可以简化成这样：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.4 \
+helm upgrade cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --reuse-values \
   --set egressGateway.enabled=true \
@@ -168,7 +168,7 @@ cilium 提供两种方式告诉 BPF masquerade 哪些流量不要 SNAT：
 Overlay 模式下 cilium 已默认 `enableIPv4Masquerade=true`，且跨节点 Pod-to-Pod 走 vxlan 封装不受 BPF masquerade 影响，因此**不需要也不要配置** `nonMasqueradeCIDRs`。在已用本指南默认方案安装好的 Overlay 集群上，启用 Egress Gateway 命令简化为：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.4 \
+helm upgrade cilium cilium/cilium --version 1.19.5 \
   --namespace kube-system \
   --reuse-values \
   --set egressGateway.enabled=true \

@@ -8,7 +8,7 @@ If you are creating a new node pool, you can prioritize from the table below. If
 
 ## Verified OS List
 
-All OS entries in the table below have passed complete e2e verification across all 3 installation modes (cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache).
+All OS entries in the table below have passed complete e2e verification across all 3 installation modes (cilium 1.19.5 + Egress Gateway + Nodelocal DNSCache).
 
 | OS                   | OsName                  | Kernel Version |
 | -------------------- | ----------------------- | -------------- |
@@ -30,7 +30,7 @@ The `OsName` column corresponds to the `node_os` field value in the [tencentclou
 The OS list in this document was produced as follows:
 
 1. Prepare a test cluster for each network mode (VPC-CNI / GR), create multiple node pools from the OS list (one OS per node pool, 1 node per pool).
-2. Install cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache using the [install script](../install.md#one-click-install-script).
+2. Install cilium 1.19.5 + Egress Gateway + Nodelocal DNSCache using the [install script](../install.md#one-click-install-script).
 3. From an environment connected to the cluster (with kubeconfig configured), run the script's e2e test subcommand:
    ```bash
    bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- test

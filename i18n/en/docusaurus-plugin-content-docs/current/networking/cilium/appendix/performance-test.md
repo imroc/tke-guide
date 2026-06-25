@@ -93,7 +93,7 @@ The TCP_STREAM test in `cilium connectivity perf` (based on netperf) uses relati
 | Item             | Value                                                               |
 | ---------------- | ------------------------------------------------------------------- |
 | Kubernetes Version | v1.34.1 (containerd 1.7.28)                                        |
-| Cilium Version   | v1.19.4                                                             |
+| Cilium Version   | v1.19.5                                                             |
 | Cilium CLI Version | v0.19.4                                                             |
 | Node OS          | TencentOS Server 4 (kernel 6.6.117-45.7.3.tl4.x86_64)               |
 | Node Count       | 3 nodes                                                             |

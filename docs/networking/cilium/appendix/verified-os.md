@@ -8,7 +8,7 @@
 
 ## 实测通过的 OS 列表
 
-下表中所有 OS 均已在 3 种安装模式下完整跑通 e2e 验证（cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache）。
+下表中所有 OS 均已在 3 种安装模式下完整跑通 e2e 验证（cilium 1.19.5 + Egress Gateway + Nodelocal DNSCache）。
 
 | OS                   | OsName                  | 内核版本 |
 | -------------------- | ----------------------- | -------- |
@@ -30,7 +30,7 @@
 本文 OS 列表的产生过程：
 
 1. 为每种网络模式（VPC-CNI / GR）准备一个测试集群，按 OS 清单创建多个节点池（一个 OS 一个节点池，每个节点池 1 个节点）。
-2. 用 [安装脚本](../install.md#一键安装脚本) 在集群上安装 cilium 1.19.4 + Egress Gateway + Nodelocal DNSCache。
+2. 用 [安装脚本](../install.md#一键安装脚本) 在集群上安装 cilium 1.19.5 + Egress Gateway + Nodelocal DNSCache。
 3. 在已连接集群的环境（kubeconfig 已配置好）执行脚本的 e2e 测试子命令：
    ```bash
    bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- test

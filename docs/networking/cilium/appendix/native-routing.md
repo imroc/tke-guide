@@ -206,7 +206,7 @@ kubectl -n kube-system get cm cilium-config -o jsonpath='{.data.enable-endpoint-
 # 输出 ""/不存在：Pod 流量经 cilium_host，BPF host routing 实际生效
 ```
 
-> 源码依据：`pkg/endpoint/endpoint.go:1036-1056`（v1.19.4） `NewDatapathConfiguration` 注释明确写 _"Since routing occurs via endpoint interface directly, BPF program on cilium_host interface is bypassed"_。
+> 源码依据：`pkg/endpoint/endpoint.go:1036-1056`（v1.19.5） `NewDatapathConfiguration` 注释明确写 _"Since routing occurs via endpoint interface directly, BPF program on cilium_host interface is bypassed"_。
 
 ## 性能影响
 
@@ -252,7 +252,7 @@ cilium_host 被绕过、Pod 流量走 per-endpoint veth 时，每个包多出的
 cilium 官方 helm chart 在 `eni.enabled=true`（cilium 自管 AWS ENI IPAM）时**自动写入** `enable-endpoint-routes: "true"`：
 
 ```yaml
-# install/kubernetes/cilium/templates/cilium-configmap.yaml (v1.19.4)
+# install/kubernetes/cilium/templates/cilium-configmap.yaml (v1.19.5)
 {{- if .Values.eni.enabled }}
   {{- if not .Values.endpointRoutes.enabled }}
   enable-endpoint-routes: "true"

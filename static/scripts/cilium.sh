@@ -88,7 +88,7 @@ set -euo pipefail
 # 7. NON-INTERACTIVE MODE (environment variables)
 #    All interactive prompts in install can be skipped by setting env vars:
 #      ROUTING_MODE     "native" or "overlay" (required)
-#      CILIUM_VERSION   e.g. "1.19.4" (optional, defaults to DEFAULT_CILIUM_VERSION)
+#      CILIUM_VERSION   e.g. "1.19.5" (optional, defaults to DEFAULT_CILIUM_VERSION)
 #      POD_CIDR         e.g. "10.244.0.0/16" (only for overlay mode)
 #      POD_CIDR_MASK    e.g. "24" (only for overlay mode)
 #      ENABLE_EGRESS    "true" or "false" (optional, default false)
@@ -141,7 +141,7 @@ set -euo pipefail
 # ====== Defaults ======
 
 # Cilium helm chart version. Bump this when a new version is tested and verified.
-DEFAULT_CILIUM_VERSION="1.19.4"
+DEFAULT_CILIUM_VERSION="1.19.5"
 # Default image registry prefix for cilium images (TKE internal mirror).
 DEFAULT_IMAGE_REGISTRY="quay.tencentcloudcr.com/cilium"
 # Default Pod CIDR for overlay mode. Only used when ROUTING_MODE=overlay.
