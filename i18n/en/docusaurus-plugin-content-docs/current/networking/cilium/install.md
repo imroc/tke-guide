@@ -1055,6 +1055,31 @@ helm upgrade cilium cilium/cilium --version 1.19.5 \
   --set 'operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]=eklet'
 ```
 
+### Native Routing (VPC-CNI) mode does not support Gateway API?
+
+**Root Cause**: Native Routing mode uses `ipam.mode=delegated-plugin` (IP allocated by TKE VPC-CNI plugin), so cilium-agent does not allocate IPs. Gateway API (and Ingress) requires the agent to create a special IP for differentiating Envoy traffic, which is impossible under delegated-plugin mode.
+
+**Source code evidence** (`pkg/option/config.go`):
+
+```go
+// envoy config (Ingress, Gateway API, ...) require cilium-agent to create an IP address
+// specifically for differentiating envoy traffic, which is not possible
+// with delegated IPAM.
+if c.EnableEnvoyConfig {
+    return fmt.Errorf("--%s must be disabled with --%s=%s",
+        EnableEnvoyConfig, IPAM, ipamOption.IPAMDelegatedPlugin)
+}
+```
+
+**Impact**:
+
+| Network Mode             | IPAM Mode        | Gateway API Support |
+| ------------------------ | ---------------- | ------------------- |
+| Native Routing (VPC-CNI) | delegated-plugin | ❌ Not supported    |
+| Overlay (VPC-CNI/GR)     | cluster-pool     | ✅ Supported        |
+
+If you need Gateway API capability, it is recommended to use **Overlay mode**.
+
 ### cilium-agent reports `operation not permitted` connecting to apiserver?
 
 If during installation `k8sServiceHost` points to a CLB address (the CLB used for cluster intranet access — either the CLB VIP or a domain resolving to the CLB VIP), cilium-agent's connection to apiserver gets intercepted and forwarded by cilium itself instead of going through the CLB. cilium implements that forwarding via eBPF, which depends on eBPF data (endpoint list) stored in the kernel. Under certain conditions the eBPF data may be flushed — when it is, the endpoint list may be temporarily emptied, making cilium-agent unable to reach apiserver (error `operation not permitted`), so it can't see the real endpoint list to refresh the eBPF data — a circular dependency that only recovers after a node reboot.

@@ -1050,6 +1050,31 @@ helm upgrade cilium cilium/cilium --version 1.19.5 \
   --set 'operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]=eklet'
 ```
 
+### Native Routing (VPC-CNI) 模式不支持 Gateway API？
+
+**根因**：Native Routing 模式使用 `ipam.mode=delegated-plugin`（IP 由 TKE VPC-CNI 插件分配），cilium-agent 不负责分配 IP。而 Gateway API（以及 Ingress）需要 agent 创建一个特殊的 IP 用于区分 Envoy 流量，这在 delegated-plugin 模式下无法实现。
+
+**源码证据**（`pkg/option/config.go`）：
+
+```go
+// envoy config (Ingress, Gateway API, ...) require cilium-agent to create an IP address
+// specifically for differentiating envoy traffic, which is not possible
+// with delegated IPAM.
+if c.EnableEnvoyConfig {
+    return fmt.Errorf("--%s must be disabled with --%s=%s",
+        EnableEnvoyConfig, IPAM, ipamOption.IPAMDelegatedPlugin)
+}
+```
+
+**影响范围**：
+
+| 网络模式                 | IPAM 模式        | Gateway API 支持 |
+| ------------------------ | ---------------- | ---------------- |
+| Native Routing (VPC-CNI) | delegated-plugin | ❌ 不支持        |
+| Overlay (VPC-CNI/GR)     | cluster-pool     | ✅ 支持          |
+
+如果需要 Gateway API 能力，建议使用 **Overlay 模式**。
+
 ### cilium-agent 连 apiserver 报错 `operation not permitted`？
 
 如果安装 cilium 时 `k8sServiceHost` 指向的是 CLB 地址（开启集群内网访问时使用的 CLB），地址为 CLB VIP 或最终解析到 CLB VIP 的域名，此时 cilium-agent 连接 apiserver 的链路会被 cilium 自身拦截并转发，不会真正到 CLB 转发。cilium 转发该地址最终是 ebpf 程序实现的，ebpf 程序转发该地址又是基于存放在内核中的 ebpf 数据（endpoint 列表），在某种触发条件下，ebpf 数据可能被刷新，刷新可能导致 endpoint 列表被临时清空，而一旦清空 cilium-agent 就再也连不上 apiserver（报错 `operation not permitted`），也就无法感知当前真实的 endpoint 列表来更新 ebpf 数据，形成循环依赖，重启节点后才会恢复正常。
