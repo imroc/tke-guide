@@ -277,6 +277,9 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --set operator.tolerations[3].key="node.cloudprovider.kubernetes.io/uninitialized",operator.tolerations[3].operator="Exists" \
   --set operator.tolerations[4].key="tke.cloud.tencent.com/uninitialized",operator.tolerations[4].operator="Exists" \
   --set operator.tolerations[5].key="tke.cloud.tencent.com/eni-ip-unavailable",operator.tolerations[5].operator="Exists" \
+  --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key="node.kubernetes.io/instance-type" \
+  --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator=NotIn \
+  --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]="eklet" \
   --set routingMode=native \
   --set endpointRoutes.enabled=true \
   --set ipam.mode=delegated-plugin \
@@ -318,6 +321,9 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --set operator.tolerations[2].key="node.kubernetes.io/not-ready",operator.tolerations[2].operator="Exists" \
   --set operator.tolerations[3].key="node.cloudprovider.kubernetes.io/uninitialized",operator.tolerations[3].operator="Exists" \
   --set operator.tolerations[4].key="tke.cloud.tencent.com/uninitialized",operator.tolerations[4].operator="Exists" \
+  --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key="node.kubernetes.io/instance-type" \
+  --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator=NotIn \
+  --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]="eklet" \
   --set routingMode=tunnel \
   --set tunnelProtocol=vxlan \
   --set ipam.mode=cluster-pool \
@@ -356,6 +362,9 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --set operator.tolerations[3].key="node.cloudprovider.kubernetes.io/uninitialized",operator.tolerations[3].operator="Exists" \
   --set operator.tolerations[4].key="tke.cloud.tencent.com/uninitialized",operator.tolerations[4].operator="Exists" \
   --set operator.tolerations[5].key="tke.cloud.tencent.com/eni-ip-unavailable",operator.tolerations[5].operator="Exists" \
+  --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key="node.kubernetes.io/instance-type" \
+  --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator=NotIn \
+  --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]="eklet" \
   --set routingMode=tunnel \
   --set tunnelProtocol=vxlan \
   --set ipam.mode=cluster-pool \
@@ -405,6 +414,19 @@ operator:
   # Tolerate TKE taints — avoid bootstrap circular dependency at first install
   - key: "tke.cloud.tencent.com/uninitialized"
     operator: Exists
+  # Prevent scheduling onto super nodes (eklet): cilium-operator uses hostNetwork,
+  # and its readiness probe (127.0.0.1:9234) is unreachable on eklet, causing
+  # endless crashloop. This nodeAffinity merges with the chart's default
+  # podAntiAffinity — multi-replica spreading is preserved.
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: node.kubernetes.io/instance-type
+            operator: NotIn
+            values:
+            - eklet
 ```
 
   </TabItem>
@@ -1020,7 +1042,18 @@ For higher availability, you can [host Cilium images via TCR](./appendix/tcr.md)
 
 cilium-operator uses hostNetwork and configures a readiness probe. On super nodes, hostNetwork-based probes don't pass, so cilium-operator never reports ready.
 
-Super nodes are not recommended in clusters with cilium installed — remove them. If you must keep them, taint them and add matching tolerations to the Pods you want to schedule there.
+**The [one-click install script](#one-click-install-script) and the helm/values.yaml examples above already set `operator.affinity.nodeAffinity` by default, using `node.kubernetes.io/instance-type NotIn [eklet]` to explicitly prevent cilium-operator from scheduling onto super nodes** — simply follow the docs and this issue is avoided.
+
+If you installed without the documented parameters (e.g. ran `helm install` yourself without the affinity), you can add it after the fact:
+
+```bash
+helm upgrade cilium cilium/cilium --version 1.19.5 \
+  --namespace kube-system \
+  --reuse-values \
+  --set 'operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key=node.kubernetes.io/instance-type' \
+  --set 'operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator=NotIn' \
+  --set 'operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]=eklet'
+```
 
 ### cilium-agent reports `operation not permitted` connecting to apiserver?
 

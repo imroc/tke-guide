@@ -1001,6 +1001,17 @@ helm_install_cilium() {
     ;;
   esac
 
+  # Prevent cilium-operator from scheduling onto super nodes (eklet).
+  # cilium-operator uses hostNetwork + 127.0.0.1 readiness probe, which is
+  # unreachable on eklet, causing endless crashloop (see install.md FAQ).
+  # nodeAffinity merges with the chart's default podAntiAffinity (helm --set
+  # merges map fields, so podAntiAffinity is preserved).
+  local -a affinity_args=(
+    --set 'operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key=node.kubernetes.io/instance-type'
+    --set 'operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator=NotIn'
+    --set 'operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]=eklet'
+  )
+
   # Egress Gateway: merge params into helm install if enabled.
   # NOTE: egress_args / ip_masq_args / hubble_args are appended LAST in helm call below — their
   # --set values take precedence over both common_args and mode_args (helm last-wins).
@@ -1046,7 +1057,7 @@ helm_install_cilium() {
   info "$(msg HELM_INSTALL) (${ROUTING_MODE} (${NETWORK_MODE}), cilium ${CILIUM_VERSION})"
   helm upgrade --install cilium cilium/cilium --version "$CILIUM_VERSION" \
     --namespace kube-system \
-    "${image_args[@]}" "${toleration_args[@]}" "${common_args[@]}" "${mode_args[@]}" \
+    "${image_args[@]}" "${toleration_args[@]}" "${affinity_args[@]}" "${common_args[@]}" "${mode_args[@]}" \
     ${egress_args[@]+"${egress_args[@]}"} ${ip_masq_args[@]+"${ip_masq_args[@]}"} ${hubble_args[@]+"${hubble_args[@]}"}
 }
 
