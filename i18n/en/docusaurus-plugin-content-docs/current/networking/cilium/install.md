@@ -15,18 +15,18 @@ Benchmarks show the **performance difference between Native Routing and Overlay 
 
 :::note[How to Choose]
 
-| Comparison Item           | Native Routing (VPC-CNI) ⭐              | Overlay (VPC-CNI) ⭐                                       | Overlay (GR)                                                                                                                                                                                                                                                                                      |
-| ------------------------- | ---------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Network Performance       | ✅ On par with Overlay                   | ✅ On par with Native (VXLAN overhead negligible)          | ✅ On par with Native (VXLAN overhead negligible)                                                                                                                                                                                                                                                 |
-| Pod IP Range              | VPC IP (including Assistant CIDR IPs)    | Independent CIDR, doesn't consume VPC IP                   | Independent CIDR, doesn't consume VPC IP                                                                                                                                                                                                                                                          |
-| VPC Secondary CIDR Burned | ✅ None                                  | ✅ None                                                    | ⚠️ A GR cluster **mandates a VPC secondary CIDR be carved out as its ClusterCIDR** at creation. Even when Overlay assigns Pod IPs from an independent CIDR and that ClusterCIDR is never used by any Pod, the secondary CIDR remains permanently held by the GR cluster (a GR cluster limitation) |
-| IP Capacity Expansion     | ✅ Supported (add a VPC-CNI subnet)      | ✅ Supported (append CIDR to `clusterPoolIPv4PodCIDRList`) | ✅ Supported (append CIDR to `clusterPoolIPv4PodCIDRList`)                                                                                                                                                                                                                                        |
-| Node Count Limit          | ✅ None                                  | ✅ None                                                    | ⚠️ Limited by GR ClusterCIDR (GR cluster's own limit)                                                                                                                                                                                                                                             |
-| External Pod Access       | ✅ Directly routable                     | ❌ Not directly routable, via Service/Ingress              | ❌ Not directly routable (Same as left)                                                                                                                                                                                                                                                           |
-| CLB Direct-to-Pod         | ✅ Supported                             | ❌ Not supported (CLB can't route Overlay IP)              | ❌ Not supported (Same as left)                                                                                                                                                                                                                                                                   |
-| Gateway API               | ❌ Not supported (ipam=delegated-plugin) | ✅ Supported (ipam=cluster-pool)                           | ✅ Supported (ipam=cluster-pool)                                                                                                                                                                                                                                                                  |
-| L7/DNS NetworkPolicy      | ✅ Fully supported                       | ✅ Fully supported                                         | ✅ Fully supported                                                                                                                                                                                                                                                                                |
-| Use Cases                 | General (recommended)                    | Gateway API needed, IP shortage, IDC (recommended)         | Only recommended if you already have a GR cluster — do NOT create a new GR cluster just to install cilium                                                                                                                                                                                         |
+| Comparison Item           | Native Routing (VPC-CNI) ⭐              | Overlay (VPC-CNI) ⭐                                                                       | Overlay (GR)                                                                                                                                                                                                                                                                                      |
+| ------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Network Performance       | ✅ On par with Overlay                   | ✅ On par with Native (VXLAN overhead negligible)                                          | ✅ On par with Native (VXLAN overhead negligible)                                                                                                                                                                                                                                                 |
+| Pod IP Range              | VPC IP (including Assistant CIDR IPs)    | Independent CIDR, doesn't consume VPC IP                                                   | Independent CIDR, doesn't consume VPC IP                                                                                                                                                                                                                                                          |
+| VPC Secondary CIDR Burned | ✅ None                                  | ✅ None                                                                                    | ⚠️ A GR cluster **mandates a VPC secondary CIDR be carved out as its ClusterCIDR** at creation. Even when Overlay assigns Pod IPs from an independent CIDR and that ClusterCIDR is never used by any Pod, the secondary CIDR remains permanently held by the GR cluster (a GR cluster limitation) |
+| IP Capacity Expansion     | ✅ Supported (add a VPC-CNI subnet)      | ✅ Supported (append CIDR to CiliumPodIPPool; auto-allocates more per node when exhausted) | ✅ Supported (append CIDR to CiliumPodIPPool; auto-allocates more per node when exhausted)                                                                                                                                                                                                        |
+| Node Count Limit          | ✅ None                                  | ✅ None                                                                                    | ⚠️ Limited by GR ClusterCIDR (GR cluster's own limit)                                                                                                                                                                                                                                             |
+| External Pod Access       | ✅ Directly routable                     | ❌ Not directly routable, via Service/Ingress                                              | ❌ Not directly routable (Same as left)                                                                                                                                                                                                                                                           |
+| CLB Direct-to-Pod         | ✅ Supported                             | ❌ Not supported (CLB can't route Overlay IP)                                              | ❌ Not supported (Same as left)                                                                                                                                                                                                                                                                   |
+| Gateway API               | ❌ Not supported (ipam=delegated-plugin) | ✅ Supported (ipam=multi-pool)                                                             | ✅ Supported (ipam=multi-pool)                                                                                                                                                                                                                                                                    |
+| L7/DNS NetworkPolicy      | ✅ Fully supported                       | ✅ Fully supported                                                                         | ✅ Fully supported                                                                                                                                                                                                                                                                                |
+| Use Cases                 | General (recommended)                    | Gateway API needed, IP shortage, IDC (recommended)                                         | Only recommended if you already have a GR cluster — do NOT create a new GR cluster just to install cilium                                                                                                                                                                                         |
 
 :::
 
@@ -327,9 +327,9 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]="eklet" \
   --set routingMode=tunnel \
   --set tunnelProtocol=vxlan \
-  --set ipam.mode=cluster-pool \
-  --set ipam.operator.clusterPoolIPv4PodCIDRList="{10.244.0.0/16}" \
-  --set ipam.operator.clusterPoolIPv4MaskSize=24 \
+  --set ipam.mode=multi-pool \
+  --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.cidrs[0]="10.244.0.0/16" \
+  --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.maskSize=24 \
   --set enableIPv4Masquerade=true \
   --set bpf.masquerade=true \
   --set localRedirectPolicies.enabled=true \
@@ -368,9 +368,9 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]="eklet" \
   --set routingMode=tunnel \
   --set tunnelProtocol=vxlan \
-  --set ipam.mode=cluster-pool \
-  --set ipam.operator.clusterPoolIPv4PodCIDRList="{10.244.0.0/16}" \
-  --set ipam.operator.clusterPoolIPv4MaskSize=24 \
+  --set ipam.mode=multi-pool \
+  --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.cidrs[0]="10.244.0.0/16" \
+  --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.maskSize=24 \
   --set enableIPv4Masquerade=true \
   --set bpf.masquerade=true \
   --set localRedirectPolicies.enabled=true \
@@ -483,13 +483,20 @@ Overlay (vxlan) mode-specific parameters — applies to both VPC-CNI and GR base
 routingMode: "tunnel"
 tunnelProtocol: "vxlan"
 ipam:
-  mode: "cluster-pool"
+  # multi-pool supports dynamic per-node PodCIDR allocation, breaking cluster-pool's
+  # fixed single-node Pod limit. CIDRs can be appended at runtime via CiliumPodIPPool.
+  mode: "multi-pool"
   operator:
-    # Pod CIDR — adjust to cluster scale. Just don't conflict with VPC CIDR or Service CIDR.
-    clusterPoolIPv4PodCIDRList:
-    - "10.244.0.0/16"
-    # Per-node subnet mask — /24 = up to 254 Pod IPs per node
-    clusterPoolIPv4MaskSize: "24"
+    autoCreateCiliumPodIPPools:
+      default:
+        ipv4:
+          # Pod CIDR — adjust to cluster scale. Just don't conflict with VPC CIDR or Service CIDR.
+          # New CIDRs can be appended at runtime to expand total cluster IP capacity.
+          cidrs:
+          - "10.244.0.0/16"
+          # Per-node subnet mask — /24 = up to 254 Pod IPs per node.
+          # When a node exhausts its IPs, cilium-agent auto-allocates another /24 — no node rebuild needed.
+          maskSize: 24
 # Overlay mode needs IP masquerade so Pod IPs are SNATed to node IP when leaving the cluster
 enableIPv4Masquerade: true
 bpf:
@@ -1077,7 +1084,7 @@ if c.EnableEnvoyConfig {
 | Network Mode             | IPAM Mode        | Gateway API Support |
 | ------------------------ | ---------------- | ------------------- |
 | Native Routing (VPC-CNI) | delegated-plugin | ❌ Not supported    |
-| Overlay (VPC-CNI/GR)     | cluster-pool     | ✅ Supported        |
+| Overlay (VPC-CNI/GR)     | multi-pool       | ✅ Supported        |
 
 If you need Gateway API capability, it is recommended to use **Overlay mode**.
 
