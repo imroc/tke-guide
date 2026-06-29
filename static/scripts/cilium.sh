@@ -74,9 +74,9 @@ set -euo pipefail
 # 5. INSTALL MODES (3 supported combinations)
 #    ┌──────────────────┬──────────────────────────────────────────────────┐
 #    │ VPC-CNI + native │ CNI chaining via ConfigMap (cni-config)         │
-#    │ VPC-CNI + overlay│ Full cilium CNI (tunnel/vxlan, cluster-pool)    │
+#    │ VPC-CNI + overlay│ Full cilium CNI (tunnel/vxlan, multi-pool)     │
 #    │                  │ + delete mutatingwebhookconfiguration           │
-#    │ GR + overlay     │ Full cilium CNI (tunnel/vxlan, cluster-pool)    │
+#    │ GR + overlay     │ Full cilium CNI (tunnel/vxlan, multi-pool)     │
 #    └──────────────────┴──────────────────────────────────────────────────┘
 #    GR + native is NOT supported — see appendix/gr-native-not-recommended
 #    for the failure modes (cross-node Pod-to-Pod broken, no L7/DNS NP, etc).
@@ -993,11 +993,14 @@ helm_install_cilium() {
     # back to legacy host routing whenever masquerading goes through iptables
     # (see pkg/kpr/initializer/kube_proxy_replacement.go: "BPF host routing
     # requires enable-bpf-masquerade").
-    mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=cluster-pool --set "ipam.operator.clusterPoolIPv4PodCIDRList={${POD_CIDR}}" --set ipam.operator.clusterPoolIPv4MaskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true --set bpf.masquerade=true)
+    # multi-pool IPAM: supports per-node multiple PodCIDRs, allowing dynamic
+    # expansion of single-node Pod capacity (cluster-pool is fixed at install
+    # time and cannot be changed per-node).
+    mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=multi-pool --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.cidrs[0]="$POD_CIDR" --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.maskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true --set bpf.masquerade=true)
     ;;
   GR_overlay)
     # See VPC-CNI_overlay note above for why bpf.masquerade=true is needed.
-    mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=cluster-pool --set "ipam.operator.clusterPoolIPv4PodCIDRList={${POD_CIDR}}" --set ipam.operator.clusterPoolIPv4MaskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true --set bpf.masquerade=true)
+    mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=multi-pool --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.cidrs[0]="$POD_CIDR" --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.maskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true --set bpf.masquerade=true)
     ;;
   esac
 

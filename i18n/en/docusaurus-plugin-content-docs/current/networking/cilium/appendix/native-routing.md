@@ -62,7 +62,7 @@ TKE also uses the `169.254.0.0/16` range for:
 
 ### Why Overlay Doesn't Need It
 
-In Overlay mode, cilium manages Pod IP allocation (cluster-pool IPAM). It knows the node's PodCIDR and automatically assigns a non-conflicting IP to `cilium_host` from that range — no user intervention needed.
+In Overlay mode, cilium manages Pod IP allocation (multi-pool IPAM). It knows the node's PodCIDR and automatically assigns a non-conflicting IP to `cilium_host` from that range — no user intervention needed.
 
 ## Why Disable sysctlfix?
 
@@ -270,7 +270,7 @@ The reason is the same as TKE Native: **whenever Pod IPs are legitimate cloud-pr
 | AWS EKS + chained aws-cni                     | aws-vpc-cni    | Required true (manual) | VPC IP              | ❌                   |
 | GKE + cilium GKE mode                         | k8s host-scope | Auto true (chart)      | Alias IP (VPC)      | ❌                   |
 | Self-hosted Cilium Native + Cluster Pool IPAM | cluster-pool   | Default false          | Cilium-managed CIDR | ✅                   |
-| TKE Cilium Overlay                            | cluster-pool   | Default false          | Cilium-managed CIDR | ✅                   |
+| TKE Cilium Overlay                            | multi-pool     | Default false          | Cilium-managed CIDR | ✅                   |
 
 The last two rows are the counter-examples — **when cilium fully owns Pod CIDR** (Native or Overlay), endpointRoutes is not forced on, and the BPF program on cilium_host hits on the data path. **So the real determinant of "BPF host routing hit or miss" is not the routing mode (Native/Tunnel) and not whether cni-chaining is used, but whether Pod IPs come from cloud-provider VPC**.
 
