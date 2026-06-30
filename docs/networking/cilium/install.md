@@ -1095,6 +1095,8 @@ if c.EnableEnvoyConfig {
 
 更多内容归入 [Cilium 附录](./appendix) 目录：
 
+- [使用 Gateway API](./gateway-api.md)
+
 - [大规模集群 Cilium 调优指南](./appendix/large-scale-tuning.md)
 - [已验证的节点操作系统](./appendix/verified-os.md)
 - [Cilium 功能测试](./appendix/connectivity-test.md)

@@ -16,6 +16,7 @@
 
 | 文章                           | 内容                                  | 前置依赖      |
 | ------------------------------ | ------------------------------------- | ------------- |
+| **使用 Gateway API**           | Cilium 内置 Gateway API 实现流量路由  | 已安装 Cilium |
 | **Egress Gateway 应用实践**    | 按策略选择固定出口 IP 访问外部        | 已安装 Cilium |
 | **启用通信加密**               | WireGuard / IPsec 加密节点间 Pod 流量 | 已安装 Cilium |
 | **使用 Cilium 构建多集群网络** | Cluster Mesh 打通多集群服务互访       | 已安装 Cilium |

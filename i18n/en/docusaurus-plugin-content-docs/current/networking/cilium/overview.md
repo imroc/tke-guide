@@ -17,7 +17,7 @@
 
 | Article | Content | Prerequisites |
 | ------- | ------- | ------------- |
-
+| **Using Gateway API** | Cilium built-in Gateway API for traffic routing | Cilium installed |
 | **Egress Gateway in Practice** | Select fixed egress IP per policy for external access | Cilium installed |
 | **Enabling Communication Encryption** | WireGuard / IPsec encryption for inter-node Pod traffic | Cilium installed |
 | **Building Multi-Cluster Networks with Cilium** | Cluster Mesh to connect services across clusters | Cilium installed |

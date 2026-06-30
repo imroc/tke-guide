@@ -1100,6 +1100,8 @@ For full root-cause analysis, reproduction steps, and the upstream cilium PR lin
 
 More content under the [Cilium Appendix](./appendix) directory:
 
+- [Using Gateway API](./gateway-api.md)
+
 - [Cilium Tuning for Large-Scale Clusters](./appendix/large-scale-tuning.md)
 - [Verified Node Operating Systems](./appendix/verified-os.md)
 - [Cilium Connectivity Test](./appendix/connectivity-test.md)

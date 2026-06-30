@@ -26,6 +26,7 @@ const sidebars: SidebarsConfig = {
             'networking/cilium/install',
             'networking/cilium/egress-gateway',
             'networking/cilium/networkpolicy',
+            'networking/cilium/gateway-api',
             'networking/cilium/observability',
             'networking/cilium/flow-logs',
             'networking/cilium/clustermesh',
