@@ -17,7 +17,7 @@ When using Cilium Gateway API in a TKE environment, be aware of the following li
 ## Prerequisites
 
 - Cilium is installed with `kubeProxyReplacement=true` (enabled by default)
-- The installation mode is **Overlay mode** (VPC-CNI or GR). Native Routing (VPC-CNI) mode does not support Gateway API due to the `ipam.mode=delegated-plugin` limitation. See [Installation FAQ](./install.md#does-native-routing-vpc-cni-mode-not-support-gateway-api) for details
+- The installation mode is **Overlay mode** (VPC-CNI or GR). Native Routing (VPC-CNI) mode does not support Gateway API due to the `ipam.mode=delegated-plugin` limitation. See [Installation FAQ](./install.md#native-routing-vpc-cni-mode-does-not-support-gateway-api) for details
 - Gateway API CRDs are installed in the cluster (cilium 1.19.5 corresponds to Gateway API v1.5.1)
 
 ### Install Gateway API CRDs
@@ -290,7 +290,7 @@ kubectl create secret tls my-tls-secret \
   --key=path/to/key.pem
 ```
 
-You also need to create a LoadBalancer Service to expose port 443 (see [HTTP Routing example](#quick-starthttp-routing)).
+You also need to create a LoadBalancer Service to expose port 443 (see [HTTP Routing example](#quick-start-http-routing)).
 
 ## TLS Passthrough
 
@@ -479,7 +479,7 @@ Common causes:
 
 ### Gateway is Programmed but not accessible from outside?
 
-1. **No LoadBalancer Service created**: In Host Network mode, you need to manually create a LoadBalancer Service to expose the Gateway (see [Quick Start](#quick-starthttp-routing))
+1. **No LoadBalancer Service created**: In Host Network mode, you need to manually create a LoadBalancer Service to expose the Gateway (see [Quick Start](#quick-start-http-routing))
 2. **CLB backends are empty**: Ensure the Service uses the `direct-access: "true"` annotation and the selector correctly matches cilium-envoy Pods
 3. **CLB returns 502**: Security groups are blocking traffic from CLB to backends. Set `LoadBalancerPassToTarget=true` on the CLB (see [CLB Security Group Passthrough](#clb-security-group-passthrough))
 

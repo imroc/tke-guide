@@ -2,7 +2,17 @@
 
 [Cilium Gateway API](https://docs.cilium.io/en/latest/network/servicemesh/gateway-api/gateway-api/) 是 Cilium 内置的 Gateway API 实现，无需额外部署 Ingress Controller，由 Cilium 的 eBPF 数据平面和内置 Envoy 代理直接处理流量路由。
 
-与独立的 Ingress Controller（如 Envoy Gateway、Nginx Ingress）相比，Cilium Gateway API 与 CNI 深度集成——流量到达 Gateway Service 后，eBPF 通过 TPROXY 机制透明转发给节点上的 Envoy 代理，无需额外的一跳。
+与独立的 Ingress Controller（如 Envoy Gateway、Nginx Ingress）相比，Cilium Gateway API 与 CNI 深度集成——流量到达 Service 后，eBPF 通过 TPROXY 机制透明转发给节点上的 Envoy 代理，无需额外的一跳。
+
+:::warning[TKE 环境下的重要限制]
+
+在 TKE 环境中使用 Cilium Gateway API 需要注意以下限制：
+
+1. **必须使用 Host Network 模式**：非 Host Network 模式下，Cilium 自动创建的 LoadBalancer Service 的 Endpoints 是虚拟地址（`192.192.192.192`），TKE 的 service-controller 无法将其注册为 CLB 后端，导致 CLB 后端为空、外部流量无法到达。Host Network 模式下 Envoy 直接绑定节点端口，可以通过 `direct-access` 注解让 CLB 直连节点 IP。
+2. **TCP 协议不可用**：Cilium Gateway API 不支持 TCP 协议的 listener（报错 `model source can't be empty, 0 listeners`）。如需纯 TCP 代理，请使用 TLS 协议 + TLS Passthrough（TLS 透传），或使用独立的 TCP 代理。
+3. **仅 Overlay 模式支持**：Native Routing (VPC-CNI) 模式因 `ipam.mode=delegated-plugin` 限制不支持 Gateway API。
+
+:::
 
 ## 前提条件
 
@@ -28,28 +38,14 @@ done
 
 ## 启用 Gateway API
 
-在已有的 Cilium 安装基础上，通过 helm 启用 Gateway API：
-
-```bash
-helm upgrade cilium cilium/cilium --version 1.19.5 \
-  --namespace kube-system \
-  --reuse-values \
-  --set gatewayAPI.enabled=true
-
-# 重启 cilium-operator 和 cilium-agent 使配置生效
-kubectl -n kube-system rollout restart deployment/cilium-operator
-kubectl -n kube-system rollout restart ds/cilium
-```
-
-也可以将配置写入 values.yaml：
+在已有的 Cilium 安装基础上，通过 helm 启用 Gateway API（**必须启用 Host Network 模式**）：
 
 ```yaml title="gateway-api-values.yaml"
 gatewayAPI:
   enabled: true
-  # externalTrafficPolicy: Local  # 保留客户端源 IP（默认 Cluster）
+  hostNetwork:
+    enabled: true
 ```
-
-更新时追加 `-f gateway-api-values.yaml`：
 
 ```bash
 helm upgrade --install cilium cilium/cilium --version 1.19.5 \
@@ -57,7 +53,27 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   -f tke-values.yaml \
   -f image-values.yaml \
   -f gateway-api-values.yaml
+
+kubectl -n kube-system rollout restart deployment/cilium-operator
+kubectl -n kube-system rollout restart ds/cilium ds/cilium-envoy
 ```
+
+### Host Network 模式的作用
+
+:::tip[cilium-envoy Pod 本身始终是 hostNetwork 部署的]
+
+无论是否启用 `gatewayAPI.hostNetwork.enabled`，cilium-envoy Pod 都以 hostNetwork 方式运行。`hostNetwork.enabled` 配置影响的是 **Envoy listener 的绑定方式**和 **Gateway Service 的类型**。
+
+:::
+
+| 对比项 | 非 Host Network 模式 | Host Network 模式 |
+| --- | --- | --- |
+| Envoy listener 绑定 | 不绑定地址，通过 eBPF TPROXY 接收流量 | 直接绑定 `0.0.0.0:<port>` |
+| Gateway Service 类型 | LoadBalancer（自动创建 CLB） | ClusterIP（不创建 CLB） |
+| TKE CLB 后端注册 | ❌ Endpoints 是虚拟地址，CLB 后端为空 | ✅ 可通过独立 Service + `direct-access` 注解注册 |
+| TKE 可用性 | ❌ 不可用 | ✅ 可用 |
+
+启用 Host Network 模式后，Envoy 会直接绑定到 `0.0.0.0:<Gateway listener port>`，外部流量到达节点端口后直接被 Envoy 接收。
 
 ### 验证
 
@@ -69,9 +85,65 @@ NAME     CONTROLLER                     ACCEPTED   AGE
 cilium   io.cilium/gateway-controller   True       1m
 ```
 
+## 暴露 Gateway：LoadBalancer Service + direct-access
+
+Host Network 模式下 Cilium 创建的 Gateway Service 是 ClusterIP 类型，不会自动创建 CLB。需要在 TKE 环境中创建一个独立的 LoadBalancer Service 来暴露 Gateway，关键配置：
+
+1. **`service.kubernetes.io/tke-existed-lbid`**：复用已有 CLB（避免每个 Gateway 创建新 CLB）
+2. **`service.cloud.tencent.com/direct-access: "true"`**：让 service-controller 直接将 Pod IP（hostNetwork 下即节点 IP）+ targetPort 注册到 CLB，绕过 NodePort
+
+```yaml title="gateway-lb-svc.yaml"
+apiVersion: v1
+kind: Service
+metadata:
+  name: <gateway-name>-lb
+  namespace: <gateway-namespace>
+  annotations:
+    service.kubernetes.io/tke-existed-lbid: lb-xxxxxxxx  # 复用已有 CLB（可选）
+    service.cloud.tencent.com/direct-access: "true"       # 直连 Pod IP，绕过 NodePort
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    k8s-app: cilium-envoy  # 选择 cilium-envoy DaemonSet
+  ports:
+  - name: <port-name>
+    port: <external-port>     # CLB 对外端口
+    targetPort: <gateway-port> # Gateway listener 端口
+    protocol: TCP
+```
+
+:::tip[direct-access 的优势]
+
+`direct-access` 注解让 service-controller 将 Pod IP:targetPort 直接注册为 CLB 后端（而非 NodePort）。由于 cilium-envoy 以 hostNetwork 运行，Pod IP 就是节点 IP，CLB 直连节点 IP:Gateway 端口，流量直达 Envoy，不经过 eBPF NodePort 拦截。
+
+节点扩缩容时，cilium-envoy DaemonSet 自动在新节点调度，Service Endpoints 自动更新，service-controller 自动注册/注销 CLB 后端，**全程自动管理**。
+
+:::
+
+### CLB 安全组放通
+
+TKE CLB 默认使用 `SourceIpType=1`（保留客户端真实 IP），CLB 到后端的流量源 IP 是客户端公网 IP，可能被节点安全组拦截导致 502。解决方案是在 CLB 上开启安全组放通：
+
+```bash
+# 在 CLB 上设置 LoadBalancerPassToTarget=true（安全组放通）
+# CLB 到后端的流量不再受后端安全组限制
+tccli clb ModifyLoadBalancerAttributes \
+  --region <region> \
+  --cli-input-json '{"LoadBalancerId":"lb-xxxxxxxx","LoadBalancerPassToTarget":true}'
+```
+
+:::warning[pass-to-target 注解与 tke-existed-lbid 冲突]
+
+`service.cloud.tencent.com/pass-to-target` 注解只支持 TKE 自动创建的 CLB，与 `tke-existed-lbid`（复用 CLB）互斥。复用 CLB 时只能通过 CLB API 手动设置 `LoadBalancerPassToTarget=true`，这是一次性配置，对 CLB 所有监听器生效。
+
+:::
+
 ## 快速入门：HTTP 路由
 
-以下示例创建一个 HTTP Gateway，将 `test.cilium.local` 的流量路由到 nginx 服务：
+以下示例创建一个 HTTP Gateway，将 `test.cilium.local` 的流量路由到 nginx 服务。
+
+**1. 创建 Gateway + HTTPRoute**：
 
 ```yaml title="gateway-http.yaml"
 apiVersion: gateway.networking.k8s.io/v1
@@ -114,25 +186,55 @@ spec:
 kubectl apply -f gateway-http.yaml
 ```
 
-创建后，cilium 会自动创建一个 LoadBalancer 类型的 Service（`cilium-gateway-<name>`），TKE 的 service-controller 会自动为其创建 CLB：
+**2. 创建 LoadBalancer Service 暴露 Gateway**：
+
+```yaml title="gateway-http-lb.yaml"
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-gateway-lb
+  namespace: default
+  annotations:
+    service.kubernetes.io/tke-existed-lbid: lb-xxxxxxxx  # 复用已有 CLB（可选）
+    service.cloud.tencent.com/direct-access: "true"
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    k8s-app: cilium-envoy
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80  # 与 Gateway listener port 一致
+    protocol: TCP
+```
+
+```bash
+kubectl apply -f gateway-http-lb.yaml
+```
+
+**3. 验证**：
 
 ```bash
 $ kubectl get gateway,httproute,svc
-NAME                                        CLASS    ADDRESS          PROGRAMMED   AGE
-gateway.gateway.networking.k8s.io/my-gateway   cilium   43.141.204.235   True         30s
+NAME                                          CLASS    ADDRESS   PROGRAMMED   AGE
+gateway.gateway.networking.k8s.io/my-gateway  cilium             True         30s
 
 NAME                                        HOSTNAMES               AGE
 httproute.gateway.networking.k8s.io/nginx   ["test.cilium.local"]   30s
 
-NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP      PORT(S)        AGE
-cilium-gateway-my-gateway  LoadBalancer   172.28.84.187   43.141.204.235   80:32676/TCP   30s
+NAME             TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)       AGE
+my-gateway-lb    LoadBalancer   172.28.84.187   <clb-vip>     80:32676/TCP  30s
+
+# 测试访问
+curl -s -H "Host: test.cilium.local" http://<clb-vip>/
 ```
 
-测试访问：
+:::note[Gateway ADDRESS 为空是正常的]
 
-```bash
-curl -s -H "Host: test.cilium.local" http://43.141.204.235/
-```
+Host Network 模式下 Gateway 的 ADDRESS 为空（因为 Gateway Service 是 ClusterIP 类型，没有外部 IP）。Gateway 的 `Programmed=True` 表示 Envoy 已配置完成，外部 IP 由独立创建的 LoadBalancer Service 提供。
+
+:::
 
 ## HTTPS 路由（TLS 终止）
 
@@ -188,104 +290,7 @@ kubectl create secret tls my-tls-secret \
   --key=path/to/key.pem
 ```
 
-## Host Network 模式
-
-:::tip[适用场景]
-
-Host Network 模式适用于有外部负载均衡器（如 TKE CLB）的环境，Cilium Envoy 直接在节点网络上监听，无需 LoadBalancer Service。适用于：
-
-- 复用已有 CLB（通过 `service.kubernetes.io/tke-load-balancer-id` 注解或手动配置 CLB 后端）
-- 需要直接控制 CLB 后端注册的场景
-- 减少一层 Service 转发
-
-:::
-
-启用 Host Network 模式：
-
-```yaml
-gatewayAPI:
-  enabled: true
-  hostNetwork:
-    enabled: true
-    # nodes:  # 可选：仅在特定节点上暴露 Gateway 监听器
-    #   matchLabels:
-    #     role: gateway
-```
-
-```bash
-helm upgrade cilium cilium/cilium --version 1.19.5 \
-  --namespace kube-system \
-  --reuse-values \
-  --set gatewayAPI.enabled=true \
-  --set gatewayAPI.hostNetwork.enabled=true
-
-kubectl -n kube-system rollout restart deployment/cilium-operator
-kubectl -n kube-system rollout restart ds/cilium ds/cilium-envoy
-```
-
-Host Network 模式下：
-
-- Envoy 直接绑定到 `0.0.0.0:<listener-port>`（每个节点上都有）
-- Cilium 创建的 Service 类型为 ClusterIP（非 LoadBalancer），不会自动创建 CLB
-- 需要手动配置外部 CLB，将流量转发到节点 IP:监听端口
-
-:::warning[端口冲突]
-
-Host Network 模式下 Envoy 会直接占用节点端口。确保 Gateway 中配置的监听端口未被其它进程使用。如果需要使用 1024 以下的特权端口，需额外配置 `envoy.securityContext.capabilities.keepCapNetBindService=true`。
-
-:::
-
-### 配置 CLB 转发到 Host Network 监听器
-
-以 TKE CLB 为例，手动配置 CLB 将流量转发到各节点的 Envoy 监听端口：
-
-```bash
-# 假设 Gateway 监听端口为 8443，CLB ID 为 lb-xxxxx
-
-# 1. 创建 TCP 监听器
-tccli clb CreateListener \
-  --region <region> \
-  --LoadBalancerId lb-xxxxx \
-  --Ports 8443 \
-  --Protocol TCP \
-  --ListenerName gateway
-
-# 2. 注册后端（各节点 IP + Gateway 监听端口）
-tccli clb RegisterTargets \
-  --region <region> \
-  --LoadBalancerId lb-xxxxx \
-  --ListenerId lbl-xxxxx \
-  --cli-unfold-argument \
-  --Targets.0.EniIp <node1-ip> --Targets.0.Port 8443 --Targets.0.Weight 10 \
-  --Targets.1.EniIp <node2-ip> --Targets.1.Port 8443 --Targets.1.Weight 10 \
-  --Targets.2.EniIp <node3-ip> --Targets.2.Port 8443 --Targets.2.Weight 10
-```
-
-:::warning[安全组放行]
-
-TKE 节点的安全组默认只放行内网网段（10.0.0.0/8 等）。如果 CLB 使用 `SourceIpType=1`（保留客户端真实 IP），来自公网 IP 的流量会被安全组拦截，导致 CLB 返回 502 Bad Gateway。
-
-解决方案（任选其一）：
-
-1. **修改 CLB 的 SourceIpType 为 0**（SNAT 模式，CLB 用自身 IP 访问后端）：
-   ```bash
-   tccli clb ModifyListener \
-     --region <region> \
-     --cli-input-json '{"LoadBalancerId":"lb-xxxxx","ListenerId":"lbl-xxxxx","SourceIpType":0}'
-   ```
-2. **在安全组中放行 Gateway 监听端口**：
-   ```bash
-   tccli vpc CreateSecurityGroupPolicies \
-     --region <region> \
-     --SecurityGroupId sg-xxxxx \
-     --SecurityGroupPolicySet.Ingress.0.Protocol TCP \
-     --SecurityGroupPolicySet.Ingress.0.Port <gateway-port> \
-     --SecurityGroupPolicySet.Ingress.0.CidrBlock 0.0.0.0/0 \
-     --SecurityGroupPolicySet.Ingress.0.Action ACCEPT \
-     --cli-unfold-argument
-   ```
-
-:::
+同样需要创建 LoadBalancer Service 暴露 443 端口（参考 [HTTP 路由示例](#快速入门http-路由)）。
 
 ## TLS Passthrough
 
@@ -334,14 +339,95 @@ TLS Passthrough 模式下，Envoy 使用 TCP 代理转发 TLS 流量。后端看
 
 :::
 
+## 实践：暴露 APIServer
+
+利用 TLS Passthrough 可以将集群 apiserver 通过 Gateway API 暴露出来，无需开启 TKE 集群公网/内网访问。
+
+```yaml title="apiserver-gateway.yaml"
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: apiserver
+  namespace: default
+spec:
+  gatewayClassName: cilium
+  listeners:
+  - name: apiserver
+    port: 8443
+    protocol: TLS
+    tls:
+      mode: Passthrough
+    allowedRoutes:
+      namespaces:
+        from: Same
+      kinds:
+      - kind: TLSRoute
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
+metadata:
+  name: apiserver
+  namespace: default
+spec:
+  parentRefs:
+  - name: apiserver
+    sectionName: apiserver
+  rules:
+  - backendRefs:
+    - name: kubernetes
+      port: 443
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apiserver-gw
+  namespace: kube-system
+  annotations:
+    service.kubernetes.io/tke-existed-lbid: lb-xxxxxxxx
+    service.cloud.tencent.com/direct-access: "true"
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    k8s-app: cilium-envoy
+  ports:
+  - name: tls
+    port: 8443
+    targetPort: 8443
+    protocol: TCP
+```
+
+流量路径：
+
+```text
+Client → CLB:8443 → cilium-envoy (hostNetwork:8443)
+       → eBPF TPROXY → Envoy TLS Passthrough
+       → kubernetes Service → apiserver (169.254.x.x:60002)
+```
+
+获取 kubeconfig（通过 tccli 获取后替换 server 地址为 CLB 地址）：
+
+```bash
+tccli tke DescribeClusterKubeconfig --region <region> --ClusterId <cluster-id> | \
+  python3 -c "
+import sys, json, yaml
+data = json.load(sys.stdin)
+kc = yaml.safe_load(data['Kubeconfig'])
+kc['clusters'][0]['cluster']['server'] = 'https://<clb-vip>:8443'
+kc['clusters'][0]['cluster']['insecure-skip-tls-verify'] = True
+kc['clusters'][0]['cluster'].pop('certificate-authority-data', None)
+print(yaml.dump(kc, default_flow_style=False, sort_keys=False))
+" > ~/.kube/configs/roc.yaml
+```
+
 ## 配置参数说明
 
 | 参数 | 默认值 | 说明 |
 | --- | --- | --- |
 | `gatewayAPI.enabled` | `false` | 启用 Gateway API |
-| `gatewayAPI.externalTrafficPolicy` | `Cluster` | LoadBalancer Service 的外部流量策略（`Local` 保留源 IP） |
-| `gatewayAPI.hostNetwork.enabled` | `false` | Host Network 模式，Envoy 直接监听节点端口 |
+| `gatewayAPI.hostNetwork.enabled` | `false` | Host Network 模式，Envoy 直接绑定节点端口（**TKE 环境必须启用**） |
 | `gatewayAPI.hostNetwork.nodes.matchLabels` | `{}` | 限制 Envoy 监听器仅在特定节点上运行 |
+| `gatewayAPI.externalTrafficPolicy` | `Cluster` | 非 Host Network 模式下 LoadBalancer Service 的外部流量策略（Host Network 模式下忽略） |
 | `gatewayAPI.gatewayClass.create` | `auto` | 是否创建 GatewayClass（`auto` 自动检测 CRD） |
 | `gatewayAPI.secretsNamespace.name` | `cilium-secrets` | TLS Secret 同步的目标 namespace |
 | `gatewayAPI.secretsNamespace.sync` | `true` | 自动同步 TLS Secret 到 `secretsNamespace` |
@@ -354,27 +440,25 @@ TLS Passthrough 模式下，Envoy 使用 TCP 代理转发 TLS 流量。后端看
 | HTTPS | `protocol: HTTPS` + `tls.mode: Terminate` | HTTPRoute | TLS 终止 + 七层路由 |
 | TLS | `protocol: TLS` + `tls.mode: Passthrough` | TLSRoute | TLS 透传（按 SNI 路由） |
 | GRPC | `protocol: HTTP` / `HTTPS` | GRPCRoute | gRPC 路由 |
-| TCP | `protocol: TCP` | TCPRoute | 实验性，TCP 路由 |
+| TCP | `protocol: TCP` | TCPRoute | ❌ 不可用（Cilium 报错 `model source can't be empty`） |
 
-:::warning[TCP 协议支持]
+:::warning[TCP 协议不可用]
 
-Cilium 1.19.5 对 TCPRoute 的支持为实验性。如果需要纯 TCP 代理（无需七层路由），可使用 TLS Passthrough（TLS 协议 + TLSRoute，不指定 `hostnames` 可匹配所有 SNI），或使用独立的 TCP 代理（如 socat、nginx stream）。
+Cilium 1.19.5 虽然在实验性 CRD 中支持 TCPRoute，但实际创建 TCP 协议的 Gateway listener 会报错 `model source can't be empty, 0 listeners`。如需纯 TCP 代理，请使用 TLS Passthrough（TLS 协议 + TLSRoute，不指定 `hostnames` 可匹配所有 SNI），或使用独立的 TCP 代理。
 
 :::
 
 ## 流量路径
 
 ```text
-非 Host Network 模式：
-  Client → CLB → NodePort → eBPF TPROXY → Envoy → Backend Pod
-                                     ↑
-                        Cilium 自动创建 LoadBalancer Service
+Host Network 模式（TKE 推荐）：
+  Client → CLB → cilium-envoy (hostNetwork, 0.0.0.0:port)
+         → eBPF TPROXY → Envoy 处理（HTTP 路由 / TLS 终止 / TLS 透传）
+         → Backend Pod
 
-Host Network 模式：
-  Client → CLB → Node:Port → Envoy → Backend Pod
-                    ↑
-          Envoy 直接监听节点端口（0.0.0.0:port）
-          无需 LoadBalancer Service，需手动配置 CLB
+  CLB 后端由 LoadBalancer Service + direct-access 自动管理：
+  service-controller 将 cilium-envoy Pod IP（=节点 IP）:targetPort 注册到 CLB
+  节点扩缩容时自动更新
 ```
 
 ## 常见问题
@@ -390,22 +474,28 @@ kubectl -n kube-system logs deploy/cilium-operator | grep gateway
 常见原因：
 
 1. **Gateway API CRD 未安装**：安装 CRD 后重启 cilium-operator
-2. **RBAC 权限不足**：确保 helm install 时没有手动修改 ClusterRole，如有冲突可删除后重新 helm upgrade
+2. **RBAC 权限不足**：如果手动 patch 过 ClusterRole 导致 helm apply 冲突，删除 ClusterRole 后重新 helm upgrade
 3. **`enable-envoy-config` 未生效**：重启 cilium-agent 使配置生效
 
 ### Gateway 已 Programmed 但无法从外部访问？
 
-1. **LoadBalancer Service 未分配 External IP**：检查 TKE service-controller 是否正常运行
-2. **安全组未放行端口**：确保节点安全组允许 CLB 访问 Gateway 监听端口
-3. **CLB SourceIpType 导致 502**：详见 [Host Network 模式 - 安全组放行](#配置-clb-转发到-host-network-监听器)
+1. **未创建 LoadBalancer Service**：Host Network 模式下需手动创建 LoadBalancer Service 暴露 Gateway（参考[快速入门](#快速入门http-路由)）
+2. **CLB 后端为空**：确认 Service 使用了 `direct-access: "true"` 注解，且 selector 正确匹配 cilium-envoy Pod
+3. **CLB 返回 502**：安全组拦截了 CLB 到后端的流量，在 CLB 上设置 `LoadBalancerPassToTarget=true`（参考[CLB 安全组放通](#clb-安全组放通)）
+
+### Gateway ADDRESS 为空？
+
+Host Network 模式下 Gateway 的 ADDRESS 为空是正常的。Gateway Service 是 ClusterIP 类型（无外部 IP），外部 IP 由独立创建的 LoadBalancer Service 提供。`Programmed=True` 表示 Envoy 已配置完成。
 
 ### Host Network 模式下端口冲突？
 
-Host Network 模式下 Envoy 直接绑定节点端口。如果端口被占用，Envoy Pod 会持续重启。解决方法：
+Host Network 模式下 Envoy 直接绑定节点端口。如果端口被占用，cilium-envoy Pod 会持续重启。解决方法：
 
 1. 使用不同的端口
 2. 停止占用端口的进程
 3. 使用 `hostNetwork.nodes.matchLabels` 限制 Envoy 仅在特定节点运行
+
+如果需要使用 1024 以下的特权端口，需额外配置 `envoy.securityContext.capabilities.keepCapNetBindService=true`。
 
 ### 如何查看 Envoy 配置？
 
@@ -417,3 +507,7 @@ kubectl get cec <cec-name> -n <namespace> -o yaml
 # 查看 Envoy 运行状态
 kubectl -n kube-system exec ds/cilium-envoy -- cilium-dbg status
 ```
+
+### 非 Host Network 模式下 CLB 后端为空？
+
+这是 TKE 环境下的已知限制。非 Host Network 模式下，Cilium 创建的 Gateway Service 的 Endpoints 是虚拟地址（`192.192.192.192:9999`），TKE 的 service-controller 无法将其注册为 CLB 后端。**必须在 TKE 环境中使用 Host Network 模式**，并通过独立 LoadBalancer Service + `direct-access` 注解暴露 Gateway。
