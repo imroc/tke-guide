@@ -294,8 +294,8 @@ MSG_ZH_UNINSTALL_TKE_OK="TKE 组件已卸载"
 MSG_EN_UNINSTALL_TKE_OK="TKE components uninstalled"
 MSG_ZH_HELM_INSTALL="执行 helm install..."
 MSG_EN_HELM_INSTALL="Running helm install..."
-MSG_ZH_CILIUM_DONE="Cilium 安装完成！请添加节点后验证:"
-MSG_EN_CILIUM_DONE="Cilium installed! Add nodes and verify:"
+MSG_ZH_CILIUM_DONE="Cilium 安装完成！请验证:"
+MSG_EN_CILIUM_DONE="Cilium installed! Verify with:"
 # Localdns
 MSG_ZH_NO_CILIUM="未检测到 cilium，请先安装 cilium (install) 再安装 localdns。"
 MSG_EN_NO_CILIUM="Cilium not detected. Run install first."
@@ -1338,33 +1338,62 @@ cmd_install_cilium() {
   # Print non-interactive replay command for batch deployment
   print_replay_command
 
-  # ---- Add nodes (install ends here) ----
-  # Up to here the install is done but the cluster may have zero schedulable
-  # nodes (recommended TKE flow is "install cilium on empty cluster first, then
-  # add nodes"). Just point the user to the add-nodes guide and finish — the
-  # install command no longer chains into connectivity test / perf. Those remain
-  # available as separate subcommands (`cilium.sh test` / `cilium.sh perf`).
+  # ---- Post-install guidance (install ends here) ----
+  # The recommended TKE flow is "install cilium on empty cluster first, then
+  # add nodes". However, if localdns was enabled, the script may have already
+  # waited for the user to add nodes (cilium-operator needs a schedulable node
+  # to start and create CRDs). Check whether the cluster now has non-super
+  # nodes to give accurate guidance instead of blindly saying "add nodes".
+  # The install command no longer chains into connectivity test / perf — those
+  # remain available as separate subcommands (`cilium.sh test` / `cilium.sh perf`).
   echo ""
-  if is_zh; then
-    info "============================================"
-    info "下一步：向集群添加节点"
-    info "============================================"
-    info "Cilium 已安装到集群（工作负载已就位），但当前集群可能还没有可调度的"
-    info "节点。请按需创建节点池并添加节点（cilium-agent 会随节点就绪自动启动）。"
-    info "节点池选型与创建方法详见: https://imroc.cc/tke/networking/cilium/install#新建节点池"
-    info ""
-    info "如需验证连通性或性能，可在节点就绪后单独运行: cilium.sh test / cilium.sh perf"
+  local has_regular_nodes=false
+  local _node
+  while IFS= read -r _node; do
+    if [[ ! "$_node" =~ ^eklet- ]]; then
+      has_regular_nodes=true
+      break
+    fi
+  done < <(kubectl get node --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null || true)
+
+  if [[ "$has_regular_nodes" == "true" ]]; then
+    if is_zh; then
+      info "============================================"
+      info "Cilium 安装完成！"
+      info "============================================"
+      info "集群已有节点，cilium-agent 会随节点就绪自动启动。"
+      info "如需验证连通性或性能，可运行: cilium.sh test / cilium.sh perf"
+      info "如需添加更多节点，参考: https://imroc.cc/tke/networking/cilium/install#新建节点池"
+    else
+      info "============================================"
+      info "Cilium installation complete!"
+      info "============================================"
+      info "Cluster has nodes — cilium-agent will auto-launch as nodes become Ready."
+      info "To verify connectivity or performance, run: cilium.sh test / cilium.sh perf"
+      info "To add more nodes, see: https://imroc.cc/tke/en/networking/cilium/install#create-node-pools"
+    fi
   else
-    info "============================================"
-    info "Next step: add nodes to the cluster"
-    info "============================================"
-    info "Cilium is installed (workload ready), but the cluster may not have any"
-    info "schedulable nodes yet. Create a node pool and add nodes (cilium-agent"
-    info "will auto-launch as nodes become Ready)."
-    info "Node pool selection and creation guide:"
-    info "  https://imroc.cc/tke/en/networking/cilium/install#create-node-pools"
-    info ""
-    info "To verify connectivity or performance, run separately once nodes are Ready: cilium.sh test / cilium.sh perf"
+    if is_zh; then
+      info "============================================"
+      info "下一步：向集群添加节点"
+      info "============================================"
+      info "Cilium 已安装到集群（工作负载已就位），但当前集群还没有可调度的"
+      info "节点。请按需创建节点池并添加节点（cilium-agent 会随节点就绪自动启动）。"
+      info "节点池选型与创建方法详见: https://imroc.cc/tke/networking/cilium/install#新建节点池"
+      info ""
+      info "如需验证连通性或性能，可在节点就绪后单独运行: cilium.sh test / cilium.sh perf"
+    else
+      info "============================================"
+      info "Next step: add nodes to the cluster"
+      info "============================================"
+      info "Cilium is installed (workload ready), but the cluster does not have"
+      info "schedulable nodes yet. Create a node pool and add nodes (cilium-agent"
+      info "will auto-launch as nodes become Ready)."
+      info "Node pool selection and creation guide:"
+      info "  https://imroc.cc/tke/en/networking/cilium/install#create-node-pools"
+      info ""
+      info "To verify connectivity or performance, run separately once nodes are Ready: cilium.sh test / cilium.sh perf"
+    fi
   fi
 
   echo ""

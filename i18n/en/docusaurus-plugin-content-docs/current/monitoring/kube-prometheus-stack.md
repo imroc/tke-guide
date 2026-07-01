@@ -68,7 +68,7 @@ helmCharts:
 
 The images used by `kube-prometheus-stack` primarily come from `quay.io`, which may fail or timeout when pulling domestically. There are two solutions:
 
-### Option 1: Using TKE Internal Mirror (Recommended)
+### Using TKE Internal Mirror (Recommended)
 
 TKE provides `quay.tencentcloudcr.com` as an internal mirror for `quay.io`. Simply replace the image registry:
 
@@ -114,30 +114,6 @@ Some images not on `quay.io` can be replaced with community mirrors on DockerHub
 | :---------------------------------------------------- | :----------------------------------------------------- |
 | registry.k8s.io/kube-state-metrics/kube-state-metrics | docker.io/k8smirror/kube-state-metrics                 |
 | registry.k8s.io/ingress-nginx/kube-webhook-certgen    | docker.io/k8smirror/ingress-nginx-kube-webhook-certgen |
-
-### Option 2: Exporting Images from an Existing Cluster
-
-If the target cluster nodes cannot pull any external images (e.g., docker.io is also blocked), you can export images from nodes in an available cluster and import them into the target cluster nodes:
-
-```bash
-# 1. Export images on an existing cluster node
-NODE_IP=<source-node-ip>
-kubectl node-shell $NODE_IP << 'EOF'
-ctr -n k8s.io images export /tmp/prometheus.tar \
-  quay.io/prometheus/prometheus:latest --platform linux/amd64
-EOF
-
-# 2. Import images on the target cluster node
-TARGET_NODE_IP=<target-node-ip>
-kubectl node-shell $TARGET_NODE_IP << 'EOF'
-# Download from source node (requires network connectivity)
-curl -o /tmp/prometheus.tar http://$SOURCE_NODE_IP:18080/prometheus.tar
-ctr -n k8s.io images import /tmp/prometheus.tar --no-unpack
-rm -f /tmp/prometheus.tar
-EOF
-```
-
-This approach requires setting `imagePullPolicy` to `IfNotPresent` (the default value) to prevent kubelet from attempting to pull from the remote registry.
 
 ## Configuring Grafana
 

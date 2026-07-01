@@ -64,7 +64,7 @@ helmCharts:
 
 `kube-prometheus-stack` 依赖的镜像主要来自 `quay.io`，国内拉取可能失败或超时。有两种解决方案：
 
-### 方案一：使用 TKE 内网 mirror（推荐）
+### 使用 TKE 内网 mirror（推荐）
 
 TKE 提供了 `quay.tencentcloudcr.com` 作为 `quay.io` 的内网 mirror，将镜像 registry 替换即可：
 
@@ -110,30 +110,6 @@ prometheus-node-exporter:
 | :---------------------------------------------------- | :----------------------------------------------------- |
 | registry.k8s.io/kube-state-metrics/kube-state-metrics | docker.io/k8smirror/kube-state-metrics                 |
 | registry.k8s.io/ingress-nginx/kube-webhook-certgen    | docker.io/k8smirror/ingress-nginx-kube-webhook-certgen |
-
-### 方案二：从已有集群导出镜像
-
-如果目标集群的节点无法拉取任何外部镜像（如 docker.io 也被屏蔽），可以从已有可用集群的节点上导出镜像，再导入到目标集群节点：
-
-```bash
-# 1. 在已有集群节点上导出镜像
-NODE_IP=<source-node-ip>
-kubectl node-shell $NODE_IP << 'EOF'
-ctr -n k8s.io images export /tmp/prometheus.tar \
-  quay.io/prometheus/prometheus:latest --platform linux/amd64
-EOF
-
-# 2. 在目标集群节点上导入镜像
-TARGET_NODE_IP=<target-node-ip>
-kubectl node-shell $TARGET_NODE_IP << 'EOF'
-# 从源节点下载（需网络互通）
-curl -o /tmp/prometheus.tar http://$SOURCE_NODE_IP:18080/prometheus.tar
-ctr -n k8s.io images import /tmp/prometheus.tar --no-unpack
-rm -f /tmp/prometheus.tar
-EOF
-```
-
-此方案需将 `imagePullPolicy` 设为 `IfNotPresent`（默认值），避免 kubelet 尝试从远程拉取。
 
 ## 配置 Grafana
 
