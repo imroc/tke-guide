@@ -2,50 +2,71 @@
 
 ## 概述
 
-[kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) 是 Prometheus 生态中用于在 Kubernetes 部署 Prometheus 相关组件的 helm chart，涵盖 Prometheus Operator、Prometheus、Thanos、Grafana、node-exporter、kube-state-metrics 以及社区提供的各种 Grafana 面板等，本文介绍如何使用这个 chart 来搭建监控系统。
+[kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) 是 Prometheus 生态中用于在 Kubernetes 部署 Prometheus 相关组件的 helm chart，涵盖 Prometheus Operator、Prometheus、Alertmanager、Grafana、node-exporter、kube-state-metrics 以及社区提供的各种 Grafana 面板等，本文介绍如何使用这个 chart 在 TKE 集群中搭建监控系统。
 
-## 自定义配置的方法
+## 安装
 
-由于 `kube-prometheus-stack` 这个 chart 非常庞大，还包含了很多其它依赖的 chart，配置也就非常多，如果我们要自定义的配置也很多，写到一个 `values.yaml` 中维护起来比较麻烦，我们可以拆成多个，在安装的时候指定多个配置文件就可以了：
-* 如果你直接用 helm 进行安装，可以指定多次 `-f` 参数:
-  ```bash
-  helm upgrade --install kube-prometheus-stack prom/kube-prometheus-stack \
-    --namespace monitoring --create-namespace \
-    -f image-values.yaml \
-    -f grafana-values.yaml
-  ```
-* 如果你用 kustomize 引用该 chart 安装，可以用 `additionalValuesFiles` 指定多个 `values` 配置文件:
-  ```yaml showLineNumbers title="kustomization.yaml"
-  helmCharts:
-    - repo: https://prometheus-community.github.io/helm-charts
-      name: kube-prometheus-stack
-      releaseName: kube-prometheus-stack
-      namespace: monitoring
-      includeCRDs: true
-      # highlight-start
-      additionalValuesFiles:
-        - image-values.yaml
-        - grafana-values.yaml
-      # highlight-start
-  ```
-  > kustomize 内置到了 kubectl，可通过 `kubectl apply -k .` 进行安装。
+添加 helm repo：
 
-## 国内环境替换镜像地址
+```bash
+helm repo add prom https://prometheus-community.github.io/helm-charts
+helm repo update
+```
 
-`kube-prometheus-stack` 很多依赖镜像在 `quay.io` 和 `registry.k8s.io` 这些国外的镜像仓库，国内环境拉取会失败，如果你的集群在国内，可以将 `quay.io` 上的镜像替换为 TKE 上的 mirror 加速地址 `quay.tencentcloudcr.com`，`registry.k8s.io` 上的镜像替换为 DockerHub 中相应的自动同步的 mirror 镜像：
+安装：
 
-| 国外的依赖镜像                                        | DockerHub 中自动同步的 mirror 镜像                     |
-| :---------------------------------------------------- | :----------------------------------------------------- |
-| registry.k8s.io/kube-state-metrics/kube-state-metrics | docker.io/k8smirror/kube-state-metrics                 |
-| registry.k8s.io/ingress-nginx/kube-webhook-certgen    | docker.io/k8smirror/ingress-nginx-kube-webhook-certgen |
+```bash
+helm upgrade --install kube-prometheus-stack prom/kube-prometheus-stack \
+  --namespace monitoring --create-namespace \
+  --version <chart-version> \
+  -f image-values.yaml \
+  -f grafana-values.yaml
+```
 
-:::tip
+:::tip[选择合适的 chart 版本]
 
-以上 mirror 镜像均是长期自动同步的镜像，可放心使用和更新版本。
+`kube-prometheus-stack` 的 chart 版本与 app 版本（Prometheus Operator 版本）一一对应。不同版本之间的 CRD、默认配置、镜像版本可能有较大差异。
+
+选择 chart 版本后，`image-values.yaml` 中的镜像 tag 必须与 chart 对应的 app 版本一致，否则可能出现兼容性问题。
 
 :::
 
-创建相应的 `values` 配置：
+## 自定义配置的方法
+
+`kube-prometheus-stack` chart 非常庞大，配置项极多。建议将自定义配置拆分为多个 `values.yaml` 文件分别维护，安装时指定多个 `-f` 参数：
+
+- `image-values.yaml`：镜像替换配置
+- `grafana-values.yaml`：Grafana 和其它自定义配置
+
+```bash
+helm upgrade --install kube-prometheus-stack prom/kube-prometheus-stack \
+  --namespace monitoring --create-namespace \
+  -f image-values.yaml \
+  -f grafana-values.yaml
+```
+
+如果使用 kustomize 管理，可以用 `additionalValuesFiles`：
+
+```yaml title="kustomization.yaml"
+helmCharts:
+- repo: https://prometheus-community.github.io/helm-charts
+  name: kube-prometheus-stack
+  releaseName: kube-prometheus-stack
+  namespace: monitoring
+  includeCRDs: true
+  version: "80.14.4"
+  additionalValuesFiles:
+  - image-values.yaml
+  - grafana-values.yaml
+```
+
+## 国内环境替换镜像地址
+
+`kube-prometheus-stack` 依赖的镜像主要来自 `quay.io`，国内拉取可能失败或超时。有两种解决方案：
+
+### 方案一：使用 TKE 内网 mirror（推荐）
+
+TKE 提供了 `quay.tencentcloudcr.com` 作为 `quay.io` 的内网 mirror，将镜像 registry 替换即可：
 
 ```yaml title="image-values.yaml"
 grafana:
@@ -63,24 +84,11 @@ prometheus:
 prometheusOperator:
   image:
     registry: quay.tencentcloudcr.com
-  admissionWebhooks:
-    deployment:
-      image:
-        registry: quay.tencentcloudcr.com
-    patch:
-      image:
-        registry: docker.io
-        repository: k8smirror/ingress-nginx-kube-webhook-certgen
   prometheusConfigReloader:
     image:
       registry: quay.tencentcloudcr.com
   thanosImage:
     registry: quay.tencentcloudcr.com
-thanosRuler:
-  thanosRulerSpec:
-    image:
-      registry: docker.io
-      repository: imroc/thanos
 kube-state-metrics:
   image:
     registry: docker.io
@@ -96,22 +104,181 @@ prometheus-node-exporter:
       registry: quay.tencentcloudcr.com
 ```
 
-## 配置 Grafana 
+部分不在 `quay.io` 上的镜像可替换为 DockerHub 上的社区 mirror：
 
-grafana 是 `kube-prometheus-stack` 中的一个 subchart，它所有的配置都放到 `grafana` 字段下面，如：
+| 原始镜像                                               | DockerHub mirror 镜像                                  |
+| :---------------------------------------------------- | :----------------------------------------------------- |
+| registry.k8s.io/kube-state-metrics/kube-state-metrics | docker.io/k8smirror/kube-state-metrics                 |
+| registry.k8s.io/ingress-nginx/kube-webhook-certgen    | docker.io/k8smirror/ingress-nginx-kube-webhook-certgen |
+
+### 方案二：从已有集群导出镜像
+
+如果目标集群的节点无法拉取任何外部镜像（如 docker.io 也被屏蔽），可以从已有可用集群的节点上导出镜像，再导入到目标集群节点：
+
+```bash
+# 1. 在已有集群节点上导出镜像
+NODE_IP=<source-node-ip>
+kubectl node-shell $NODE_IP << 'EOF'
+ctr -n k8s.io images export /tmp/prometheus.tar \
+  quay.io/prometheus/prometheus:latest --platform linux/amd64
+EOF
+
+# 2. 在目标集群节点上导入镜像
+TARGET_NODE_IP=<target-node-ip>
+kubectl node-shell $TARGET_NODE_IP << 'EOF'
+# 从源节点下载（需网络互通）
+curl -o /tmp/prometheus.tar http://$SOURCE_NODE_IP:18080/prometheus.tar
+ctr -n k8s.io images import /tmp/prometheus.tar --no-unpack
+rm -f /tmp/prometheus.tar
+EOF
+```
+
+此方案需将 `imagePullPolicy` 设为 `IfNotPresent`（默认值），避免 kubelet 尝试从远程拉取。
+
+## 配置 Grafana
+
+grafana 是 `kube-prometheus-stack` 的一个 subchart，所有 grafana 配置放在 `grafana` 字段下：
 
 ```yaml title="grafana-values.yaml"
 grafana:
-  adminUser: "admin"
-  adminPassword: "123456"
-defaultDashboardsTimezone: "Asia/Shanghai"
-sidecar:
-  dashboards:
-    folderAnnotation: "grafana_folder"
-    provider:
-      foldersFromFilesStructure: true
-testFramework:
-  enabled: false
+  adminUser: "roc"
+  adminPassword: "<your-password>"
+  defaultDashboardsTimezone: "Asia/Shanghai"
+  sidecar:
+    dashboards:
+      folderAnnotation: "grafana_folder"
+      provider:
+        foldersFromFilesStructure: true
+  testFramework:
+    enabled: false
 ```
 
-具体配置建议参考 [在 TKE 上自建 Grafana](grafana)。
+具体配置建议参考 [在 TKE 上自建 Grafana](./grafana)。
+
+## 在自建 Cilium Overlay 集群中的特殊配置
+
+:::warning[Overlay 模式的 Webhook 兼容性问题]
+
+在 TKE 自建 Cilium Overlay 模式的托管集群中，apiserver 运行在管控面（无 cilium-agent），无法路由到 overlay Pod IP（如 `10.244.x.x`）。这导致 apiserver 调用 ValidatingWebhook / MutatingWebhook 时连接超时。
+
+详见 [安装 Cilium FAQ - Overlay 模式下 Webhook 连接超时](../networking/cilium/install.md#overlay-模式下-webhookvalidatingmutating连接超时)。
+
+:::
+
+### 禁用 Admission Webhooks
+
+`kube-prometheus-stack` 的 Prometheus Operator 默认启用 admission webhooks，其 certgen job 需要拉取额外镜像（如 `kube-webhook-certgen`），且 webhook 服务本身也会遇到上述 overlay 不可达问题。建议在 Overlay 模式下禁用：
+
+```yaml title="grafana-values.yaml"
+prometheusOperator:
+  admissionWebhooks:
+    enabled: false
+```
+
+禁用后，operator 的 deployment 仍会引用 `kube-prometheus-stack-admission` TLS Secret 作为 volume。需手动创建一个自签名证书 Secret：
+
+```bash
+openssl req -x509 -newkey rsa:2048 -keyout /tmp/tls.key -out /tmp/tls.crt \
+  -days 365 -nodes -subj "/CN=kube-prometheus-stack-operator"
+
+kubectl -n monitoring create secret generic kube-prometheus-stack-admission \
+  --from-file=cert=/tmp/tls.crt \
+  --from-file=key=/tmp/tls.key
+```
+
+### cert-manager Webhook
+
+如果集群中安装了 cert-manager，其 webhook 同样受 overlay 不可达影响。解决方案：
+
+1. **将 cert-manager webhook 配置为 `hostNetwork: true`**（推荐）
+2. **临时删除 ValidatingWebhookConfiguration**（绕过验证，适合初始部署阶段）
+
+```bash
+# 临时绕过 cert-manager webhook 验证
+kubectl delete validatingwebhookconfiguration cert-manager-webhook
+```
+
+## 暴露 Grafana
+
+### 通过 Gateway API 暴露
+
+如果集群中已部署 EnvoyGateway，可以通过 HTTPRoute 暴露 Grafana：
+
+```yaml title="grafana-httproute.yaml"
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: eg
+    namespace: envoy-gateway-system
+    sectionName: https
+  hostnames:
+  - "grafana.imroc.cc"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - group: ""
+      kind: Service
+      name: kube-prometheus-stack-grafana
+      port: 80
+      weight: 1
+```
+
+### 通过 port-forward 临时访问
+
+```bash
+kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
+```
+
+访问 `http://localhost:3000`，使用 `grafana-values.yaml` 中配置的账号密码登录。
+
+## 验证
+
+```bash
+# 检查所有 Pod 是否就绪
+kubectl -n monitoring get pod
+
+# 验证 Prometheus
+kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090:9090
+curl http://localhost:9090/-/healthy
+
+# 验证 Grafana
+kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
+curl http://localhost:3000/api/health
+
+# 获取 Grafana 密码
+kubectl -n monitoring get secret kube-prometheus-stack-grafana \
+  -o jsonpath='{.data.admin-password}' | base64 -d
+```
+
+## 常见问题
+
+### Pod 一直 ImagePullBackOff？
+
+检查 `image-values.yaml` 中的镜像配置是否正确：
+
+1. 镜像 tag 是否与 chart 版本对应的 app 版本一致
+2. 镜像仓库是否在集群节点上可达（参考[国内环境替换镜像地址](#国内环境替换镜像地址)）
+
+### Prometheus Operator CrashLoopBackOff？
+
+如果禁用了 admission webhooks 但未创建 `kube-prometheus-stack-admission` Secret，operator 会因缺少 TLS 证书文件而启动失败。参考[禁用 Admission Webhooks](#禁用-admission-webhooks)章节创建 Secret。
+
+### Grafana sidecar CrashLoopBackOff？
+
+Grafana sidecar（`grafana-sc-dashboard` / `grafana-sc-datasources`）通过 Kubernetes API 列举 Secret 和 ConfigMap。在自建 Cilium Overlay 集群中，如果 sidecar Pod 无法连接 apiserver（虽然 Overlay Pod 到 apiserver 的 169.254 地址通常可达，但可能因证书验证失败而报错），可设置环境变量跳过 TLS 验证：
+
+```yaml
+grafana:
+  env:
+    - name: SKIP_TLS_VERIFY
+      value: "true"
+```
