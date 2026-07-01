@@ -25,6 +25,8 @@ Benchmarks show the **performance difference between Native Routing and Overlay 
 | External Pod Access       | ✅ Directly routable                     | ❌ Not directly routable, via Service/Ingress                                              | ❌ Not directly routable (Same as left)                                                                                                                                                                                                                                                           |
 | CLB Direct-to-Pod         | ✅ Supported                             | ❌ Not supported (CLB can't route Overlay IP)                                              | ❌ Not supported (Same as left)                                                                                                                                                                                                                                                                   |
 | Gateway API               | ❌ Not supported (ipam=delegated-plugin) | ✅ Supported (ipam=multi-pool)                                                             | ✅ Supported (ipam=multi-pool)                                                                                                                                                                                                                                                                    |
+| Webhook Compatibility     | ✅ No restrictions                       | ⚠️ Requires hostNetwork (see FAQ below)                                                    | ⚠️ Requires hostNetwork (Same as left)                                                                                                                                                                                                                                                            |
+| Pod Fixed IP              | ✅ Supported (TKE VPC-CNI native)        | ❌ Not supported (cilium multi-pool IPAM has no fixed IP)                                  | ❌ Not supported (Same as left)                                                                                                                                                                                                                                                                   |
 | L7/DNS NetworkPolicy      | ✅ Fully supported                       | ✅ Fully supported                                                                         | ✅ Fully supported                                                                                                                                                                                                                                                                                |
 | Use Cases                 | General (recommended)                    | Gateway API needed, IP shortage, IDC (recommended)                                         | Only recommended if you already have a GR cluster — do NOT create a new GR cluster just to install cilium                                                                                                                                                                                         |
 
@@ -1087,6 +1089,59 @@ if c.EnableEnvoyConfig {
 | Overlay (VPC-CNI/GR)     | multi-pool       | ✅ Supported        |
 
 If you need Gateway API capability, it is recommended to use **Overlay mode**.
+
+### Webhook (Validating/Mutating) connection timeout in Overlay mode?
+
+**Symptom**: In a TKE managed cluster with Overlay mode, apiserver calls to ValidatingWebhook / MutatingWebhook time out (e.g. cert-manager's `webhook.cert-manager.io`), reporting `context deadline exceeded` or `Client.Timeout exceeded while awaiting headers`.
+
+**Root Cause**: In TKE managed clusters, the apiserver runs on the control plane (MetaCluster), where there is no cilium-agent and therefore no overlay tunnel. When apiserver accesses a webhook Pod via Service ClusterIP → EndpointSlice, the Pod IP in the EndpointSlice is in the overlay subnet (e.g. `10.244.x.x`), which is not routable from the control plane — hence the timeout.
+
+```text
+apiserver (control plane, no cilium-agent)
+  → Service ClusterIP
+  → EndpointSlice: 10.244.x.x (overlay Pod IP)
+  → ❌ No overlay tunnel on control plane, route unreachable
+```
+
+Native Routing mode does not have this issue — Pod IPs are VPC IPs, directly routable from apiserver.
+
+**Solution**: Set `hostNetwork: true` on the webhook Pod, so the Pod IP becomes the node IP (a VPC IP) that apiserver can route to directly. Use `podAntiAffinity` to spread webhook Pods across different nodes for high availability:
+
+```yaml
+spec:
+  hostNetwork: true  # Pod IP = node IP, apiserver can reach directly
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: <webhook-name>
+        topologyKey: kubernetes.io/hostname
+```
+
+:::tip[Common components that need hostNetwork]
+
+The following components typically require `hostNetwork: true` in Overlay mode:
+
+- cert-manager webhook
+- Custom admission webhooks (e.g. Gatekeeper, OPA)
+- Any webhook service that apiserver actively calls
+
+:::
+
+### Overlay mode does not support Pod fixed IP?
+
+**Root Cause**: Overlay mode uses cilium's `ipam.mode=multi-pool` IPAM, which dynamically allocates IPs from CiliumPodIPPool — it does not support fixed IP. Pod IPs change after recreation.
+
+Native Routing (VPC-CNI) mode uses `ipam.mode=delegated-plugin`, where IPs are allocated by the TKE VPC-CNI plugin, which natively supports [Pod fixed IP](https://cloud.tencent.com/document/product/457/34994) — capabilities like StatefulSet fixed IP and direct EIP binding work normally.
+
+If your workload depends on fixed IP (e.g.:
+
+- Stateful services with IP whitelist
+- Log/monitoring agents collecting by fixed IP
+- Pods that need direct EIP binding
+
+), it is recommended to use **Native Routing mode**.
 
 ### cilium-agent reports `operation not permitted` connecting to apiserver?
 
