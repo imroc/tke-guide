@@ -60,7 +60,12 @@ TKE nodes can pull Docker Hub images through intranet acceleration without addit
 However, note that TKE's built-in Docker Hub acceleration **does not provide an SLA, and speed is not guaranteed**. For production environments, it is recommended to sync images to your own TCR registry for a more stable image pulling experience. You can use the `skopeo` tool to sync:
 
 ```bash
-skopeo copy -a docker://docker.io/k8smirror/nfsplugin:v4.13.3 docker://your-repo/nfsplugin:v4.13.3
+# Replace your-repo with your TCR registry address, e.g. ccr.ccs.tencentyun.com/your-namespace
+skopeo copy -a docker://registry.k8s.io/sig-storage/nfsplugin:v4.13.3 docker://your-repo/nfsplugin:v4.13.3
+skopeo copy -a docker://registry.k8s.io/sig-storage/csi-provisioner:v6.1.0 docker://your-repo/csi-provisioner:v6.1.0
+skopeo copy -a docker://registry.k8s.io/sig-storage/csi-resizer:v2.0.0 docker://your-repo/csi-resizer:v2.0.0
+skopeo copy -a docker://registry.k8s.io/sig-storage/livenessprobe:v2.17.0 docker://your-repo/livenessprobe:v2.17.0
+skopeo copy -a docker://registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0 docker://your-repo/csi-node-driver-registrar:v2.15.0
 ```
 
 :::
