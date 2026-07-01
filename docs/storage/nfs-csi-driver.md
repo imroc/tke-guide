@@ -43,40 +43,45 @@ NFS CSI Driver 通过在容器中自带 NFS 挂载工具来解决此问题，Dae
 
 ### 镜像准备
 
-NFS CSI Driver 默认使用 `registry.k8s.io` 上的镜像，国内节点可能无法直接拉取。需要将镜像同步到可访问的镜像仓库，可使用 `skopeo` 工具：
+NFS CSI Driver 默认使用 `registry.k8s.io` 上的镜像，国内节点无法直接拉取。已有镜像同步到了 Docker Hub 的 `k8smirror` 组织下，TKE 节点可直接通过内网加速拉取，无需自行同步：
+
+| 镜像 | Docker Hub 地址 |
+|------|----------------|
+| nfsplugin | `docker.io/k8smirror/nfsplugin` |
+| csi-provisioner | `docker.io/k8smirror/csi-provisioner` |
+| csi-resizer | `docker.io/k8smirror/csi-resizer` |
+| livenessprobe | `docker.io/k8smirror/livenessprobe` |
+| csi-node-driver-registrar | `docker.io/k8smirror/csi-node-driver-registrar` |
+
+:::tip[关于镜像拉取加速]
+
+TKE 节点可通过内网加速拉取 Docker Hub 上的镜像，无需额外配置，本文使用的 `k8smirror` 镜像可直接拉取。
+
+但需要注意，TKE 自带的 Docker Hub 加速**不提供 SLA，速度也无法保障**。生产环境建议将镜像同步到自己的镜像仓库（如 TCR 或 CCR），以获得更稳定的镜像拉取体验。可使用 `skopeo` 工具同步：
 
 ```bash
-# 同步所需镜像到 Docker Hub（或任意可访问的镜像仓库）
-skopeo copy -a docker://registry.k8s.io/sig-storage/nfsplugin:v4.13.3 docker://your-repo/nfsplugin:v4.13.3
-skopeo copy -a docker://registry.k8s.io/sig-storage/csi-provisioner:v6.1.0 docker://your-repo/csi-provisioner:v6.1.0
-skopeo copy -a docker://registry.k8s.io/sig-storage/csi-resizer:v2.0.0 docker://your-repo/csi-resizer:v2.0.0
-skopeo copy -a docker://registry.k8s.io/sig-storage/livenessprobe:v2.17.0 docker://your-repo/livenessprobe:v2.17.0
-skopeo copy -a docker://registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0 docker://your-repo/csi-node-driver-registrar:v2.15.0
+skopeo copy -a docker://docker.io/k8smirror/nfsplugin:v4.13.3 docker://your-repo/nfsplugin:v4.13.3
 ```
-
-:::tip[TKE 内网加速拉取 Docker Hub 镜像]
-
-TKE 节点可通过内网加速拉取 Docker Hub 上的镜像，无需额外配置。因此将镜像同步到 Docker Hub 是最简单的方案。
 
 :::
 
 ### 使用 Helm Chart 部署
 
-官方提供了 Helm Chart，推荐使用此方式部署：
+官方提供了 Helm Chart，推荐使用此方式部署。使用预同步的 `k8smirror` 镜像，TKE 集群可直接一键安装：
 
 ```bash
 # 添加 Helm 仓库
 helm repo add csi-driver-nfs https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
 helm repo update
 
-# 部署（替换镜像地址为你的镜像仓库）
+# 一键部署（使用 k8smirror 镜像）
 helm upgrade --install csi-driver-nfs csi-driver-nfs/csi-driver-nfs \
   --namespace kube-system \
-  --set image.nfs.repository=your-repo/nfsplugin \
-  --set image.csiProvisioner.repository=your-repo/csi-provisioner \
-  --set image.csiResizer.repository=your-repo/csi-resizer \
-  --set image.livenessProbe.repository=your-repo/livenessprobe \
-  --set image.nodeDriverRegistrar.repository=your-repo/csi-node-driver-registrar \
+  --set image.nfs.repository=docker.io/k8smirror/nfsplugin \
+  --set image.csiProvisioner.repository=docker.io/k8smirror/csi-provisioner \
+  --set image.csiResizer.repository=docker.io/k8smirror/csi-resizer \
+  --set image.livenessProbe.repository=docker.io/k8smirror/livenessprobe \
+  --set image.nodeDriverRegistrar.repository=docker.io/k8smirror/csi-node-driver-registrar \
   --set controller.enableSnapshotter=false
 ```
 
@@ -107,18 +112,18 @@ controller:
 ```
 
 ```yaml
-# image-values.yaml - 镜像替换
+# image-values.yaml - 镜像替换（使用 k8smirror 预同步镜像）
 image:
   nfs:
-    repository: your-repo/nfsplugin
+    repository: docker.io/k8smirror/nfsplugin
   csiProvisioner:
-    repository: your-repo/csi-provisioner
+    repository: docker.io/k8smirror/csi-provisioner
   csiResizer:
-    repository: your-repo/csi-resizer
+    repository: docker.io/k8smirror/csi-resizer
   livenessProbe:
-    repository: your-repo/livenessprobe
+    repository: docker.io/k8smirror/livenessprobe
   nodeDriverRegistrar:
-    repository: your-repo/csi-node-driver-registrar
+    repository: docker.io/k8smirror/csi-node-driver-registrar
 ```
 
 ### 验证部署
