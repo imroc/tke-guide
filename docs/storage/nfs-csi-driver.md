@@ -45,19 +45,19 @@ NFS CSI Driver 通过在容器中自带 NFS 挂载工具来解决此问题，Dae
 
 NFS CSI Driver 默认使用 `registry.k8s.io` 上的镜像，国内节点无法直接拉取。已有镜像同步到了 Docker Hub 的 `k8smirror` 组织下，TKE 节点可直接通过内网加速拉取，无需自行同步：
 
-| 镜像 | Docker Hub 地址 |
+| 原始镜像 | k8smirror 同步镜像 |
 |------|----------------|
-| nfsplugin | `docker.io/k8smirror/nfsplugin` |
-| csi-provisioner | `docker.io/k8smirror/csi-provisioner` |
-| csi-resizer | `docker.io/k8smirror/csi-resizer` |
-| livenessprobe | `docker.io/k8smirror/livenessprobe` |
-| csi-node-driver-registrar | `docker.io/k8smirror/csi-node-driver-registrar` |
+| `registry.k8s.io/sig-storage/nfsplugin` | `docker.io/k8smirror/nfsplugin` |
+| `registry.k8s.io/sig-storage/csi-provisioner` | `docker.io/k8smirror/csi-provisioner` |
+| `registry.k8s.io/sig-storage/csi-resizer` | `docker.io/k8smirror/csi-resizer` |
+| `registry.k8s.io/sig-storage/livenessprobe` | `docker.io/k8smirror/livenessprobe` |
+| `registry.k8s.io/sig-storage/csi-node-driver-registrar` | `docker.io/k8smirror/csi-node-driver-registrar` |
 
 :::tip[关于镜像拉取加速]
 
 TKE 节点可通过内网加速拉取 Docker Hub 上的镜像，无需额外配置，本文使用的 `k8smirror` 镜像可直接拉取。
 
-但需要注意，TKE 自带的 Docker Hub 加速**不提供 SLA，速度也无法保障**。生产环境建议将镜像同步到自己的镜像仓库（如 TCR 或 CCR），以获得更稳定的镜像拉取体验。可使用 `skopeo` 工具同步：
+但需要注意，TKE 自带的 Docker Hub 加速**不提供 SLA，速度也无法保障**。生产环境建议将镜像同步到自己的 TCR 镜像仓库，以获得更稳定的镜像拉取体验。可使用 `skopeo` 工具同步：
 
 ```bash
 skopeo copy -a docker://docker.io/k8smirror/nfsplugin:v4.13.3 docker://your-repo/nfsplugin:v4.13.3
