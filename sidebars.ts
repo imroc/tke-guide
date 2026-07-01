@@ -113,6 +113,7 @@ const sidebars: SidebarsConfig = {
         'storage/cbs-pvc-expansion',
         'storage/readonlymany-pv',
         'storage/mount-cfs-with-v3',
+        'storage/nfs-csi-driver',
       ],
     },
     {
