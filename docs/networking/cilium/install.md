@@ -191,6 +191,14 @@ kubectl -n kube-system patch daemonset ip-masq-agent -p '{"spec":{"template":{"s
 <Tabs>
 <TabItem value="native-vpccni" label="Native Routing (VPC-CNI)" default>
 
+:::warning[前置要求：确认 eni 组件版本 ≥ v3.8]
+
+VPC-CNI 共享网卡多 IP 模式下，tke-route-eni 会为每张辅助网卡维护 `2000 + LinkIndex`（v3.8.0 之前）的策略路由表；而 cilium（≥1.15）的 L7 Proxy 固定使用路由表 **2004**（`local 0.0.0.0/0 dev lo`，硬编码，不可配置）。若 eni 组件版本低于 v3.8.0，节点上第三张网卡（eth2，LinkIndex=4）的策略路由表 2004 会被 cilium 覆盖，该网卡上所有 Pod IP 的出向流量被送入 `lo` 黑洞，表现为 Pod 访问 API Server / 外部地址持续超时。
+
+安装前先确认版本（`kubectl -n kube-system get ds tke-eni-agent -o jsonpath='{.spec.template.spec.containers[0].image}'`），若低于 **v3.8.0**（建议 v3.8.3+，含存量 2000+ 路由表对账修复），请先通过 [组件管理](https://cloud.tencent.com/document/product/457/58234) 升级 eni 相关组件后再安装 cilium。v3.8.0 起 ENI 策略路由表已迁移到 `4000 + LinkIndex`，与 cilium 的 2004/2005 彻底错开。
+
+:::
+
 创建 CNI 配置 ConfigMap，定义 VPC-CNI 与 cilium 的 chaining 关系：
 
 ```yaml title="cni-config.yaml"
