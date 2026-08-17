@@ -194,6 +194,14 @@ Run the steps corresponding to your chosen mode:
 <Tabs>
 <TabItem value="native-vpccni" label="Native Routing (VPC-CNI)" default>
 
+:::warning[Prerequisite: Confirm that the ipamd addon version is ≥ v3.8]
+
+In the VPC-CNI shared ENI multi-IP mode, `tke-route-eni` maintains a policy routing table with the ID `2000 + LinkIndex` (for versions prior to v3.8.0) for each secondary ENI; meanwhile, the Cilium (v1.15+) L7 Proxy uses a fixed routing table ID of **2004** (`local 0.0.0.0/0 dev lo`; hardcoded and non-configurable). If the ENI component version is earlier than v3.8.0, the policy routing table 2004 for the node's third network interface (`eth2`, `LinkIndex=4`) will be overwritten by Cilium. Consequently, outbound traffic from all Pod IPs on that interface is routed to the `lo` blackhole, resulting in persistent timeouts when Pods attempt to access the API Server or external addresses.
+
+Before installation, verify the version using `kubectl -n kube-system get ds tke-eni-agent -o jsonpath='{.spec.template.spec.containers[0].image}'`. If the version is earlier than **v3.8.0** (v3.8.3+ is recommended, as it includes a fix for reconciling existing `2000+` routing tables), please upgrade the relevant ENI components via [Component Management](https://cloud.tencent.com/document/product/457/58234) before installing Cilium. Starting from v3.8.0, ENI policy routing tables have been migrated to the `4000 + LinkIndex` range, completely avoiding conflicts with Cilium's tables 2004 and 2005.
+
+:::
+
 Create a CNI config ConfigMap defining the chaining relationship between VPC-CNI and cilium:
 
 ```yaml title="cni-config.yaml"
