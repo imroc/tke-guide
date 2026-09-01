@@ -249,7 +249,7 @@ kubectl apply -f cni-config.yaml
    kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook
    ```
 
-2. 部署 `cilium-sysctl-override` DaemonSet，在每个节点上持续维护 `/etc/sysctl.d/99-zzz-override_cilium.conf`（rp_filter 覆盖文件）：
+2. 部署 `cilium-sysctl-override` DaemonSet，将节点上**所有网卡的 `rp_filter` 统一固定为 0**（写 `/etc/sysctl.d/99-zzz-rp-filter.conf` + 立即应用到存量接口）：
 
    ```yaml title="cilium-sysctl-override.yaml"
    apiVersion: apps/v1
@@ -271,6 +271,9 @@ kubectl apply -f cni-config.yaml
            app: cilium-sysctl-override
        spec:
          priorityClassName: system-node-critical
+         # 必须使用 hostNetwork：DaemonSet 在 cilium 接管 CNI 之前部署，普通 Pod
+         # 此时会卡在 TKE 节点 multus 的 sandbox 创建（out-of-cluster 凭证问题）
+         hostNetwork: true
          tolerations:
          - operator: Exists
          nodeSelector:
@@ -280,17 +283,28 @@ kubectl apply -f cni-config.yaml
            # 与 cilium agent 相同的镜像，节点本地已有缓存，无需额外拉取
            image: quay.tencentcloudcr.com/cilium/cilium:v1.20.1
            command: ["/bin/sh", "-ce"]
+           # 必须特权模式：否则容器内 /proc/sys 只读，无法立即生效
+           securityContext:
+             privileged: true
            args:
            - |
              while true; do
                printf '%s\n' \
-                 '# Disable rp_filter on Cilium interfaces since it may cause mangled packets to be dropped' \
-                 '-net.ipv4.conf.lxc*.rp_filter = 0' \
-                 '-net.ipv4.conf.cilium_*.rp_filter = 0' \
-                 '# The kernel uses max(conf.all, conf.{dev}) as its value, so we need to set .all. to 0 as well.' \
-                 '# Otherwise it will overrule the device specific settings.' \
+                 '# Disable rp_filter on ALL interfaces: cilium (lxc*/cilium_*), VPC-CNI policy' \
+                 '# routing (eth*), and RDMA bond NICs all require asymmetric routing, which' \
+                 '# strict rp_filter breaks. Filename sorts after distro defaults (50-*.conf),' \
+                 '# so every sysctl replay (udev per-interface application, systemd-sysctl' \
+                 '# restart, node reboot) ends with 0 winning.' \
                  'net.ipv4.conf.all.rp_filter = 0' \
-                 > /host/etc/sysctl.d/99-zzz-override_cilium.conf
+                 'net.ipv4.conf.default.rp_filter = 0' \
+                 '-net.ipv4.conf.*.rp_filter = 0' \
+                 > /host/etc/sysctl.d/99-zzz-rp-filter.conf
+               rm -f /host/etc/sysctl.d/99-zzz-override_cilium.conf
+               # 立即应用到存量接口（hostNetwork Pod 的 /proc/sys 即宿主机网络栈）。
+               # 新接口从 default=0 继承初值，且每次 udev 重放都会应用本文件，双保险。
+               echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
+               echo 0 > /proc/sys/net/ipv4/conf/default/rp_filter
+               for f in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$f"; done
                sleep 60
              done
            resources:
@@ -321,9 +335,15 @@ TencentOS 等 systemd 发行版有一条 udev 规则：**每个新网络接口�
 
 cilium CNI 插件在创建 Pod veth 时虽然会写 `lxc*.rp_filter = 0`，但这条 udev 规则在**之后**异步执行，会把值覆盖回 1。Overlay 模式下 Pod IP 的路由聚合到 `cilium_host`（非 per-endpoint 路由），host → Pod 的回包经过 lxc 接口时严格反向路径校验不通过，直接丢包——表现为 **kubelet 探针失败、`cilium-health status` 中 localhost endpoint 0/1、节点上进程无法访问 Pod IP**。
 
-cilium 自带的 `sysctlfix` 功能本可以写这个文件（它写的正是 `99-zzz-override_cilium.conf`），但它同时会**重启宿主机 `systemd-sysctl.service`**，把发行版所有 sysctl 默认值全量重放，覆盖运行时修改——Native Routing 模式下直接断网，依赖特殊 sysctl 值的场景（如 AI 推理 RDMA 的 bond 网卡 `rp_filter=0`）同样受害。因此本教程统一 `sysctlfix.enabled=false`，改用这个 DaemonSet 写文件——**同样的保护效果，但不重启 systemd-sysctl**。
+cilium 自带的 `sysctlfix` 功能本可以写覆盖文件，但存在两个问题：它同时会**重启宿主机 `systemd-sysctl.service`**，把发行版所有 sysctl 默认值全量重放，覆盖运行时修改——Native Routing 模式下直接断网，依赖特殊 sysctl 值的场景（如 AI 推理 RDMA 的 bond 网卡 `rp_filter=0`）同样受害；且它只覆盖 lxc*/cilium_* 两类接口，bond 等接口不受保护。因此本教程统一 `sysctlfix.enabled=false`，改用这个 DaemonSet 将**全节点接口的 `rp_filter` 统一固定为 0**——cilium 接口、VPC-CNI 策略路由的 eth*、RDMA bond 一次性全覆盖，且不重启 systemd-sysctl、无任何重放副作用。
 
-文件名中的 `99-zzz` 前缀保证它在 systemd-sysctl 的应用顺序中排在发行版配置（`50-*.conf`）之后，任何时机触发 sysctl 重放（节点重启、OS 升级、管理员手工执行）都是 cilium 的值胜出。DaemonSet 每 60 秒重写一次，可自愈文件被误删的情况，新节点加入集群时也会自动写上。
+三重保护机制：
+
+1. **文件落盘**（`99-zzz-rp-filter.conf`）：文件名排序在发行版配置（`50-*.conf`）之后，任何时机触发 sysctl 重放（节点重启、OS 升级、管理员手工执行）都是 0 胜出；新接口创建时 udev 的 per-interface 应用同样以本文件收尾。
+2. **立即应用**（直写 `/proc/sys`）：文件本身只在未来某次 systemd-sysctl 运行时才生效，对部署时已存在的接口（含 bond、eth*）由 DaemonSet 直接写入立即归零。
+3. **周期自愈**（每 60 秒）：值被外部改动、文件被误删，都会在下一轮循环纠正；新节点加入集群自动覆盖。
+
+在 K8s 节点上全量关闭 rp_filter 是安全惯例（cilium 官方对 kube-proxy-free 模式的建议同样如此）：节点上的多接口路由（veth/vxlan/策略路由/bond）天然非对称，strict rp_filter 只会误伤；源地址校验由 cilium 的 BPF 层和 VPC 安全组承担。
 
 完整机制分析（含 Native 与 Overlay 的差异、路由对称性原理）见 [sysctlfix 与 rp_filter 机制详解](./appendix/sysctlfix.md)。
 
@@ -593,10 +613,10 @@ bpf:
   # 详见《VPC-CNI Native Routing 模式详解》
   masquerade: true
 # 禁用 sysctlfix：它会在每次 cilium pod 启动时重启宿主机 systemd-sysctl，
-# 全量重放发行版 sysctl 默认值，覆盖运行时修改。Overlay 模式的 lxc 接口
-# rp_filter 保护改由 cilium-sysctl-override DaemonSet 写入的
-# /etc/sysctl.d/99-zzz-override_cilium.conf 承担（安装前置操作中已部署）。
-# 详见《sysctlfix 与 rp_filter 机制详解》
+# 全量重放发行版 sysctl 默认值，覆盖运行时修改。Overlay 模式所有接口的
+# rp_filter 保护改由 cilium-sysctl-override DaemonSet 承担：写
+# /etc/sysctl.d/99-zzz-rp-filter.conf 将全节点接口统一固定为 0 并立即
+# 应用（安装前置操作中已部署）。详见《sysctlfix 与 rp_filter 机制详解》
 sysctlfix:
   enabled: false
 ```
@@ -934,7 +954,7 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
    # 在每个节点执行
    sudo rm -f /etc/cni/net.d/05-cilium.conf /etc/cni/net.d/05-cilium.conflist
    sudo rm -f /etc/cni/net.d/*.cilium_bak  # 恢复被 cilium 重命名的原 CNI 配置
-   sudo rm -f /etc/sysctl.d/99-zzz-override_cilium.conf  # Overlay 安装的 rp_filter 覆盖文件
+   sudo rm -f /etc/sysctl.d/99-zzz-rp-filter.conf  # Overlay 安装的 rp_filter 覆盖文件
    sudo iptables-save | grep -i cilium | wc -l  # 检查残留规则，必要时手动 -D
    ```
 4. **重新启用 TKE 组件**：控制台勾选回 `tke-cni-agent`、`kube-proxy`、`ip-masq-agent` 等被卸载的组件。

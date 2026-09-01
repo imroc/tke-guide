@@ -69,7 +69,7 @@ RUN+="/usr/lib/systemd/systemd-sysctl --prefix=/net/ipv4/conf/$name ..."
 
 That is, **whenever a new network interface is created**, udev asynchronously runs `systemd-sysctl --prefix`, applying every sysctl.d entry matching that interface — and the `net.ipv4.conf.*.rp_filter = 1` glob matches every new lxc interface.
 
-The cilium CNI plugin does write `lxc.rp_filter = 0` when creating the Pod veth (source: `DisableRpFilter` in `pkg/datapath/connector/veth.go`), **but the udev application runs afterwards and asynchronously, overriding the 0 back to 1**. Without the 99-zzz file, every new Pod's lxc interface ends up with rp_filter=1.
+The cilium CNI plugin does write `lxc.rp_filter = 0` when creating the Pod veth (source: `DisableRpFilter` in `pkg/datapath/connector/veth.go`), **but the udev application runs afterwards and asynchronously, overriding the 0 back to 1**. Without any override file, every new Pod's lxc interface ends up with rp_filter=1.
 
 A cilium-internal detail worth knowing: interfaces created by the **cilium-agent itself** (`cilium_host`, `cilium_net`, `cilium_vxlan`, `lxc_health`) are managed by the agent's internal reconciler, which re-applies desired values every 10 minutes and can self-heal after a udev override. But **Pod veths are created by the CNI plugin process, which writes once and exits** — after a udev override the value **never self-heals**. Restarting the cilium pod doesn't help; only recreating the business Pod triggers another write.
 
@@ -93,25 +93,32 @@ This also explains why **Native mode has no such dependency**: Native always ena
 
 ## Final solution: disable sysctlfix + cilium-sysctl-override DaemonSet
 
-Conclusion: **disable sysctlfix in both modes** (removing the trigger of "every cilium start replays the node's sysctl"), and in Overlay mode let the `cilium-sysctl-override` DaemonSet provide the 99-zzz file protection instead (already built into the [installation guide](../install.md)'s pre-install steps):
+Conclusion: **disable sysctlfix in both modes** (removing the trigger of "every cilium start replays the node's sysctl"), and in Overlay mode let the `cilium-sysctl-override` DaemonSet provide the rp_filter protection instead — with even broader coverage than sysctlfix's own file (already built into the [installation guide](../install.md)'s pre-install steps):
 
-| Mode                     | sysctlfix    | 99-zzz override file                  | Notes                                                        |
-| ------------------------ | ------------ | ------------------------------------- | ------------------------------------------------------------ |
-| Native Routing (VPC-CNI) | ❌ disabled  | not needed                            | symmetric routing; lxc rp_filter=1 is harmless                |
-| Overlay (VPC-CNI / GR)   | ❌ disabled  | ✅ maintained by cilium-sysctl-override DaemonSet | identical file content to sysctlfix's, but no systemd-sysctl restart |
+| Mode                     | sysctlfix    | cilium-sysctl-override DaemonSet      | Notes                                       |
+| ------------------------ | ------------ | ------------------------------------- | ------------------------------------------- |
+| Native Routing (VPC-CNI) | ❌ disabled  | not needed (optional, see below)      | symmetric routing; lxc rp_filter=1 is harmless |
+| Overlay (VPC-CNI / GR)   | ❌ disabled  | ✅ required: rp_filter=0 on ALL interfaces | no systemd-sysctl restart, no replay side effects |
 
-This DaemonSet approach gets the best of both worlds:
+**The DaemonSet goes one step further than sysctlfix: instead of a cilium-specific override (lxc*/cilium_*), it pins `rp_filter=0` on ALL node interfaces** (three keys: `all`/`default`/`*`). Cilium interfaces, VPC-CNI policy-routing eth*, and AI-inference RDMA bond NICs are all covered in one shot, with three layers of protection:
 
-- **New-interface protection**: once the file exists, udev's per-interface application (Mechanism A) applies `50-*.conf` (=1) first and `99-zzz` (=0) second — every newly created lxc ends up at 0.
-- **Replay protection**: any `systemd-sysctl` trigger (node reboot, OS upgrade, manual `sysctl --system`) applies `99-zzz` last thanks to filename ordering, so existing interfaces keep the value 0.
-- **No side effects**: `systemd-sysctl.service` is never restarted, no full replay happens, runtime sysctl changes are untouched.
-- **Self-healing and scale-out**: the DaemonSet rewrites the file every 60 seconds (survives accidental deletion) and automatically covers newly added nodes.
+1. **Persisted file** (`/etc/sysctl.d/99-zzz-rp-filter.conf`): the filename sorts after the distro configs (`50-*.conf`), so every sysctl replay trigger (node reboot, OS upgrade, manual `sysctl --system`) ends with 0 winning; the udev per-interface application on every new interface (Mechanism A) also ends with this file — and new interfaces additionally inherit `default=0` as their kernel initial value. Double coverage.
+2. **Immediate application** (direct writes to `/proc/sys`): the file alone only takes effect on the next systemd-sysctl run, so every DaemonSet loop also writes existing interfaces (including bond, eth*) to 0 immediately.
+3. **Periodic self-healing** (every 60 seconds): externally changed values and deleted files are corrected on the next loop; newly added nodes are covered automatically.
+
+The DaemonSet also cleans up the legacy `99-zzz-override_cilium.conf` left by the old sysctlfix (its content is subsumed by the all-interfaces version).
+
+Disabling rp_filter node-wide is a safe convention on K8s nodes (cilium's own recommendation for kube-proxy-free mode): multi-interface routing (veth/vxlan/policy routes/bond) is inherently asymmetric and strict rp_filter only causes collateral damage; source validation is handled by cilium's BPF layer and VPC security groups.
+
+Native mode doesn't depend on this DaemonSet (symmetric routing), but if the node runs components requiring `rp_filter=0` (e.g. RDMA bond NICs), deploying the same DaemonSet provides the same all-interface immunity (verified that `tke-eni-agent` does not periodically rewrite eth0, so there is no override fight).
 
 The only case needing manual attention is migrating an **existing cluster from the old sysctlfix=true setup**: lxc interfaces already on the node may be stuck at the replayed value 1 (the agent doesn't manage rp_filter of existing Pod veths). Fix by rolling-restarting business Pods or running `sudo systemctl restart systemd-sysctl` once on the node (the 99-zzz file now wins the replay).
 
-:::tip[What if other components on the node depend on special sysctl values (e.g. the bond NIC's rp_filter=0 in AI-inference RDMA setups)?]
+:::tip[AI-inference RDMA scenarios (bond NICs requiring rp_filter=0)]
 
-With sysctlfix disabled, cilium no longer pulls the trigger — the bond NIC is no longer periodically clobbered by cilium, and bond/RDMA initialization re-applies its settings on node reboot. To also immunize against low-frequency external replays (OS upgrades, someone running `sysctl --system`), apply the same idea: persist the bond override into another late-sorted file under `/etc/sysctl.d/` (e.g. `99-zzz-bond-rp-filter.conf` with `net.ipv4.conf.bond0.rp_filter = 0`) — every replay then ends with your value winning.
+The `cilium-sysctl-override` DaemonSet deployed in Overlay mode already pins **all node interfaces** to 0, so bond NICs are covered natively — when a bond is created, the udev application ends with `99-zzz-rp-filter.conf` (verified: a freshly created bond0 lands on 0 immediately), the value survives external replays, and the "cilium replay breaks the bond NIC" problem is eliminated at the root.
+
+The full matrix verified on TencentOS 4.4 + cilium 1.20.1: existing interfaces zeroed immediately; newly created bond and Pod lxc both 0; all values held at 0 after a manual `systemctl restart systemd-sysctl`; manual corruption self-healed within 60 seconds; after a node reboot all interfaces were 0 with the file intact; host→Pod / cross-node / cilium-health all green.
 
 :::
 
@@ -135,7 +142,7 @@ kubectl -n kube-system get pod -l app=cilium-sysctl-override -o wide
 Flow:
 
 1. **99-zzz file missing** → the cilium-sysctl-override DaemonSet isn't deployed or not ready; deploy it per the [installation guide](../install.md) and wait 60 seconds.
-2. **File exists but value still 1** → existing interfaces stuck at a replayed value (typical when migrating from sysctlfix=true); run `sudo systemctl restart systemd-sysctl` on the node so the 99-zzz replay wins, or roll the business Pods.
+2. **File exists but value still 1** → the DaemonSet self-heals by writing `/proc/sys` every 60 seconds, so a persistent 1 means the DS pod isn't running properly: check `kubectl -n kube-system get pod -l app=cilium-sysctl-override` (Running? configured with `privileged: true`? otherwise `/proc/sys` is read-only and the pod CrashLoops).
 3. **All zero but still unreachable** → the issue is not rp_filter; continue with other paths (`cilium-health status --verbose`, `hubble observe`).
 
 ## References

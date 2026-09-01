@@ -932,9 +932,9 @@ setup_overlay_vpccni() {
   kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook 2>/dev/null || true
 }
 
-# apply_sysctl_override — Deploys a DaemonSet that keeps /etc/sysctl.d/99-zzz-override_cilium.conf
-# present on every node (Overlay mode only; runs BEFORE helm install so the file
-# exists before the first cilium-agent starts).
+# apply_sysctl_override — Deploys a DaemonSet that pins rp_filter=0 on ALL node
+# interfaces (Overlay mode only; runs BEFORE helm install so the values are in
+# place before the first cilium-agent starts).
 #
 # Why this exists (see appendix/sysctlfix.md for the full analysis):
 #   1. Overlay pods reach the host via the aggregated cilium_host route, so
@@ -944,17 +944,29 @@ setup_overlay_vpccni() {
 #      defaults to EVERY new net interface:
 #      ACTION=="add", SUBSYSTEM=="net" RUN+="systemd-sysctl --prefix=/net/ipv4/conf/$name"
 #      This runs asynchronously AFTER cilium's DisableRpFilter write, silently
-#      overriding it with the distro value (rp_filter=1). Without the 99-zzz
+#      overriding it with the distro value (rp_filter=1). Without an override
 #      file every new Pod's lxc would end up with rp_filter=1 and host→Pod
 #      traffic (kubelet probes, cilium-health) breaks.
-#   3. The stock sysctlfix would write this file itself — but it ALSO restarts
-#      systemd-sysctl, which replays ALL distro defaults over runtime sysctl
-#      changes (this is what breaks eth0 on Native mode). We therefore disable
-#      sysctlfix and write the file ourselves: same protection, no restart.
-#   4. A resident DaemonSet (instead of a one-shot Job) re-writes the file
-#      every 60s so it survives manual deletion and covers newly added nodes.
+#   3. The stock sysctlfix would write a lxc/cilium_*-only override file — but
+#      it ALSO restarts systemd-sysctl, which replays ALL distro defaults over
+#      runtime sysctl changes, breaking interfaces it doesn't cover (eth0 on
+#      Native mode, RDMA bond NICs on AI-inference clusters). We disable it and
+#      write the file ourselves — covering ALL interfaces, with no restart.
+#   4. The file covers all/default/* so new interfaces inherit 0 (default=0)
+#      and every replay (udev per-interface, systemd-sysctl, node reboot) ends
+#      with 0 winning. Existing interfaces are also fixed immediately by
+#      writing /proc/sys directly (a file alone only takes effect on the next
+#      systemd-sysctl run).
+#   5. hostNetwork + privileged are REQUIRED:
+#      - hostNetwork: the pod must not go through any CNI — on a fresh TKE node
+#        (before cilium takes over CNI) multus's out-of-cluster kubeconfig is
+#        Unauthorized and any non-hostNetwork pod is stuck in sandbox creation.
+#      - privileged: /proc/sys is read-only for non-privileged containers.
+#   6. A resident DaemonSet (instead of a one-shot Job) re-applies every 60s,
+#      self-heals accidental value changes / file deletion, and covers newly
+#      added nodes.
 apply_sysctl_override() {
-  info "$(is_zh && echo "部署 cilium sysctl override DaemonSet（rp_filter 保护）..." || echo "Deploying cilium sysctl override DaemonSet (rp_filter protection)...")"
+  info "$(is_zh && echo "部署 cilium sysctl override DaemonSet（rp_filter 全接口归零）..." || echo "Deploying cilium sysctl override DaemonSet (pin rp_filter=0 on all interfaces)...")"
   kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: DaemonSet
@@ -975,6 +987,7 @@ spec:
         app: cilium-sysctl-override
     spec:
       priorityClassName: system-node-critical
+      hostNetwork: true
       tolerations:
       - operator: Exists
       nodeSelector:
@@ -983,17 +996,28 @@ spec:
       - name: ensure
         image: ${IMAGE_REGISTRY}/cilium:${CILIUM_VERSION}
         command: ["/bin/sh", "-ce"]
+        securityContext:
+          privileged: true
         args:
         - |
           while true; do
             printf '%s\n' \
-              '# Disable rp_filter on Cilium interfaces since it may cause mangled packets to be dropped' \
-              '-net.ipv4.conf.lxc*.rp_filter = 0' \
-              '-net.ipv4.conf.cilium_*.rp_filter = 0' \
-              '# The kernel uses max(conf.all, conf.{dev}) as its value, so we need to set .all. to 0 as well.' \
-              '# Otherwise it will overrule the device specific settings.' \
+              '# Disable rp_filter on ALL interfaces: cilium (lxc*/cilium_*), VPC-CNI policy' \
+              '# routing (eth*), and RDMA bond NICs all require asymmetric routing, which' \
+              '# strict rp_filter breaks. Filename sorts after distro defaults (50-*.conf),' \
+              '# so every sysctl replay (udev per-interface application, systemd-sysctl' \
+              '# restart, node reboot) ends with 0 winning.' \
               'net.ipv4.conf.all.rp_filter = 0' \
-              > /host/etc/sysctl.d/99-zzz-override_cilium.conf
+              'net.ipv4.conf.default.rp_filter = 0' \
+              '-net.ipv4.conf.*.rp_filter = 0' \
+              > /host/etc/sysctl.d/99-zzz-rp-filter.conf
+            rm -f /host/etc/sysctl.d/99-zzz-override_cilium.conf
+            # Apply immediately (hostNetwork pod: /proc/sys is the host netns).
+            # New interfaces inherit default=0 and are re-covered by the file on
+            # every udev replay, so this loop only needs to fix existing ones.
+            echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
+            echo 0 > /proc/sys/net/ipv4/conf/default/rp_filter
+            for f in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$f"; done
             sleep 60
           done
         resources:
@@ -1616,7 +1640,7 @@ cmd_uninstall_cilium() {
     info "   时自动恢复，无需手工干预"
     info "4. 如果不打算重建节点，每个节点上手工清理:"
     info "   sudo rm -f /etc/cni/net.d/05-cilium.conf /etc/cni/net.d/05-cilium.conflist"
-    info "   sudo rm -f /etc/sysctl.d/99-zzz-override_cilium.conf  # Overlay 安装的 rp_filter 覆盖文件"
+    info "   sudo rm -f /etc/sysctl.d/99-zzz-rp-filter.conf  # Overlay 安装的 rp_filter 覆盖文件"
     info "   sudo iptables-save | grep -i cilium  # 检查残留规则"
     info ""
     info "完整回滚指南: https://imroc.cc/tke/networking/cilium/install#回滚到-tke-内置-cni"
@@ -1630,7 +1654,7 @@ cmd_uninstall_cilium() {
     info "   when TKE re-applies its addon manifests; no manual action needed."
     info "4. If NOT recreating nodes, manually clean up on each node:"
     info "   sudo rm -f /etc/cni/net.d/05-cilium.conf /etc/cni/net.d/05-cilium.conflist"
-    info "   sudo rm -f /etc/sysctl.d/99-zzz-override_cilium.conf  # rp_filter override file from Overlay installs"
+    info "   sudo rm -f /etc/sysctl.d/99-zzz-rp-filter.conf  # rp_filter override file from Overlay installs"
     info "   sudo iptables-save | grep -i cilium  # check for leftover rules"
     info ""
     info "Full rollback guide: https://imroc.cc/tke/en/networking/cilium/install#rollback-to-tke-built-in-cni"
