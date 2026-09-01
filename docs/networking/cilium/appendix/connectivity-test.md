@@ -460,7 +460,7 @@ cilium connectivity test 共下发 132 个用例，按功能分组列出每个�
 
 #### cilium 1.20.1 复测记录（sysctlfix=false + cilium-sysctl-override）
 
-2026-09 在 Overlay (VPC-CNI) 集群（cilium **1.20.1** + cilium CLI v0.20.0 + TencentOS Server 4.4 / kernel 6.6.88）按新方案（`sysctlfix.enabled=false` + `cilium-sysctl-override` DaemonSet 维护 99-zzz 文件，详见 [Native Routing 模式详解](./native-routing.md)）复测：
+2026-09 在 Overlay (VPC-CNI) 集群（cilium **1.20.1** + cilium CLI v0.20.0 + TencentOS Server 4.4 / kernel 6.6.88）按新方案（`sysctlfix.enabled=false` + `cilium-sysctl-override` DaemonSet 维护 99-zzz 文件，详见 [sysctlfix 与 rp_filter 机制详解](./sysctlfix.md)）复测：
 
 ```text
 ❌ 4/83 tests failed (22/763 actions), 54 tests skipped, 0 scenarios skipped

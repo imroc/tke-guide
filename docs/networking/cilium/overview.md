@@ -40,6 +40,7 @@
 | ---------------------------------------- | ---------------------------------------------------- |
 | **大规模集群 Cilium 调优指南**           | 200+ 节点规模下的参数、资源、BPF map 调优            |
 | **已验证的节点操作系统**                 | 8 种 OS 的兼容性验证结果                             |
+| **sysctlfix 与 rp_filter 机制详解**     | 为什么两种模式都禁用 sysctlfix、udev 覆盖机制、Overlay 的 DaemonSet 补偿 |
 | **VPC-CNI Native Routing 模式详解**     | local-router-ipv4、sysctlfix 与 rp_filter 机制、Host Routing 配置原理 |
 | **为什么不提供 GR Native Routing**       | 完整试错记录与 4 类不可用问题                        |
 | **Cilium 与 Nodelocal DNSCache 共存**    | 自建 NodeLocal DNS 加速 DNS 解析                     |

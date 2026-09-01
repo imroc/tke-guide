@@ -8,7 +8,7 @@ In simple terms, IP masquerade translates the source IP of outbound Pod traffic 
 
 In TKE VPC-CNI network mode, Pod IPs are VPC IPs, just like node IPs, and can be routed directly within the VPC. When connected to other VPCs or other clouds (e.g., AWS) via Cloud Connect Network, Pod IPs can also be routed directly. Additionally, NAT Gateways are supported, allowing Pods to access the internet through them.
 
-Therefore, in most scenarios, IP masquerade is not needed. The default installation method in [Installing Cilium](./install.md) also disables Cilium's IP masquerade feature (`--set enableIPv4Masquerade=false`).
+Therefore, in most scenarios, IP masquerade is not needed. The default installation method in [Installing Cilium](../install.md) also disables Cilium's IP masquerade feature (`--set enableIPv4Masquerade=false`).
 
 ## When Is IP Masquerade Needed?
 
@@ -30,7 +30,7 @@ In VPC-CNI Native mode, Pod IPs are allocated from the **secondary ENI** IP pool
 To allow Native mode Pods to access the internet, one of the following conditions must be met:
 
 - Configure a NAT Gateway in the VPC (suitable for most scenarios, cleanest approach);
-- Enable [Cilium Egress Gateway](./egress-gateway.md) (suitable for scenarios requiring per-namespace/Pod fixed egress IP selection);
+- Enable [Cilium Egress Gateway](../egress-gateway.md) (suitable for scenarios requiring per-namespace/Pod fixed egress IP selection);
 - Enable the ip-masq-agent described in this article to SNAT outbound VPC traffic to the node IP, going out through the node's primary ENI + node EIP (self-built TKE ip-masq-agent).
 
 GR and VPC-CNI Overlay modes do not have this issue:

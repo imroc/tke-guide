@@ -460,7 +460,7 @@ The 55 skipped test cases in this run can be categorized into 4 groups, all unre
 
 #### cilium 1.20.1 re-test record (sysctlfix=false + cilium-sysctl-override)
 
-Re-tested 2026-09 on an Overlay (VPC-CNI) cluster (cilium **1.20.1** + cilium CLI v0.20.0 + TencentOS Server 4.4 / kernel 6.6.88) with the new scheme (`sysctlfix.enabled=false` + the `cilium-sysctl-override` DaemonSet maintaining the 99-zzz file; see [Native Routing Details](./native-routing.md)):
+Re-tested 2026-09 on an Overlay (VPC-CNI) cluster (cilium **1.20.1** + cilium CLI v0.20.0 + TencentOS Server 4.4 / kernel 6.6.88) with the new scheme (`sysctlfix.enabled=false` + the `cilium-sysctl-override` DaemonSet maintaining the 99-zzz file; see [sysctlfix and rp_filter Deep Dive](./sysctlfix.md)):
 
 ```text
 ❌ 4/83 tests failed (22/763 actions), 54 tests skipped, 0 scenarios skipped

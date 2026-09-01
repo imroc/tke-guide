@@ -328,7 +328,7 @@ Cilium's built-in `sysctlfix` could write this file (it writes exactly `99-zzz-o
 
 The `99-zzz` filename prefix guarantees it is applied after the distro configs (`50-*.conf`) whenever systemd-sysctl runs, so cilium's values win on every replay trigger (node reboot, OS upgrade, manual `sysctl --system`). The DaemonSet rewrites the file every 60 seconds, self-heals accidental deletion, and automatically covers newly added nodes.
 
-For the full analysis (including the Native vs Overlay difference and the routing symmetry principle), see [VPC-CNI Native Routing Mode Deep Dive](./appendix/native-routing.md).
+For the full analysis (including the Native vs Overlay difference and the routing symmetry principle), see [sysctlfix and rp_filter Deep Dive](./appendix/sysctlfix.md).
 
 :::
 
@@ -555,7 +555,7 @@ extraConfig:
   # cilium doesn't allocate Pod IPs here — manually specify the cilium_host IP
   local-router-ipv4: 169.254.32.16
 # Disable sysctlfix — prevents restarting systemd-sysctl from resetting eth0 rp_filter.
-# See "VPC-CNI Native Routing Details" for explanation.
+# See "sysctlfix and rp_filter Deep Dive" for explanation.
 sysctlfix:
   enabled: false
 operator:
@@ -600,7 +600,7 @@ bpf:
 # replaying all distro sysctl defaults over runtime changes. The lxc rp_filter
 # protection for Overlay mode is instead provided by the 99-zzz-override_cilium.conf
 # file maintained by the cilium-sysctl-override DaemonSet (deployed in the
-# pre-install steps). See "VPC-CNI Native Routing Details" for the full analysis.
+# pre-install steps). See "sysctlfix and rp_filter Deep Dive" for the full analysis.
 sysctlfix:
   enabled: false
 ```
@@ -1258,6 +1258,7 @@ More content under the [Cilium Appendix](./appendix) directory:
 - [Verified Node Operating Systems](./appendix/verified-os.md)
 - [Cilium Connectivity Test](./appendix/connectivity-test.md)
 - [Cilium Performance Test](./appendix/performance-test.md)
+- [sysctlfix and rp_filter Deep Dive](./appendix/sysctlfix.md)
 - [VPC-CNI Native Routing Details](./appendix/native-routing.md)
 - [Why this guide does not offer GR Native Routing](./appendix/gr-native-not-recommended.md)
 - [Cilium with NodeLocal DNSCache](./appendix/with-node-local-dns.md)

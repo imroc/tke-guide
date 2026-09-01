@@ -41,6 +41,7 @@
 | ------------------------------------------- | ----------------------------------------------------------------- |
 | **Cilium Tuning for Large Clusters**        | Parameter, resource, and BPF map tuning for 200+ node clusters    |
 | **Verified Node Operating Systems**         | Compatibility verification results for 8 OS types                 |
+| **sysctlfix and rp_filter Deep Dive**       | Why both modes disable sysctlfix, the udev override mechanism, and Overlay's DaemonSet compensation |
 | **VPC-CNI Native Routing Details**         | Configuration principles of local-router-ipv4, sysctlfix, and Host Routing |
 | **Why GR Native Routing Is Not Available**  | Complete trial-and-error record and 4 types of issues             |
 | **Cilium with NodeLocal DNSCache**          | Self-built NodeLocal DNS cache for DNS acceleration               |

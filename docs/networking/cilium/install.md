@@ -325,7 +325,7 @@ cilium 自带的 `sysctlfix` 功能本可以写这个文件（它写的正是 `9
 
 文件名中的 `99-zzz` 前缀保证它在 systemd-sysctl 的应用顺序中排在发行版配置（`50-*.conf`）之后，任何时机触发 sysctl 重放（节点重启、OS 升级、管理员手工执行）都是 cilium 的值胜出。DaemonSet 每 60 秒重写一次，可自愈文件被误删的情况，新节点加入集群时也会自动写上。
 
-完整机制分析（含 Native 与 Overlay 的差异、路由对称性原理）见 [VPC-CNI Native Routing 模式详解](./appendix/native-routing.md)。
+完整机制分析（含 Native 与 Overlay 的差异、路由对称性原理）见 [sysctlfix 与 rp_filter 机制详解](./appendix/sysctlfix.md)。
 
 :::
 
@@ -551,7 +551,7 @@ extraConfig:
   # cilium 不负责 Pod IP 分配，需手动指定 cilium_host 虚拟网卡的 IP
   local-router-ipv4: 169.254.32.16
 # 禁用 sysctlfix，避免重启 systemd-sysctl 导致 eth0 rp_filter 被重置，
-# 详见《VPC-CNI Native Routing 模式详解》
+# 详见《sysctlfix 与 rp_filter 机制详解》
 sysctlfix:
   enabled: false
 operator:
@@ -596,7 +596,7 @@ bpf:
 # 全量重放发行版 sysctl 默认值，覆盖运行时修改。Overlay 模式的 lxc 接口
 # rp_filter 保护改由 cilium-sysctl-override DaemonSet 写入的
 # /etc/sysctl.d/99-zzz-override_cilium.conf 承担（安装前置操作中已部署）。
-# 详见《VPC-CNI Native Routing 模式详解》
+# 详见《sysctlfix 与 rp_filter 机制详解》
 sysctlfix:
   enabled: false
 ```
@@ -1253,6 +1253,7 @@ spec:
 - [已验证的节点操作系统](./appendix/verified-os.md)
 - [Cilium 功能测试](./appendix/connectivity-test.md)
 - [Cilium 性能测试](./appendix/performance-test.md)
+- [sysctlfix 与 rp_filter 机制详解](./appendix/sysctlfix.md)
 - [VPC-CNI Native Routing 模式详解](./appendix/native-routing.md)
 - [为什么不提供 GR Native Routing 部署方案？](./appendix/gr-native-not-recommended.md)
 - [Cilium 与 Nodelocal DNSCache 共存](./appendix/with-node-local-dns.md)
