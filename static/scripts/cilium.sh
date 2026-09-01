@@ -936,7 +936,7 @@ setup_overlay_vpccni() {
 # present on every node (Overlay mode only; runs BEFORE helm install so the file
 # exists before the first cilium-agent starts).
 #
-# Why this exists (see appendix/native-routing.md for the full analysis):
+# Why this exists (see appendix/sysctlfix.md for the full analysis):
 #   1. Overlay pods reach the host via the aggregated cilium_host route, so
 #      host→Pod reply traffic fails strict rp_filter on lxc interfaces — lxc
 #      rp_filter MUST stay 0.

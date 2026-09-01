@@ -7,6 +7,8 @@ Cilium's default-enabled `sysctlfix` causes two classes of problems on TKE, whic
 | Native Routing (VPC-CNI) | systemd-sysctl restart resets eth0 to strict, breaking networking outright | No (symmetric routing; lxc rp_filter value is irrelevant) |
 | Overlay (VPC-CNI / GR)   | Same (replay clobbers runtime sysctl changes)                   | **Yes**: deploy the `cilium-sysctl-override` DaemonSet |
 
+Regardless of mode, if the node runs **other components that depend on non-default sysctl values** — a typical example being the bond NIC in AI-inference RDMA setups, which requires `rp_filter=0` — the full replay triggered by sysctlfix resets them to distro defaults and breaks the workload (see the [victim list](#problem-1-restarting-systemd-sysctl-replays-all-distro-defaults) below).
+
 This article explains the complete mechanism behind these conclusions.
 
 ## What sysctlfix does
@@ -38,10 +40,19 @@ The TencentOS 4 distro baseline (`/usr/lib/sysctl.d/`):
 50-tencentos.conf: net.ipv4.conf.default.rp_filter = 1 / net.ipv4.conf.*.rp_filter = 1
 ```
 
-The replay harms in two ways:
+What does the replay break? **The 99-zzz file only protects the three key families cilium writes (lxc*, cilium_*, all); everything else is left exposed** — any setting not persisted in a sysctl.d file is reset to the distro default:
 
-- **Native Routing (VPC-CNI): outright network outage.** In VPC-CNI shared-ENI multi-IP mode, `tke-eni-agent` sets the NIC's `rp_filter` to `2` (loose, allowing asymmetric routing with policy routing). The sysctlfix-triggered replay resets eth0 back to `1` (strict); asymmetric traffic for auxiliary-ENI IPs is then dropped by strict reverse-path validation and Pod networking breaks. This is why Native mode **must disable** sysctlfix.
-- **All modes: runtime sysctl changes are lost.** Any runtime modification not persisted in sysctl.d files (node-pool scripts using `sysctl -w`, manually tuned `nf_conntrack_max`, `somaxconn`, ...) is reset to distro defaults on every replay. Cilium's own interfaces survive thanks to the 99-zzz file (sorted after the distro files), but **sysctl changes made by other components and operators on the node are all clobbered** — and this failure mode is "fine right now, breaks on the next pod restart", which makes it notoriously hard to debug.
+| Victim                            | Typical example                                                                                   | Consequence                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **NIC settings made by other components** | Native mode's eth0: `tke-eni-agent` sets `rp_filter=2` for VPC-CNI policy routing           | Reset to 1 (strict), **networking breaks**   |
+|                                   | AI-inference RDMA bond NIC: multi-node training/inference depends on `bond.rp_filter=0`            | Reset to 1, **RDMA traffic breaks**          |
+| **Global sysctl tuning by operators/scripts** | Node-pool scripts using `sysctl -w`: `nf_conntrack_max`, `somaxconn`, `tcp_*`, ...      | Reset to defaults; silent performance regression |
+
+Cilium's own interfaces (lxc*, cilium_*, all) survive because the 99-zzz file sorts after the distro files — **sysctlfix protects itself at the cost of breaking everyone else on the node**.
+
+The full causal chain, using the first row as an example: eth0 reset to `1` (strict) → traffic on asymmetric routes (VPC-CNI auxiliary-ENI policy routing, RDMA bond multipath) fails reverse-path validation → the kernel drops the packets → networking breaks. This is why Native mode **must disable** sysctlfix — and why Overlay + RDMA setups must disable it too.
+
+This failure class is notoriously hard to debug: the trigger is "cilium pod recreation" (node reboot, DS update, pod rescheduling), which has no obvious causal link to the symptom — typically "fine right now, suddenly broken after some cilium update".
 
 ## Problem 2: Overlay can't simply turn it off either
 
@@ -97,6 +108,12 @@ This DaemonSet approach gets the best of both worlds:
 - **Self-healing and scale-out**: the DaemonSet rewrites the file every 60 seconds (survives accidental deletion) and automatically covers newly added nodes.
 
 The only case needing manual attention is migrating an **existing cluster from the old sysctlfix=true setup**: lxc interfaces already on the node may be stuck at the replayed value 1 (the agent doesn't manage rp_filter of existing Pod veths). Fix by rolling-restarting business Pods or running `sudo systemctl restart systemd-sysctl` once on the node (the 99-zzz file now wins the replay).
+
+:::tip[What if other components on the node depend on special sysctl values (e.g. the bond NIC's rp_filter=0 in AI-inference RDMA setups)?]
+
+With sysctlfix disabled, cilium no longer pulls the trigger — the bond NIC is no longer periodically clobbered by cilium, and bond/RDMA initialization re-applies its settings on node reboot. To also immunize against low-frequency external replays (OS upgrades, someone running `sysctl --system`), apply the same idea: persist the bond override into another late-sorted file under `/etc/sysctl.d/` (e.g. `99-zzz-bond-rp-filter.conf` with `net.ipv4.conf.bond0.rp_filter = 0`) — every replay then ends with your value winning.
+
+:::
 
 ## Troubleshooting
 

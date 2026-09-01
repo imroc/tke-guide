@@ -7,6 +7,8 @@ cilium 默认启用的 `sysctlfix` 功能会在 TKE 上引发两类问题，因�
 | Native Routing (VPC-CNI) | 重启 systemd-sysctl 会把 eth0 打回 strict，直接断网 | 不需要（路由对称，lxc rp_filter 值无影响） |
 | Overlay (VPC-CNI / GR)   | 同上（重放覆盖运行时 sysctl 修改）       | **需要**：部署 `cilium-sysctl-override` DaemonSet |
 
+无论哪种模式，只要节点上有**其它组件依赖非默认的 sysctl 值**——典型如 AI 推理 RDMA 场景的 bond 网卡依赖 `rp_filter=0`——sysctlfix 触发的全量重放都会把它打回发行版默认值导致业务不可用（详见下文[受害清单](#问题一重启-systemd-sysctl-会全量重放发行版默认值)）。
+
 本文解释这套结论背后的完整机制。
 
 ## sysctlfix 做了什么
@@ -38,10 +40,19 @@ TencentOS 4 的发行版底噪（`/usr/lib/sysctl.d/`）：
 50-tencentos.conf: net.ipv4.conf.default.rp_filter = 1 / net.ipv4.conf.*.rp_filter = 1
 ```
 
-重放的危害分两类：
+重放会打坏什么？**99-zzz 只保护 cilium 自己写的三类 key（lxc*、cilium_*、all），其余全部裸奔**——任何不是通过 sysctl.d 文件落盘的设置都会被打回发行版默认值：
 
-- **Native Routing (VPC-CNI)：直接断网**。VPC-CNI 共享网卡多 IP 模式下，`tke-eni-agent` 会把网卡的 `rp_filter` 调成 `2`（loose，配合策略路由放行非对称路由）。sysctlfix 触发的重放把 eth0 打回 `1`（strict），辅助网卡 IP 的非对称流量被严格反向路径校验丢弃，Pod 网络随之中断。这是 Native 模式**必须禁用** sysctlfix 的原因。
-- **所有模式：运行时 sysctl 修改丢失**。任何不是通过 sysctl.d 文件落盘的运行时修改（节点池脚本 `sysctl -w`、运维手工调优的 `nf_conntrack_max`、`somaxconn` 等）都会在重放时被打回发行版默认值。cilium 自身接口因 99-zzz 文件（文件名排序在后）胜出不受影响，但**节点上其它组件与运维的 sysctl 修改全部遭殃**——而且这类故障"当时没事、pod 一重建就坏"，非常难排查。
+| 受害对象                          | 典型例子                                                                  | 后果                             |
+| --------------------------------- | ------------------------------------------------------------------------- | -------------------------------- |
+| **其它组件设置的网卡参数**        | Native 模式的 eth0：`tke-eni-agent` 为 VPC-CNI 策略路由设 `rp_filter=2`   | 打回 1（strict），**直接断网**   |
+|                                   | AI 推理 RDMA 场景的 bond 网卡：多机训练/推理依赖 `bond.rp_filter=0`        | 打回 1，**RDMA 通信不可用**      |
+| **运维/脚本的全局 sysctl 调优**   | 节点池脚本 `sysctl -w` 设置的 `nf_conntrack_max`、`somaxconn`、`tcp_*` 等 | 打回默认值，性能回退且难察觉     |
+
+而 cilium 自己的接口（lxc*、cilium_*、all）因 99-zzz 文件名排序靠后而胜出——**sysctlfix 保护了自己，代价是打坏节点上所有人**。
+
+以上面第一行为例的完整因果链：eth0 被打回 `1`（strict）→ 非对称路由的流量（VPC-CNI 辅助网卡的策略路由、RDMA bond 的多路径流量）反向路径校验不过 → 包被内核丢弃 → 网络中断。这是 Native 模式**必须禁用** sysctlfix 的原因，也是 Overlay + RDMA 场景必须禁用它的原因。
+
+这类故障尤其难排查：触发时机是"cilium pod 重建"（节点重启、DS 更新、pod 漂移），与受害症状之间没有 obvious 的因果关联，往往"当时没事、某次 cilium 更新后突然坏"。
 
 ## 问题二：Overlay 模式不能简单关掉了事
 
@@ -97,6 +108,12 @@ host → Pod 的回包从 lxc 接口进入内核栈时，rp_filter 反查源 IP�
 - **自愈与扩容**：DaemonSet 每 60 秒重写文件（防误删），新节点加入集群自动写上。
 
 唯一需要人工介入的场景是**从旧的 sysctlfix=true 配置切换过来**的存量集群：节点上已有的 lxc 接口可能停留在被重放后的 1（agent 不管存量 Pod veth 的 rp_filter），处理方式是滚动重启业务 Pod 或在节点上执行一次 `sudo systemctl restart systemd-sysctl`（有 99-zzz 文件在，重放后 cilium 值胜出）。
+
+:::tip[节点上还有其它组件依赖特殊 sysctl 值怎么办（如 AI 推理 RDMA 的 bond 网卡 rp_filter=0）]
+
+禁用 sysctlfix 后，cilium 不再当"扳机"——bond 等接口不会再被 cilium 周期性打坏，节点重启时 bond/RDMA 的初始化流程也会自行设置。若还想彻底免疫低频的外部重放（OS 升级、他人手工 `sysctl --system`），套用同一个思路：把 bond 的覆盖配置也落盘到 `/etc/sysctl.d/` 下一个排序靠后的文件（如 `99-zzz-bond-rp-filter.conf` 写 `net.ipv4.conf.bond0.rp_filter = 0`），任何重放都是你落盘的值赢。
+
+:::
 
 ## 故障排查
 

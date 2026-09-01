@@ -321,7 +321,7 @@ TencentOS 等 systemd 发行版有一条 udev 规则：**每个新网络接口�
 
 cilium CNI 插件在创建 Pod veth 时虽然会写 `lxc*.rp_filter = 0`，但这条 udev 规则在**之后**异步执行，会把值覆盖回 1。Overlay 模式下 Pod IP 的路由聚合到 `cilium_host`（非 per-endpoint 路由），host → Pod 的回包经过 lxc 接口时严格反向路径校验不通过，直接丢包——表现为 **kubelet 探针失败、`cilium-health status` 中 localhost endpoint 0/1、节点上进程无法访问 Pod IP**。
 
-cilium 自带的 `sysctlfix` 功能本可以写这个文件（它写的正是 `99-zzz-override_cilium.conf`），但它同时会**重启宿主机 `systemd-sysctl.service`**，把发行版所有 sysctl 默认值全量重放，覆盖运行时修改（Native Routing 模式下这会直接断网）。因此本教程统一 `sysctlfix.enabled=false`，改用这个 DaemonSet 写文件——**同样的保护效果，但不重启 systemd-sysctl**。
+cilium 自带的 `sysctlfix` 功能本可以写这个文件（它写的正是 `99-zzz-override_cilium.conf`），但它同时会**重启宿主机 `systemd-sysctl.service`**，把发行版所有 sysctl 默认值全量重放，覆盖运行时修改——Native Routing 模式下直接断网，依赖特殊 sysctl 值的场景（如 AI 推理 RDMA 的 bond 网卡 `rp_filter=0`）同样受害。因此本教程统一 `sysctlfix.enabled=false`，改用这个 DaemonSet 写文件——**同样的保护效果，但不重启 systemd-sysctl**。
 
 文件名中的 `99-zzz` 前缀保证它在 systemd-sysctl 的应用顺序中排在发行版配置（`50-*.conf`）之后，任何时机触发 sysctl 重放（节点重启、OS 升级、管理员手工执行）都是 cilium 的值胜出。DaemonSet 每 60 秒重写一次，可自愈文件被误删的情况，新节点加入集群时也会自动写上。
 
