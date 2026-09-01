@@ -458,6 +458,23 @@ cilium connectivity test 共下发 132 个用例，按功能分组列出每个�
 
 **全部用例通过，零失败**——Overlay (VPC-CNI) 是 cilium 在 TKE 上跑测最干净的方案。耗时约 36 分 15 秒。
 
+#### cilium 1.20.1 复测记录（sysctlfix=false + cilium-sysctl-override）
+
+2026-09 在 Overlay (VPC-CNI) 集群（cilium **1.20.1** + cilium CLI v0.20.0 + TencentOS Server 4.4 / kernel 6.6.88）按新方案（`sysctlfix.enabled=false` + `cilium-sysctl-override` DaemonSet 维护 99-zzz 文件，详见 [Native Routing 模式详解](./native-routing.md)）复测：
+
+```text
+❌ 4/83 tests failed (22/763 actions), 54 tests skipped, 0 scenarios skipped
+```
+
+4 个失败用例均为环境性因素，与 sysctlfix 方案无关：
+
+| 失败用例 | 原因 | 说明 |
+| --- | --- | --- |
+| `no-policies` / `allow-all-except-world` / `host-entity-egress` 中的 `pod-to-host:ping-ipv4-external-ip` | 测试 VPC 未配置 NAT 网关 | 教程已记载的已知场景（[为什么节点要配 NAT 网关](#为什么节点要配-nat-网关)），配 NAT 网关或 `--test '!/pod-to-host$'` 跳过 |
+| `check-log-errors` | 节点重启实验导致 pod restart count 非 0 + TencentOS 内核未开启 `CONFIG_INET_DIAG_DESTROY`（无害提示） | 环境性噪声，非 cilium 功能问题 |
+
+**核心连通性用例（host↔Pod、Pod↔Pod、ClusterIP/NodePort、NetworkPolicy 全系）全部通过**，`cilium-health status` 2/2 reachable 且 localhost endpoint 1/1。
+
 #### 与 Native (VPC-CNI) 的差异
 
 相比 Native 模式，Overlay 多了 BPF host routing、cilium 完全接管 Pod 网络（不依赖 chained CNI），所以：

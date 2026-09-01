@@ -10,6 +10,8 @@ If you are creating a new node pool, you can prioritize from the table below. If
 
 All OS entries in the table below have passed complete e2e verification across all 3 installation modes (cilium 1.19.5 + Egress Gateway + Nodelocal DNSCache).
 
+Added 2026-09: cilium **1.20.1** (Overlay VPC-CNI mode, `sysctlfix.enabled=false` + the `cilium-sysctl-override` DaemonSet) was re-verified on TencentOS Server 4.4 (kernel 6.6.88) — all core `cilium connectivity test` connectivity tests passed (only `ping-ipv4-external-ip` has no-NAT-gateway skip semantics in the test VPC, and `check-log-errors` reports a harmless notice because the kernel lacks `CONFIG_INET_DIAG_DESTROY`).
+
 | OS                   | OsName                  | Kernel Version |
 | -------------------- | ----------------------- | -------------- |
 | TencentOS Server 4   | `tlinux4_x86_64_public` | 6.6.117        |

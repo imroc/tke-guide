@@ -20,7 +20,7 @@ The table below summarizes all tuning items, categorized by "recommended priorit
 
 | Priority       | Tuning Item                                                    | Risk/Cost                      | When to Enable                              |
 | -------------- | -------------------------------------------------------------- | ------------------------------ | ------------------------------------------- |
-| ⭐ Strongly recommended | [1. Enable CiliumEndpointSlice](#1-enable-ciliumendpointslice) | Still Beta in 1.19, track GA status | Enable when node count ≥ 200          |
+| ⭐ Strongly recommended | [1. Enable CiliumEndpointSlice](#1-enable-ciliumendpointslice) | Still Beta in 1.20, track GA status | Enable when node count ≥ 200          |
 | ⭐ Strongly recommended | [2. Enable APF Rate Limiting](#2-enable-apf-rate-limiting)     | Nearly zero                    | Should be enabled at any scale (default in install script) |
 | Recommended    | [3. Adjust K8s Client QPS/Burst](#3-adjust-k8s-client-qps-burst) | Over-configuring may overwhelm apiserver | Enable when cilium-agent sync latency is observed |
 | Recommended    | [4. Trim Security Identity](#4-trim-security-identity)         | Label exclusion policy must match business needs | Enable when identity count ≥ 1000 or identity bloat is observed |
@@ -42,7 +42,7 @@ ciliumEndpointSlice:
 
 :::warning[Beta Feature]
 
-This feature was introduced in cilium 1.11 and is still **Beta** in 1.19. We recommend thorough verification in a test cluster before using it in production. Track Stable progress: [cilium/cilium#31904](https://github.com/cilium/cilium/issues/31904).
+This feature was introduced in cilium 1.11 and is still **Beta** in 1.20. We recommend thorough verification in a test cluster before using it in production. Track Stable progress: [cilium/cilium#31904](https://github.com/cilium/cilium/issues/31904).
 
 Once enabled, a smooth rollback is not possible (CEPSlice and CEP are not dual-written). Evaluate your rollback plan.
 

@@ -17,7 +17,7 @@ Hubble 包括 Hubble Server 和 Hubble Relay，其中 Hubble Server 已内置到
 使用下面的命令启用 Hubble Relay：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.5 \
+helm upgrade cilium cilium/cilium --version 1.20.1 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.relay.image.repository=quay.tencentcloudcr.com/cilium/hubble-relay \
@@ -48,11 +48,11 @@ Containers:            cilium                   Running: 3
                        # highlight-next-line
                        hubble-relay             Running: 1
 Cluster Pods:          4/4 managed by Cilium
-Helm chart version:    1.19.5
-Image versions         cilium             quay.tencentcloudcr.com/cilium/cilium:v1.19.5@sha256:5649db451c88d928ea585514746d50d91e6210801b300c897283ea319d68de15: 3
-                       cilium-envoy       quay.tencentcloudcr.com/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222@sha256:ca76eb4e9812d114c7f43215a742c00b8bf41200992af0d21b5561d46156fd15: 3
-                       cilium-operator    quay.tencentcloudcr.com/cilium/operator-generic:v1.19.5@sha256:b5a0138e1a38e4437c5215257ff4e35373619501f4877dbaf92c89ecfad81797: 2
-                       hubble-relay       quay.tencentcloudcr.com/cilium/hubble-relay:v1.19.5@sha256:e53e00c47fe4ffb9c086bad0c1c77f23cb968be4385881160683d9e15aa34dc3: 1
+Helm chart version:    1.20.1
+Image versions         cilium             quay.tencentcloudcr.com/cilium/cilium:v1.20.1@sha256:ae9ea21f7427fe24bc6ea7247eb552157a1b0a431744045d3f641545ca71d11b: 3
+                       cilium-envoy       quay.tencentcloudcr.com/cilium/cilium-envoy:v1.37.5-1786810558-766ccfb37260a43e9d228837aa84ce3faf9f64e7@sha256:75b8094c7127736a2ffd2dce3945e0931cb6df21b0372ff661940eca26730b91: 3
+                       cilium-operator    quay.tencentcloudcr.com/cilium/operator-generic:v1.20.1@sha256:6c3885fc7b629099fdbe2a5c87869c86feb825fa18fae299eac0f61918d16ecf: 2
+                       hubble-relay       quay.tencentcloudcr.com/cilium/hubble-relay:v1.20.1@sha256:59be0ae7d475ab9011a5e954618c0f27b5778b17140381425b308b55ba4917f4: 1
 ```
 
 ## 安装 Hubble 客户端
@@ -76,7 +76,7 @@ Hubble UI 可用于可视化查看集群中的服务拓扑。
 使用下面的命令启用 Hubble UI：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.5 \
+helm upgrade cilium cilium/cilium --version 1.20.1 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.relay.enabled=true \

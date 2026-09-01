@@ -458,6 +458,23 @@ The 55 skipped test cases in this run can be categorized into 4 groups, all unre
 
 **All test cases passed, zero failures**—Overlay (VPC-CNI) is the cleanest Cilium deployment option on TKE. Duration: approximately 36 minutes 15 seconds.
 
+#### cilium 1.20.1 re-test record (sysctlfix=false + cilium-sysctl-override)
+
+Re-tested 2026-09 on an Overlay (VPC-CNI) cluster (cilium **1.20.1** + cilium CLI v0.20.0 + TencentOS Server 4.4 / kernel 6.6.88) with the new scheme (`sysctlfix.enabled=false` + the `cilium-sysctl-override` DaemonSet maintaining the 99-zzz file; see [Native Routing Details](./native-routing.md)):
+
+```text
+❌ 4/83 tests failed (22/763 actions), 54 tests skipped, 0 scenarios skipped
+```
+
+All 4 failures are environmental and unrelated to the sysctlfix scheme:
+
+| Failed test | Cause | Notes |
+| --- | --- | --- |
+| `pod-to-host:ping-ipv4-external-ip` in `no-policies` / `allow-all-except-world` / `host-entity-egress` | Test VPC has no NAT gateway | Known scenario already documented ([Why configure a NAT gateway for nodes](#why-configure-a-nat-gateway-for-nodes)); configure a NAT gateway or skip with `--test '!/pod-to-host$'` |
+| `check-log-errors` | Non-zero pod restart count caused by a node-reboot experiment + TencentOS kernel lacks `CONFIG_INET_DIAG_DESTROY` (harmless notice) | Environmental noise, not a cilium functional issue |
+
+**All core connectivity tests (host↔Pod, Pod↔Pod, ClusterIP/NodePort, the full NetworkPolicy suite) passed**, and `cilium-health status` shows 2/2 reachable with localhost endpoint 1/1.
+
 #### Differences from Native (VPC-CNI)
 
 Compared to Native mode, Overlay mode has BPF host routing and Cilium fully manages the Pod network (without relying on chained CNI). Therefore:

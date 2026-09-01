@@ -20,7 +20,7 @@
 
 | 优先级      | 调优项                                                      | 风险/代价                      | 何时启用                                   |
 | ----------- | ----------------------------------------------------------- | ------------------------------ | ------------------------------------------ |
-| ⭐ 强烈推荐 | [1. 启用 CiliumEndpointSlice](#1-启用-ciliumendpointslice)  | 1.19 仍为 Beta，需关注 GA 状态 | 节点数 ≥ 200 即可启用                      |
+| ⭐ 强烈推荐 | [1. 启用 CiliumEndpointSlice](#1-启用-ciliumendpointslice)  | 1.20 仍为 Beta，需关注 GA 状态 | 节点数 ≥ 200 即可启用                      |
 | ⭐ 强烈推荐 | [2. 启用 APF 限速](#2-启用-apf-限速)                        | 几乎无                         | 任何规模都应启用（安装脚本默认已配）       |
 | 推荐        | [3. 调整 K8s Client QPS/Burst](#3-调整-k8s-client-qpsburst) | 配置过高反而压垮 apiserver     | 观察到 cilium-agent 同步延迟高时启用       |
 | 推荐        | [4. 精简 Security Identity](#4-精简-security-identity)      | label 排除策略需结合业务设计   | Identity 数 ≥ 1000 或观察到 Identity 膨胀  |
@@ -42,7 +42,7 @@ ciliumEndpointSlice:
 
 :::warning[Beta 特性]
 
-该特性于 cilium 1.11 引入，1.19 仍为 **Beta**，建议在测试集群充分验证后再上生产。Stable 进展跟踪：[cilium/cilium#31904](https://github.com/cilium/cilium/issues/31904)。
+该特性于 cilium 1.11 引入，1.20 仍为 **Beta**，建议在测试集群充分验证后再上生产。Stable 进展跟踪：[cilium/cilium#31904](https://github.com/cilium/cilium/issues/31904)。
 
 启用后无法平滑回滚（CEPSlice 与 CEP 不会双写），需评估回滚预案。
 

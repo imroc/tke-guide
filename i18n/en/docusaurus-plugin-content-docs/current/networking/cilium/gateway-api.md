@@ -18,23 +18,29 @@ When using Cilium Gateway API in a TKE environment, be aware of the following li
 
 - Cilium is installed with `kubeProxyReplacement=true` (enabled by default)
 - The installation mode is **Overlay mode** (VPC-CNI or GR). Native Routing (VPC-CNI) mode does not support Gateway API due to the `ipam.mode=delegated-plugin` limitation. See [Installation FAQ](./install.md#native-routing-vpc-cni-mode-does-not-support-gateway-api) for details
-- Gateway API CRDs are installed in the cluster (cilium 1.19.5 corresponds to Gateway API v1.5.1)
+- Gateway API CRDs are installed in the cluster (cilium 1.20.1 corresponds to Gateway API **v1.6.1**; as of cilium 1.20, Gateway API support requires v1.6.1 at a minimum)
 
 ### Install Gateway API CRDs
 
 If the Gateway API CRDs are not yet installed in the cluster, use the following commands to install them:
 
 ```bash
-# Standard CRDs (GatewayClass, Gateway, HTTPRoute, GRPCRoute, ReferenceGrant, TLSRoute, BackendTLSPolicy)
-for crd in gatewayclasses gateways httproutes grpcroutes referencegrants backendtlspolicies tlsroutes; do
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.5.1/config/crd/standard/gateway.networking.k8s.io_${crd}.yaml
+# Standard CRDs (GatewayClass, Gateway, HTTPRoute, GRPCRoute, ReferenceGrant, BackendTLSPolicy)
+for crd in gatewayclasses gateways httproutes grpcroutes referencegrants backendtlspolicies; do
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.6.1/config/crd/standard/gateway.networking.k8s.io_${crd}.yaml
 done
 
-# Experimental CRDs (TCPRoute, UDPRoute) — for TCP/UDP routing
-for crd in tcproutes udproutes; do
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.5.1/config/crd/experimental/gateway.networking.k8s.io_${crd}.yaml
+# Experimental CRDs (TCPRoute, UDPRoute, TLSRoute) — TLSRoute ships experimental-only since v1.6
+for crd in tcproutes udproutes tlsroutes; do
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.6.1/config/crd/experimental/gateway.networking.k8s.io_${crd}.yaml
 done
 ```
+
+:::warning[TLSRoute must be installed from the Experimental channel]
+
+Starting with Gateway API v1.6, the TLSRoute CRD is **only published in the experimental channel** (removed from standard). If you are upgrading and your existing TLSRoute resources were installed from the standard channel, the apiserver will no longer be able to read them after the CRD upgrade — back them up first and install the v1.6.1 experimental TLSRoute CRD (see the official cilium [Upgrade Guide](https://docs.cilium.io/en/stable/operations/upgrade/)).
+
+:::
 
 ## Enable Gateway API
 
@@ -48,7 +54,7 @@ gatewayAPI:
 ```
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml \
@@ -444,7 +450,7 @@ print(yaml.dump(kc, default_flow_style=False, sort_keys=False))
 
 :::warning[TCP protocol unavailable]
 
-Although Cilium 1.19.5 supports TCPRoute in the experimental CRD, creating a TCP protocol Gateway listener actually fails with the error `model source can't be empty, 0 listeners`. For pure TCP proxying, use TLS Passthrough (TLS protocol + TLSRoute, omitting `hostnames` to match all SNIs), or use a standalone TCP proxy.
+In cilium 1.19.5 testing, although TCPRoute was supported via the experimental CRD, creating a TCP protocol Gateway listener actually failed with the error `model source can't be empty, 0 listeners`. cilium 1.20 upgraded TCPRoute/UDPRoute to the v1 API (per the official release notes), which theoretically fixes this, but it has not been re-verified on TKE yet. For pure TCP proxying, the reliable option is still TLS Passthrough (TLS protocol + TLSRoute, omitting `hostnames` to match all SNIs), or a standalone TCP proxy.
 
 :::
 

@@ -73,10 +73,15 @@ set -euo pipefail
 #
 # 5. INSTALL MODES (3 supported combinations)
 #    ┌──────────────────┬──────────────────────────────────────────────────┐
-#    │ VPC-CNI + native │ CNI chaining via ConfigMap (cni-config)         │
+#    │ VPC-CNI + native │ CNI chaining via ConfigMap (cni-config);        │
+#    │                  │ sysctlfix disabled (eth0 rp_filter protection)  │
 #    │ VPC-CNI + overlay│ Full cilium CNI (tunnel/vxlan, multi-pool)     │
 #    │                  │ + delete mutatingwebhookconfiguration           │
-#    │ GR + overlay     │ Full cilium CNI (tunnel/vxlan, multi-pool)     │
+#    │                  │ + sysctlfix disabled, replaced by a resident    │
+#    │                  │   cilium-sysctl-override DaemonSet writing the  │
+#    │                  │   99-zzz rp_filter override file (see           │
+#    │                  │   apply_sysctl_override for the rationale)      │
+#    │ GR + overlay     │ Same as VPC-CNI + overlay (minus webhook step) │
 #    └──────────────────┴──────────────────────────────────────────────────┘
 #    GR + native is NOT supported — see appendix/gr-native-not-recommended
 #    for the failure modes (cross-node Pod-to-Pod broken, no L7/DNS NP, etc).
@@ -88,7 +93,7 @@ set -euo pipefail
 # 7. NON-INTERACTIVE MODE (environment variables)
 #    All interactive prompts in install can be skipped by setting env vars:
 #      ROUTING_MODE     "native" or "overlay" (required)
-#      CILIUM_VERSION   e.g. "1.19.5" (optional, defaults to DEFAULT_CILIUM_VERSION)
+#      CILIUM_VERSION   e.g. "1.20.1" (optional, defaults to DEFAULT_CILIUM_VERSION)
 #      POD_CIDR         e.g. "10.244.0.0/16" (only for overlay mode)
 #      POD_CIDR_MASK    e.g. "24" (only for overlay mode)
 #      ENABLE_EGRESS    "true" or "false" (optional, default false)
@@ -141,7 +146,7 @@ set -euo pipefail
 # ====== Defaults ======
 
 # Cilium helm chart version. Bump this when a new version is tested and verified.
-DEFAULT_CILIUM_VERSION="1.19.5"
+DEFAULT_CILIUM_VERSION="1.20.1"
 # Default image registry prefix for cilium images (TKE internal mirror).
 DEFAULT_IMAGE_REGISTRY="quay.tencentcloudcr.com/cilium"
 # Default Pod CIDR for overlay mode. Only used when ROUTING_MODE=overlay.
@@ -927,6 +932,91 @@ setup_overlay_vpccni() {
   kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook 2>/dev/null || true
 }
 
+# apply_sysctl_override — Deploys a DaemonSet that keeps /etc/sysctl.d/99-zzz-override_cilium.conf
+# present on every node (Overlay mode only; runs BEFORE helm install so the file
+# exists before the first cilium-agent starts).
+#
+# Why this exists (see appendix/native-routing.md for the full analysis):
+#   1. Overlay pods reach the host via the aggregated cilium_host route, so
+#      host→Pod reply traffic fails strict rp_filter on lxc interfaces — lxc
+#      rp_filter MUST stay 0.
+#   2. On TencentOS (and most systemd distros), a udev rule re-applies sysctl.d
+#      defaults to EVERY new net interface:
+#      ACTION=="add", SUBSYSTEM=="net" RUN+="systemd-sysctl --prefix=/net/ipv4/conf/$name"
+#      This runs asynchronously AFTER cilium's DisableRpFilter write, silently
+#      overriding it with the distro value (rp_filter=1). Without the 99-zzz
+#      file every new Pod's lxc would end up with rp_filter=1 and host→Pod
+#      traffic (kubelet probes, cilium-health) breaks.
+#   3. The stock sysctlfix would write this file itself — but it ALSO restarts
+#      systemd-sysctl, which replays ALL distro defaults over runtime sysctl
+#      changes (this is what breaks eth0 on Native mode). We therefore disable
+#      sysctlfix and write the file ourselves: same protection, no restart.
+#   4. A resident DaemonSet (instead of a one-shot Job) re-writes the file
+#      every 60s so it survives manual deletion and covers newly added nodes.
+apply_sysctl_override() {
+  info "$(is_zh && echo "部署 cilium sysctl override DaemonSet（rp_filter 保护）..." || echo "Deploying cilium sysctl override DaemonSet (rp_filter protection)...")"
+  kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cilium-sysctl-override
+  namespace: kube-system
+  labels:
+    app: cilium-sysctl-override
+spec:
+  selector:
+    matchLabels:
+      app: cilium-sysctl-override
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: cilium-sysctl-override
+    spec:
+      priorityClassName: system-node-critical
+      tolerations:
+      - operator: Exists
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+      - name: ensure
+        image: ${IMAGE_REGISTRY}/cilium:${CILIUM_VERSION}
+        command: ["/bin/sh", "-ce"]
+        args:
+        - |
+          while true; do
+            printf '%s\n' \
+              '# Disable rp_filter on Cilium interfaces since it may cause mangled packets to be dropped' \
+              '-net.ipv4.conf.lxc*.rp_filter = 0' \
+              '-net.ipv4.conf.cilium_*.rp_filter = 0' \
+              '# The kernel uses max(conf.all, conf.{dev}) as its value, so we need to set .all. to 0 as well.' \
+              '# Otherwise it will overrule the device specific settings.' \
+              'net.ipv4.conf.all.rp_filter = 0' \
+              > /host/etc/sysctl.d/99-zzz-override_cilium.conf
+            sleep 60
+          done
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+        volumeMounts:
+        - name: sysctl-dir
+          mountPath: /host/etc/sysctl.d
+      volumes:
+      - name: sysctl-dir
+        hostPath:
+          path: /etc/sysctl.d
+          type: DirectoryOrCreate
+EOF
+  info "$(is_zh && echo "等待 cilium-sysctl-override 就绪..." || echo "Waiting for cilium-sysctl-override to be ready...")"
+  kubectl -n kube-system rollout status daemonset/cilium-sysctl-override --timeout=180s 2>/dev/null || \
+    warn "$(is_zh && echo "cilium-sysctl-override 未在 180s 内就绪，可稍后手动检查: kubectl -n kube-system rollout status ds/cilium-sysctl-override" || echo "cilium-sysctl-override not ready within 180s, check later: kubectl -n kube-system rollout status ds/cilium-sysctl-override")"
+}
+
 # helm_install_cilium — Runs helm upgrade --install with mode-specific parameters.
 # Assembles the following helm --set argument arrays and concatenates them
 # (helm last-wins, so later arrays override earlier ones):
@@ -996,11 +1086,16 @@ helm_install_cilium() {
     # multi-pool IPAM: supports per-node multiple PodCIDRs, allowing dynamic
     # expansion of single-node Pod capacity (cluster-pool is fixed at install
     # time and cannot be changed per-node).
-    mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=multi-pool --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.cidrs[0]="$POD_CIDR" --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.maskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true --set bpf.masquerade=true)
+    # sysctlfix.enabled=false: sysctlfix restarts systemd-sysctl on every
+    # cilium pod start, replaying ALL distro sysctl defaults over runtime
+    # changes. The 99-zzz override file is instead written by the
+    # cilium-sysctl-override DaemonSet (see apply_sysctl_override).
+    mode_args=(--set sysctlfix.enabled=false --set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=multi-pool --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.cidrs[0]="$POD_CIDR" --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.maskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true --set bpf.masquerade=true)
     ;;
   GR_overlay)
-    # See VPC-CNI_overlay note above for why bpf.masquerade=true is needed.
-    mode_args=(--set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=multi-pool --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.cidrs[0]="$POD_CIDR" --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.maskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true --set bpf.masquerade=true)
+    # See VPC-CNI_overlay note above for why bpf.masquerade=true is needed
+    # and why sysctlfix is disabled (apply_sysctl_override replaces it).
+    mode_args=(--set sysctlfix.enabled=false --set routingMode=tunnel --set tunnelProtocol=vxlan --set ipam.mode=multi-pool --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.cidrs[0]="$POD_CIDR" --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.maskSize="$POD_CIDR_MASK" --set enableIPv4Masquerade=true --set bpf.masquerade=true)
     ;;
   esac
 
@@ -1274,7 +1369,8 @@ print_replay_command() {
 #   9. resolve_non_masq_cidrs (Native + Egress, OR Native + ip-masq-agent)
 #  10. confirm_enable_hubble (optional)
 #  11. confirm_enable_localdns (optional)
-#  12. uninstall_tke_components → setup_* → helm_install → apply_apf
+#  12. uninstall_tke_components → setup_* → apply_sysctl_override (Overlay)
+#      → helm_install → apply_apf
 #  13. (optional) install localdns
 #  14. Print "add nodes" guidance and finish. Install no longer chains into
 #      connectivity test / perf — run `cilium.sh test` / `cilium.sh perf`
@@ -1316,6 +1412,11 @@ cmd_install_cilium() {
   VPC-CNI_overlay) setup_overlay_vpccni ;;
   GR_overlay) ;;
   esac
+  # Overlay only: write the 99-zzz sysctl override file BEFORE cilium installs,
+  # so the udev per-interface rule applies it to every lxc from the very start.
+  if [[ "$ROUTING_MODE" == "overlay" ]]; then
+    apply_sysctl_override
+  fi
 
   helm_install_cilium
   apply_apf
@@ -1463,6 +1564,12 @@ cmd_uninstall_cilium() {
   info "$(is_zh && echo "卸载 cilium helm release..." || echo "Uninstalling cilium helm release...")"
   helm uninstall cilium -n kube-system 2>/dev/null || true
 
+  # 1b. Remove the sysctl override DaemonSet (Overlay installs only). The
+  # 99-zzz file left on nodes is inert once cilium is gone but is listed in
+  # the follow-up cleanup notes below.
+  info "$(is_zh && echo "清理 cilium-sysctl-override DaemonSet..." || echo "Removing cilium-sysctl-override DaemonSet...")"
+  kubectl -n kube-system delete daemonset cilium-sysctl-override 2>/dev/null || true
+
   # 2. Clean up cni-config (Native VPC-CNI chaining mode)
   info "$(is_zh && echo "清理 cni-config ConfigMap..." || echo "Cleaning up cni-config ConfigMap...")"
   kubectl -n kube-system delete configmap cni-config 2>/dev/null || true
@@ -1509,6 +1616,7 @@ cmd_uninstall_cilium() {
     info "   时自动恢复，无需手工干预"
     info "4. 如果不打算重建节点，每个节点上手工清理:"
     info "   sudo rm -f /etc/cni/net.d/05-cilium.conf /etc/cni/net.d/05-cilium.conflist"
+    info "   sudo rm -f /etc/sysctl.d/99-zzz-override_cilium.conf  # Overlay 安装的 rp_filter 覆盖文件"
     info "   sudo iptables-save | grep -i cilium  # 检查残留规则"
     info ""
     info "完整回滚指南: https://imroc.cc/tke/networking/cilium/install#回滚到-tke-内置-cni"
@@ -1522,6 +1630,7 @@ cmd_uninstall_cilium() {
     info "   when TKE re-applies its addon manifests; no manual action needed."
     info "4. If NOT recreating nodes, manually clean up on each node:"
     info "   sudo rm -f /etc/cni/net.d/05-cilium.conf /etc/cni/net.d/05-cilium.conflist"
+    info "   sudo rm -f /etc/sysctl.d/99-zzz-override_cilium.conf  # rp_filter override file from Overlay installs"
     info "   sudo iptables-save | grep -i cilium  # check for leftover rules"
     info ""
     info "Full rollback guide: https://imroc.cc/tke/en/networking/cilium/install#rollback-to-tke-built-in-cni"

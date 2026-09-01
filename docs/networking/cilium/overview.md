@@ -40,7 +40,7 @@
 | ---------------------------------------- | ---------------------------------------------------- |
 | **大规模集群 Cilium 调优指南**           | 200+ 节点规模下的参数、资源、BPF map 调优            |
 | **已验证的节点操作系统**                 | 8 种 OS 的兼容性验证结果                             |
-| **VPC-CNI Native Routing 模式详解**     | local-router-ipv4、sysctlfix、Host Routing 配置原理 |
+| **VPC-CNI Native Routing 模式详解**     | local-router-ipv4、sysctlfix 与 rp_filter 机制、Host Routing 配置原理 |
 | **为什么不提供 GR Native Routing**       | 完整试错记录与 4 类不可用问题                        |
 | **Cilium 与 Nodelocal DNSCache 共存**    | 自建 NodeLocal DNS 加速 DNS 解析                     |
 | **配置 IP 伪装**                         | 让 Pod 借节点 EIP 出公网，无需 NAT 网关              |

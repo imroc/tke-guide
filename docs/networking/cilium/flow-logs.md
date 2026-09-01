@@ -37,7 +37,7 @@ Cilium 的 cilium-agent 可以将网络流日志（Hubble Flows）写到文件�
 启用 Hubble 动态日志导出并配置导出规则：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.5 \
+helm upgrade cilium cilium/cilium --version 1.20.1 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.enabled=true \
@@ -86,7 +86,7 @@ Hubble 支持**静态导出**和**动态导出**两种方式：
 如果不需要导出所有字段，可以使用 `fieldMask` 只保留需要的字段，减少日志体积：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.5 \
+helm upgrade cilium cilium/cilium --version 1.20.1 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.enabled=true \
@@ -155,7 +155,7 @@ fieldMask 的字段路径使用点号（`.`）分隔嵌套字段，完整的可�
 动态导出支持同时配置多组规则，每组规则可以导出到不同的文件，适用于按场景分类导出：
 
 ```bash showLineNumbers
-helm upgrade cilium cilium/cilium --version 1.19.5 \
+helm upgrade cilium cilium/cilium --version 1.20.1 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.enabled=true \
@@ -189,7 +189,7 @@ helm upgrade cilium cilium/cilium --version 1.19.5 \
 如果日志量较大，可以适当调大文件大小和备份数量：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.5 \
+helm upgrade cilium cilium/cilium --version 1.20.1 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.export.fileMaxSizeMb=50 \
@@ -226,7 +226,7 @@ helm upgrade cilium cilium/cilium --version 1.19.5 \
     },
     "emitter": {
       "name": "Hubble",
-      "version": "1.19.5+gd0d0c879"
+      "version": "1.20.1+7d68cfb3"
     },
     "ethernet": {
       "destination": "02:21:a9:ff:89:f4",
@@ -413,7 +413,7 @@ L7 规则不仅启用可观测，同时也会限制流量 —— 不匹配规则
 L7 日志可能包含敏感信息（URL 中的查询参数、认证信息等）。Cilium 提供了脱敏配置：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.5 \
+helm upgrade cilium cilium/cilium --version 1.20.1 \
    --namespace kube-system \
    --reuse-values \
    --set hubble.redact.enabled=true \

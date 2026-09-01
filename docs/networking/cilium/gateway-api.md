@@ -18,23 +18,29 @@
 
 - Cilium 已安装且 `kubeProxyReplacement=true`（默认已启用）
 - 安装方案为 **Overlay 模式**（VPC-CNI 或 GR）。Native Routing (VPC-CNI) 模式因 `ipam.mode=delegated-plugin` 限制不支持 Gateway API，详见 [安装文档 FAQ](./install.md#native-routing-vpc-cni-模式不支持-gateway-api)
-- 集群中已安装 Gateway API CRD（cilium 1.19.5 对应 Gateway API v1.5.1）
+- 集群中已安装 Gateway API CRD（cilium 1.20.1 对应 Gateway API **v1.6.1**；cilium 1.20 起 Gateway API 支持最低要求 v1.6.1）
 
 ### 安装 Gateway API CRD
 
 如果集群中尚未安装 Gateway API CRD，使用以下命令安装：
 
 ```bash
-# 标准 CRD（GatewayClass, Gateway, HTTPRoute, GRPCRoute, ReferenceGrant, TLSRoute, BackendTLSPolicy）
-for crd in gatewayclasses gateways httproutes grpcroutes referencegrants backendtlspolicies tlsroutes; do
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.5.1/config/crd/standard/gateway.networking.k8s.io_${crd}.yaml
+# 标准 CRD（GatewayClass, Gateway, HTTPRoute, GRPCRoute, ReferenceGrant, BackendTLSPolicy）
+for crd in gatewayclasses gateways httproutes grpcroutes referencegrants backendtlspolicies; do
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.6.1/config/crd/standard/gateway.networking.k8s.io_${crd}.yaml
 done
 
-# 实验 CRD（TCPRoute, UDPRoute）——如需 TCP/UDP 路由
-for crd in tcproutes udproutes; do
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.5.1/config/crd/experimental/gateway.networking.k8s.io_${crd}.yaml
+# 实验 CRD（TCPRoute, UDPRoute, TLSRoute）——v1.6 起 TLSRoute 仅在 experimental channel 发布
+for crd in tcproutes udproutes tlsroutes; do
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.6.1/config/crd/experimental/gateway.networking.k8s.io_${crd}.yaml
 done
 ```
+
+:::warning[TLSRoute 必须装 Experimental 版本]
+
+Gateway API v1.6 起，TLSRoute CRD **只在 experimental channel 发布**（standard channel 已移除）。如果从旧版本升级且原 TLSRoute 资源是 standard channel 安装的，升级 CRD 后 apiserver 将无法读取存量 TLSRoute 对象——升级前先备份，再安装 v1.6.1 experimental 版 TLSRoute（参考 cilium 官方 [Upgrade Guide](https://docs.cilium.io/en/stable/operations/upgrade/)）。
+
+:::
 
 ## 启用 Gateway API
 
@@ -48,7 +54,7 @@ gatewayAPI:
 ```
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml \
@@ -444,7 +450,7 @@ print(yaml.dump(kc, default_flow_style=False, sort_keys=False))
 
 :::warning[TCP 协议不可用]
 
-Cilium 1.19.5 虽然在实验性 CRD 中支持 TCPRoute，但实际创建 TCP 协议的 Gateway listener 会报错 `model source can't be empty, 0 listeners`。如需纯 TCP 代理，请使用 TLS Passthrough（TLS 协议 + TLSRoute，不指定 `hostnames` 可匹配所有 SNI），或使用独立的 TCP 代理。
+Cilium 1.19.5 实测中，虽然实验性 CRD 支持 TCPRoute，但实际创建 TCP 协议的 Gateway listener 会报错 `model source can't be empty, 0 listeners`。cilium 1.20 已将 TCPRoute/UDPRoute 升级到 v1 API（官方 release note），该问题理论上已修复，但尚未在 TKE 上实测验证。如需纯 TCP 代理，稳妥方案仍是 TLS Passthrough（TLS 协议 + TLSRoute，不指定 `hostnames` 可匹配所有 SNI），或使用独立的 TCP 代理。
 
 :::
 

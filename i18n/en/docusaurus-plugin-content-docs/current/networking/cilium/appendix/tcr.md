@@ -43,7 +43,7 @@ Before uploading Cilium images, configure TCR access credentials. Refer to [User
 Before uploading Cilium images, first determine which images are depended on by the current installation configuration. Use `helm template` with the installation parameters you plan to add to see which images are used in the rendered YAML:
 
 ```bash
-$ helm template cilium cilium/cilium --version 1.19.5 \
+$ helm template cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
   --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
@@ -65,9 +65,9 @@ $ helm template cilium cilium/cilium --version 1.19.5 \
   --set k8sServiceHost=169.254.128.125 \
   --set k8sServicePort=60002 \
   | grep image: | awk -F 'image: "' '/image:/ {gsub(/@sha256:[^"]+"/, ""); print $2}' | sort | uniq
-quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222
-quay.io/cilium/cilium:v1.19.5
-quay.io/cilium/operator-generic:v1.19.5
+quay.io/cilium/cilium-envoy:v1.37.5-1786810558-766ccfb37260a43e9d228837aa84ce3faf9f64e7
+quay.io/cilium/cilium:v1.20.1
+quay.io/cilium/operator-generic:v1.20.1
 ```
 
 Next, prepare to upload images. You can use [skopeo](https://github.com/containers/skopeo) to migrate Cilium dependency images to the TCR image repository. Refer to [Installing Skopeo](https://github.com/containers/skopeo/blob/main/install.md) for installation instructions.
@@ -81,9 +81,9 @@ skopeo login xxx.tencentcloudcr.com --username xxx --password xxx
 Finally, use skopeo to sync all Cilium dependency images to the TCR image repository:
 
 ```bash
-skopeo copy -a docker://quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium-envoy:v1.34.10-1761014632-c360e8557eb41011dfb5210f8fb53fed6c0b3222
-skopeo copy -a docker://quay.io/cilium/cilium:v1.19.5  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium:v1.19.5
-skopeo copy -a docker://quay.io/cilium/operator-generic:v1.19.5  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/operator-generic:v1.19.5
+skopeo copy -a docker://quay.io/cilium/cilium-envoy:v1.37.5-1786810558-766ccfb37260a43e9d228837aa84ce3faf9f64e7  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium-envoy:v1.37.5-1786810558-766ccfb37260a43e9d228837aa84ce3faf9f64e7
+skopeo copy -a docker://quay.io/cilium/cilium:v1.20.1  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium:v1.20.1
+skopeo copy -a docker://quay.io/cilium/operator-generic:v1.20.1  docker://your-tcr-name.tencentcloudcr.com/quay.io/cilium/operator-generic:v1.20.1
 ```
 
 If your installation configuration depends on many images, you can use a script to sync all dependency images to the TCR repository at once. Save the script content below to `sync-cilium-images.sh`:
@@ -102,7 +102,7 @@ set -e
 
 TARGET_REGISTRY="your-tcr-name.tencentcloudcr.com"
 
-source_images=$(helm template cilium cilium/cilium --version 1.19.5 \
+source_images=$(helm template cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --set operator.tolerations[0].key="node-role.kubernetes.io/control-plane",operator.tolerations[0].operator="Exists" \
   --set operator.tolerations[1].key="node-role.kubernetes.io/master",operator.tolerations[1].operator="Exists" \
@@ -165,7 +165,7 @@ chmod +x sync-cilium-images.sh
 Refer to [Installing Cilium](https://imroc.cc/tke/networking/cilium/install) for installation, replacing dependency images with the corresponding TCR repository addresses:
 
 ```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   # highlight-add-start
   --set image.repository=your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium \
@@ -197,7 +197,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
 If installation has already been performed, modify the dependency image addresses as follows:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.5 \
+helm upgrade cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --reuse-values \
   --set image.repository=your-tcr-name.tencentcloudcr.com/quay.io/cilium/cilium \

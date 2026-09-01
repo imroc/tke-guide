@@ -10,6 +10,8 @@
 
 下表中所有 OS 均已在 3 种安装模式下完整跑通 e2e 验证（cilium 1.19.5 + Egress Gateway + Nodelocal DNSCache）。
 
+2026-09 追加：cilium **1.20.1**（Overlay VPC-CNI 模式，`sysctlfix.enabled=false` + `cilium-sysctl-override` DaemonSet）已在 TencentOS Server 4.4（kernel 6.6.88）上复测通过——`cilium connectivity test` 核心连通性用例全部通过（仅 `ping-ipv4-external-ip` 因测试 VPC 未配 NAT 网关跳过语义、`check-log-errors` 因内核未开启 `CONFIG_INET_DIAG_DESTROY` 报无害提示）。
+
 | OS                   | OsName                  | 内核版本 |
 | -------------------- | ----------------------- | -------- |
 | TencentOS Server 4   | `tlinux4_x86_64_public` | 6.6.117  |

@@ -160,7 +160,7 @@ bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install
 如果想完全无交互，通过环境变量预先指定参数即可（`bash -c` 会继承当前 shell 环境变量）：
 
 ```bash
-ROUTING_MODE=native CILIUM_VERSION=1.19.5 \
+ROUTING_MODE=native CILIUM_VERSION=1.20.1 \
   bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install
 ```
 
@@ -238,16 +238,96 @@ kubectl apply -f cni-config.yaml
 </TabItem>
 <TabItem value="overlay-gr" label="Overlay (GR)">
 
-无额外前置操作。
+部署 `cilium-sysctl-override` DaemonSet（见下方 Overlay (VPC-CNI) Tab 中的说明与 YAML，两个方案共用同一步骤）。
 
 </TabItem>
 <TabItem value="overlay-vpccni" label="Overlay (VPC-CNI)">
 
-禁用 `add-pod-eni-ip-limit-webhook`（否则 Pod 会被自动注入 `tke.cloud.tencent.com/eni-ip` 资源请求，导致 ip-scheduler 拦截调度）：
+1. 禁用 `add-pod-eni-ip-limit-webhook`（否则 Pod 会被自动注入 `tke.cloud.tencent.com/eni-ip` 资源请求，导致 ip-scheduler 拦截调度）：
 
-```bash
-kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook
-```
+   ```bash
+   kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook
+   ```
+
+2. 部署 `cilium-sysctl-override` DaemonSet，在每个节点上持续维护 `/etc/sysctl.d/99-zzz-override_cilium.conf`（rp_filter 覆盖文件）：
+
+   ```yaml title="cilium-sysctl-override.yaml"
+   apiVersion: apps/v1
+   kind: DaemonSet
+   metadata:
+     name: cilium-sysctl-override
+     namespace: kube-system
+     labels:
+       app: cilium-sysctl-override
+   spec:
+     selector:
+       matchLabels:
+         app: cilium-sysctl-override
+     updateStrategy:
+       type: RollingUpdate
+     template:
+       metadata:
+         labels:
+           app: cilium-sysctl-override
+       spec:
+         priorityClassName: system-node-critical
+         tolerations:
+         - operator: Exists
+         nodeSelector:
+           kubernetes.io/os: linux
+         containers:
+         - name: ensure
+           # 与 cilium agent 相同的镜像，节点本地已有缓存，无需额外拉取
+           image: quay.tencentcloudcr.com/cilium/cilium:v1.20.1
+           command: ["/bin/sh", "-ce"]
+           args:
+           - |
+             while true; do
+               printf '%s\n' \
+                 '# Disable rp_filter on Cilium interfaces since it may cause mangled packets to be dropped' \
+                 '-net.ipv4.conf.lxc*.rp_filter = 0' \
+                 '-net.ipv4.conf.cilium_*.rp_filter = 0' \
+                 '# The kernel uses max(conf.all, conf.{dev}) as its value, so we need to set .all. to 0 as well.' \
+                 '# Otherwise it will overrule the device specific settings.' \
+                 'net.ipv4.conf.all.rp_filter = 0' \
+                 > /host/etc/sysctl.d/99-zzz-override_cilium.conf
+               sleep 60
+             done
+           resources:
+             requests:
+               cpu: 10m
+               memory: 16Mi
+             limits:
+               cpu: 100m
+               memory: 64Mi
+           volumeMounts:
+           - name: sysctl-dir
+             mountPath: /host/etc/sysctl.d
+         volumes:
+         - name: sysctl-dir
+           hostPath:
+             path: /etc/sysctl.d
+             type: DirectoryOrCreate
+   ```
+
+   ```bash
+   kubectl apply -f cilium-sysctl-override.yaml
+   kubectl -n kube-system rollout status daemonset/cilium-sysctl-override --timeout=180s
+   ```
+
+:::warning[为什么 Overlay 必须部署这个 DaemonSet]
+
+TencentOS 等 systemd 发行版有一条 udev 规则：**每个新网络接口创建时**，异步执行 `systemd-sysctl --prefix=/net/ipv4/conf/<接口名>`，把 `/usr/lib/sysctl.d` 中所有匹配该接口的配置应用上去——包括 `net.ipv4.conf.*.rp_filter = 1`。
+
+cilium CNI 插件在创建 Pod veth 时虽然会写 `lxc*.rp_filter = 0`，但这条 udev 规则在**之后**异步执行，会把值覆盖回 1。Overlay 模式下 Pod IP 的路由聚合到 `cilium_host`（非 per-endpoint 路由），host → Pod 的回包经过 lxc 接口时严格反向路径校验不通过，直接丢包——表现为 **kubelet 探针失败、`cilium-health status` 中 localhost endpoint 0/1、节点上进程无法访问 Pod IP**。
+
+cilium 自带的 `sysctlfix` 功能本可以写这个文件（它写的正是 `99-zzz-override_cilium.conf`），但它同时会**重启宿主机 `systemd-sysctl.service`**，把发行版所有 sysctl 默认值全量重放，覆盖运行时修改（Native Routing 模式下这会直接断网）。因此本教程统一 `sysctlfix.enabled=false`，改用这个 DaemonSet 写文件——**同样的保护效果，但不重启 systemd-sysctl**。
+
+文件名中的 `99-zzz` 前缀保证它在 systemd-sysctl 的应用顺序中排在发行版配置（`50-*.conf`）之后，任何时机触发 sysctl 重放（节点重启、OS 升级、管理员手工执行）都是 cilium 的值胜出。DaemonSet 每 60 秒重写一次，可自愈文件被误删的情况，新节点加入集群时也会自动写上。
+
+完整机制分析（含 Native 与 Overlay 的差异、路由对称性原理）见 [VPC-CNI Native Routing 模式详解](./appendix/native-routing.md)。
+
+:::
 
 </TabItem>
 </Tabs>
@@ -264,7 +344,7 @@ kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook
 <TabItem value="native-vpccni" label="Native Routing (VPC-CNI)" default>
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -309,7 +389,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
 <TabItem value="overlay-gr" label="Overlay (GR)">
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -334,6 +414,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]="eklet" \
   --set routingMode=tunnel \
   --set tunnelProtocol=vxlan \
+  --set sysctlfix.enabled=false \
   --set ipam.mode=multi-pool \
   --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.cidrs[0]="10.244.0.0/16" \
   --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.maskSize=24 \
@@ -349,7 +430,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
 <TabItem value="overlay-vpccni" label="Overlay (VPC-CNI)">
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -375,6 +456,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]="eklet" \
   --set routingMode=tunnel \
   --set tunnelProtocol=vxlan \
+  --set sysctlfix.enabled=false \
   --set ipam.mode=multi-pool \
   --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.cidrs[0]="10.244.0.0/16" \
   --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.maskSize=24 \
@@ -510,7 +592,13 @@ bpf:
   # routing 强制 fallback 到 legacy（无法启用 BPF host routing）。
   # 详见《VPC-CNI Native Routing 模式详解》
   masquerade: true
-# 不设置 sysctlfix（保持默认 true），确保 lxc 接口 rp_filter=0
+# 禁用 sysctlfix：它会在每次 cilium pod 启动时重启宿主机 systemd-sysctl，
+# 全量重放发行版 sysctl 默认值，覆盖运行时修改。Overlay 模式的 lxc 接口
+# rp_filter 保护改由 cilium-sysctl-override DaemonSet 写入的
+# /etc/sysctl.d/99-zzz-override_cilium.conf 承担（安装前置操作中已部署）。
+# 详见《VPC-CNI Native Routing 模式详解》
+sysctlfix:
+  enabled: false
 ```
 
 VPC-CNI 集群额外需要的 operator toleration：
@@ -581,7 +669,7 @@ authentication:
 生产环境部署建议将参数保存到 YAML 文件，然后在安装或更新时，都可以类似执行下面的命令（如果要升级版本，替换 `--version` 即可）：
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml
@@ -590,7 +678,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
 如果自定义的配置较多，建议拆成多个 yaml 文件维护，比如用于启用 Egress Gateway 的配置放到 `egress-values.yaml`，配置容器 request 与 limit 的放到 `resources-values.yaml`，更新配置时通过加多个 `-f` 参数来合并多个 yaml 文件：
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml \
@@ -792,7 +880,7 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
 
 ### 升级 cilium 版本
 
-cilium 小版本升级（如 1.19.5 → 1.19.5）通常向后兼容，使用 helm 直接升级即可。**跨大版本升级（如 1.18 → 1.19）必须查阅官方 [Upgrade Guide](https://docs.cilium.io/en/stable/operations/upgrade/) 的版本对应章节**，确认 breaking change 与必需的参数调整。
+cilium 小版本升级（如 1.20.1 → 1.20.2）通常向后兼容，使用 helm 直接升级即可。**跨大版本升级（如 1.19 → 1.20）必须查阅官方 [Upgrade Guide](https://docs.cilium.io/en/stable/operations/upgrade/) 的版本对应章节**，确认 breaking change 与必需的参数调整。
 
 升级步骤：
 
@@ -846,6 +934,7 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
    # 在每个节点执行
    sudo rm -f /etc/cni/net.d/05-cilium.conf /etc/cni/net.d/05-cilium.conflist
    sudo rm -f /etc/cni/net.d/*.cilium_bak  # 恢复被 cilium 重命名的原 CNI 配置
+   sudo rm -f /etc/sysctl.d/99-zzz-override_cilium.conf  # Overlay 安装的 rp_filter 覆盖文件
    sudo iptables-save | grep -i cilium | wc -l  # 检查残留规则，必要时手动 -D
    ```
 4. **重新启用 TKE 组件**：控制台勾选回 `tke-cni-agent`、`kube-proxy`、`ip-masq-agent` 等被卸载的组件。
@@ -884,7 +973,7 @@ Cilium 的 helm 安装包提供了大量的自定义配置项，本文给出的�
 执行下面的命令可查看所有的安装配置项：
 
 ```bash
-helm show values cilium/cilium --version 1.19.5
+helm show values cilium/cilium --version 1.20.1
 ```
 
 ### 连不上 cilium 的 helm repo 怎么办？
@@ -894,15 +983,15 @@ helm show values cilium/cilium --version 1.19.5
 解决办法是在可以连上的环境下载 chart 压缩包：
 
 ```bash
-$ helm pull cilium/cilium --version 1.19.5
+$ helm pull cilium/cilium --version 1.20.1
 $ ls cilium-*.tgz
-cilium-1.19.5.tgz
+cilium-1.20.1.tgz
 ```
 
 然后将 chart 压缩包复制到执行 helm 安装的机器上，安装时指定下 chart 压缩包的路径：
 
 ```bash
-helm upgrade --install cilium ./cilium-1.19.5.tgz \
+helm upgrade --install cilium ./cilium-1.20.1.tgz \
   --namespace kube-system \
   -f values.yaml
 ```
@@ -965,7 +1054,7 @@ cilium 依赖的大部分镜像在 `quay.io`，如果安装时没使用本文给
 如果你配置了更多安装的参数，可能会涉及更多的镜像依赖，没有配置镜像地址替换的话可能导致镜像拉取失败，用以下命令可将所有 cilium 依赖镜像一键替换为 TKE 环境中可直接内网拉取的 mirror 仓库地址：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.5 \
+helm upgrade cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --reuse-values \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
@@ -1036,7 +1125,7 @@ authentication:
 更新 cilium 时追加一个 `-f image-values.yaml` 将镜像替换的配置加上：
 
 ```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace=kube-system \
   -f values.yaml \
   # highlight-add-line
@@ -1060,7 +1149,7 @@ cilium-operator 使用 hostNetwork 并配置了就绪探针，在超级节点上
 如果安装时未使用文档中的参数（如自行 `helm install` 且未配置 affinity），可补上：
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.5 \
+helm upgrade cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --reuse-values \
   --set 'operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key=node.kubernetes.io/instance-type' \

@@ -163,7 +163,7 @@ With `bash -c "$(curl ...)"`, bash receives the script as a string argument and 
 If you want a fully non-interactive one-liner, set the parameters via environment variables (`bash -c` inherits them from the parent shell):
 
 ```bash
-ROUTING_MODE=native CILIUM_VERSION=1.19.5 \
+ROUTING_MODE=native CILIUM_VERSION=1.20.1 \
   bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- install
 ```
 
@@ -241,16 +241,96 @@ kubectl apply -f cni-config.yaml
 </TabItem>
 <TabItem value="overlay-gr" label="Overlay (GR)">
 
-No extra pre-install steps.
+Deploy the `cilium-sysctl-override` DaemonSet (see the Overlay (VPC-CNI) tab below for the rationale and YAML — both modes share this step).
 
 </TabItem>
 <TabItem value="overlay-vpccni" label="Overlay (VPC-CNI)">
 
-Disable `add-pod-eni-ip-limit-webhook` (otherwise Pods get auto-injected with the `tke.cloud.tencent.com/eni-ip` resource request, which causes ip-scheduler to block scheduling):
+1. Disable `add-pod-eni-ip-limit-webhook` (otherwise Pods get auto-injected with the `tke.cloud.tencent.com/eni-ip` resource request, which causes ip-scheduler to block scheduling):
 
-```bash
-kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook
-```
+   ```bash
+   kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook
+   ```
+
+2. Deploy the `cilium-sysctl-override` DaemonSet, which continuously maintains `/etc/sysctl.d/99-zzz-override_cilium.conf` (the rp_filter override file) on every node:
+
+   ```yaml title="cilium-sysctl-override.yaml"
+   apiVersion: apps/v1
+   kind: DaemonSet
+   metadata:
+     name: cilium-sysctl-override
+     namespace: kube-system
+     labels:
+       app: cilium-sysctl-override
+   spec:
+     selector:
+       matchLabels:
+         app: cilium-sysctl-override
+     updateStrategy:
+       type: RollingUpdate
+     template:
+       metadata:
+         labels:
+           app: cilium-sysctl-override
+       spec:
+         priorityClassName: system-node-critical
+         tolerations:
+         - operator: Exists
+         nodeSelector:
+           kubernetes.io/os: linux
+         containers:
+         - name: ensure
+           # Same image as the cilium agent — already cached on nodes, no extra pull
+           image: quay.tencentcloudcr.com/cilium/cilium:v1.20.1
+           command: ["/bin/sh", "-ce"]
+           args:
+           - |
+             while true; do
+               printf '%s\n' \
+                 '# Disable rp_filter on Cilium interfaces since it may cause mangled packets to be dropped' \
+                 '-net.ipv4.conf.lxc*.rp_filter = 0' \
+                 '-net.ipv4.conf.cilium_*.rp_filter = 0' \
+                 '# The kernel uses max(conf.all, conf.{dev}) as its value, so we need to set .all. to 0 as well.' \
+                 '# Otherwise it will overrule the device specific settings.' \
+                 'net.ipv4.conf.all.rp_filter = 0' \
+                 > /host/etc/sysctl.d/99-zzz-override_cilium.conf
+               sleep 60
+             done
+           resources:
+             requests:
+               cpu: 10m
+               memory: 16Mi
+             limits:
+               cpu: 100m
+               memory: 64Mi
+           volumeMounts:
+           - name: sysctl-dir
+             mountPath: /host/etc/sysctl.d
+         volumes:
+         - name: sysctl-dir
+           hostPath:
+             path: /etc/sysctl.d
+             type: DirectoryOrCreate
+   ```
+
+   ```bash
+   kubectl apply -f cilium-sysctl-override.yaml
+   kubectl -n kube-system rollout status daemonset/cilium-sysctl-override --timeout=180s
+   ```
+
+:::warning[Why Overlay requires this DaemonSet]
+
+systemd-based distros such as TencentOS ship a udev rule: whenever a **new network interface is created**, it asynchronously runs `systemd-sysctl --prefix=/net/ipv4/conf/<iface>`, applying every sysctl.d entry matching that interface — including `net.ipv4.conf.*.rp_filter = 1`.
+
+The cilium CNI plugin does write `lxc*.rp_filter = 0` when creating the Pod veth, but the udev rule runs **afterwards** and overrides it back to 1. In Overlay mode the Pod IP routes are aggregated to `cilium_host` (no per-endpoint routes), so host → Pod reply traffic fails the strict reverse-path check on the lxc interface and gets dropped — symptoms include **failing kubelet probes, `cilium-health status` showing localhost endpoint 0/1, and node processes unable to reach Pod IPs**.
+
+Cilium's built-in `sysctlfix` could write this file (it writes exactly `99-zzz-override_cilium.conf`), but it also **restarts the host's `systemd-sysctl.service`**, replaying all distro sysctl defaults over runtime changes (on Native Routing mode this breaks networking outright). This guide therefore sets `sysctlfix.enabled=false` everywhere and uses this DaemonSet to write the file instead — **the same protection, without restarting systemd-sysctl**.
+
+The `99-zzz` filename prefix guarantees it is applied after the distro configs (`50-*.conf`) whenever systemd-sysctl runs, so cilium's values win on every replay trigger (node reboot, OS upgrade, manual `sysctl --system`). The DaemonSet rewrites the file every 60 seconds, self-heals accidental deletion, and automatically covers newly added nodes.
+
+For the full analysis (including the Native vs Overlay difference and the routing symmetry principle), see [VPC-CNI Native Routing Mode Deep Dive](./appendix/native-routing.md).
+
+:::
 
 </TabItem>
 </Tabs>
@@ -267,7 +347,7 @@ kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook
 <TabItem value="native-vpccni" label="Native Routing (VPC-CNI)" default>
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -312,7 +392,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
 <TabItem value="overlay-gr" label="Overlay (GR)">
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -337,6 +417,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]="eklet" \
   --set routingMode=tunnel \
   --set tunnelProtocol=vxlan \
+  --set sysctlfix.enabled=false \
   --set ipam.mode=multi-pool \
   --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.cidrs[0]="10.244.0.0/16" \
   --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.maskSize=24 \
@@ -352,7 +433,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
 <TabItem value="overlay-vpccni" label="Overlay (VPC-CNI)">
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
   --set envoy.image.repository=quay.tencentcloudcr.com/cilium/cilium-envoy \
@@ -378,6 +459,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
   --set operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]="eklet" \
   --set routingMode=tunnel \
   --set tunnelProtocol=vxlan \
+  --set sysctlfix.enabled=false \
   --set ipam.mode=multi-pool \
   --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.cidrs[0]="10.244.0.0/16" \
   --set ipam.operator.autoCreateCiliumPodIPPools.default.ipv4.maskSize=24 \
@@ -514,7 +596,13 @@ bpf:
   # which forces host routing back to legacy (BPF host routing won't be active).
   # See "VPC-CNI Native Routing Details" for explanation.
   masquerade: true
-# Don't set sysctlfix (leave the default true) — ensures lxc interface rp_filter=0
+# Disable sysctlfix — it restarts the host's systemd-sysctl on every cilium pod start,
+# replaying all distro sysctl defaults over runtime changes. The lxc rp_filter
+# protection for Overlay mode is instead provided by the 99-zzz-override_cilium.conf
+# file maintained by the cilium-sysctl-override DaemonSet (deployed in the
+# pre-install steps). See "VPC-CNI Native Routing Details" for the full analysis.
+sysctlfix:
+  enabled: false
 ```
 
 VPC-CNI base cluster additionally needs this operator toleration:
@@ -585,7 +673,7 @@ authentication:
 For production, save the parameters to YAML files and run the same command for both install and update (just swap `--version` for upgrades):
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml
@@ -594,7 +682,7 @@ helm upgrade --install cilium cilium/cilium --version 1.19.5 \
 If you have lots of custom config, split it into multiple files (e.g. Egress Gateway config in `egress-values.yaml`, container resource requests/limits in `resources-values.yaml`) and merge them via multiple `-f` flags:
 
 ```bash
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace=kube-system \
   -f tke-values.yaml \
   -f image-values.yaml \
@@ -797,7 +885,7 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
 
 ### Upgrade Cilium Version
 
-Cilium minor-version upgrades (e.g. 1.19.5 → 1.19.5) are usually backward-compatible — upgrade directly with helm. **For major-version upgrades (e.g. 1.18 → 1.19), you MUST consult the corresponding version section of the official [Upgrade Guide](https://docs.cilium.io/en/stable/operations/upgrade/)** to confirm breaking changes and required parameter adjustments.
+Cilium minor-version upgrades (e.g. 1.20.1 → 1.20.2) are usually backward-compatible — upgrade directly with helm. **For major-version upgrades (e.g. 1.19 → 1.20), you MUST consult the corresponding version section of the official [Upgrade Guide](https://docs.cilium.io/en/stable/operations/upgrade/)** to confirm breaking changes and required parameter adjustments.
 
 Upgrade steps:
 
@@ -851,6 +939,7 @@ The script uninstalls the cilium helm release, deletes cni-config / APF rules, r
    # Run on each node
    sudo rm -f /etc/cni/net.d/05-cilium.conf /etc/cni/net.d/05-cilium.conflist
    sudo rm -f /etc/cni/net.d/*.cilium_bak  # Restore original CNI config that cilium renamed
+   sudo rm -f /etc/sysctl.d/99-zzz-override_cilium.conf  # rp_filter override file from Overlay installs
    sudo iptables-save | grep -i cilium | wc -l  # Check leftover rules; manually -D if needed
    ```
 4. **Re-enable TKE components**: in the console, re-enable `tke-cni-agent`, `kube-proxy`, `ip-masq-agent`, and any other addons you uninstalled.
@@ -889,7 +978,7 @@ Cilium's helm chart provides a huge number of customization options. The configu
 Run this to see all options:
 
 ```bash
-helm show values cilium/cilium --version 1.19.5
+helm show values cilium/cilium --version 1.20.1
 ```
 
 ### What if I can't reach the cilium helm repo?
@@ -899,15 +988,15 @@ During `helm` installation, helm fetches chart info from the cilium helm repo. I
 Workaround: download the chart archive from a reachable environment:
 
 ```bash
-$ helm pull cilium/cilium --version 1.19.5
+$ helm pull cilium/cilium --version 1.20.1
 $ ls cilium-*.tgz
-cilium-1.19.5.tgz
+cilium-1.20.1.tgz
 ```
 
 Copy the archive to the machine running helm, then install using the local path:
 
 ```bash
-helm upgrade --install cilium ./cilium-1.19.5.tgz \
+helm upgrade --install cilium ./cilium-1.20.1.tgz \
   --namespace kube-system \
   -f values.yaml
 ```
@@ -970,7 +1059,7 @@ TKE provides the mirror registry `quay.tencentcloudcr.com` for `quay.io` images 
 If you've configured many additional install parameters, more image dependencies may be involved — without address replacement these may fail to pull. The following command replaces all cilium dependencies with TKE-intranet-reachable mirrors in one shot:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.5 \
+helm upgrade cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --reuse-values \
   --set image.repository=quay.tencentcloudcr.com/cilium/cilium \
@@ -1041,7 +1130,7 @@ authentication:
 When updating cilium, append `-f image-values.yaml` to include the image overrides:
 
 ```bash showLineNumbers
-helm upgrade --install cilium cilium/cilium --version 1.19.5 \
+helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --namespace=kube-system \
   -f values.yaml \
   # highlight-add-line
@@ -1065,7 +1154,7 @@ cilium-operator uses hostNetwork and configures a readiness probe. On super node
 If you installed without the documented parameters (e.g. ran `helm install` yourself without the affinity), you can add it after the fact:
 
 ```bash
-helm upgrade cilium cilium/cilium --version 1.19.5 \
+helm upgrade cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --reuse-values \
   --set 'operator.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key=node.kubernetes.io/instance-type' \
