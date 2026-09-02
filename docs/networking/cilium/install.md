@@ -564,7 +564,7 @@ cni:
   chainingMode: generic-veth
   # CNI 配置完全自定义，使用下方 configMap 中预先创建的配置
   customConf: true
-  configMap: cni-configuration
+  configMap: cni-config
   # VPC-CNI 会自动配置 Pod 路由，cilium 无需配置
   externalRouting: true
 extraConfig:
@@ -686,7 +686,7 @@ authentication:
   </TabItem>
 </Tabs>
 
-生产环境部署建议将参数保存到 YAML 文件，然后在安装或更新时，都可以类似执行下面的命令（如果要升级版本，替换 `--version` 即可）：
+生产环境部署建议将参数保存到 YAML 文件，然后在安装或更新时，都可以类似执行下面的命令（如果要升级版本，替换 `--version` 即可）。其中 `tke-values.yaml` 的内容为上方 Tabs 中「通用参数」+ 所选模式的「模式专属参数」两块，`image-values.yaml` 的内容为「镜像相关」一块：
 
 ```bash
 helm upgrade --install cilium cilium/cilium --version 1.20.1 \
@@ -917,7 +917,7 @@ helm upgrade cilium cilium/cilium \
   --version <新版本> \
   --reuse-values
 
-# 4. 滚动重启确保 datapath 使用新版本（cilium-agent 默认 RollingUpdate，无中断）
+# 4. 等待滚动更新完成（cilium-agent 默认 RollingUpdate，无中断）
 kubectl -n kube-system rollout status ds/cilium
 
 # 5. 验证
@@ -928,7 +928,7 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 
 - **生产集群升级前先在测试集群验证**，确认业务无异常。
 - **NetworkPolicy 行为可能在不同版本间有微调**，升级后回归核心策略效果。
-- 跨大版本升级如涉及 ConfigMap / CRD 变更，按官方文档执行 `cilium upgrade --pre-flight` 检查或手动迁移。
+- 跨大版本升级如涉及 ConfigMap / CRD 变更，可先部署官方 preflight release 检查新旧版本兼容性：`helm install cilium-preflight cilium/cilium --version <新版本> -n kube-system --set preflight.enabled=true --set agent=false --set operator.enabled=false`，确认通过后 `helm uninstall cilium-preflight -n kube-system` 再正式升级。
 
 :::
 
@@ -936,7 +936,7 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 
 如需从 cilium 回退到 TKE 原生 CNI（VPC-CNI 或 GR），操作不可避免地会中断业务，建议在维护窗口执行。
 
-**一键卸载脚本**（推荐，自动完成下列前 4 步）：
+**一键卸载脚本**（推荐，自动完成下列第 2、4 步，并额外清理 `cilium-sysctl-override` DaemonSet、`cni-config` ConfigMap 与 APF 限速规则；第 1、3、5 步仍需手工）：
 
 ```bash
 bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- uninstall
@@ -944,10 +944,15 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 
 脚本会卸载 cilium helm release、删除 cni-config / APF 限速规则、恢复 TKE 网络组件 DaemonSet 调度，最后打印剩余的手工动作。如需手动操作，按下列步骤执行：
 
-1. **删除新的业务调度**：节点池打 cordon，避免回滚过程中有 Pod 新建。
+1. **删除新的业务调度**：控制台停用节点池（或对节点逐个打 cordon），避免回滚过程中有 Pod 新建。
 2. **卸载 cilium**：
    ```bash
    helm uninstall cilium -n kube-system
+   # Overlay 方案安装时部署了 cilium-sysctl-override DaemonSet，必须先删除再清理节点文件：
+   # 它每 60 秒重写一次 /etc/sysctl.d/99-zzz-rp-filter.conf，不删 DS，节点上删掉的文件会复活
+   kubectl -n kube-system delete daemonset cilium-sysctl-override
+   # Native (VPC-CNI) 方案安装时创建的 CNI chaining 配置，一并清理
+   kubectl -n kube-system delete configmap cni-config
    ```
 3. **清理节点残留**：每个节点上手动清理 cilium 的 BPF 程序、CNI 配置与 iptables 规则：
    ```bash
@@ -957,7 +962,15 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
    sudo rm -f /etc/sysctl.d/99-zzz-rp-filter.conf  # Overlay 安装的 rp_filter 覆盖文件
    sudo iptables-save | grep -i cilium | wc -l  # 检查残留规则，必要时手动 -D
    ```
-4. **重新启用 TKE 组件**：控制台勾选回 `tke-cni-agent`、`kube-proxy`、`ip-masq-agent` 等被卸载的组件。
+4. **重新启用 TKE 组件**：安装时是给 `kube-proxy`、`tke-cni-agent`、`ip-masq-agent` 三个 DaemonSet 打 nodeSelector 停用的（组件对象一直在），移除该 nodeSelector 即恢复调度，无需控制台重新勾选：
+   ```bash
+   for ds in kube-proxy tke-cni-agent ip-masq-agent; do
+     kubectl -n kube-system patch daemonset "$ds" \
+       --type=json \
+       -p='[{"op":"remove","path":"/spec/template/spec/nodeSelector/label-not-exist"}]'
+   done
+   ```
+   Overlay (VPC-CNI) 方案安装时删除的 `add-pod-eni-ip-limit-webhook`，会在 TKE 重新下发组件时自动恢复，无需手工干预。
 5. **重启或重建节点**：最稳妥的方式是直接重建所有节点，确保 datapath 干净（**这步无论用不用一键脚本都需要手工做**）。
 
 :::warning
@@ -1261,7 +1274,7 @@ spec:
 
 所以建议是 `k8sServiceHost` 不要配置 apiserver 的 CLB 地址，而是使用集群 `169.254.x.x` 的 apiserver 地址（`kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'`），该地址也是一个 VIP，但不会被 cilium 拦截转发，并且是自集群创建完后就再也不会变的，可以放心作为 `k8sServiceHost` 配置。如果希望使用辨识度更高的域名方式配置，也可以将域名解析到该地址然后再配置到 `k8sServiceHost`。
 
-完整的根因分析、复现步骤和 cilium 上游 PR 链接，参见 [问题排查：连接 APIServer 报错 operation not permitted](./appendix/troubleshooting/connect-apiserver-operation-not-permitted.md)。
+完整的根因分析、复现步骤和 cilium 上游 PR 链接，参见 [问题排查：连接 APIServer 报错 operation not permitted](./appendix/troubleshooting/connect-apiserver-operation-not-permitted.md)。该 bug 影响至 1.18.x（backport 前），1.19+（含本教程的 1.20.1）已包含修复；不过无论版本如何，`k8sServiceHost` 使用 `169.254.x.x` 地址都是更稳的配置。
 
 ## 延伸阅读
 

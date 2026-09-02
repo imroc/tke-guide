@@ -576,7 +576,7 @@ The issue and fix have been submitted to the community:
 - Issue: https://github.com/cilium/cilium/issues/43619
 - PR: https://github.com/cilium/cilium/pull/43620
 
-The PR has been merged. Upgrading cilium in the next release should resolve the issue.
+The PR was merged into main in January 2026 and backported to 1.18 ([#43777](https://github.com/cilium/cilium/pull/43777)) — so **1.18 patches released afterwards and 1.19+ (including the 1.20.1 used by this tutorial) already contain the fix and are not affected by this bug**. If you are still on an affected version (1.18.x before the backport), work around it as described above by pointing `k8sServiceHost` at the `169.254.x.x` address.
 
 ## Postscript
 

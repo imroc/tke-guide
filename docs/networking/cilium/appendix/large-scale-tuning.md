@@ -97,23 +97,36 @@ kubectl -n kube-system exec ds/cilium -- cilium metrics list | grep client_rate_
 
 **作用**：cilium 为每组唯一的 label 组合分配一个 Security Identity，过多 Identity 会增加 cilium-agent 内存占用与策略计算开销，并增加 apiserver 上 CiliumIdentity 资源的存储压力。
 
-**Identity 膨胀的典型来源**：
+**cilium 默认已排除的 label**：Kubernetes 常见的高基数 label 在 cilium 1.20 中**默认就不参与 Identity 计算**（见源码 `pkg/labelsfilter/filter.go` 的默认排除清单），无需手工配置：
 
-| 高基数 label                         | 来源                       |
-| ------------------------------------ | -------------------------- |
-| `pod-template-hash`                  | Deployment 每次更新都会变  |
-| `controller-revision-hash`           | StatefulSet/DaemonSet 滚动 |
-| `job-name`                           | Job 实例名                 |
-| `batch.kubernetes.io/controller-uid` | Job controller UID         |
+| label                                                         | 来源                       |
+| ------------------------------------------------------------- | -------------------------- |
+| `pod-template-hash`                                           | Deployment 每次更新都会变  |
+| `controller-revision-hash`                                    | StatefulSet/DaemonSet 滚动 |
+| `controller-uid`、`batch.kubernetes.io/controller-uid`        | Job/控制器 UID             |
+| `annotation.*`、`topology.kubernetes.io`、`k8s.io` 等系统前缀 | 注解与拓扑类 label         |
+
+**真正需要关注的膨胀来源**是默认清单不覆盖的：
+
+| 高基数 label   | 来源                                        |
+| -------------- | ------------------------------------------- |
+| `job-name`     | Job 实例名（每个 Job 都不同）               |
+| 业务自有 label | 版本号、构建 hash、实例序号等随 Pod 变化的自定义 label |
 
 **配置**：通过 `extraConfig.labels` 排除这些 label，避免它们参与 Identity 计算：
 
 ```yaml
 extraConfig:
-  labels: "!pod-template-hash !controller-revision-hash !job-name !batch.kubernetes.io/controller-uid"
+  labels: "!job-name !app.mycompany.com/build-hash"
 ```
 
 `!` 表示排除（取反），仅排除指定 label，其余 label 仍参与 Identity 计算。
+
+:::warning[白名单语义]
+
+`labels` 中只要出现一个**不带 `!` 的条目**，就会切换为白名单模式：只有列出的 label 参与 Identity 计算，其余全部排除。因此只想追加排除项时，务必让所有条目都带 `!` 前缀。
+
+:::
 
 **验证效果**：
 

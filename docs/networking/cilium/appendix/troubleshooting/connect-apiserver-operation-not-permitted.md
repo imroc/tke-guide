@@ -576,7 +576,7 @@ $ kubectl -n kube-system exec ds/cilium -- cilium bpf lb list | grep 192.168.92.
 - issue: https://github.com/cilium/cilium/issues/43619
 - PR: https://github.com/cilium/cilium/pull/43620
 
-PR 已经合并，预计下一次版本 release 后升级下 cilium 即可解决。
+PR 已于 2026-01 合并进 main 分支并 backport 到 1.18（[#43777](https://github.com/cilium/cilium/pull/43777)），即 **1.18 后续 patch 与 1.19+（含本教程主线 1.20.1）均已包含修复，不受此 bug 影响**。若仍在使用受影响版本（1.18.x backport 前），按上文将 `k8sServiceHost` 换成 `169.254.x.x` 地址规避即可。
 
 ## 后记
 

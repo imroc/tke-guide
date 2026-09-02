@@ -994,7 +994,9 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: ensure
-        image: ${IMAGE_REGISTRY}/cilium:${CILIUM_VERSION}
+        # Image tags carry the "v" prefix (v1.20.1) while the helm chart version
+        # does not (1.20.1); strip any user-supplied "v" then re-add it here.
+        image: ${IMAGE_REGISTRY}/cilium:v${CILIUM_VERSION#v}
         command: ["/bin/sh", "-ce"]
         securityContext:
           privileged: true

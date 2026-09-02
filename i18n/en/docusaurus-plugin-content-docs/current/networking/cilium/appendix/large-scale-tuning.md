@@ -97,23 +97,36 @@ If the throttle count keeps increasing, you need to raise QPS/Burst.
 
 **Effect**: Cilium assigns a Security Identity to each unique set of labels. Too many identities increases cilium-agent memory usage and policy computation overhead, as well as the storage pressure on CiliumIdentity resources on apiserver.
 
-**Typical sources of identity bloat**:
+**Labels cilium excludes by default**: Common high-cardinality Kubernetes labels are **already excluded from Identity computation by default** in cilium 1.20 (see the default exclusion list in `pkg/labelsfilter/filter.go` in the source) — no manual configuration needed:
 
-| High-cardinality label                  | Source                       |
-| --------------------------------------- | ---------------------------- |
-| `pod-template-hash`                     | Changes with every Deployment update |
-| `controller-revision-hash`              | StatefulSet/DaemonSet rolling updates |
-| `job-name`                              | Job instance name            |
-| `batch.kubernetes.io/controller-uid`    | Job controller UID           |
+| Label                                                       | Source                       |
+| ----------------------------------------------------------- | ---------------------------- |
+| `pod-template-hash`                                         | Changes with every Deployment update |
+| `controller-revision-hash`                                  | StatefulSet/DaemonSet rolling updates |
+| `controller-uid`, `batch.kubernetes.io/controller-uid`      | Job/controller UIDs          |
+| System prefixes like `annotation.*`, `topology.kubernetes.io`, `k8s.io` | Annotation and topology labels |
+
+**Sources of bloat that actually need attention** are those not covered by the default list:
+
+| High-cardinality label | Source                                        |
+| ---------------------- | --------------------------------------------- |
+| `job-name`             | Job instance name (differs per Job)           |
+| Business-owned labels  | Custom labels that vary per Pod: version strings, build hashes, instance indexes, etc. |
 
 **Configuration**: Exclude these labels via `extraConfig.labels` to prevent them from participating in Identity computation:
 
 ```yaml
 extraConfig:
-  labels: "!pod-template-hash !controller-revision-hash !job-name !batch.kubernetes.io/controller-uid"
+  labels: "!job-name !app.mycompany.com/build-hash"
 ```
 
 `!` means exclude (negation). Only the specified labels are excluded; all other labels still participate in Identity computation.
+
+:::warning[Whitelist semantics]
+
+As soon as one entry **without** the `!` prefix appears in `labels`, cilium switches to whitelist mode: only the listed labels participate in Identity computation and everything else is excluded. When you only mean to add exclusions, make sure every entry carries the `!` prefix.
+
+:::
 
 **Verify the effect**:
 

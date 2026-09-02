@@ -135,7 +135,13 @@ VPC-CNI Native must enable endpointRoutes (because Pod IPs are legitimate VPC IP
 | VPC-CNI + Native + ip-masq | `bpf.masquerade=true` + endpointRoutes=true        | BPF           | ❌ packets bypass cilium_host |
 | VPC-CNI + Native + Egress  | `bpf.masquerade=true` + endpointRoutes=true        | BPF           | ❌ packets bypass cilium_host |
 
-The `cilium.sh` install script explicitly sets `bpf.masquerade=true` + `kubeProxyReplacement=true` on every path, so cilium status uniformly reports `Host Routing: BPF`. In Native mode this is the status-level state, **not a guarantee that BPF host routing actually hits on the data path** — that further depends on whether packets traverse cilium_host.
+All three install plans in the `cilium.sh` script set `kubeProxyReplacement=true` and none of them trigger the config-level fallback described in the "historical pitfall" above, so cilium status uniformly reports `Host Routing: BPF`. However, each plan arrives at that state for different reasons:
+
+- **The two Overlay plans**: explicitly set `bpf.masquerade=true` — the standard path (condition 1).
+- **Plain Native (SNAT off)**: `enableIPv4Masquerade=false` disables masquerading entirely — the fallback check only downgrades when iptables masquerading is enabled, so the condition never fires and BPF is still reported.
+- **Native + ip-masq / Egress Gateway**: the script adds `bpf.masquerade=true` when these features are enabled.
+
+In Native mode `Host Routing: BPF` is the status-level state, **not a guarantee that BPF host routing actually hits on the data path** — that further depends on whether packets traverse cilium_host.
 
 > Historical pitfall: if helm values set `enableIPv4Masquerade=true` but forget `bpf.masquerade=true`, cilium logs `BPF host routing requires enable-bpf-masquerade. Falling back to legacy host routing.` at startup, and `cilium status` directly reports `Host: Legacy`, `Masquerading: IPTables`. This is config-level fallback, distinct from the data-path-bypass issue caused by endpointRoutes.
 

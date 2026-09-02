@@ -135,7 +135,13 @@ VPC-CNI Native 必启 endpointRoutes（因 Pod IP 是 VPC 合法 IP，cilium 不
 | VPC-CNI + Native + ip-masq    | `bpf.masquerade=true` + endpointRoutes=true        | BPF           | ❌ 包绕过 cilium_host |
 | VPC-CNI + Native + Egress     | `bpf.masquerade=true` + endpointRoutes=true        | BPF           | ❌ 包绕过 cilium_host |
 
-一键安装脚本 `cilium.sh` 在所有路径上都显式设了 `bpf.masquerade=true` + `kubeProxyReplacement=true`，所以 cilium status 一律显示 `Host Routing: BPF`。Native 模式下 `Host Routing: BPF` 是 status 视角的状态，**不代表数据路径上 BPF host routing 真的被命中**——能否命中取决于包是否经过 cilium_host。
+一键安装脚本 `cilium.sh` 的三种方案都设了 `kubeProxyReplacement=true`，且都不会触发上文「历史小坑」中的配置层 fallback，因此 cilium status 一律显示 `Host Routing: BPF`。但各方案到达这个状态的原因不同：
+
+- **Overlay 两方案**：显式设了 `bpf.masquerade=true`，即标准路径（条件 1）。
+- **纯 Native（不开 SNAT）**：`enableIPv4Masquerade=false`，masquerading 整体关闭——fallback 检查要求 iptables masquerading 处于启用状态才降级，这里条件不成立，照样显示 BPF。
+- **Native + ip-masq / Egress Gateway**：脚本在启用这些功能时会补设 `bpf.masquerade=true`。
+
+Native 模式下 `Host Routing: BPF` 是 status 视角的状态，**不代表数据路径上 BPF host routing 真的被命中**——能否命中取决于包是否经过 cilium_host。
 
 > 历史小坑：如果 helm values 只写了 `enableIPv4Masquerade=true`、漏掉 `bpf.masquerade=true`，cilium 启动时会打日志 `BPF host routing requires enable-bpf-masquerade. Falling back to legacy host routing.`，然后 `cilium status` 直接显示 `Host: Legacy`、`Masquerading: IPTables`。这是配置层 fallback，跟 endpointRoutes 绕过 cilium_host 是两个独立的层面。
 

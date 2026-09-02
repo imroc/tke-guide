@@ -570,7 +570,7 @@ cni:
   chainingMode: generic-veth
   # Fully custom CNI config — use the ConfigMap we created earlier
   customConf: true
-  configMap: cni-configuration
+  configMap: cni-config
   # VPC-CNI already configures Pod routes — cilium doesn't need to
   externalRouting: true
 extraConfig:
@@ -693,7 +693,7 @@ authentication:
   </TabItem>
 </Tabs>
 
-For production, save the parameters to YAML files and run the same command for both install and update (just swap `--version` for upgrades):
+For production, save the parameters to YAML files and run the same command for both install and update (just swap `--version` for upgrades). The content of `tke-values.yaml` is the "Common parameters" tab above plus the mode-specific tab for your chosen mode; `image-values.yaml` holds the "Image-related" tab:
 
 ```bash
 helm upgrade --install cilium cilium/cilium --version 1.20.1 \
@@ -925,7 +925,7 @@ helm upgrade cilium cilium/cilium \
   --version <new-version> \
   --reuse-values
 
-# 4. Rolling restart so the datapath uses the new version (cilium-agent uses RollingUpdate by default — no interruption)
+# 4. Wait for the rolling update to finish (cilium-agent uses RollingUpdate by default — no interruption)
 kubectl -n kube-system rollout status ds/cilium
 
 # 5. Verify
@@ -936,7 +936,7 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 
 - **Validate on a test cluster before upgrading production**, confirm no business impact.
 - **NetworkPolicy behavior may change subtly between versions** — regression-test your core policies after upgrade.
-- For major-version upgrades involving ConfigMap / CRD changes, run `cilium upgrade --pre-flight` per the official docs, or migrate manually.
+- For major-version upgrades involving ConfigMap / CRD changes, deploy the official preflight release first to check old/new version compatibility: `helm install cilium-preflight cilium/cilium --version <new-version> -n kube-system --set preflight.enabled=true --set agent=false --set operator.enabled=false`; once it passes, `helm uninstall cilium-preflight -n kube-system` and proceed with the real upgrade.
 
 :::
 
@@ -944,7 +944,7 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 
 Rolling back from cilium to TKE's native CNI (VPC-CNI or GR) inevitably disrupts traffic. Schedule a maintenance window.
 
-**One-click uninstall script** (recommended — automates the first 4 steps):
+**One-click uninstall script** (recommended — automates steps 2 and 4 below, and additionally removes the `cilium-sysctl-override` DaemonSet, the `cni-config` ConfigMap, and the APF rate-limit rules; steps 1, 3, and 5 remain manual):
 
 ```bash
 bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- uninstall
@@ -952,10 +952,16 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 
 The script uninstalls the cilium helm release, deletes cni-config / APF rules, restores TKE network DaemonSet scheduling, and prints the remaining manual steps. To do it manually:
 
-1. **Stop new scheduling**: cordon all node pools so no new Pods are placed during the rollback.
+1. **Stop new scheduling**: disable node pools in the console (or cordon each node) so no new Pods are placed during the rollback.
 2. **Uninstall cilium**:
    ```bash
    helm uninstall cilium -n kube-system
+   # Overlay installs deployed the cilium-sysctl-override DaemonSet — delete it BEFORE
+   # cleaning up node files: it rewrites /etc/sysctl.d/99-zzz-rp-filter.conf every 60
+   # seconds, so files you remove on nodes will come back as long as the DS exists
+   kubectl -n kube-system delete daemonset cilium-sysctl-override
+   # CNI chaining config created by the Native (VPC-CNI) install — clean it up too
+   kubectl -n kube-system delete configmap cni-config
    ```
 3. **Clean up node residue**: on each node, manually clear cilium's BPF programs, CNI config, and iptables rules:
    ```bash
@@ -965,7 +971,15 @@ The script uninstalls the cilium helm release, deletes cni-config / APF rules, r
    sudo rm -f /etc/sysctl.d/99-zzz-rp-filter.conf  # rp_filter override file from Overlay installs
    sudo iptables-save | grep -i cilium | wc -l  # Check leftover rules; manually -D if needed
    ```
-4. **Re-enable TKE components**: in the console, re-enable `tke-cni-agent`, `kube-proxy`, `ip-masq-agent`, and any other addons you uninstalled.
+4. **Re-enable TKE components**: the install disabled `kube-proxy`, `tke-cni-agent`, and `ip-masq-agent` by patching a nodeSelector onto those DaemonSets (the component objects were never deleted) — remove that nodeSelector to restore scheduling; no console re-enabling needed:
+   ```bash
+   for ds in kube-proxy tke-cni-agent ip-masq-agent; do
+     kubectl -n kube-system patch daemonset "$ds" \
+       --type=json \
+       -p='[{"op":"remove","path":"/spec/template/spec/nodeSelector/label-not-exist"}]'
+   done
+   ```
+   The `add-pod-eni-ip-limit-webhook` deleted during an Overlay (VPC-CNI) install comes back automatically when TKE re-syncs the addon — no manual action required.
 5. **Reboot or recreate nodes**: the safest approach is to recreate all nodes to ensure a clean datapath (**this step still requires manual action regardless of whether you used the one-click script**).
 
 :::warning
@@ -1269,7 +1283,7 @@ If during installation `k8sServiceHost` points to a CLB address (the CLB used fo
 
 So the recommendation is: do **not** configure `k8sServiceHost` with the apiserver's CLB address. Use the cluster's `169.254.x.x` apiserver address instead (`kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}'`) — this is also a VIP, but cilium does not intercept and forward it, and it doesn't change once the cluster is created. For a more readable form, you can resolve a domain to this address and configure that domain in `k8sServiceHost`.
 
-For full root-cause analysis, reproduction steps, and the upstream cilium PR link, see [Troubleshooting: APIServer reports operation not permitted](./appendix/troubleshooting/connect-apiserver-operation-not-permitted.md).
+For full root-cause analysis, reproduction steps, and the upstream cilium PR link, see [Troubleshooting: APIServer reports operation not permitted](./appendix/troubleshooting/connect-apiserver-operation-not-permitted.md). The bug affects versions up to 1.18.x (before the backport); 1.19+ (including the 1.20.1 used by this tutorial) already contain the fix — that said, pointing `k8sServiceHost` at the `169.254.x.x` address remains the more robust configuration on any version.
 
 ## Further Reading
 
