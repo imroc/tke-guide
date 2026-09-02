@@ -133,8 +133,8 @@ set -euo pipefail
 #       - Helper functions left dead after a feature removal (e.g. when
 #         removing an auto-detection branch, also remove the helper it called)
 #    b) Sibling docs that reference this script (sync zh + en together):
-#       - docs/networking/cilium/{install,with-node-local-dns,observability,
-#         egress-gateway}.md
+#       - docs/networking/cilium/{install,observability,egress-gateway}.md
+#         and docs/networking/cilium/appendix/with-node-local-dns.md
 #       - docs/networking/cilium/appendix/{connectivity-test,performance-test,
 #         verified-os,host-routing,...}.md
 #       - i18n/en/.../same files
@@ -879,7 +879,7 @@ format_duration() {
 
 # uninstall_tke_components — Disables TKE built-in networking components.
 # - kube-proxy: always disabled (cilium replaces it via kubeProxyReplacement).
-# - tke-cni-agent: disabled EXCEPT for GR+native (needed to copy CNI binaries like bridge).
+# - tke-cni-agent: always disabled.
 # - ip-masq-agent: disabled (cilium has its own BPF-based masquerade).
 # Uses nodeSelector trick to prevent scheduling without deleting the DaemonSet.
 uninstall_tke_components() {
@@ -1389,16 +1389,17 @@ print_replay_command() {
 #   3. detect_network_mode (GR or VPC-CNI)
 #   4. select_routing_mode (native or overlay)
 #   5. confirm_cilium_version
-#   6. confirm_pod_cidr (overlay only)
-#   7. confirm_enable_egress (optional)
-#   8. confirm_enable_ip_masq (only Native + no Egress)
-#   9. resolve_non_masq_cidrs (Native + Egress, OR Native + ip-masq-agent)
-#  10. confirm_enable_hubble (optional)
-#  11. confirm_enable_localdns (optional)
-#  12. uninstall_tke_components → setup_* → apply_sysctl_override (Overlay)
+#   6. confirm_image_registry
+#   7. confirm_pod_cidr (overlay only)
+#   8. confirm_enable_egress (optional)
+#   9. confirm_enable_ip_masq (only Native + no Egress)
+#   10. resolve_non_masq_cidrs (Native + Egress, OR Native + ip-masq-agent)
+#  11. confirm_enable_hubble (optional)
+#  12. confirm_enable_localdns (optional)
+#  13. uninstall_tke_components → setup_* → apply_sysctl_override (Overlay)
 #      → helm_install → apply_apf
-#  13. (optional) install localdns
-#  14. Print "add nodes" guidance and finish. Install no longer chains into
+#  14. (optional) install localdns
+#  15. Print "add nodes" guidance and finish. Install no longer chains into
 #      connectivity test / perf — run `cilium.sh test` / `cilium.sh perf`
 #      separately once nodes are Ready if you want to validate.
 cmd_install_cilium() {
@@ -1610,7 +1611,10 @@ cmd_uninstall_cilium() {
   # prevent scheduling. Setting nodeSelector to {} restores normal scheduling.
   # Use kubectl patch with strategic merge: setting a field to null removes it.
   info "$(is_zh && echo "恢复 TKE 内置网络组件..." || echo "Restoring TKE built-in network components...")"
-  for ds in kube-proxy tke-cni-agent tke-eni-agent ip-masq-agent; do
+  # Only restore the three DS that cmd_install_cilium actually disabled; patching
+  # never-disabled DS (e.g. tke-eni-agent) would hit the fallback branch and wipe
+  # their own nodeSelector keys.
+  for ds in kube-proxy tke-cni-agent ip-masq-agent; do
     if kubectl -n kube-system get ds "$ds" >/dev/null 2>&1; then
       # Patch: set spec.template.spec.nodeSelector to null removes the disable patch.
       # Use JSON patch with `replace` op replacing nodeSelector with empty object,
