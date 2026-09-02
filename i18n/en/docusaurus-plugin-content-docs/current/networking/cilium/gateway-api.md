@@ -423,8 +423,14 @@ kc['clusters'][0]['cluster']['server'] = 'https://<clb-vip>:8443'
 kc['clusters'][0]['cluster']['insecure-skip-tls-verify'] = True
 kc['clusters'][0]['cluster'].pop('certificate-authority-data', None)
 print(yaml.dump(kc, default_flow_style=False, sort_keys=False))
-" > ~/.kube/configs/roc.yaml
+" > ~/.kube/configs/cls-a.yaml
 ```
+
+:::note[Why TLS verification is skipped]
+
+`insecure-skip-tls-verify: True` is set here and the CA certificate removed because the server address has been replaced with the CLB VIP, while the apiserver certificate's SAN does not contain that CLB VIP — client-side certificate verification would always fail. Skipping TLS verification carries man-in-the-middle risk and is recommended only for test environments.
+
+:::
 
 ## Configuration Parameters
 
@@ -446,7 +452,7 @@ print(yaml.dump(kc, default_flow_style=False, sort_keys=False))
 | HTTPS | `protocol: HTTPS` + `tls.mode: Terminate` | HTTPRoute | TLS termination + Layer 7 routing |
 | TLS | `protocol: TLS` + `tls.mode: Passthrough` | TLSRoute | TLS passthrough (route by SNI) |
 | GRPC | `protocol: HTTP` / `HTTPS` | GRPCRoute | gRPC routing |
-| TCP | `protocol: TCP` | TCPRoute | ❌ Unavailable (Cilium error `model source can't be empty`) |
+| TCP | `protocol: TCP` | TCPRoute | ❌ Unavailable (verified on 1.19.5; Cilium error `model source can't be empty`) |
 
 :::warning[TCP protocol unavailable]
 

@@ -4,12 +4,14 @@
 
 本文介绍如何使用 Cilium 的 Egress Gateway 和 CiliumEgressGatewayPolicy 来灵活控制哪些集群外访流量用哪个出口 IP 出去。
 
+**适用方案**：三种部署方案（Native Routing (VPC-CNI)、Overlay (VPC-CNI)、Overlay (GR)）均支持。其中 Native 模式的启用参数与 `nonMasqueradeCIDRs` 配置经过完整功能实测（见 [Cilium 功能测试](./appendix/connectivity-test.md)）；Overlay 模式基于机制分析（跨节点流量走 vxlan 封装，天然不受 BPF masquerade 的 SNAT 影响），尚未做完整实测，生产使用前建议先在测试集群验证。
+
 ## 已知问题
 
 使用 Cilium 的 Egress Gateway 功能存在以下已知问题：
 
 1. 对新 Pod 执行 Egress 策略有延迟。新 Pod 启动后，如果该 Pod 命中 Egress 策略，期望 Pod 的外访流量走指定出口网关出去，但实际上在 Pod 刚启动的一段时间内，该策略可能并未生效，不过这个时间通常会很短，大部分场景不受影响。
-2. 与 Cilium 的 Cluster Mesh 和 CiliumEndpointSlice 功能不兼容。
+2. 与 Cilium 的 ClusterMesh 和 CiliumEndpointSlice 功能不兼容。
 
 ## 启用 Egress Gateway
 
@@ -627,7 +629,7 @@ spec:
 
 ### 配置策略后网络不通
 
-首先确认 CiliumEgressGatewayPolicy 配置方法是否正确，在 TKE 环境下，确保 egressGateway 的 nodeSelector 只选中一个 node，egressIP 必须配置该 node 的内网 IP，否则可能就会出现不通的问题。
+首先确认 CiliumEgressGatewayPolicy 配置方法是否正确，在 TKE 环境下，确保每个 egressGateway(s) 条目的 nodeSelector 只选中一个节点，egressIP 必须配置该节点的内网 IP，否则可能就会出现不通的问题。
 
 另外还可以登录 egress 节点所在的 cilium pod，执行 `cilium-dbg bpf egress list` 查看当前节点上的 egress bpf 规则：
 
@@ -706,7 +708,7 @@ flowchart LR
 
 :::tip[注意]
 
-1. 确保 work 子网和 egress 子网之间的安全组互通 **UDP 4789**（VXLAN 隧道端口）。
+1. 确保 work 子网和 egress 子网之间的安全组互通 **UDP 8472**（VXLAN 隧道端口）。
 2. `egressIP` 填 egress 节点的**内网 IP**，不是 EIP。
 3. 如果 egress 节点本身也需要访问公网（如拉取镜像），可以单独给 egress 子网配置特定的路由规则，或确保 egress 节点有 EIP 且安全组出方向放通。
 
@@ -738,7 +740,7 @@ flowchart LR
      - podSelector: # 指定该 egress 策略针对哪些 Pod 生效
          matchLabels:
            app: nginx # 指定带 app=nginx 标签的 Pod
-           io.kubernetes.pod.namespace: test # 指定 default 命名空间
+           io.kubernetes.pod.namespace: test # 指定 test 命名空间
      destinationCIDRs:
      - "0.0.0.0/0"
      - "::/0"

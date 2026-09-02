@@ -10,7 +10,7 @@ If you are creating a new node pool, you can prioritize from the table below. If
 
 All OS entries in the table below have passed complete e2e verification across all 3 installation modes (cilium 1.19.5 + Egress Gateway + Nodelocal DNSCache).
 
-Added 2026-09: cilium **1.20.1** (Overlay VPC-CNI mode, `sysctlfix.enabled=false` + the `cilium-sysctl-override` DaemonSet) was re-verified on TencentOS Server 4.4 (kernel 6.6.88) — all core `cilium connectivity test` connectivity tests passed (only `ping-ipv4-external-ip` has no-NAT-gateway skip semantics in the test VPC, and `check-log-errors` reports a harmless notice because the kernel lacks `CONFIG_INET_DIAG_DESTROY`).
+Added 2026-09: cilium **1.20.1** (Overlay VPC-CNI mode, `sysctlfix.enabled=false` + the `cilium-sysctl-override` DaemonSet) was re-verified on TencentOS Server 4.4 (kernel 6.6.88) — all core `cilium connectivity test` connectivity tests passed (the 4/83 failed tests were all environmental: the `ping-ipv4-external-ip` tests failed because the test VPC had no NAT Gateway, and `check-log-errors` failed with a harmless notice because the kernel lacks `CONFIG_INET_DIAG_DESTROY`; see the cilium 1.20.1 retest record in [Cilium Connectivity Test](./connectivity-test.md)).
 
 | OS                   | OsName                  | Kernel Version |
 | -------------------- | ----------------------- | -------------- |
@@ -53,7 +53,7 @@ If you need to use an OS not in the table (e.g., custom images, other CVM public
    - Whether all nodes are reachable in `cilium-health status`
    - Whether DNS resolution (both in-cluster svc names and external domain names) is working
    - Whether `cilium connectivity test` passes all cases
-4. **Run business feature verification**: If using additional features like NetworkPolicy, Egress Gateway, Cluster Mesh, etc., test each feature's key path.
+4. **Run business feature verification**: If using additional features like NetworkPolicy, Egress Gateway, ClusterMesh, etc., test each feature's key path.
 
 Once all verifications pass, you can safely use the OS in production node pools.
 

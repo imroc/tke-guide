@@ -119,7 +119,7 @@ bpf:
 
 BPF host routing 的代码挂在 `cilium_host` 设备的 tc-bpf 程序上（源码：`bpf/bpf_host.c` 的 `ENABLE_HOST_ROUTING` 宏分支）。如果包根本不经过 `cilium_host`，这段代码就不会被执行——即使配置层全开、`cilium status` 报 `BPF`，**数据路径上 BPF host routing 也不会命中**。
 
-**`endpointRoutes.enabled=true` 模式正是这种情况**：每个 Pod 在节点上有独立的内核路由（`ip route` 直接指向 lxc 设备），包不经过 `cilium_host`。源码 `pkg/endpoint/endpoint.go:1036-1056` 的 `NewDatapathConfiguration()` 注释直接说明这一点：
+**`endpointRoutes.enabled=true` 模式正是这种情况**：每个 Pod 在节点上有独立的内核路由（`ip route` 直接指向 lxc 设备），包不经过 `cilium_host`。源码 `pkg/endpoint/endpoint.go:999-1012` 的 `NewDatapathConfiguration()` 注释直接说明这一点：
 
 > _"Since routing occurs via endpoint interface directly, BPF program on cilium_host interface is bypassed"_
 

@@ -68,7 +68,7 @@ Hubble 支持**静态导出**和**动态导出**两种方式：
 
 #### 过滤器
 
-`includeFilters` 和 `excludeFilters` 完整的过滤器字段列表参考源码 [flow.proto](https://github.com/cilium/cilium/blob/main/api/v1/flow/flow.proto) 中的 `FlowFilter` meesage 定义，以下是常用字段：
+`includeFilters` 和 `excludeFilters` 完整的过滤器字段列表参考源码 [flow.proto](https://github.com/cilium/cilium/blob/main/api/v1/flow/flow.proto) 中的 `FlowFilter` message 定义，以下是常用字段：
 
 | 字段              | 说明                                 | 示例                           |
 | ----------------- | ------------------------------------ | ------------------------------ |
@@ -438,7 +438,7 @@ TKE 使用 LogConfig 这个 CRD 配置日志采集规则，通过这种方式配
 
 > 通过 `kubectl apply -f <your-logconfig-yaml-file>` 进行配置。
 
-:::info[注意]
+:::note[注意]
 
 需根据注释替换相关字段。
 

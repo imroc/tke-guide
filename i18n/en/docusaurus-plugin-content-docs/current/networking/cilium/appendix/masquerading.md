@@ -4,7 +4,9 @@
 
 In simple terms, IP masquerade translates the source IP of outbound Pod traffic to the node IP (SNAT). It is typically used when Pod IPs cannot be routed directly outside the cluster but outbound access is still needed.
 
-## VPC-CNI Mostly Does Not Need IP Masquerade
+## Native Routing (VPC-CNI) Mostly Does Not Need IP Masquerade
+
+Overlay modes (GR and VPC-CNI Overlay) enable IP masquerade by default (`enableIPv4Masquerade=true`); this article only discusses Native Routing (VPC-CNI).
 
 In TKE VPC-CNI network mode, Pod IPs are VPC IPs, just like node IPs, and can be routed directly within the VPC. When connected to other VPCs or other clouds (e.g., AWS) via Cloud Connect Network, Pod IPs can also be routed directly. Additionally, NAT Gateways are supported, allowing Pods to access the internet through them.
 
@@ -75,7 +77,7 @@ helm upgrade cilium cilium/cilium --version 1.20.1 \
   # highlight-add-end
 ```
 
-:::info[Note]
+:::note[Note]
 
 If adjusting an already installed Cilium configuration, existing nodes need a cilium-agent restart to take effect:
 
@@ -112,7 +114,7 @@ ipMasqAgent:
 
 ## Configuring nonMasqueradeCIDRs
 
-The IP masquerade enablement method described above does not SNAT traffic to all internal network ranges (except 169.255.0.0/16). For more fine-grained control, you can explicitly configure which CIDRs should not be SNATed, as follows.
+The IP masquerade enablement method described above does not SNAT traffic to all internal network ranges (except 169.254.0.0/16). For more fine-grained control, you can explicitly configure which CIDRs should not be SNATed, as follows.
 
 1. Prepare the ip-masq-agent ConfigMap in a file `ip-masq-agent-config.yaml`:
 

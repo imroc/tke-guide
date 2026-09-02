@@ -9,7 +9,7 @@ VPC-CNI 集群两种模式都支持；GR 集群仅支持 Overlay 模式。**推�
 
 :::tip[Native 和 Overlay 性能几乎一致，选型看架构而非性能]
 
-实测表明 **Native Routing 和 Overlay 的性能差异在噪声范围内**：吞吐均达线速、真实业务延迟完全相同、大规模 Service 退化两者都远好于 iptables。两者的 VXLAN 封装 / 双层处理开销量级相当，且都只在极限压测下可见，对真实业务无感知。**因此选型应基于网络架构需求（Pod IP 是否需要 VPC 可路由、CLB 是否直连 Pod、IP 资源是否紧张），而不是性能。** 完整数据见 [Cilium 网络性能 Benchmark](./appendix/network-benchmark.md)。
+实测表明 **Native Routing 和 Overlay 在跨节点吞吐、真实业务延迟上的差异在噪声范围内**：吞吐均达线速、真实业务延迟完全相同、大规模 Service 退化两者都远好于 iptables（唯一可复现的差异是同节点极限压测下 Overlay 延迟略优约 17%，见 [Cilium 性能测试](./appendix/performance-test.md)）。两者的 VXLAN 封装 / 双层处理开销量级相当，且都只在极限压测下可见，对真实业务无感知。**因此选型应基于网络架构需求（Pod IP 是否需要 VPC 可路由、CLB 是否直连 Pod、IP 资源是否紧张），而不是性能。** 完整数据见 [Cilium 网络性能 Benchmark](./appendix/network-benchmark.md)。
 
 :::
 
@@ -25,6 +25,7 @@ VPC-CNI 集群两种模式都支持；GR 集群仅支持 Overlay 模式。**推�
 | 集群外访问 Pod       | ✅ 可直接路由                           | ❌ 不可直接路由，需通过 Service/Ingress                       | ❌ 不可直接路由（同左）                                                                                                                                                                |
 | CLB 直连 Pod         | ✅ 支持                                 | ❌ 不支持（CLB 无法转发 Overlay Pod IP）                      | ❌ 不支持（同左）                                                                                                                                                                      |
 | Gateway API          | ❌ 不支持（ipam=delegated-plugin 限制） | ✅ 支持（ipam=multi-pool）                                    | ✅ 支持（ipam=multi-pool）                                                                                                                                                             |
+| Egress Gateway       | ✅ 支持（已实测）                        | ✅ 支持（基于机制分析，尚未完整实测）                         | ✅ 支持（同左）                                                                                                                                                                        |
 | Webhook 兼容性       | ✅ 无限制                               | ⚠️ 需 hostNetwork（见下方 FAQ）                               | ⚠️ 需 hostNetwork（同左）                                                                                                                                                              |
 | Pod 固定 IP          | ✅ 支持（TKE VPC-CNI 原生能力）         | ❌ 不支持（cilium multi-pool IPAM 无固定 IP 能力）            | ❌ 不支持（同左）                                                                                                                                                                      |
 | L7/DNS NetworkPolicy | ✅ 完整支持                             | ✅ 完整支持                                                   | ✅ 完整支持                                                                                                                                                                            |
@@ -47,7 +48,7 @@ GR 集群有两个**与 cilium 不太搭**的硬限制：
 
 ### 准备 TKE 集群
 
-:::info[注意]
+:::warning[注意]
 
 安装 cilium 是对集群一个很重大的变更，不建议在有生产业务运行的集群中安装，否则安装过程中可能会影响线上业务的正常运行，建议在新创建的 TKE 集群中安装 cilium。
 
@@ -73,7 +74,7 @@ cilium 必须在**空集群**（无节点 / 仅有超级节点）上安装。如
 正确做法：
 
 1. **新建集群**：在控制台 / terraform 创建集群时不要添加节点
-2. **节点 → 安装 cilium → 加节点**：cilium 一键脚本安装完成后会暂停并提示加节点，等节点 Ready 后再继续
+2. **节点 → 安装 cilium → 加节点**：cilium 一键脚本安装完成后会打印加节点的提示（勾选安装 NodeLocal DNSCache 时会等待节点 Ready 后再继续），按提示把节点池扩容出来即可
 
 如果意外在 cilium 安装前向集群加了节点，**重启或重建这些节点**才能让 cilium 干净接管。
 
@@ -149,7 +150,7 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install
 ```
 
-脚本会自动检测集群网络模式、引导选择安装方案和版本，然后执行安装。安装过程中还可选择是否启用 [Egress Gateway](egress-gateway.md) 和 [Nodelocal DNSCache](./appendix/with-node-local-dns.md)。如需手动安装，参考后续步骤。
+脚本会自动检测集群网络模式、引导选择安装方案和版本，然后执行安装。安装过程中还可选择是否启用 [Egress Gateway](egress-gateway.md)、[Hubble 可观测性](observability.md)（默认启用，含 Hubble Relay 与 UI）与 [Nodelocal DNSCache](./appendix/with-node-local-dns.md)；Native 方案还会询问是否启用 ip-masq-agent（Pod 借节点 EIP 出公网，见 [配置 IP 伪装](./appendix/masquerading.md)）。注意脚本默认装 Hubble，而本文手动 helm 命令不包含——如需对齐，手动安装时参考 [增强可观测性](observability.md)。如需手动安装，参考后续步骤。
 
 :::tip[为什么用 `bash -c "$(curl ...)"` 而不是 `curl ... \| bash`？]
 
@@ -285,7 +286,7 @@ cilium 自带的 `sysctlfix` 功能本可以写覆盖文件，但存在两个问
 
 ### 使用 helm 安装 cilium
 
-:::info[注意]
+:::note[注意]
 
 `k8sServiceHost` 是 apiserver 地址，通过命令动态获取。
 

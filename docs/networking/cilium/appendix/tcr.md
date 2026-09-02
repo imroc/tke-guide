@@ -88,7 +88,7 @@ skopeo copy -a docker://quay.io/cilium/operator-generic:v1.20.1  docker://your-t
 
 如果你的安装配置所依赖镜像较多，也可以通过脚本来实现一键将所有依赖镜像全部同步到 TCR 镜像仓库中，保存下面的脚本内容到 `sync-cilium-images.sh` 文件中:
 
-:::info[注意]
+:::note[注意]
 
 1. `TARGET_REGISTRY` 是目标 TCR 镜像仓库地址，替换成自己仓库的地址。
 2. 根据自己实际需要的部署配置，修改下 `helm template` 后面使用的安装参数。

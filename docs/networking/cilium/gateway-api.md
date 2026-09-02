@@ -423,8 +423,14 @@ kc['clusters'][0]['cluster']['server'] = 'https://<clb-vip>:8443'
 kc['clusters'][0]['cluster']['insecure-skip-tls-verify'] = True
 kc['clusters'][0]['cluster'].pop('certificate-authority-data', None)
 print(yaml.dump(kc, default_flow_style=False, sort_keys=False))
-" > ~/.kube/configs/roc.yaml
+" > ~/.kube/configs/cls-a.yaml
 ```
+
+:::note[为什么要跳过 TLS 校验]
+
+这里设置 `insecure-skip-tls-verify: True` 并移除 CA 证书，是因为 server 地址已替换为 CLB VIP，而 apiserver 证书的 SAN 中不包含该 CLB VIP，客户端证书校验必然失败。跳过 TLS 校验存在中间人风险，建议仅在测试环境使用。
+
+:::
 
 ## 配置参数说明
 
@@ -446,7 +452,7 @@ print(yaml.dump(kc, default_flow_style=False, sort_keys=False))
 | HTTPS | `protocol: HTTPS` + `tls.mode: Terminate` | HTTPRoute | TLS 终止 + 七层路由 |
 | TLS | `protocol: TLS` + `tls.mode: Passthrough` | TLSRoute | TLS 透传（按 SNI 路由） |
 | GRPC | `protocol: HTTP` / `HTTPS` | GRPCRoute | gRPC 路由 |
-| TCP | `protocol: TCP` | TCPRoute | ❌ 不可用（Cilium 报错 `model source can't be empty`） |
+| TCP | `protocol: TCP` | TCPRoute | ❌ 不可用（1.19.5 实测，Cilium 报错 `model source can't be empty`） |
 
 :::warning[TCP 协议不可用]
 

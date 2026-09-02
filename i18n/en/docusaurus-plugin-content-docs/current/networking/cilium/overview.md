@@ -14,12 +14,12 @@
 
 ### Network Enhancement
 
-| Article                                                                    | Content                                                           | Prerequisites   |
-| -------------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------- |
-| **[Using Gateway API](./gateway-api.md)**                                  | Cilium built-in Gateway API for traffic routing                   | Cilium installed |
-| **[Egress Gateway in Practice](./egress-gateway.md)**                      | Select fixed egress IP per policy for external access             | Cilium installed |
-| **[Enabling Communication Encryption](./encryption.md)**                   | WireGuard / IPsec encryption for inter-node Pod traffic           | Cilium installed |
-| **[Building Multi-Cluster Networks with Cilium](./clustermesh.md)**        | Cluster Mesh to connect services across clusters                  | Cilium installed |
+| Article                                                                    | Content                                                           | Applicable Plans                                        |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------- |
+| **[Using Gateway API](./gateway-api.md)**                                  | Cilium built-in Gateway API for traffic routing                   | Overlay only (ipam=multi-pool)                          |
+| **[Egress Gateway in Practice](./egress-gateway.md)**                      | Select fixed egress IP per policy for external access             | All three plans (Native verified in tests)              |
+| **[Enabling Communication Encryption](./encryption.md)**                   | WireGuard / IPsec encryption for inter-node Pod traffic           | WireGuard: all plans (IPsec has limits, see that guide) |
+| **[Building Multi-Cluster Networks with Cilium](./clustermesh.md)**        | ClusterMesh to connect services across clusters                 | All plans (needs cross-cluster connectivity, see guide) |
 
 ### Security Policies
 
@@ -53,7 +53,7 @@
 | Article                                                                                 | Content                                             |
 | --------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | **[Apiserver Connection Error: operation not permitted](./appendix/troubleshooting/connect-apiserver-operation-not-permitted.md)** | Cilium bug investigation and root cause analysis |
-| **[Cilium Debugging Tips](./appendix/debug.md)**                                        | `cilium status`, monitor, and other common commands |
+| **[Cilium Debugging Quick Reference](./appendix/debug.md)**                             | Common debugging commands: `cilium status`, monitor, hubble observe, BPF maps |
 
 ## Quick Decision Tree
 
@@ -151,4 +151,4 @@ After installing Cilium in TKE, it can replace or enhance the following TKE nati
 | **Egress Control**        | Requires additional config | Egress Gateway (per-policy egress IP selection) |
 | **Encryption**            | None                       | WireGuard / IPsec transparent encryption        |
 | **IP Masquerade**         | ip-masq-agent              | Built-in BPF ip-masq-agent (better performance) |
-| **Multi-Cluster Network** | None                       | Cluster Mesh (cross-cluster Service access)     |
+| **Multi-Cluster Network** | None                       | ClusterMesh (cross-cluster Service access)     |

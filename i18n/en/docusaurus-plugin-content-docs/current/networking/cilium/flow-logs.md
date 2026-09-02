@@ -438,7 +438,7 @@ TKE uses the LogConfig CRD to configure log collection rules. This approach allo
 
 > Apply with `kubectl apply -f <your-logconfig-yaml-file>`.
 
-:::info[Note]
+:::note[Note]
 
 Replace the relevant fields based on the comments.
 

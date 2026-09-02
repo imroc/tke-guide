@@ -2,6 +2,12 @@
 
 本文介绍如何对在 TKE 集群上安装的 cilium 做网络性能测试，并给出各推荐安装方案的实测结果。
 
+:::note[版本口径]
+
+本文实测数据基于 **cilium 1.19.5**（2026-06 实测，环境表见下文）；教程当前验证版本为 1.20.1，功能与安装流程已复测（见 [Cilium 功能测试](./connectivity-test.md)），**性能数据尚未在 1.20.1 复测**。测试方法与命令对 1.20.1 同样适用，结论量级预期不变，如需精确数据请按本文方法自行复测。
+
+:::
+
 cilium 官方提供了 [`cilium connectivity perf`](https://docs.cilium.io/en/stable/operations/performance/benchmark/) 性能测试工具，基于 netperf 在集群中实际下发 Pod 跑 TCP_RR（请求-响应延迟）/ TCP_STREAM（吞吐）等测试，覆盖 **同节点 / 跨节点** × **Pod 网络 / Host 网络** 共四种网络组合。
 
 ## 测试方法
@@ -29,7 +35,7 @@ SA5 等支持突发带宽的机型，默认 4 流可能无法触发突发，建�
 cilium connectivity perf --streams 8
 
 # 或通过一键脚本
-bash -c "$(curl -sfL ...)" -- perf --streams 8
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- perf --streams 8
 ```
 
 8 流在 SA5 各规格上经实测均可稳定填满突发带宽，能更准确地反映吞吐上限。

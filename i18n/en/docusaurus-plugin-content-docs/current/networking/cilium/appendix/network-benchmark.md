@@ -10,6 +10,12 @@ The three clusters tested:
 
 Coverage: throughput, HTTP RPS (keepalive/short conn), TCP latency, Service-scale degradation (5000→30000, 4 Endpoints per Service), Hubble overhead, NetworkPolicy L3/L4 and L7 overhead, BPF memory, and component resources.
 
+:::note[Version note]
+
+The measured data in this article is based on **cilium 1.19.5** (tested in June 2026; see the environment table below). The tutorial's currently verified version is 1.20.1 — **the performance data has not been re-tested on 1.20.1**; the selection conclusions are expected to hold at the same magnitude.
+
+:::
+
 :::tip[Conclusions first]
 
 - **Throughput and real-workload latency (HTTP p99 @1000 QPS) are identical across all three** — networking-solution differences are invisible under realistic load.
@@ -101,6 +107,8 @@ kubectl -n kube-system patch configmap cilium-config --type merge \
   -p '{"data":{"bpf-lb-map-max":"1048576"}}'
 kubectl -n kube-system rollout restart ds/cilium
 ```
+
+The example value `1048576` (= 2^20) is a round number chosen for easy memory; after tuning, the value actually used in our tests was `1020000` (see the BPF Map memory section below) — base the actual value on your own measurements.
 
 :::
 

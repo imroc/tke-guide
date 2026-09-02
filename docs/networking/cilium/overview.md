@@ -14,12 +14,12 @@
 
 ### 网络增强
 
-| 文章                                                                   | 内容                                  | 前置依赖      |
-| ---------------------------------------------------------------------- | ------------------------------------- | ------------- |
-| **[使用 Gateway API](./gateway-api.md)**                               | Cilium 内置 Gateway API 实现流量路由  | 已安装 Cilium |
-| **[Egress Gateway 应用实践](./egress-gateway.md)**                     | 按策略选择固定出口 IP 访问外部        | 已安装 Cilium |
-| **[启用通信加密](./encryption.md)**                                    | WireGuard / IPsec 加密节点间 Pod 流量 | 已安装 Cilium |
-| **[使用 Cilium 构建多集群网络](./clustermesh.md)**                     | Cluster Mesh 打通多集群服务互访       | 已安装 Cilium |
+| 文章                                                                   | 内容                                  | 适用方案                                       |
+| ---------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------- |
+| **[使用 Gateway API](./gateway-api.md)**                               | Cilium 内置 Gateway API 实现流量路由  | 仅 Overlay（ipam=multi-pool）                  |
+| **[Egress Gateway 应用实践](./egress-gateway.md)**                     | 按策略选择固定出口 IP 访问外部        | 三种方案（Native 已实测）                      |
+| **[启用通信加密](./encryption.md)**                                    | WireGuard / IPsec 加密节点间 Pod 流量 | WireGuard 全方案（IPsec 有限制，见该篇）       |
+| **[使用 Cilium 构建多集群网络](./clustermesh.md)**                     | ClusterMesh 打通多集群服务互访       | 全方案（需跨集群网络互通，见该篇前提）          |
 
 ### 安全策略
 
@@ -53,7 +53,7 @@
 | 文章                                                                    | 内容                                |
 | ----------------------------------------------------------------------- | ----------------------------------- |
 | **[连接 apiserver 报错 operation not permitted](./appendix/troubleshooting/connect-apiserver-operation-not-permitted.md)** | Cilium bug 排查与根因分析 |
-| **[Cilium 调试技巧](./appendix/debug.md)**                              | `cilium status`、monitor 等常用命令 |
+| **[Cilium 调试速查](./appendix/debug.md)**                              | `cilium status`、monitor、hubble observe、BPF map 等常用调试命令 |
 
 ## 快速决策树
 
@@ -151,4 +151,4 @@ Cilium 路由支持两种模式：
 | **Egress 控制**   | 需额外配置    | Egress Gateway（按策略选择出口 IP）   |
 | **加密**          | 无            | WireGuard / IPsec 透明加密            |
 | **IP 伪装**       | ip-masq-agent | 内置 BPF 版 ip-masq-agent（性能更好） |
-| **多集群网络**    | 无            | Cluster Mesh（跨集群 Service 互访）   |
+| **多集群网络**    | 无            | ClusterMesh（跨集群 Service 互访）   |

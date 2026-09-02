@@ -4,12 +4,14 @@
 
 This article covers how to use Cilium's Egress Gateway and CiliumEgressGatewayPolicy to flexibly control which external traffic uses which egress IP.
 
+**Applicable plans**: All three deployment plans (Native Routing (VPC-CNI), Overlay (VPC-CNI), Overlay (GR)) are supported. The Native-mode enablement parameters and `nonMasqueradeCIDRs` configuration have been verified by full functional testing (see [Cilium Functional Test](./appendix/connectivity-test.md)); the Overlay path is mechanism-based (cross-node traffic rides the vxlan tunnel and is naturally unaffected by BPF masquerade SNAT) but has not been fully tested yet — validate in a test cluster before production use.
+
 ## Known Issues
 
 Using Cilium's Egress Gateway has the following known issues:
 
 1. Delay in applying Egress policy to new Pods. After a new Pod starts, if it matches an Egress policy, the traffic is expected to go through the designated egress gateway. However, the policy may not take effect immediately after the Pod starts. This period is usually short and does not affect most scenarios.
-2. Incompatible with Cilium Cluster Mesh and CiliumEndpointSlice features.
+2. Incompatible with Cilium ClusterMesh and CiliumEndpointSlice features.
 
 ## Enabling Egress Gateway
 
@@ -628,7 +630,7 @@ spec:
 
 ### Network Unreachable After Configuring Policy
 
-First, verify the CiliumEgressGatewayPolicy configuration. In TKE environments, ensure that `egressGateway.nodeSelector` selects only one node, and `egressIP` must be set to that node's internal IP. Otherwise, connectivity issues may occur.
+First, verify the CiliumEgressGatewayPolicy configuration. In TKE environments, ensure that each `egressGateway`/`egressGateways` entry's `nodeSelector` selects exactly one node, and `egressIP` must be set to that node's internal IP. Otherwise, connectivity issues may occur.
 
 You can also log into the cilium pod on the egress node and run `cilium-dbg bpf egress list` to check the egress BPF rules on the current node:
 
@@ -707,7 +709,7 @@ External traffic from Pods that do not match the Egress policy takes the normal 
 
 :::tip[Note]
 
-1. Ensure the security groups between the work subnet and egress subnet allow **UDP 4789** (VXLAN tunnel port).
+1. Ensure the security groups between the work subnet and egress subnet allow **UDP 8472** (VXLAN tunnel port).
 2. `egressIP` should be the egress node's **internal IP**, not the EIP.
 3. If the egress node itself needs public network access (e.g., pulling images), you can configure specific route rules for the egress subnet or ensure the egress node has an EIP and the security group's outbound rules are open.
 
@@ -739,7 +741,7 @@ Procedure:
      - podSelector: # Specify which Pods this egress policy applies to
          matchLabels:
            app: nginx # Pods with app=nginx label
-           io.kubernetes.pod.namespace: test # Specify default namespace
+           io.kubernetes.pod.namespace: test # Specify the test namespace
      destinationCIDRs:
      - "0.0.0.0/0"
      - "::/0"

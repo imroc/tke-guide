@@ -13,7 +13,7 @@ GR + Native Routing runs into all 4 categories of issues below, making it practi
 3. ⚠️ **Node pools must have the `node.cilium.io/agent-not-ready` taint added** (not required in the other three modes)
 4. ⚠️ **GR and VPC-CNI coexistence is broken**
 
-We performed a complete [e2e verification](./connectivity-test.md) of this scheme: in cilium's [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) mode on top of tke-bridge's `cbr0` bridge, cilium's eBPF datapath and the Linux bridge forwarding path are incompatible — basic connectivity fails. The failure points are listed below.
+In cilium's [generic-veth chaining](https://docs.cilium.io/en/stable/installation/cni-chaining-generic-veth/) mode on top of tke-bridge's `cbr0` bridge, cilium's eBPF datapath and the Linux bridge forwarding path are incompatible — basic connectivity fails (reproduction steps in [1. Cross-node Pod-to-Pod Traffic Failure](#1-cross-node-pod-to-pod-traffic-failure)). The failure points are listed below.
 
 :::
 
@@ -140,7 +140,7 @@ Choose based on your needs from the table below:
 | New cluster, performance-first, direct Pod routing | **Native Routing (VPC-CNI)** — recommended          |
 | New cluster, limited IP resources or want Pod CIDR decoupled from VPC | **Overlay (VPC-CNI)** — recommended |
 
-All three recommended schemes have passed [complete e2e testing](./connectivity-test.md) (see the "Test Results" section of that article).
+For the e2e results of Native (VPC-CNI) and Overlay (VPC-CNI), see [Cilium Connectivity Test](./connectivity-test.md); for the verification status of Overlay (GR), see [Verified Node Operating Systems](./verified-os.md).
 
 If you already have a GR cluster in production but **haven't installed cilium yet**, we recommend installing cilium in Overlay mode. The impact on your workloads is that Pod IPs will no longer come from the GR network range (using a dedicated CIDR), but all other capabilities remain intact.
 

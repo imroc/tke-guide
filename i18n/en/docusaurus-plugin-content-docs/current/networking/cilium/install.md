@@ -9,7 +9,7 @@ VPC-CNI clusters support both modes; GR clusters only support Overlay mode. **VP
 
 :::tip[Native and Overlay perform almost identically — choose by architecture, not performance]
 
-Benchmarks show the **performance difference between Native Routing and Overlay is within noise**: both hit line-rate throughput, identical real-workload latency, and at large Service scale both degrade far less than iptables. Their VXLAN-encap vs double-processing overheads are comparable in magnitude and only visible under saturation benchmarks — invisible to real workloads. **So choose based on network architecture needs (does Pod IP need to be VPC-routable, does CLB need to reach Pods directly, is IP supply tight), not performance.** Full data: [Cilium Network Performance Benchmark](./appendix/network-benchmark.md).
+Benchmarks show the **difference between Native Routing and Overlay is within noise for cross-node throughput and real-workload latency**: both hit line-rate throughput, identical real-workload latency, and at large Service scale both degrade far less than iptables (the only reproducible difference is that Overlay wins ~17% on same-node latency under saturation benchmarks — see [Cilium Performance Test](./appendix/performance-test.md)). Their VXLAN-encap vs double-processing overheads are comparable in magnitude and only visible under saturation benchmarks — invisible to real workloads. **So choose based on network architecture needs (does Pod IP need to be VPC-routable, does CLB need to reach Pods directly, is IP supply tight), not performance.** Full data: [Cilium Network Performance Benchmark](./appendix/network-benchmark.md).
 
 :::
 
@@ -25,6 +25,7 @@ Benchmarks show the **performance difference between Native Routing and Overlay 
 | External Pod Access       | ✅ Directly routable                     | ❌ Not directly routable, via Service/Ingress                                              | ❌ Not directly routable (Same as left)                                                                                                                                                                                                                                                           |
 | CLB Direct-to-Pod         | ✅ Supported                             | ❌ Not supported (CLB can't route Overlay IP)                                              | ❌ Not supported (Same as left)                                                                                                                                                                                                                                                                   |
 | Gateway API               | ❌ Not supported (ipam=delegated-plugin) | ✅ Supported (ipam=multi-pool)                                                             | ✅ Supported (ipam=multi-pool)                                                                                                                                                                                                                                                                    |
+| Egress Gateway            | ✅ Supported (verified in tests)         | ✅ Supported (mechanism-based, not fully tested yet)                                       | ✅ Supported (Same as left)                                                                                                                                                                                                                                                                       |
 | Webhook Compatibility     | ✅ No restrictions                       | ⚠️ Requires hostNetwork (see FAQ below)                                                    | ⚠️ Requires hostNetwork (Same as left)                                                                                                                                                                                                                                                            |
 | Pod Fixed IP              | ✅ Supported (TKE VPC-CNI native)        | ❌ Not supported (cilium multi-pool IPAM has no fixed IP)                                  | ❌ Not supported (Same as left)                                                                                                                                                                                                                                                                   |
 | L7/DNS NetworkPolicy      | ✅ Fully supported                       | ✅ Fully supported                                                                         | ✅ Fully supported                                                                                                                                                                                                                                                                                |
@@ -47,7 +48,7 @@ If you already have a GR cluster, follow the **Overlay (GR)** path in this guide
 
 ### Prepare TKE Cluster
 
-:::info[Note]
+:::warning[Note]
 
 Installing cilium is a major change to the cluster. Do not install it in a cluster running production workloads — installation may disrupt online services. It is recommended to install cilium in a newly created TKE cluster.
 
@@ -73,7 +74,7 @@ Cilium must be installed on an **empty cluster** (no nodes / super nodes only). 
 The right order:
 
 1. **Create the cluster empty** (no nodes from console / terraform)
-2. **Install cilium → add nodes**: the one-click script pauses after install and prompts you to add nodes; once they're Ready, it continues
+2. **Install cilium → add nodes**: the one-click script prints a prompt to add nodes after the install completes (when NodeLocal DNSCache is selected it waits for the nodes to be Ready before continuing) — scale the node pool out as prompted
 
 If you accidentally added nodes before installing cilium, **reboot or recreate those nodes** so cilium can take over cleanly.
 
@@ -152,7 +153,7 @@ If the GitHub URL is not reachable, use the site mirror:
 bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install
 ```
 
-The script auto-detects the cluster's network mode, guides you through choosing a mode and version, then performs the installation. During installation you can optionally enable [Egress Gateway](egress-gateway.md) and [Nodelocal DNSCache](./appendix/with-node-local-dns.md). For manual installation, follow the steps below.
+The script auto-detects the cluster's network mode, guides you through choosing a mode and version, then performs the installation. During installation you can optionally enable [Egress Gateway](egress-gateway.md), [Hubble observability](observability.md) (enabled by default, including Hubble Relay and UI), and [Nodelocal DNSCache](./appendix/with-node-local-dns.md); the Native plan also asks whether to enable ip-masq-agent (Pods egress via node EIP — see [Configure IP Masquerading](./appendix/masquerading.md)). Note the script installs Hubble by default while the manual helm commands in this guide do not — see [Enhanced Observability](observability.md) to align a manual install. For manual installation, follow the steps below.
 
 :::tip[Why `bash -c "$(curl ...)"` and not `curl ... | bash`?]
 
@@ -288,7 +289,7 @@ For the full analysis (including the Native vs Overlay difference and the routin
 
 ### Install Cilium via Helm
 
-:::info[Note]
+:::note[Note]
 
 `k8sServiceHost` is the apiserver address, fetched dynamically via the command shown.
 

@@ -38,7 +38,7 @@ bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install-localdn
 
 :::tip[说明]
 
-以下内容是根据 Ciium 官方文档 [Node-local DNS cache](https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/#node-local-dns-cache) 中的 **Manual Configuration** 方式，将 node-local-dns 官方的部署 YAML 文件 [nodelocaldns.yaml](https://raw.githubusercontent.com/kubernetes/kubernetes/refs/heads/master/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml) 修改而来，另外替换镜像地址成 dockerhub 上的 mirror 镜像，方便在 TKE 环境中直接内网拉取到，并且禁用了 HINFO 请求避免日志一直报错（VPC 的 DNS 服务不支持 HINFO 请求）。
+以下内容是根据 Cilium 官方文档 [Node-local DNS cache](https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/#node-local-dns-cache) 中的 **Manual Configuration** 方式，将 node-local-dns 官方的部署 YAML 文件 [nodelocaldns.yaml](https://raw.githubusercontent.com/kubernetes/kubernetes/refs/heads/master/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml) 修改而来，另外替换镜像地址成 dockerhub 上的 mirror 镜像，方便在 TKE 环境中直接内网拉取到，并且禁用了 HINFO 请求避免日志一直报错（VPC 的 DNS 服务不支持 HINFO 请求）。
 
 :::
 

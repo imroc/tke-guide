@@ -138,7 +138,7 @@ D. **包以 Pod IP 出节点，但 Pod IP 没有公网出口**——结合 A，�
 | Pod IP 是否有公网能力               | ❌ 无（辅助 ENI 不绑 EIP）                        | n/a（Pod IP 出节点前一定 SNAT，从不直接面对公网）                                                                      |
 | `enableIPv4Masquerade`              | `false`（Pod IP 是 VPC 合法 IP，东西向无需 SNAT） | `true`                                                                                                                 |
 | 节点 EIP identity                   | `remote-node`                                     | `remote-node`                                                                                                          |
-| BPF masq 早退出（remote-node 跳过） | 命中——但 Native 整体没启用 masq，本来也不 SNAT    | 命中——cilium 把目标当集群内部，跳过 vxlan 解封后的 SNAT，**但内层 SNAT 已在 vxlan 封装前由 enableIPv4Masquerade 完成** |
+| BPF masq 早退出（remote-node 跳过） | 命中——默认不开 masq；即使开启（ip-masq-agent/Egress Gateway），也因 remote-node identity 早退出不对该目标 SNAT（见上文 C 点） | 命中——cilium 把目标当集群内部，跳过 vxlan 解封后的 SNAT，**但内层 SNAT 已在 vxlan 封装前由 enableIPv4Masquerade 完成** |
 | 出节点的源 IP                       | Pod IP（辅助 ENI IP，无公网能力）                 | **节点主 ENI VPC IP**（已 SNAT）                                                                                       |
 | 能否到达公网 EIP                    | ❌ Pod IP 没有公网出口                            | ✅ 节点主 ENI IP 走主 ENI 的公网能力（EIP / NAT 网关）                                                                 |
 

@@ -119,7 +119,7 @@ When both are satisfied, `cilium status` reports `Host Routing: BPF`.
 
 The BPF host routing code is attached to the tc-bpf program on the `cilium_host` device (source: `ENABLE_HOST_ROUTING` macro branch in `bpf/bpf_host.c`). If packets never reach `cilium_host`, the code is never executed — even if config-layer requirements are met and `cilium status` reports `BPF`, **BPF host routing does not actually hit on the data path**.
 
-**`endpointRoutes.enabled=true` is exactly this case**: each Pod has its own kernel route (`ip route` pointing directly to the lxc device), so packets bypass `cilium_host`. The comment in `pkg/endpoint/endpoint.go:1036-1056` `NewDatapathConfiguration()` confirms this directly:
+**`endpointRoutes.enabled=true` is exactly this case**: each Pod has its own kernel route (`ip route` pointing directly to the lxc device), so packets bypass `cilium_host`. The comment in `pkg/endpoint/endpoint.go:999-1012` `NewDatapathConfiguration()` confirms this directly:
 
 > _"Since routing occurs via endpoint interface directly, BPF program on cilium_host interface is bypassed"_
 

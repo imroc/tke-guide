@@ -362,14 +362,14 @@ kind: CiliumNetworkPolicy
 metadata:
   name: from-b-to-a-api
 spec:
-  description: "Allow HTTP API from a to b"
+  description: "Allow HTTP API from b to a"
   endpointSelector:
     matchLabels:
-      role: a
+      app: a
   ingress:
   - fromEndpoints:
     - matchLabels:
-        role: b
+        app: b
     toPorts:
     - ports:
       - port: "80"
@@ -464,7 +464,7 @@ metadata:
 spec:
   endpointSelector:
     matchLabels:
-      role: a
+      app: a
   egress:
   - toCIDR:
     - 192.0.2.0/24

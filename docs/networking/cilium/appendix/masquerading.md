@@ -4,9 +4,11 @@
 
 简单来说，IP 伪装就是将 Pod 出集群的流量的源 IP 伪装成节点 IP（SNAT），通常用在 Pod IP 无法直接在集群外路由但又希望流量能够外访的场景。
 
-## VPC-CNI 大部分场景不需要 IP 伪装
+## Native Routing（VPC-CNI）大部分场景不需要 IP 伪装
 
-TKE VPC-CNI 网络模式，Pod IP 使用的 VPC IP，与节点 IP 一样，可直接在 VPC 内路由，与其他 VPC 或其它云（如 AWS）通过云联网打通后，Pod IP 也可以直接路由。另外，它还支持 NAT 网关，Pod 通过 NAT 网关访问公网也是可以的。
+Overlay 模式（GR 与 VPC-CNI Overlay）默认已开启 IP 伪装（`enableIPv4Masquerade=true`），本文只讨论 Native Routing（VPC-CNI）模式。
+
+TKE VPC-CNI 网络模式，Pod IP 使用的是 VPC IP，与节点 IP 一样，可直接在 VPC 内路由，与其他 VPC 或其它云（如 AWS）通过云联网打通后，Pod IP 也可以直接路由。另外，它还支持 NAT 网关，Pod 通过 NAT 网关访问公网也是可以的。
 
 所以，大部分场景，我们不需要开启 IP 伪装，[安装 Cilium](../install.md) 中给出的默认安装方式也是禁用了 Cilium 的 IP 伪装功能（`--set enableIPv4Masquerade=false`）。
 
@@ -75,7 +77,7 @@ helm upgrade cilium cilium/cilium --version 1.20.1 \
   # highlight-add-end
 ```
 
-:::info[注意]
+:::note[注意]
 
 如果是调整已安装的 cilium 配置，存量节点需重启 cilium-agent 才能生效：
 
@@ -87,7 +89,7 @@ kubectl -n kube-system rollout restart daemonset cilium
 
 :::tip[参数说明]
 
-以下是是包含相关参数解释的 `values.yaml`:
+以下是包含相关参数解释的 `values.yaml`:
 
 ```yaml title="values.yaml"
 # 启用 cilium 的 IP MASQUERADE 功能
@@ -112,13 +114,13 @@ ipMasqAgent:
 
 ## 配置 nonMasqueradeCIDRs
 
-前面的 IP 伪装启用方法会针对所有内网网段（169.255.0.0/16 除外）不做 SNAT，如需更精细化的控制，可显式配置具体哪些 CIDR 不做 SNAT，具体方法如下。
+前面的 IP 伪装启用方法会针对所有内网网段（169.254.0.0/16 除外）不做 SNAT，如需更精细化的控制，可显式配置具体哪些 CIDR 不做 SNAT，具体方法如下。
 
 1. 准备 ip-masq-agent ConfigMap 到文件 `ip-masq-agent-config.yaml`：
 
 :::tip[说明]
 
-将不需要 SNAT 的 CIDR 都 nonMasqueradeCIDRs 中，通常是 TKE 集群中的 Pod 使用到的 VPC CIDR（包括 VPC 辅助 CIDR）。
+将不需要 SNAT 的 CIDR 都加入 nonMasqueradeCIDRs 中，通常是 TKE 集群中的 Pod 使用到的 VPC CIDR（包括 VPC 辅助 CIDR）。
 
 :::
 

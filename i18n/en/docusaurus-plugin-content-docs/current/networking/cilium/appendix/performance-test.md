@@ -2,6 +2,12 @@
 
 This document describes how to run network performance tests on cilium installed on a TKE cluster, and presents the measured results for each recommended installation scheme.
 
+:::note[Version note]
+
+The measured data in this document is based on **cilium 1.19.5** (tested in June 2026; see the environment table below). The tutorial's currently verified version is 1.20.1 — functionality and installation flow have been re-verified (see [Cilium Functional Test](./connectivity-test.md)), but **the performance data has not been re-tested on 1.20.1**. The test method and commands apply equally to 1.20.1; conclusions are expected to hold at the same magnitude — re-run the tests yourself for exact numbers.
+
+:::
+
 Cilium provides the official [`cilium connectivity perf`](https://docs.cilium.io/en/stable/operations/performance/benchmark/) performance test tool. It uses netperf to deploy Pods in the cluster and run TCP_RR (request-response latency), TCP_STREAM (throughput), and other tests, covering **same-node / cross-node** × **Pod network / Host network** — a total of four network combinations.
 
 ## Test Methods
@@ -29,7 +35,7 @@ For instance types like SA5 that support burst bandwidth, the default 4 streams 
 cilium connectivity perf --streams 8
 
 # Or through the one-click script
-bash -c "$(curl -sfL ...)" -- perf --streams 8
+bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/static/scripts/cilium.sh)" -- perf --streams 8
 ```
 
 8 streams have been verified to stably saturate the burst bandwidth on all SA5 specifications, giving a more accurate throughput ceiling.

@@ -10,6 +10,12 @@
 
 覆盖吞吐、HTTP RPS（长/短连接）、TCP 延迟、Service 规模化退化（5000→30000，每 Service 4 个 Endpoint）、Hubble 开销、NetworkPolicy L3/L4 与 L7 开销、BPF 内存、组件资源。
 
+:::note[版本口径]
+
+本文实测数据基于 **cilium 1.19.5**（2026-06 实测，环境表见下文）；教程当前验证版本为 1.20.1，**性能数据尚未在 1.20.1 复测**，选型结论量级预期不变。
+
+:::
+
 :::tip[先看结论]
 
 - **吞吐、真实业务延迟（HTTP p99 @1000 QPS）三者完全一致**——网络方案的差异在真实负载下不可见。
@@ -101,6 +107,8 @@ kubectl -n kube-system patch configmap cilium-config --type merge \
   -p '{"data":{"bpf-lb-map-max":"1048576"}}'
 kubectl -n kube-system rollout restart ds/cilium
 ```
+
+示例值 `1048576`（= 2^20）是取整便于记忆的写法；本文实测调优后取的是 `1020000`（见下文「BPF Map 内存」一节），实际取值以自己的实测为准。
 
 :::
 

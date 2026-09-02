@@ -297,7 +297,7 @@ spec:
 
 ### 限制 apiserver 的访问
 
-如需严格限制 apiserver 的访问，避免集群被攻击或减少不必要的控制面压力，可先配置一个全局的默认拒绝规则（参考前面的 `安全基线：默认拒绝` 示例），然后在按需配置允许哪些 Pod 访问。
+如需严格限制 apiserver 的访问，避免集群被攻击或减少不必要的控制面压力，可先配置一个全局的默认拒绝规则（参考前面的 `安全基线：默认拒绝` 示例），然后再按需配置允许哪些 Pod 访问。
 
 允许 `test` 命名空间下所有 pod 访问 apiserver:
 
@@ -362,14 +362,14 @@ kind: CiliumNetworkPolicy
 metadata:
  name: from-b-to-a-api
 spec:
- description: "Allow HTTP API from a to b"
+ description: "Allow HTTP API from b to a"
  endpointSelector:
    matchLabels:
-     role: a
+     app: a
  ingress:
  - fromEndpoints:
    - matchLabels:
-       role: b
+       app: b
    toPorts:
    - ports:
      - port: "80"
@@ -464,7 +464,7 @@ metadata:
 spec:
   endpointSelector:
     matchLabels:
-      role: a
+      app: a
   egress:
   - toCIDR:
     - 192.0.2.0/24

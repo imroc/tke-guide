@@ -10,7 +10,7 @@
 
 下表中所有 OS 均已在 3 种安装模式下完整跑通 e2e 验证（cilium 1.19.5 + Egress Gateway + Nodelocal DNSCache）。
 
-2026-09 追加：cilium **1.20.1**（Overlay VPC-CNI 模式，`sysctlfix.enabled=false` + `cilium-sysctl-override` DaemonSet）已在 TencentOS Server 4.4（kernel 6.6.88）上复测通过——`cilium connectivity test` 核心连通性用例全部通过（仅 `ping-ipv4-external-ip` 因测试 VPC 未配 NAT 网关跳过语义、`check-log-errors` 因内核未开启 `CONFIG_INET_DIAG_DESTROY` 报无害提示）。
+2026-09 追加：cilium **1.20.1**（Overlay VPC-CNI 模式，`sysctlfix.enabled=false` + `cilium-sysctl-override` DaemonSet）已在 TencentOS Server 4.4（kernel 6.6.88）上复测通过——`cilium connectivity test` 核心连通性用例全部通过（4/83 用例失败均为环境性因素：`ping-ipv4-external-ip` 相关用例因测试 VPC 未配 NAT 网关失败、`check-log-errors` 因内核未开启 `CONFIG_INET_DIAG_DESTROY` 报无害提示，详见 [Cilium 功能测试](./connectivity-test.md) 的 1.20.1 复测记录）。
 
 | OS                   | OsName                  | 内核版本 |
 | -------------------- | ----------------------- | -------- |
@@ -53,7 +53,7 @@
    - `cilium-health status` 是否所有节点 reachable
    - DNS 解析（含集群内 svc 名和外部域名）是否正常
    - `cilium connectivity test` 是否全部通过
-4. **跑业务功能验证**：如使用 NetworkPolicy、Egress Gateway、Cluster Mesh 等额外特性，对应跑一遍业务的关键路径。
+4. **跑业务功能验证**：如使用 NetworkPolicy、Egress Gateway、ClusterMesh 等额外特性，对应跑一遍业务的关键路径。
 
 通过以上验证后即可在生产节点池放心使用。
 

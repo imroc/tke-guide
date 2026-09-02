@@ -88,7 +88,7 @@ skopeo copy -a docker://quay.io/cilium/operator-generic:v1.20.1  docker://your-t
 
 If your installation configuration depends on many images, you can use a script to sync all dependency images to the TCR repository at once. Save the script content below to `sync-cilium-images.sh`:
 
-:::info[Note]
+:::note[Note]
 
 1. `TARGET_REGISTRY` is the target TCR image repository address. Replace it with your own repository address.
 2. Modify the installation parameters used after `helm template` according to your actual deployment configuration.
