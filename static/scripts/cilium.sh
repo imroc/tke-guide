@@ -22,7 +22,7 @@ set -euo pipefail
 #   as a string argument and stdin remains attached to the terminal — `read`
 #   works normally. This pattern works for both interactive and non-interactive
 #   subcommands, so all docs should use it.
-# For non-interactive batch deployment, see the env var section at the bottom.
+# For non-interactive batch deployment, see the NON-INTERACTIVE MODE section in this header.
 #
 # Commands:
 #   install                 Install Cilium (auto-detect network mode, interactive)
@@ -109,6 +109,11 @@ set -euo pipefail
 #                       in the interactive prompt enables hubble; set "false" to
 #                       skip Hubble Relay + Hubble UI)
 #      ENABLE_LOCALDNS  "true" or "false" (optional, default false)
+#      IMAGE_REGISTRY   image registry prefix for cilium images (optional, defaults
+#                       to DEFAULT_IMAGE_REGISTRY; also accepted by the interactive
+#                       image-registry prompt; echoed in print_replay_command())
+#    Additionally, `uninstall` supports CILIUM_UNINSTALL_YES="true" to skip its
+#    confirmation prompt (useful in CI).
 #    NETWORK_MODE is always auto-detected and cannot be overridden.
 #    When adding a new interactive prompt, follow the pattern:
 #      - Check if the env var is already set → if yes, skip the prompt.
@@ -136,7 +141,7 @@ set -euo pipefail
 #       - docs/networking/cilium/{install,observability,egress-gateway}.md
 #         and docs/networking/cilium/appendix/with-node-local-dns.md
 #       - docs/networking/cilium/appendix/{connectivity-test,performance-test,
-#         verified-os,host-routing,...}.md
+#         verified-os,native-routing,...}.md
 #       - i18n/en/.../same files
 #    Mismatched comments/docs are worse than missing ones — they actively
 #    mislead the next contributor.
@@ -1054,6 +1059,7 @@ EOF
 #   - ip_masq_args:     ip-masq-agent params (Native only; when ENABLE_IP_MASQ=true
 #                       OR ENABLE_EGRESS=true — Egress forces ip-masq-agent on)
 #   - hubble_args:      Hubble Relay + UI (only when ENABLE_HUBBLE=true)
+#   - affinity_args:    operator nodeAffinity to avoid super nodes (eklet)
 helm_install_cilium() {
   info "$(is_zh && echo "添加 Cilium Helm 仓库..." || echo "Adding Cilium Helm repo...")"
   helm repo add cilium https://helm.cilium.io/ 2>/dev/null || true
@@ -1534,6 +1540,7 @@ cmd_install_cilium() {
 #
 # What this does:
 #   1. helm uninstall cilium (removes DaemonSet / Deployment / CRDs created by chart)
+#   1b. Delete the cilium-sysctl-override DaemonSet (Overlay installs)
 #   2. Delete cni-config ConfigMap (only set up for VPC-CNI Native)
 #   3. Delete cilium APF FlowSchema + PriorityLevelConfiguration
 #   4. Restore TKE DaemonSets by clearing the nodeSelector patch
