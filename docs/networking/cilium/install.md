@@ -150,7 +150,7 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install
 ```
 
-脚本会自动检测集群网络模式、引导选择安装方案和版本，然后执行安装。安装过程中还可选择是否启用 [Egress Gateway](egress-gateway.md)、[Hubble 可观测性](observability.md)（默认启用，含 Hubble Relay 与 UI）与 [Nodelocal DNSCache](./appendix/with-node-local-dns.md)；Native 方案还会询问是否启用 ip-masq-agent（Pod 借节点 EIP 出公网，见 [配置 IP 伪装](./appendix/masquerading.md)）。注意脚本默认装 Hubble，而本文手动 helm 命令不包含——如需对齐，手动安装时参考 [增强可观测性](observability.md)。如需手动安装，参考后续步骤。
+脚本会自动检测集群网络模式，引导依次确认安装方案、cilium 版本、镜像仓库（默认 TKE 内网 mirror `quay.tencentcloudcr.com/cilium`，可换自建 TCR，见 [使用 TCR 托管镜像](./appendix/tcr.md)）；Overlay 方案还会确认 Pod CIDR 与每节点掩码。然后执行安装，过程中还可选择是否启用 [Egress Gateway](egress-gateway.md)、[Hubble 可观测性](observability.md)（默认启用，含 Hubble Relay 与 UI）与 [Nodelocal DNSCache](./appendix/with-node-local-dns.md)；Native 方案还会询问是否启用 ip-masq-agent（Pod 借节点 EIP 出公网，见 [配置 IP 伪装](./appendix/masquerading.md)）。注意脚本默认装 Hubble，而本文手动 helm 命令不包含——如需对齐，手动安装时参考 [增强可观测性](observability.md)。如需手动安装，参考后续步骤。
 
 :::tip[为什么用 `bash -c "$(curl ...)"` 而不是 `curl ... \| bash`？]
 
@@ -278,7 +278,7 @@ cilium 自带的 `sysctlfix` 功能本可以写覆盖文件，但存在两个问
 2. **立即应用**（直写 `/proc/sys`）：文件本身只在未来某次 systemd-sysctl 运行时才生效，对部署时已存在的接口（含 bond、eth*）由 DaemonSet 直接写入立即归零。
 3. **周期自愈**（每 60 秒）：值被外部改动、文件被误删，都会在下一轮循环纠正；新节点加入集群自动覆盖。
 
-在 K8s 节点上全量关闭 rp_filter 是安全惯例（cilium 官方对 kube-proxy-free 模式的建议同样如此）：节点上的多接口路由（veth/vxlan/策略路由/bond）天然非对称，strict rp_filter 只会误伤；源地址校验由 cilium 的 BPF 层和 VPC 安全组承担。
+在 K8s 节点上全量关闭 rp_filter 是安全惯例（strict rp_filter 破坏 kube-proxy-free 部署的问题即 [cilium/cilium#13130](https://github.com/cilium/cilium/issues/13130)，cilium 默认启用的 sysctlfix 正是官方给出的缓解方案）：节点上的多接口路由（veth/vxlan/策略路由/bond）天然非对称，strict rp_filter 只会误伤；源地址校验由 cilium 的 BPF 层和 VPC 安全组承担。
 
 完整机制分析（含 Native 与 Overlay 的差异、路由对称性原理）见 [sysctlfix 与 rp_filter 机制详解](./appendix/sysctlfix.md)。
 
@@ -592,23 +592,6 @@ helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   -f resources-values.yaml
 ```
 
-#### 验证安装结果
-
-确保 cilium 相关 pod 正常运行：
-
-```bash
-$ kubectl --namespace=kube-system get pod -l app.kubernetes.io/part-of=cilium
-NAME                              READY   STATUS    RESTARTS   AGE
-cilium-5rfrk                      1/1     Running   0          1m
-cilium-9mntb                      1/1     Running   0          1m
-cilium-envoy-4r4x9                1/1     Running   0          1m
-cilium-envoy-kl5cz                1/1     Running   0          1m
-cilium-envoy-sgl5v                1/1     Running   0          1m
-cilium-operator-896cdbf88-jlgt7   1/1     Running   0          1m
-cilium-operator-896cdbf88-nj6jc   1/1     Running   0          1m
-cilium-zrxwn                      1/1     Running   0          1m
-```
-
 ### 配置 APF 限速
 
 每台节点上都有 cilium-agent 运行，当集群规模较大时，可能会对 APIServer 造成较大压力，极端场景可能造成雪崩，导致整个集群不可用，所以需要配置 APF 来对 cilium 的组件进行限速。
@@ -627,6 +610,23 @@ cilium-zrxwn                      1/1     Running   0          1m
 
 ```bash
 kubectl apply -f cilium-apf.yaml
+```
+
+### 验证安装结果
+
+确保 cilium 相关 pod 正常运行：
+
+```bash
+$ kubectl --namespace=kube-system get pod -l app.kubernetes.io/part-of=cilium
+NAME                              READY   STATUS    RESTARTS   AGE
+cilium-5rfrk                      1/1     Running   0          1m
+cilium-9mntb                      1/1     Running   0          1m
+cilium-envoy-4r4x9                1/1     Running   0          1m
+cilium-envoy-kl5cz                1/1     Running   0          1m
+cilium-envoy-sgl5v                1/1     Running   0          1m
+cilium-operator-896cdbf88-jlgt7   1/1     Running   0          1m
+cilium-operator-896cdbf88-nj6jc   1/1     Running   0          1m
+cilium-zrxwn                      1/1     Running   0          1m
 ```
 
 ## 新建节点池
@@ -815,6 +815,7 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 - **生产集群升级前先在测试集群验证**，确认业务无异常。
 - **NetworkPolicy 行为可能在不同版本间有微调**，升级后回归核心策略效果。
 - 跨大版本升级如涉及 ConfigMap / CRD 变更，可先部署官方 preflight release 检查新旧版本兼容性：`helm install cilium-preflight cilium/cilium --version <新版本> -n kube-system --set preflight.enabled=true --set agent=false --set operator.enabled=false`，确认通过后 `helm uninstall cilium-preflight -n kube-system` 再正式升级。
+- **Overlay 方案需同步升级 `cilium-sysctl-override` DaemonSet 镜像**：该 DaemonSet 不在 helm release 内（前置操作单独部署），镜像 tag 是部署时写死的。升级 cilium 后执行 `kubectl -n kube-system set image daemonset/cilium-sysctl-override ensure=quay.tencentcloudcr.com/cilium/cilium:v<新版本>` 消除版本漂移（旧镜像只跑 shell 循环写 sysctl，功能不受影响，仅为保持版本一致）。
 
 :::
 
@@ -981,8 +982,8 @@ GR (GlobalRouter) 集群本身有几个限制，叠加 cilium 后体验也受影
 
 **VPC-CNI Native 模式**：cilium 默认**关闭** IP 伪装（`enableIPv4Masquerade=false`），因为 Pod IP 本身就是合法 VPC IP，东西向流量直接路由即可。但这意味着 Pod 出公网时源 IP 是 Pod IP（来自节点辅助网卡的 IP 池），辅助网卡上没有 EIP，**节点即使绑了 EIP（EIP 只在主网卡）也无法让 Pod 出公网**。需要满足下列任一条件：
 
-1. **VPC 配置 NAT 网关**：在集群所在 VPC 的路由表中新建路由规则，让访问外网的流量转发到公网 NAT 网关，并确保路由表关联到了集群使用的子网，参考 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)。
-2. **启用 cilium 的 ip-masq-agent**：Pod 出 VPC 的流量 SNAT 成节点 IP，从节点主网卡 + 节点 EIP 出公网，适合"节点本身有公网，希望复用节点公网带宽"的场景。具体方法参考 [配置 IP 伪装](./appendix/masquerading.md)。
+1. **VPC 配置 NAT 网关**（最干净的方案，对所有节点子网生效）：在集群所在 VPC 的路由表中新建路由规则，让访问外网的流量转发到公网 NAT 网关，并确保路由表关联到了集群使用的子网，参考 [通过 NAT 网关访问外网](https://cloud.tencent.com/document/product/457/48710)。
+2. **启用 cilium 的 ip-masq-agent**：Pod 出 VPC 的流量 SNAT 成节点 IP，从节点主网卡 + 节点 EIP 出公网（等价于自管版 TKE 内置 ip-masq-agent），适合"节点本身有公网，希望复用节点公网带宽"的场景。具体方法参考 [配置 IP 伪装](./appendix/masquerading.md)。
 3. **启用 Cilium Egress Gateway**：适合需要按 namespace/pod 选择固定出口 IP 的高级场景，参考 [Egress Gateway 应用实践](./egress-gateway.md)。
 
 ### 镜像拉取失败？

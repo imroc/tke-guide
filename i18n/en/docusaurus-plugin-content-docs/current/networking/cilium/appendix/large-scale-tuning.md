@@ -219,5 +219,5 @@ After completing the tuning, observe the following metrics to verify the effect:
 
 - [Installing Cilium](../install.md)
 - [Cilium Scaling Performance Tuning Guide](https://docs.cilium.io/en/stable/operations/performance/scalability/)
-- [Cilium API Priority and Fairness Documentation](https://docs.cilium.io/en/stable/operations/scalability/apf/)
+- [Kubernetes API Priority and Fairness Documentation](https://kubernetes.io/docs/concepts/cluster-administration/flow-control/)
 - [CiliumEndpointSlice Stable Progress](https://github.com/cilium/cilium/issues/31904)

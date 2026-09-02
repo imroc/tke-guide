@@ -53,6 +53,7 @@
 | Article                                                                                 | Content                                             |
 | --------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | **[Apiserver Connection Error: operation not permitted](./appendix/troubleshooting/connect-apiserver-operation-not-permitted.md)** | Cilium bug investigation and root cause analysis |
+| **[Webhook Connection Timeout in Overlay Mode](./appendix/troubleshooting/webhook-connection-timeout.md)** | Root cause and hostNetwork solution for apiserver-to-webhook timeouts in managed clusters |
 | **[Cilium Debugging Quick Reference](./appendix/debug.md)**                             | Common debugging commands: `cilium status`, monitor, hubble observe, BPF maps |
 
 ## Quick Decision Tree
@@ -66,6 +67,7 @@ What do you want to do?
 │  ├─ Existing cluster, want to test → Functional Test
 │  └─ Care about performance → Performance Test
 ├─ Configure network capabilities
+│  ├─ Expose HTTP/HTTPS services (Ingress alternative) → Gateway API
 │  ├─ Pods need outbound internet
 │  │  ├─ Already have NAT Gateway → No additional config needed
 │  │  ├─ Want to reuse node EIP → Configure IP Masquerade
@@ -81,10 +83,11 @@ What do you want to do?
 ├─ Tuning & Troubleshooting
 │  ├─ Large cluster optimization → Large Cluster Tuning Guide
 │  ├─ Check OS compatibility → Verified Node Operating Systems
-│  └─ Apiserver connection error → Corresponding troubleshooting article
+│  ├─ Apiserver connection error → Corresponding troubleshooting article
+│  └─ Webhook (cert-manager etc.) connection timeout → Corresponding troubleshooting article
 └─ Understand design principles
-   ├─ What is Host Routing → Host Routing Appendix
-   ├─ Why configure local-router-ipv4 → Corresponding appendix
+   ├─ What is Host Routing → Native Routing Deep Dive
+   ├─ Why configure local-router-ipv4 → Native Routing Deep Dive
    └─ Why GR doesn't work → GR Native Not Recommended
 ```
 

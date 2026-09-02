@@ -116,14 +116,13 @@ CiliumLocalRedirectPolicy 的能力没有默认开启，需在安装时加参数
 若 Cilium 已安装，通过以下方式更新 Cilium 配置来开启：
 
 ```bash
-
 helm upgrade cilium cilium/cilium --version 1.20.1 \
   --namespace kube-system \
   --reuse-values \
   --set localRedirectPolicies.enabled=true
 ```
 
-再需重启下 operator 和 agent 生效:
+还需重启 operator 和 agent 才能生效:
 
 ```bash
 kubectl rollout restart deploy cilium-operator -n kube-system

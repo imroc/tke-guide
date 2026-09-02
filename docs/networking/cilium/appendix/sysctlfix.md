@@ -69,7 +69,7 @@ RUN+="/usr/lib/systemd/systemd-sysctl --prefix=/net/ipv4/conf/$name ..."
 
 即**每个新网络接口创建时**，udev 会异步执行 `systemd-sysctl --prefix`，把 sysctl.d 配置中所有匹配该接口的项应用上去——`net.ipv4.conf.*.rp_filter = 1` 的 glob 恰好匹配每个新 lxc 接口。
 
-cilium CNI 插件在创建 Pod veth 时确实会写 `lxc.rp_filter = 0`（源码 `pkg/datapath/connector/veth.go` 的 `DisableRpFilter`），**但 udev 的应用在它之后异步执行，会把 0 覆盖回 1**。没有任何覆盖文件时，新建 Pod 的 lxc 接口 rp_filter 恒为 1。
+cilium CNI 插件在创建 Pod veth 时确实会写 `lxc.rp_filter = 0`（实现在 `pkg/datapath/connector/add.go`，由 veth 创建流程调用，函数 `DisableRpFilter`），**但 udev 的应用在它之后异步执行，会把 0 覆盖回 1**。没有任何覆盖文件时，新建 Pod 的 lxc 接口 rp_filter 恒为 1。
 
 补充一个 cilium 内部的差异：cilium-agent **自己**创建的接口（`cilium_host`、`cilium_net`、`cilium_vxlan`、`lxc_health`）走 agent 内部的 reconciler 管理，每 10 分钟会重新应用期望值，被 udev 覆盖后能自愈；而 **Pod 的 veth 由 CNI 插件进程创建，写一次就结束**，被 udev 覆盖后**永不自愈**——重启 cilium pod 也没用，只有重建业务 Pod 才会再次写入。
 
@@ -108,7 +108,7 @@ host → Pod 的回包从 lxc 接口进入内核栈时，rp_filter 反查源 IP�
 
 同时 DaemonSet 会清理旧版 sysctlfix 留下的 `99-zzz-override_cilium.conf`，并顺带删除 cilium 的接口覆盖（内容已包含在全接口版本中）。
 
-在 K8s 节点上全量关闭 rp_filter 是安全惯例（cilium 官方对 kube-proxy-free 模式的建议同样如此）：节点上的多接口路由（veth/vxlan/策略路由/bond）天然非对称，strict rp_filter 只会误伤；源地址校验由 cilium 的 BPF 层和 VPC 安全组承担。
+在 K8s 节点上全量关闭 rp_filter 是安全惯例（strict rp_filter 破坏 kube-proxy-free 部署的问题即 [cilium/cilium#13130](https://github.com/cilium/cilium/issues/13130)，cilium 默认启用的 sysctlfix 正是官方给出的缓解方案）：节点上的多接口路由（veth/vxlan/策略路由/bond）天然非对称，strict rp_filter 只会误伤；源地址校验由 cilium 的 BPF 层和 VPC 安全组承担。
 
 Native 模式因路由对称不依赖此 DaemonSet，但节点上若有 RDMA bond 等依赖 `rp_filter=0` 的组件，部署同一个 DaemonSet 可获得相同的全接口免疫（实测 `tke-eni-agent` 不会周期性回写 eth0，无覆盖竞争）。
 

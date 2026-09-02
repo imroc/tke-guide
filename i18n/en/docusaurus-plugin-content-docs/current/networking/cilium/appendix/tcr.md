@@ -162,7 +162,7 @@ chmod +x sync-cilium-images.sh
 
 ## Install Cilium Using TCR Images
 
-Refer to [Installing Cilium](https://imroc.cc/tke/networking/cilium/install) for installation, replacing dependency images with the corresponding TCR repository addresses:
+Refer to [Installing Cilium](../install.md) for installation, replacing dependency images with the corresponding TCR repository addresses (example uses the Native Routing (VPC-CNI) setup; it shows the image-replacement essentials — follow the installation doc for the full parameter set, keeping functional parameters such as `localRedirectPolicies.enabled=true`):
 
 ```bash showLineNumbers
 helm upgrade --install cilium cilium/cilium --version 1.20.1 \
@@ -188,6 +188,7 @@ helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --set cni.configMap=cni-config \
   --set cni.externalRouting=true \
   --set extraConfig.local-router-ipv4=169.254.32.16 \
+  --set localRedirectPolicies.enabled=true \
   --set sysctlfix.enabled=false \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \

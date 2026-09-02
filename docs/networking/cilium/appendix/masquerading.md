@@ -114,7 +114,7 @@ ipMasqAgent:
 
 ## 配置 nonMasqueradeCIDRs
 
-前面的 IP 伪装启用方法会针对所有内网网段（169.254.0.0/16 除外）不做 SNAT，如需更精细化的控制，可显式配置具体哪些 CIDR 不做 SNAT，具体方法如下。
+前面的 IP 伪装启用方法未显式配置 `nonMasqueradeCIDRs`，cilium 默认对 RFC 1918 三段及其它保留网段（100.64.0.0/10、240.0.0.0/4 等共 11 段）不做 SNAT；169.254.0.0/16 因已设 `masqLinkLocal: true` 仍会 SNAT。如需更精细化的控制，可显式配置具体哪些 CIDR 不做 SNAT，具体方法如下。
 
 1. 准备 ip-masq-agent ConfigMap 到文件 `ip-masq-agent-config.yaml`：
 

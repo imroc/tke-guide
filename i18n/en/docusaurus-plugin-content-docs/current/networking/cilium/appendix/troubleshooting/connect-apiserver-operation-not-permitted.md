@@ -65,7 +65,7 @@ kubernetes-intranet   LoadBalancer   192.168.60.179   10.15.1.8     443:30965/TC
 
 Since Cilium was installed with kubeProxyReplacement enabled, traffic to the apiserver is intercepted by Cilium's eBPF program and forwarded directly to the backend address, bypassing the CLB (this behavior is consistent with native Kubernetes kube-proxy).
 
-Checking the eBPF data written by cilium-agent:
+Checking the eBPF data written by cilium-agent (this troubleshooting happened on cilium 1.18, when the CLI subcommand was still named `cilium` — equivalent to `cilium-dbg` in 1.20; outputs below are kept as recorded):
 
 ```txt
 $ kubectl -n kube-system exec cilium-kddvm -- cilium bpf lb list

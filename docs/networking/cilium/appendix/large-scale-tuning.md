@@ -219,5 +219,5 @@ bpf:
 
 - [安装 Cilium](../install.md)
 - [Cilium 官方 Scaling Performance Tuning Guide](https://docs.cilium.io/en/stable/operations/performance/scalability/)
-- [Cilium API Priority and Fairness 说明](https://docs.cilium.io/en/stable/operations/scalability/apf/)
+- [Kubernetes API Priority and Fairness 官方文档](https://kubernetes.io/docs/concepts/cluster-administration/flow-control/)
 - [CiliumEndpointSlice Stable 进展](https://github.com/cilium/cilium/issues/31904)

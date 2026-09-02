@@ -162,7 +162,7 @@ chmod +x sync-cilium-images.sh
 
 ## 使用 TCR 镜像安装 Cilium
 
-参考 [安装 cilium](https://imroc.cc/tke/networking/cilium/install) 进行安装，替换下依赖镜像为 TCR 镜像仓库中对应的镜像地址：
+参考 [安装 cilium](../install.md) 进行安装，替换下依赖镜像为 TCR 镜像仓库中对应的镜像地址（以 Native Routing (VPC-CNI) 方案为例；下例展示镜像替换要点，完整参数以安装文档为准，注意保留 `localRedirectPolicies.enabled=true` 等功能性参数）：
 
 ```bash showLineNumbers
 helm upgrade --install cilium cilium/cilium --version 1.20.1 \
@@ -188,6 +188,7 @@ helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   --set cni.configMap=cni-config \
   --set cni.externalRouting=true \
   --set extraConfig.local-router-ipv4=169.254.32.16 \
+  --set localRedirectPolicies.enabled=true \
   --set sysctlfix.enabled=false \
   --set kubeProxyReplacement=true \
   --set k8sServiceHost=$(kubectl get ep kubernetes -n default -o jsonpath='{.subsets[0].addresses[0].ip}') \

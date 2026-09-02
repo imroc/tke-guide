@@ -53,6 +53,7 @@
 | 文章                                                                    | 内容                                |
 | ----------------------------------------------------------------------- | ----------------------------------- |
 | **[连接 apiserver 报错 operation not permitted](./appendix/troubleshooting/connect-apiserver-operation-not-permitted.md)** | Cilium bug 排查与根因分析 |
+| **[Overlay 模式下 Webhook 连接超时](./appendix/troubleshooting/webhook-connection-timeout.md)** | 托管集群 apiserver 调用 webhook 超时的根因与 hostNetwork 方案 |
 | **[Cilium 调试速查](./appendix/debug.md)**                              | `cilium status`、monitor、hubble observe、BPF map 等常用调试命令 |
 
 ## 快速决策树
@@ -66,6 +67,7 @@
 │  ├─ 已有集群，想测试是否正常 → 功能测试
 │  └─ 关心性能表现 → 性能测试
 ├─ 配置网络能力
+│  ├─ 暴露 HTTP/HTTPS 服务（Ingress 替代）→ Gateway API
 │  ├─ Pod 要出公网
 │  │  ├─ 已有 NAT 网关 → 无需额外配置
 │  │  ├─ 想复用节点 EIP → 配置 IP 伪装
@@ -81,10 +83,11 @@
 ├─ 调优与排障
 │  ├─ 大规模集群优化 → 大规模集群调优指南
 │  ├─ 检查 OS 兼容性 → 已验证的节点操作系统
-│  └─ 连接 apiserver 报错 → 对应故障排查文章
+│  ├─ 连接 apiserver 报错 → 对应故障排查文章
+│  └─ Webhook（cert-manager 等）连接超时 → 对应故障排查文章
 └─ 了解设计原理
-   ├─ Host Routing 是什么 → Host Routing 附录
-   ├─ 为什么配 local-router-ipv4 → 对应附录
+   ├─ Host Routing 是什么 → Native Routing 模式详解
+   ├─ 为什么配 local-router-ipv4 → Native Routing 模式详解
    └─ 为什么 GR 不行 → GR Native 不推荐原因
 ```
 

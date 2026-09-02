@@ -1,5 +1,7 @@
 # Enhanced Observability with Cilium
 
+**Applicable modes**: all three deployment modes (Native Routing (VPC-CNI), Overlay (VPC-CNI), Overlay (GR)) are supported, with no mode-specific limitations.
+
 ## One-Click Enable Hubble
 
 If Hubble Relay and Hubble UI were not enabled during Cilium installation, use the one-click script to quickly enable them:

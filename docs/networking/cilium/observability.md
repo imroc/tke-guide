@@ -1,5 +1,7 @@
 # 使用 Cilium 增强可观测性
 
+**适用方案**：三种部署方案（Native Routing (VPC-CNI)、Overlay (VPC-CNI)、Overlay (GR)）均支持，无模式限制。
+
 ## 一键启用 Hubble
 
 如果安装 cilium 时未启用 Hubble Relay 和 Hubble UI，可使用一键脚本快速启用：

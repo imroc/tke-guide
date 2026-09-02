@@ -18,7 +18,7 @@ Benchmarks show the **difference between Native Routing and Overlay is within no
 | Comparison Item           | Native Routing (VPC-CNI) ⭐              | Overlay (VPC-CNI) ⭐                                                                       | Overlay (GR)                                                                                                                                                                                                                                                                                      |
 | ------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Network Performance       | ✅ On par with Overlay                   | ✅ On par with Native (VXLAN overhead negligible)                                          | ✅ On par with Native (VXLAN overhead negligible)                                                                                                                                                                                                                                                 |
-| Pod IP Range              | VPC IP (including Assistant CIDR IPs)    | Independent CIDR, doesn't consume VPC IP                                                   | Independent CIDR, doesn't consume VPC IP                                                                                                                                                                                                                                                          |
+| Pod IP Range              | VPC IP (including secondary CIDR IPs)    | Independent CIDR, doesn't consume VPC IP                                                   | Independent CIDR, doesn't consume VPC IP                                                                                                                                                                                                                                                          |
 | VPC Secondary CIDR Burned | ✅ None                                  | ✅ None                                                                                    | ⚠️ A GR cluster **mandates a VPC secondary CIDR be carved out as its ClusterCIDR** at creation. Even when Overlay assigns Pod IPs from an independent CIDR and that ClusterCIDR is never used by any Pod, the secondary CIDR remains permanently held by the GR cluster (a GR cluster limitation) |
 | IP Capacity Expansion     | ✅ Supported (add a VPC-CNI subnet)      | ✅ Supported (append CIDR to CiliumPodIPPool; auto-allocates more per node when exhausted) | ✅ Supported (append CIDR to CiliumPodIPPool; auto-allocates more per node when exhausted)                                                                                                                                                                                                        |
 | Node Count Limit          | ✅ None                                  | ✅ None                                                                                    | ⚠️ Limited by GR ClusterCIDR (GR cluster's own limit)                                                                                                                                                                                                                                             |
@@ -153,7 +153,7 @@ If the GitHub URL is not reachable, use the site mirror:
 bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- install
 ```
 
-The script auto-detects the cluster's network mode, guides you through choosing a mode and version, then performs the installation. During installation you can optionally enable [Egress Gateway](egress-gateway.md), [Hubble observability](observability.md) (enabled by default, including Hubble Relay and UI), and [Nodelocal DNSCache](./appendix/with-node-local-dns.md); the Native plan also asks whether to enable ip-masq-agent (Pods egress via node EIP — see [Configure IP Masquerading](./appendix/masquerading.md)). Note the script installs Hubble by default while the manual helm commands in this guide do not — see [Enhanced Observability](observability.md) to align a manual install. For manual installation, follow the steps below.
+The script auto-detects the cluster's network mode, guides you through confirming the install mode, cilium version, and image registry (defaults to the TKE intranet mirror `quay.tencentcloudcr.com/cilium`; can be swapped to your own TCR — see [Host Cilium Images via TCR](./appendix/tcr.md)); Overlay mode also confirms the Pod CIDR and per-node mask. It then performs the installation. During installation you can optionally enable [Egress Gateway](egress-gateway.md), [Hubble observability](observability.md) (enabled by default, including Hubble Relay and UI), and [Nodelocal DNSCache](./appendix/with-node-local-dns.md); the Native plan also asks whether to enable ip-masq-agent (Pods egress via node EIP — see [Configure IP Masquerading](./appendix/masquerading.md)). Note the script installs Hubble by default while the manual helm commands in this guide do not — see [Enhanced Observability](observability.md) to align a manual install. For manual installation, follow the steps below.
 
 :::tip[Why `bash -c "$(curl ...)"` and not `curl ... | bash`?]
 
@@ -281,7 +281,7 @@ Three layers of protection:
 2. **Immediate application** (direct writes to `/proc/sys`): the file alone only takes effect on the next systemd-sysctl run, so the DaemonSet writes existing interfaces (including bond, eth*) to 0 immediately.
 3. **Periodic self-healing** (every 60 seconds): externally changed values and deleted files are corrected on the next loop; newly added nodes are covered automatically.
 
-Disabling rp_filter node-wide is a safe convention on K8s nodes (cilium's own recommendation for kube-proxy-free mode): multi-interface routing (veth/vxlan/policy routes/bond) is inherently asymmetric and strict rp_filter only causes collateral damage; source validation is handled by cilium's BPF layer and VPC security groups.
+Disabling rp_filter node-wide is a safe convention on K8s nodes (strict rp_filter breaking kube-proxy-free deployments is [cilium/cilium#13130](https://github.com/cilium/cilium/issues/13130), and cilium's default-enabled sysctlfix is exactly the official mitigation): multi-interface routing (veth/vxlan/policy routes/bond) is inherently asymmetric and strict rp_filter only causes collateral damage; source validation is handled by cilium's BPF layer and VPC security groups.
 
 For the full analysis (including the Native vs Overlay difference and the routing symmetry principle), see [sysctlfix and rp_filter Deep Dive](./appendix/sysctlfix.md).
 
@@ -492,7 +492,7 @@ ipam:
   mode: "delegated-plugin"
 # In VPC-CNI Pods already have VPC IPs — no IP masquerade needed
 enableIPv4Masquerade: false
-# All eth-prefixed interfaces on TKE nodes can carry traffic (auxiliary ENIs eth1/eth2/...)
+# All eth-prefixed interfaces on TKE nodes can carry traffic (secondary ENIs eth1/eth2/...)
 # This flag attaches cilium eBPF programs to all eth* interfaces
 devices: eth+
 cni:
@@ -597,23 +597,6 @@ helm upgrade --install cilium cilium/cilium --version 1.20.1 \
   -f resources-values.yaml
 ```
 
-#### Verify Installation
-
-Verify that cilium-related Pods are running:
-
-```bash
-$ kubectl --namespace=kube-system get pod -l app.kubernetes.io/part-of=cilium
-NAME                              READY   STATUS    RESTARTS   AGE
-cilium-5rfrk                      1/1     Running   0          1m
-cilium-9mntb                      1/1     Running   0          1m
-cilium-envoy-4r4x9                1/1     Running   0          1m
-cilium-envoy-kl5cz                1/1     Running   0          1m
-cilium-envoy-sgl5v                1/1     Running   0          1m
-cilium-operator-896cdbf88-jlgt7   1/1     Running   0          1m
-cilium-operator-896cdbf88-nj6jc   1/1     Running   0          1m
-cilium-zrxwn                      1/1     Running   0          1m
-```
-
 ### Configure API Priority and Fairness (APF)
 
 A cilium-agent Pod runs on every node. In large clusters this can put significant pressure on the apiserver — in extreme cases triggering a cascading failure that takes the whole cluster down. Configure APF to rate-limit cilium components.
@@ -632,6 +615,23 @@ Apply the APF rules:
 
 ```bash
 kubectl apply -f cilium-apf.yaml
+```
+
+### Verify Installation
+
+Verify that cilium-related Pods are running:
+
+```bash
+$ kubectl --namespace=kube-system get pod -l app.kubernetes.io/part-of=cilium
+NAME                              READY   STATUS    RESTARTS   AGE
+cilium-5rfrk                      1/1     Running   0          1m
+cilium-9mntb                      1/1     Running   0          1m
+cilium-envoy-4r4x9                1/1     Running   0          1m
+cilium-envoy-kl5cz                1/1     Running   0          1m
+cilium-envoy-sgl5v                1/1     Running   0          1m
+cilium-operator-896cdbf88-jlgt7   1/1     Running   0          1m
+cilium-operator-896cdbf88-nj6jc   1/1     Running   0          1m
+cilium-zrxwn                      1/1     Running   0          1m
 ```
 
 ## Create Node Pools
@@ -821,6 +821,7 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 - **Validate on a test cluster before upgrading production**, confirm no business impact.
 - **NetworkPolicy behavior may change subtly between versions** — regression-test your core policies after upgrade.
 - For major-version upgrades involving ConfigMap / CRD changes, deploy the official preflight release first to check old/new version compatibility: `helm install cilium-preflight cilium/cilium --version <new-version> -n kube-system --set preflight.enabled=true --set agent=false --set operator.enabled=false`; once it passes, `helm uninstall cilium-preflight -n kube-system` and proceed with the real upgrade.
+- **Overlay setups should also bump the `cilium-sysctl-override` DaemonSet image**: this DaemonSet is deployed separately in the prerequisites and is not part of the helm release, so its image tag stays at the version deployed initially. After upgrading cilium, run `kubectl -n kube-system set image daemonset/cilium-sysctl-override ensure=quay.tencentcloudcr.com/cilium/cilium:v<new-version>` to remove the version drift (the old image only runs a shell loop writing sysctls, so functionality is unaffected — this is purely to stay consistent).
 
 :::
 
@@ -990,7 +991,7 @@ Pod public-internet egress behaves differently per network mode — case-by-case
 
 1. **Configure a NAT gateway in the VPC** (cleanest, applies to all node subnets): add a route in the cluster's VPC route table forwarding outbound traffic to the NAT gateway, and make sure the route table is associated with the subnets used by the cluster. See [Accessing the Internet via NAT Gateway](https://www.tencentcloud.com/document/product/457/35427).
 2. **Enable cilium's ip-masq-agent**: SNAT Pod traffic destined outside the VPC to the node IP so it egresses via the primary ENI + node EIP (a self-managed equivalent of TKE's built-in ip-masq-agent). Suitable when "the node already has an EIP and we want Pods to share its public bandwidth". See [Configure IP Masquerading](./appendix/masquerading.md).
-3. **Enable Cilium Egress Gateway**: suitable for advanced cases like "route specific Pods through a specific public IP". See [Egress Gateway Practice](./egress-gateway.md).
+3. **Enable Cilium Egress Gateway**: suitable for advanced cases like "route specific namespaces/Pods through a specific public IP". See [Egress Gateway Practice](./egress-gateway.md).
 
 ### Image pull failure?
 

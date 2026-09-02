@@ -65,7 +65,7 @@ kubernetes-intranet   LoadBalancer   192.168.60.179   10.15.1.8     443:30965/TC
 
 由于安装了 cilium 且启用了 kubeProxyReplacement，访问 apiserver 的流量也会直接被 cilium 的 ebpf 程序拦截并直接转发到后端地址，流量并不会经过 CLB（这个行为也与原生 Kubernetes 的 kube-proxy 一致）。
 
-检查 cilium-agent 写入的 ebpf 数据:
+检查 cilium-agent 写入的 ebpf 数据（下文排障发生于 cilium 1.18，当时 CLI 子命令名仍为 `cilium`，等价于 1.20 的 `cilium-dbg`，输出保留原样）:
 
 ```txt
 $ kubectl -n kube-system exec cilium-kddvm -- cilium bpf lb list

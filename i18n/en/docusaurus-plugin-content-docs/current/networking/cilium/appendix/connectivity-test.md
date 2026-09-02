@@ -102,13 +102,13 @@ cilium-cli's `--test` filter only supports scenario-level matching (`/pod-to-hos
 
 Actual causality chain (reproduced on cls-148r0kxp Native cluster and cls-qj0gbg3f Overlay cluster):
 
-A. **Pod IPs have no public network capability under VPC-CNI Native mode**. Pod IPs are allocated from the node's auxiliary ENI IP pool (e.g., `10.20.0.x`), but **the auxiliary ENI does not have an EIP**—the EIP is only bound to the node's primary ENI. At the VPC routing table level, the auxiliary ENI IP range has no public network egress, **so any Pod attempting to reach a public destination must first be SNATed to the node's primary ENI IP** (then egress via the primary ENI's EIP / NAT Gateway / Egress Gateway). This is an inherent constraint of TKE VPC-CNI Native, applicable to Cilium and any other CNI.
+A. **Pod IPs have no public network capability under VPC-CNI Native mode**. Pod IPs are allocated from the node's secondary ENI IP pool (e.g., `10.20.0.x`), but **the secondary ENI does not have an EIP**—the EIP is only bound to the node's primary ENI. At the VPC routing table level, the secondary ENI IP range has no public network egress, **so any Pod attempting to reach a public destination must first be SNATed to the node's primary ENI IP** (then egress via the primary ENI's EIP / NAT Gateway / Egress Gateway). This is an inherent constraint of TKE VPC-CNI Native, applicable to Cilium and any other CNI.
 
 B. **cilium-operator registers all Node objects' ExternalIPs as `remote-node identity`** (numeric 6). `cilium-dbg bpf ipcache list` shows the node EIP `42.193.37.239 identity=6`—Cilium treats the node EIP as a "legitimate address of a cluster member node" in the data plane.
 
 C. **Cilium's BPF masquerade implementation has an early return that skips SNAT when the destination identity is internal to the cluster** (preserving Pod identity for NetworkPolicy use). This check **takes precedence over the ipMasqAgent's `nonMasqueradeCIDRs` matching**, so even if you configure ip-masq-agent and the node EIP is not in the `nonMasqueradeCIDRs` list, the CIDR check never takes effect—the destination identity=remote-node already triggers the early return, and the packet does not get SNATed.
 
-D. **The packet leaves the node with the Pod IP, but the Pod IP has no public network egress**—combined with A, packets originating from the auxiliary ENI IP range destined for a public IP are either dropped by the VPC routing table or have no legitimate return path once they reach the network. Hence, the ping fails.
+D. **The packet leaves the node with the Pod IP, but the Pod IP has no public network egress**—combined with A, packets originating from the secondary ENI IP range destined for a public IP are either dropped by the VPC routing table or have no legitimate return path once they reach the network. Hence, the ping fails.
 
 > Packet capture evidence (source node 10.10.21.26):
 >
@@ -117,7 +117,7 @@ D. **The packet leaves the node with the Pod IP, but the Pod IP has no public ne
 > eth1         Out ... 10.20.0.208 > 42.193.37.239: ICMP echo request   ← source IP is still Pod IP, no SNAT
 > ```
 >
-> Pod IP `10.20.0.208` comes from the auxiliary ENI IP pool, destination `42.193.37.239` is a public IP—this traffic has no public egress path.
+> Pod IP `10.20.0.208` comes from the secondary ENI IP pool, destination `42.193.37.239` is a public IP—this traffic has no public egress path.
 
 **Why does ping to the node's VPC IP work, but ping to the public EIP does not?**
 
@@ -134,21 +134,21 @@ Actual testing shows `Pod → 223.5.5.5` works while `Pod → Node EIP` does not
 
 | Dimension                             | Native                                            | Overlay                                                                                                               |
 | ------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Pod IP source                         | Node auxiliary ENI VPC IP pool (e.g., `10.20.0.x`) | Independent Overlay CIDR (e.g., `10.244.x.x`), **not in the VPC range**                                               |
-| Pod IP public capability              | ❌ No (auxiliary ENI has no EIP)                  | n/a (Pod IP is always SNATed before leaving the node, never directly faces the public internet)                      |
+| Pod IP source                         | Node secondary ENI VPC IP pool (e.g., `10.20.0.x`) | Independent Overlay CIDR (e.g., `10.244.x.x`), **not in the VPC range**                                               |
+| Pod IP public capability              | ❌ No (secondary ENI has no EIP)                  | n/a (Pod IP is always SNATed before leaving the node, never directly faces the public internet)                      |
 | `enableIPv4Masquerade`                | `false` (Pod IP is a valid VPC IP, no SNAT needed for east-west traffic) | `true`                                                                                                                |
 | Node EIP identity                     | `remote-node`                                     | `remote-node`                                                                                                         |
 | BPF masq early return (remote-node skip) | Hit—masq is off by default; even when enabled (ip-masq-agent/Egress Gateway), the remote-node identity early return still skips SNAT for this destination (see point C above) | Hit—Cilium treats the destination as internal to the cluster, skips SNAT after vxlan decapsulation, **but the inner SNAT was already done by enableIPv4Masquerade before vxlan encapsulation** |
-| Source IP leaving the node            | Pod IP (auxiliary ENI IP, no public capability)   | **Node primary ENI VPC IP** (already SNATed)                                                                         |
+| Source IP leaving the node            | Pod IP (secondary ENI IP, no public capability)   | **Node primary ENI VPC IP** (already SNATed)                                                                         |
 | Can reach public EIP                  | ❌ Pod IP has no public egress                    | ✅ Node primary ENI IP uses the primary ENI's public capability (EIP / NAT Gateway)                                  |
 
-In short: **Under Native mode, Pod IPs come from auxiliary ENIs without EIPs and have no public capability; Cilium refuses to SNAT due to the remote-node identity, so the path to the public EIP is blocked. Under Overlay mode, the Pod IP doesn't exist in the VPC route table at all; Cilium always SNATs it to the node's primary ENI IP before leaving the node, and the primary ENI has public capability, so it can reach the EIP.**
+In short: **Under Native mode, Pod IPs come from secondary ENIs without EIPs and have no public capability; Cilium refuses to SNAT due to the remote-node identity, so the path to the public EIP is blocked. Under Overlay mode, the Pod IP doesn't exist in the VPC route table at all; Cilium always SNATs it to the node's primary ENI IP before leaving the node, and the primary ENI has public capability, so it can reach the EIP.**
 
 #### Is this a bug in Cilium / TKE?
 
 Neither—it is the combination of two reasonable design decisions:
 
-- **TKE VPC-CNI Native places Pod IPs on auxiliary ENIs and EIPs only on the primary ENI** to decouple Pod IPs from node IPs and prevent Pod count from being limited by the primary ENI—the trade-off is that Pods must explicitly use SNAT for public internet access.
+- **TKE VPC-CNI Native places Pod IPs on secondary ENIs and EIPs only on the primary ENI** to decouple Pod IPs from node IPs and prevent Pod count from being limited by the primary ENI—the trade-off is that Pods must explicitly use SNAT for public internet access.
 - **Cilium treats node EIPs as remote-node and does not SNAT them** to preserve Pod identity so that NetworkPolicy can still work based on the source Pod label in cross-node scenarios.
 
 Both designs are reasonable on their own, but together they cause cilium-cli's `pod-to-host:ping-ipv4-external-ip` to fail under Native mode. In production, the scenario of "a Pod actively pinging another node's EIP" is virtually non-existent, so there is no practical impact—simply use `--test '!/pod-to-host$'` to skip it.
@@ -540,7 +540,7 @@ If you do not need the `skipRedirectFromBackend` edge feature, you can ignore th
 
 During testing, in addition to binding EIPs to nodes, a public NAT Gateway was configured in the VPC route table—this was to allow the `ping-ipv4-external-ip` sub-action (pinging the node's EIP from the Pod) within the `pod-to-host` scenario to pass.
 
-**Causality chain without NAT Gateway** (see above [Why Pod ping to node EIP never works under Native Routing](#why-pod-ping-to-node-eip-never-works-under-native-routing)): Pod IPs come from auxiliary ENIs with no public capability → Cilium treats node EIPs as remote-node and does not SNAT → packets leave the node with the Pod IP and find no public path → ping fails.
+**Causality chain without NAT Gateway** (see above [Why Pod ping to node EIP never works under Native Routing](#why-pod-ping-to-node-eip-never-works-under-native-routing)): Pod IPs come from secondary ENIs with no public capability → Cilium treats node EIPs as remote-node and does not SNAT → packets leave the node with the Pod IP and find no public path → ping fails.
 
 **With NAT Gateway configured**, an additional path is introduced to route traffic back:
 

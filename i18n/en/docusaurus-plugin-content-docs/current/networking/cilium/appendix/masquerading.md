@@ -114,7 +114,7 @@ ipMasqAgent:
 
 ## Configuring nonMasqueradeCIDRs
 
-The IP masquerade enablement method described above does not SNAT traffic to all internal network ranges (except 169.254.0.0/16). For more fine-grained control, you can explicitly configure which CIDRs should not be SNATed, as follows.
+The IP masquerade enablement method described above does not set `nonMasqueradeCIDRs` explicitly, so cilium skips SNAT for the RFC 1918 ranges and other reserved ranges (100.64.0.0/10, 240.0.0.0/4, etc. — 11 ranges in total) by default; 169.254.0.0/16 is still SNATed because `masqLinkLocal: true` is set. For more fine-grained control, you can explicitly configure which CIDRs should not be SNATed, as follows.
 
 1. Prepare the ip-masq-agent ConfigMap in a file `ip-masq-agent-config.yaml`:
 

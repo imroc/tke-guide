@@ -69,7 +69,7 @@ RUN+="/usr/lib/systemd/systemd-sysctl --prefix=/net/ipv4/conf/$name ..."
 
 That is, **whenever a new network interface is created**, udev asynchronously runs `systemd-sysctl --prefix`, applying every sysctl.d entry matching that interface — and the `net.ipv4.conf.*.rp_filter = 1` glob matches every new lxc interface.
 
-The cilium CNI plugin does write `lxc.rp_filter = 0` when creating the Pod veth (source: `DisableRpFilter` in `pkg/datapath/connector/veth.go`), **but the udev application runs afterwards and asynchronously, overriding the 0 back to 1**. Without any override file, every new Pod's lxc interface ends up with rp_filter=1.
+The cilium CNI plugin does write `lxc.rp_filter = 0` when creating the Pod veth (source: `DisableRpFilter` in `pkg/datapath/connector/add.go`, called from the veth creation flow), **but the udev application runs afterwards and asynchronously, overriding the 0 back to 1**. Without any override file, every new Pod's lxc interface ends up with rp_filter=1.
 
 A cilium-internal detail worth knowing: interfaces created by the **cilium-agent itself** (`cilium_host`, `cilium_net`, `cilium_vxlan`, `lxc_health`) are managed by the agent's internal reconciler, which re-applies desired values every 10 minutes and can self-heal after a udev override. But **Pod veths are created by the CNI plugin process, which writes once and exits** — after a udev override the value **never self-heals**. Restarting the cilium pod doesn't help; only recreating the business Pod triggers another write.
 
@@ -108,7 +108,7 @@ Conclusion: **disable sysctlfix in both modes** (removing the trigger of "every 
 
 The DaemonSet also cleans up the legacy `99-zzz-override_cilium.conf` left by the old sysctlfix (its content is subsumed by the all-interfaces version).
 
-Disabling rp_filter node-wide is a safe convention on K8s nodes (cilium's own recommendation for kube-proxy-free mode): multi-interface routing (veth/vxlan/policy routes/bond) is inherently asymmetric and strict rp_filter only causes collateral damage; source validation is handled by cilium's BPF layer and VPC security groups.
+Disabling rp_filter node-wide is a safe convention on K8s nodes (strict rp_filter breaking kube-proxy-free deployments is [cilium/cilium#13130](https://github.com/cilium/cilium/issues/13130), and cilium's default-enabled sysctlfix is exactly the official mitigation): multi-interface routing (veth/vxlan/policy routes/bond) is inherently asymmetric and strict rp_filter only causes collateral damage; source validation is handled by cilium's BPF layer and VPC security groups.
 
 Native mode doesn't depend on this DaemonSet (symmetric routing), but if the node runs components requiring `rp_filter=0` (e.g. RDMA bond NICs), deploying the same DaemonSet provides the same all-interface immunity (verified that `tke-eni-agent` does not periodically rewrite eth0, so there is no override fight).
 
