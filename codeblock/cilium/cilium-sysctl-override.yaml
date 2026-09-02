@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cilium-sysctl-override
+  namespace: kube-system
+  labels:
+    app: cilium-sysctl-override
+spec:
+  selector:
+    matchLabels:
+      app: cilium-sysctl-override
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: cilium-sysctl-override
+    spec:
+      priorityClassName: system-node-critical
+      # 必须使用 hostNetwork：DaemonSet 在 cilium 接管 CNI 之前部署，普通 Pod
+      # 此时会卡在 TKE 节点 multus 的 sandbox 创建（out-of-cluster 凭证问题）
+      hostNetwork: true
+      tolerations:
+      - operator: Exists
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+      - name: ensure
+        # 复用 cilium agent 同一镜像，后续 helm 安装 cilium 不需要额外拉取第二个镜像
+        image: quay.tencentcloudcr.com/cilium/cilium:v1.20.1
+        command: ["/bin/sh", "-ce"]
+        # 必须特权模式：否则容器内 /proc/sys 只读，无法立即生效
+        securityContext:
+          privileged: true
+        args:
+        - |
+          while true; do
+            printf '%s\n' \
+              '# Disable rp_filter on ALL interfaces: cilium (lxc*/cilium_*), VPC-CNI policy' \
+              '# routing (eth*), and RDMA bond NICs all require asymmetric routing, which' \
+              '# strict rp_filter breaks. Filename sorts after distro defaults (50-*.conf),' \
+              '# so every sysctl replay (udev per-interface application, systemd-sysctl' \
+              '# restart, node reboot) ends with 0 winning.' \
+              'net.ipv4.conf.all.rp_filter = 0' \
+              'net.ipv4.conf.default.rp_filter = 0' \
+              '-net.ipv4.conf.*.rp_filter = 0' \
+              > /host/etc/sysctl.d/99-zzz-rp-filter.conf
+            rm -f /host/etc/sysctl.d/99-zzz-override_cilium.conf
+            # 立即应用到存量接口（hostNetwork Pod 的 /proc/sys 即宿主机网络栈）。
+            # 新接口从 default=0 继承初值，且每次 udev 重放都会应用本文件，双保险。
+            echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
+            echo 0 > /proc/sys/net/ipv4/conf/default/rp_filter
+            for f in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$f"; done
+            sleep 60
+          done
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+        volumeMounts:
+        - name: sysctl-dir
+          mountPath: /host/etc/sysctl.d
+      volumes:
+      - name: sysctl-dir
+        hostPath:
+          path: /etc/sysctl.d
+          type: DirectoryOrCreate

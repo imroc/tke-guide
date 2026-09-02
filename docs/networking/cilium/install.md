@@ -238,96 +238,30 @@ kubectl apply -f cni-config.yaml
 </TabItem>
 <TabItem value="overlay-gr" label="Overlay (GR)">
 
-部署 `cilium-sysctl-override` DaemonSet（见下方 Overlay (VPC-CNI) Tab 中的说明与 YAML，两个方案共用同一步骤）。
+无 GR 特定的前置操作；与 Overlay (VPC-CNI) 方案相同，需要完成下方「Overlay 方案共用的前置操作」小节。
 
 </TabItem>
 <TabItem value="overlay-vpccni" label="Overlay (VPC-CNI)">
 
-1. 禁用 `add-pod-eni-ip-limit-webhook`（否则 Pod 会被自动注入 `tke.cloud.tencent.com/eni-ip` 资源请求，导致 ip-scheduler 拦截调度）：
+禁用 `add-pod-eni-ip-limit-webhook`（否则 Pod 会被自动注入 `tke.cloud.tencent.com/eni-ip` 资源请求，导致 ip-scheduler 拦截调度）：
 
-   ```bash
-   kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook
-   ```
+```bash
+kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook
+```
 
-2. 部署 `cilium-sysctl-override` DaemonSet，将节点上**所有网卡的 `rp_filter` 统一固定为 0**（写 `/etc/sysctl.d/99-zzz-rp-filter.conf` + 立即应用到存量接口）：
+</TabItem>
+</Tabs>
 
-   ```yaml title="cilium-sysctl-override.yaml"
-   apiVersion: apps/v1
-   kind: DaemonSet
-   metadata:
-     name: cilium-sysctl-override
-     namespace: kube-system
-     labels:
-       app: cilium-sysctl-override
-   spec:
-     selector:
-       matchLabels:
-         app: cilium-sysctl-override
-     updateStrategy:
-       type: RollingUpdate
-     template:
-       metadata:
-         labels:
-           app: cilium-sysctl-override
-       spec:
-         priorityClassName: system-node-critical
-         # 必须使用 hostNetwork：DaemonSet 在 cilium 接管 CNI 之前部署，普通 Pod
-         # 此时会卡在 TKE 节点 multus 的 sandbox 创建（out-of-cluster 凭证问题）
-         hostNetwork: true
-         tolerations:
-         - operator: Exists
-         nodeSelector:
-           kubernetes.io/os: linux
-         containers:
-         - name: ensure
-           # 与 cilium agent 相同的镜像，节点本地已有缓存，无需额外拉取
-           image: quay.tencentcloudcr.com/cilium/cilium:v1.20.1
-           command: ["/bin/sh", "-ce"]
-           # 必须特权模式：否则容器内 /proc/sys 只读，无法立即生效
-           securityContext:
-             privileged: true
-           args:
-           - |
-             while true; do
-               printf '%s\n' \
-                 '# Disable rp_filter on ALL interfaces: cilium (lxc*/cilium_*), VPC-CNI policy' \
-                 '# routing (eth*), and RDMA bond NICs all require asymmetric routing, which' \
-                 '# strict rp_filter breaks. Filename sorts after distro defaults (50-*.conf),' \
-                 '# so every sysctl replay (udev per-interface application, systemd-sysctl' \
-                 '# restart, node reboot) ends with 0 winning.' \
-                 'net.ipv4.conf.all.rp_filter = 0' \
-                 'net.ipv4.conf.default.rp_filter = 0' \
-                 '-net.ipv4.conf.*.rp_filter = 0' \
-                 > /host/etc/sysctl.d/99-zzz-rp-filter.conf
-               rm -f /host/etc/sysctl.d/99-zzz-override_cilium.conf
-               # 立即应用到存量接口（hostNetwork Pod 的 /proc/sys 即宿主机网络栈）。
-               # 新接口从 default=0 继承初值，且每次 udev 重放都会应用本文件，双保险。
-               echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
-               echo 0 > /proc/sys/net/ipv4/conf/default/rp_filter
-               for f in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$f"; done
-               sleep 60
-             done
-           resources:
-             requests:
-               cpu: 10m
-               memory: 16Mi
-             limits:
-               cpu: 100m
-               memory: 64Mi
-           volumeMounts:
-           - name: sysctl-dir
-             mountPath: /host/etc/sysctl.d
-         volumes:
-         - name: sysctl-dir
-           hostPath:
-             path: /etc/sysctl.d
-             type: DirectoryOrCreate
-   ```
+#### Overlay 方案共用的前置操作：部署 cilium-sysctl-override DaemonSet
 
-   ```bash
-   kubectl apply -f cilium-sysctl-override.yaml
-   kubectl -n kube-system rollout status daemonset/cilium-sysctl-override --timeout=180s
-   ```
+两个 Overlay 方案（VPC-CNI 与 GR）都需要部署 `cilium-sysctl-override` DaemonSet，将节点上**所有网卡的 `rp_filter` 统一固定为 0**（写 `/etc/sysctl.d/99-zzz-rp-filter.conf` + 立即应用到存量接口）：
+
+<FileBlock file="cilium/cilium-sysctl-override.yaml" />
+
+```bash
+kubectl apply -f cilium-sysctl-override.yaml
+kubectl -n kube-system rollout status daemonset/cilium-sysctl-override --timeout=180s
+```
 
 :::warning[为什么 Overlay 必须部署这个 DaemonSet]
 
@@ -348,9 +282,6 @@ cilium 自带的 `sysctlfix` 功能本可以写覆盖文件，但存在两个问
 完整机制分析（含 Native 与 Overlay 的差异、路由对称性原理）见 [sysctlfix 与 rp_filter 机制详解](./appendix/sysctlfix.md)。
 
 :::
-
-</TabItem>
-</Tabs>
 
 ### 使用 helm 安装 cilium
 
@@ -582,7 +513,7 @@ operator:
 ```
 
   </TabItem>
-  <TabItem value="overlay" label="Overlay (VPC-CNI/GR)">
+  <TabItem value="overlay-vpccni" label="Overlay (VPC-CNI/GR)">
 
 Overlay (vxlan) 模式专属参数，VPC-CNI 和 GR 集群通用：
 
@@ -635,53 +566,7 @@ operator:
 
 将所有 cilium 依赖镜像替换为在 TKE 环境中能直接内网拉取 mirror 镜像，避免因网络问题导致镜像拉取失败：
 
-```yaml title="image-values.yaml"
-image:
-  repository: quay.tencentcloudcr.com/cilium/cilium
-envoy:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-operator:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/operator
-certgen:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/certgen
-hubble:
-  relay:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/hubble-relay
-  ui:
-    backend:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/hubble-ui-backend
-    frontend:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/hubble-ui
-nodeinit:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/startup-script
-preflight:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/cilium
-  envoy:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-clustermesh:
-  apiserver:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/clustermesh-apiserver
-authentication:
-  mutual:
-    spire:
-      install:
-        agent:
-          image:
-            repository: docker.io/k8smirror/spire-agent
-        server:
-          image:
-            repository: docker.io/k8smirror/spire-server
-```
+<FileBlock file="cilium/image-values.yaml" showLineNumbers showFileName />
 
   </TabItem>
 </Tabs>
@@ -932,6 +817,27 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 
 :::
 
+### 回滚 cilium 版本
+
+小版本升级后如发现问题，无需回退到 TKE 内置 CNI，先用 helm 直接回滚到上一个版本：
+
+```bash
+# 查看版本历史
+helm history cilium -n kube-system
+
+# 回滚到上一个版本（REVISION 号见上表输出）
+helm rollback cilium <REVISION> -n kube-system
+
+# 等待滚动更新完成
+kubectl -n kube-system rollout status ds/cilium
+```
+
+:::note[回滚前提]
+
+`helm rollback` 只回滚 helm 管理的配置与工作负载；跨大版本升级若涉及 CRD 变更（新版本新增了 CRD 字段），已升级的 CRD 不会随 rollback 自动降级（新 CRD 通常向后兼容旧版本 agent，一般可正常工作），必要时需手动处理。回滚前用 `helm history` 确认目标 revision 是健康版本。
+
+:::
+
 ### 回滚到 TKE 内置 CNI
 
 如需从 cilium 回退到 TKE 原生 CNI（VPC-CNI 或 GR），操作不可避免地会中断业务，建议在维护窗口执行。
@@ -1107,53 +1013,7 @@ helm upgrade cilium cilium/cilium --version 1.20.1 \
 
 如果你使用 yaml 管理配置，可以将镜像替换的配置保存到 `image-values.yaml`:
 
-```yaml title="image-values.yaml"
-image:
-  repository: quay.tencentcloudcr.com/cilium/cilium
-envoy:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-operator:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/operator
-certgen:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/certgen
-hubble:
-  relay:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/hubble-relay
-  ui:
-    backend:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/hubble-ui-backend
-    frontend:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/hubble-ui
-nodeinit:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/startup-script
-preflight:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/cilium
-  envoy:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-clustermesh:
-  apiserver:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/clustermesh-apiserver
-authentication:
-  mutual:
-    spire:
-      install:
-        agent:
-          image:
-            repository: docker.io/k8smirror/spire-agent
-        server:
-          image:
-            repository: docker.io/k8smirror/spire-server
-```
+<FileBlock file="cilium/image-values.yaml" showLineNumbers showFileName />
 
 更新 cilium 时追加一个 `-f image-values.yaml` 将镜像替换的配置加上：
 
@@ -1217,42 +1077,9 @@ if c.EnableEnvoyConfig {
 
 ### Overlay 模式下 Webhook（Validating/Mutating）连接超时？
 
-**问题现象**：在 Overlay 模式的 TKE 托管集群中，apiserver 调用 ValidatingWebhook / MutatingWebhook 时连接超时（如 cert-manager 的 `webhook.cert-manager.io`），报错 `context deadline exceeded` 或 `Client.Timeout exceeded while awaiting headers`。
+**根因**：TKE 托管集群的 apiserver 运行在管控面（MetaCluster），管控面上没有 cilium-agent、没有 overlay 隧道，而 EndpointSlice 中的 Pod IP 是 overlay 网段，管控面到该网段没有路由，因此 apiserver 调用 webhook 时连接超时（如 cert-manager 的 `webhook.cert-manager.io`，报错 `context deadline exceeded`）。Native Routing 模式没有此问题——Pod IP 是 VPC IP，apiserver 可以直接路由。
 
-**根因**：TKE 托管集群的 apiserver 运行在管控面（MetaCluster），管控面上没有 cilium-agent，也就没有 cilium 的 overlay 隧道。apiserver 通过 Service ClusterIP → EndpointSlice 访问 webhook Pod 时，EndpointSlice 中的 Pod IP 是 overlay 网段（如 `10.244.x.x`），管控面到 overlay 网段没有路由，因此连接超时。
-
-```text
-apiserver (管控面, 无 cilium-agent)
-  → Service ClusterIP
-  → EndpointSlice: 10.244.x.x (overlay Pod IP)
-  → ❌ 管控面无 overlay 隧道，路由不可达
-```
-
-Native Routing 模式没有此问题——Pod IP 是 VPC IP，apiserver 可以直接路由。
-
-**解决方案**：Webhook Pod 使用 `hostNetwork: true`，这样 Pod IP 就是节点 IP（VPC IP），apiserver 可直接路由到达。配合 `podAntiAffinity` 将 webhook Pod 打散到不同节点保证高可用：
-
-```yaml
-spec:
-  hostNetwork: true  # Pod IP = 节点 IP，apiserver 可直达
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/name: <webhook-name>
-        topologyKey: kubernetes.io/hostname
-```
-
-:::tip[常见需要 hostNetwork 的组件]
-
-以下组件在 Overlay 模式下通常需要 `hostNetwork: true` 才能正常工作：
-
-- cert-manager webhook
-- 各类自定义 admission webhook（如 Gatekeeper、OPA）
-- 任何被 apiserver 主动调用的 webhook 服务
-
-:::
+**解决方案**：Webhook Pod 使用 `hostNetwork: true`（Pod IP 即节点 IP），配合 `podAntiAffinity` 打散保证高可用。完整分析见 [问题排查：Overlay 模式下 Webhook 连接超时](./appendix/troubleshooting/webhook-connection-timeout.md)。
 
 ### Overlay 模式不支持 Pod 固定 IP？
 

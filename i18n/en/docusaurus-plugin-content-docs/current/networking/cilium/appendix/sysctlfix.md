@@ -112,8 +112,6 @@ Disabling rp_filter node-wide is a safe convention on K8s nodes (cilium's own re
 
 Native mode doesn't depend on this DaemonSet (symmetric routing), but if the node runs components requiring `rp_filter=0` (e.g. RDMA bond NICs), deploying the same DaemonSet provides the same all-interface immunity (verified that `tke-eni-agent` does not periodically rewrite eth0, so there is no override fight).
 
-The only case needing manual attention is migrating an **existing cluster from the old sysctlfix=true setup**: lxc interfaces already on the node may be stuck at the replayed value 1 (the agent doesn't manage rp_filter of existing Pod veths). Fix by rolling-restarting business Pods or running `sudo systemctl restart systemd-sysctl` once on the node (the 99-zzz file now wins the replay).
-
 :::tip[AI-inference RDMA scenarios (bond NICs requiring rp_filter=0)]
 
 The `cilium-sysctl-override` DaemonSet deployed in Overlay mode already pins **all node interfaces** to 0, so bond NICs are covered natively — when a bond is created, the udev application ends with `99-zzz-rp-filter.conf` (verified: a freshly created bond0 lands on 0 immediately), the value survives external replays, and the "cilium replay breaks the bond NIC" problem is eliminated at the root.

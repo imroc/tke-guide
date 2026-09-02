@@ -241,98 +241,30 @@ kubectl apply -f cni-config.yaml
 </TabItem>
 <TabItem value="overlay-gr" label="Overlay (GR)">
 
-Deploy the `cilium-sysctl-override` DaemonSet (see the Overlay (VPC-CNI) tab below for the rationale and YAML — both modes share this step).
+No GR-specific prerequisite; just like the Overlay (VPC-CNI) plan, complete the "Shared prerequisite for both Overlay modes" section below.
 
 </TabItem>
 <TabItem value="overlay-vpccni" label="Overlay (VPC-CNI)">
 
-1. Disable `add-pod-eni-ip-limit-webhook` (otherwise Pods get auto-injected with the `tke.cloud.tencent.com/eni-ip` resource request, which causes ip-scheduler to block scheduling):
+Disable `add-pod-eni-ip-limit-webhook` (otherwise Pods get auto-injected with the `tke.cloud.tencent.com/eni-ip` resource request, which causes ip-scheduler to block scheduling):
 
-   ```bash
-   kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook
-   ```
+```bash
+kubectl delete mutatingwebhookconfiguration add-pod-eni-ip-limit-webhook
+```
 
-2. Deploy the `cilium-sysctl-override` DaemonSet, which pins `rp_filter=0` on **ALL node interfaces** (writes `/etc/sysctl.d/99-zzz-rp-filter.conf` + applies immediately to existing interfaces):
+</TabItem>
+</Tabs>
 
-   ```yaml title="cilium-sysctl-override.yaml"
-   apiVersion: apps/v1
-   kind: DaemonSet
-   metadata:
-     name: cilium-sysctl-override
-     namespace: kube-system
-     labels:
-       app: cilium-sysctl-override
-   spec:
-     selector:
-       matchLabels:
-         app: cilium-sysctl-override
-     updateStrategy:
-       type: RollingUpdate
-     template:
-       metadata:
-         labels:
-           app: cilium-sysctl-override
-       spec:
-         priorityClassName: system-node-critical
-         # hostNetwork is required: this DaemonSet deploys BEFORE cilium takes
-         # over CNI, and on a fresh TKE node any non-hostNetwork pod is stuck in
-         # sandbox creation (multus out-of-cluster kubeconfig is Unauthorized)
-         hostNetwork: true
-         tolerations:
-         - operator: Exists
-         nodeSelector:
-           kubernetes.io/os: linux
-         containers:
-         - name: ensure
-           # Same image as the cilium agent — already cached on nodes, no extra pull
-           image: quay.tencentcloudcr.com/cilium/cilium:v1.20.1
-           command: ["/bin/sh", "-ce"]
-           # Privileged is required: /proc/sys is read-only otherwise
-           securityContext:
-             privileged: true
-           args:
-           - |
-             while true; do
-               printf '%s\n' \
-                 '# Disable rp_filter on ALL interfaces: cilium (lxc*/cilium_*), VPC-CNI policy' \
-                 '# routing (eth*), and RDMA bond NICs all require asymmetric routing, which' \
-                 '# strict rp_filter breaks. Filename sorts after distro defaults (50-*.conf),' \
-                 '# so every sysctl replay (udev per-interface application, systemd-sysctl' \
-                 '# restart, node reboot) ends with 0 winning.' \
-                 'net.ipv4.conf.all.rp_filter = 0' \
-                 'net.ipv4.conf.default.rp_filter = 0' \
-                 '-net.ipv4.conf.*.rp_filter = 0' \
-                 > /host/etc/sysctl.d/99-zzz-rp-filter.conf
-               rm -f /host/etc/sysctl.d/99-zzz-override_cilium.conf
-               # Apply immediately to existing interfaces (hostNetwork pod:
-               # /proc/sys is the host netns). New interfaces inherit default=0
-               # and are re-covered by the file on every udev replay.
-               echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
-               echo 0 > /proc/sys/net/ipv4/conf/default/rp_filter
-               for f in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$f"; done
-               sleep 60
-             done
-           resources:
-             requests:
-               cpu: 10m
-               memory: 16Mi
-             limits:
-               cpu: 100m
-               memory: 64Mi
-           volumeMounts:
-           - name: sysctl-dir
-             mountPath: /host/etc/sysctl.d
-         volumes:
-         - name: sysctl-dir
-           hostPath:
-             path: /etc/sysctl.d
-             type: DirectoryOrCreate
-   ```
+#### Shared prerequisite for both Overlay modes: deploy the cilium-sysctl-override DaemonSet
 
-   ```bash
-   kubectl apply -f cilium-sysctl-override.yaml
-   kubectl -n kube-system rollout status daemonset/cilium-sysctl-override --timeout=180s
-   ```
+Both Overlay plans (VPC-CNI and GR) need the `cilium-sysctl-override` DaemonSet, which pins `rp_filter=0` on **ALL node interfaces** (writes `/etc/sysctl.d/99-zzz-rp-filter.conf` + applies immediately to existing interfaces):
+
+<FileBlock file="cilium/cilium-sysctl-override.yaml" />
+
+```bash
+kubectl apply -f cilium-sysctl-override.yaml
+kubectl -n kube-system rollout status daemonset/cilium-sysctl-override --timeout=180s
+```
 
 :::warning[Why Overlay requires this DaemonSet]
 
@@ -353,9 +285,6 @@ Disabling rp_filter node-wide is a safe convention on K8s nodes (cilium's own re
 For the full analysis (including the Native vs Overlay difference and the routing symmetry principle), see [sysctlfix and rp_filter Deep Dive](./appendix/sysctlfix.md).
 
 :::
-
-</TabItem>
-</Tabs>
 
 ### Install Cilium via Helm
 
@@ -588,7 +517,7 @@ operator:
 ```
 
   </TabItem>
-  <TabItem value="overlay" label="Overlay (VPC-CNI/GR)">
+  <TabItem value="overlay-vpccni" label="Overlay (VPC-CNI/GR)">
 
 Overlay (vxlan) mode-specific parameters — applies to both VPC-CNI and GR base clusters:
 
@@ -642,53 +571,7 @@ operator:
 
 Replace all cilium-related images with mirrors reachable from TKE intranet, to avoid pull failures:
 
-```yaml title="image-values.yaml"
-image:
-  repository: quay.tencentcloudcr.com/cilium/cilium
-envoy:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-operator:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/operator
-certgen:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/certgen
-hubble:
-  relay:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/hubble-relay
-  ui:
-    backend:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/hubble-ui-backend
-    frontend:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/hubble-ui
-nodeinit:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/startup-script
-preflight:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/cilium
-  envoy:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-clustermesh:
-  apiserver:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/clustermesh-apiserver
-authentication:
-  mutual:
-    spire:
-      install:
-        agent:
-          image:
-            repository: docker.io/k8smirror/spire-agent
-        server:
-          image:
-            repository: docker.io/k8smirror/spire-server
-```
+<FileBlock file="cilium/image-values.yaml" showLineNumbers showFileName />
 
   </TabItem>
 </Tabs>
@@ -940,6 +823,27 @@ bash -c "$(curl -sfL https://raw.githubusercontent.com/imroc/tke-guide/main/stat
 
 :::
 
+### Roll Back the cilium Version
+
+If problems appear after a minor-version upgrade, roll straight back with helm — no need to fall back to the TKE built-in CNI:
+
+```bash
+# Check version history
+helm history cilium -n kube-system
+
+# Roll back to the previous version (REVISION number from the output above)
+helm rollback cilium <REVISION> -n kube-system
+
+# Wait for the rolling update to finish
+kubectl -n kube-system rollout status ds/cilium
+```
+
+:::note[Rollback prerequisites]
+
+`helm rollback` only reverts the helm-managed configuration and workloads; if a major-version upgrade involved CRD changes (new CRD fields), the upgraded CRDs are not automatically downgraded by rollback (newer CRDs are usually backward-compatible with older agents and generally keep working) — handle them manually if necessary. Before rolling back, use `helm history` to confirm the target revision was healthy.
+
+:::
+
 ### Rollback to TKE Built-in CNI
 
 Rolling back from cilium to TKE's native CNI (VPC-CNI or GR) inevitably disrupts traffic. Schedule a maintenance window.
@@ -1116,53 +1020,7 @@ helm upgrade cilium cilium/cilium --version 1.20.1 \
 
 If you manage configuration in YAML, save the image override config as `image-values.yaml`:
 
-```yaml title="image-values.yaml"
-image:
-  repository: quay.tencentcloudcr.com/cilium/cilium
-envoy:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-operator:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/operator
-certgen:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/certgen
-hubble:
-  relay:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/hubble-relay
-  ui:
-    backend:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/hubble-ui-backend
-    frontend:
-      image:
-        repository: quay.tencentcloudcr.com/cilium/hubble-ui
-nodeinit:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/startup-script
-preflight:
-  image:
-    repository: quay.tencentcloudcr.com/cilium/cilium
-  envoy:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/cilium-envoy
-clustermesh:
-  apiserver:
-    image:
-      repository: quay.tencentcloudcr.com/cilium/clustermesh-apiserver
-authentication:
-  mutual:
-    spire:
-      install:
-        agent:
-          image:
-            repository: docker.io/k8smirror/spire-agent
-        server:
-          image:
-            repository: docker.io/k8smirror/spire-server
-```
+<FileBlock file="cilium/image-values.yaml" showLineNumbers showFileName />
 
 When updating cilium, append `-f image-values.yaml` to include the image overrides:
 
@@ -1226,42 +1084,9 @@ If you need Gateway API capability, it is recommended to use **Overlay mode**.
 
 ### Webhook (Validating/Mutating) connection timeout in Overlay mode?
 
-**Symptom**: In a TKE managed cluster with Overlay mode, apiserver calls to ValidatingWebhook / MutatingWebhook time out (e.g. cert-manager's `webhook.cert-manager.io`), reporting `context deadline exceeded` or `Client.Timeout exceeded while awaiting headers`.
+**Root Cause**: In TKE managed clusters, the apiserver runs on the control plane (MetaCluster), where there is no cilium-agent and no overlay tunnel — while the Pod IP in the EndpointSlice is in the overlay subnet, which is not routable from the control plane, so apiserver calls to webhooks time out (e.g. cert-manager's `webhook.cert-manager.io`, reporting `context deadline exceeded`). Native Routing mode does not have this issue — Pod IPs are VPC IPs, directly routable from apiserver.
 
-**Root Cause**: In TKE managed clusters, the apiserver runs on the control plane (MetaCluster), where there is no cilium-agent and therefore no overlay tunnel. When apiserver accesses a webhook Pod via Service ClusterIP → EndpointSlice, the Pod IP in the EndpointSlice is in the overlay subnet (e.g. `10.244.x.x`), which is not routable from the control plane — hence the timeout.
-
-```text
-apiserver (control plane, no cilium-agent)
-  → Service ClusterIP
-  → EndpointSlice: 10.244.x.x (overlay Pod IP)
-  → ❌ No overlay tunnel on control plane, route unreachable
-```
-
-Native Routing mode does not have this issue — Pod IPs are VPC IPs, directly routable from apiserver.
-
-**Solution**: Set `hostNetwork: true` on the webhook Pod, so the Pod IP becomes the node IP (a VPC IP) that apiserver can route to directly. Use `podAntiAffinity` to spread webhook Pods across different nodes for high availability:
-
-```yaml
-spec:
-  hostNetwork: true  # Pod IP = node IP, apiserver can reach directly
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/name: <webhook-name>
-        topologyKey: kubernetes.io/hostname
-```
-
-:::tip[Common components that need hostNetwork]
-
-The following components typically require `hostNetwork: true` in Overlay mode:
-
-- cert-manager webhook
-- Custom admission webhooks (e.g. Gatekeeper, OPA)
-- Any webhook service that apiserver actively calls
-
-:::
+**Solution**: Set `hostNetwork: true` on the webhook Pod (the Pod IP becomes the node IP), combined with `podAntiAffinity` for high availability. See [Troubleshooting: Webhook Connection Timeout in Overlay Mode](./appendix/troubleshooting/webhook-connection-timeout.md) for the full analysis.
 
 ### Overlay mode does not support Pod fixed IP?
 

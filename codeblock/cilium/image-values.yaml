@@ -1,0 +1,45 @@
+image:
+  repository: quay.tencentcloudcr.com/cilium/cilium
+envoy:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/cilium-envoy
+operator:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/operator
+certgen:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/certgen
+hubble:
+  relay:
+    image:
+      repository: quay.tencentcloudcr.com/cilium/hubble-relay
+  ui:
+    backend:
+      image:
+        repository: quay.tencentcloudcr.com/cilium/hubble-ui-backend
+    frontend:
+      image:
+        repository: quay.tencentcloudcr.com/cilium/hubble-ui
+nodeinit:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/startup-script
+preflight:
+  image:
+    repository: quay.tencentcloudcr.com/cilium/cilium
+  envoy:
+    image:
+      repository: quay.tencentcloudcr.com/cilium/cilium-envoy
+clustermesh:
+  apiserver:
+    image:
+      repository: quay.tencentcloudcr.com/cilium/clustermesh-apiserver
+authentication:
+  mutual:
+    spire:
+      install:
+        agent:
+          image:
+            repository: docker.io/k8smirror/spire-agent
+        server:
+          image:
+            repository: docker.io/k8smirror/spire-server

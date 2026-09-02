@@ -60,7 +60,7 @@ Once all verifications pass, you can safely use the OS in production node pools.
 ## Common OS Selection Pitfalls
 
 - **Older OS versions (TencentOS 3.x / early Ubuntu 20.04)**: Kernel versions may be < 5.10, causing cilium installation errors or some features (e.g., BPF Host Routing) being unavailable.
-- **DataPlaneV2's bundled OS**: The OS used when creating a VPC-CNI cluster with DataPlaneV2 is incompatible with the latest cilium (see [Installing Cilium - FAQ: Can I select DataPlaneV2 when creating a VPC-CNI cluster?](../install.md#vpc-cni-集群创建时能否勾选-dataplanev2)).
+- **DataPlaneV2's bundled OS**: The OS used when creating a VPC-CNI cluster with DataPlaneV2 is incompatible with the latest cilium (see [Installing Cilium - FAQ: Can I select DataPlaneV2 when creating a VPC-CNI cluster?](../install.md#can-dataplanev2-be-selected-when-creating-a-vpc-cni-cluster)).
 - **Custom stripped OS images**: If BPF-related kernel modules (e.g., `bpf`, `bpf_jit`) have been stripped, cilium will fail to start.
 
 ## Related Links

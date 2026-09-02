@@ -6,54 +6,54 @@
 
 ### Getting Started
 
-| Article               | Content                                                           | Audience         |
-| --------------------- | ----------------------------------------------------------------- | ---------------- |
-| **Installing Cilium** | Empty cluster creation, helm installation, verification, rollback | First-time users |
-
-| **Cilium Functional Test** | Functional testing methods and measured data | All post-install users |
-| **Cilium Performance Test**| Baseline network performance and cross-scheme comparison | Performance-focused users |
+| Article                                                            | Content                                                           | Audience         |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------- | ---------------- |
+| **[Installing Cilium](./install.md)**                              | Empty cluster creation, helm installation, verification, rollback | First-time users |
+| **[Cilium Functional Test](./appendix/connectivity-test.md)**      | Functional testing methods and measured data                      | All post-install users |
+| **[Cilium Performance Test](./appendix/performance-test.md)**      | Baseline network performance and cross-scheme comparison          | Performance-focused users |
 
 ### Network Enhancement
 
-| Article | Content | Prerequisites |
-| ------- | ------- | ------------- |
-| **Using Gateway API** | Cilium built-in Gateway API for traffic routing | Cilium installed |
-| **Egress Gateway in Practice** | Select fixed egress IP per policy for external access | Cilium installed |
-| **Enabling Communication Encryption** | WireGuard / IPsec encryption for inter-node Pod traffic | Cilium installed |
-| **Building Multi-Cluster Networks with Cilium** | Cluster Mesh to connect services across clusters | Cilium installed |
+| Article                                                                    | Content                                                           | Prerequisites   |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------- |
+| **[Using Gateway API](./gateway-api.md)**                                  | Cilium built-in Gateway API for traffic routing                   | Cilium installed |
+| **[Egress Gateway in Practice](./egress-gateway.md)**                      | Select fixed egress IP per policy for external access             | Cilium installed |
+| **[Enabling Communication Encryption](./encryption.md)**                   | WireGuard / IPsec encryption for inter-node Pod traffic           | Cilium installed |
+| **[Building Multi-Cluster Networks with Cilium](./clustermesh.md)**        | Cluster Mesh to connect services across clusters                  | Cilium installed |
 
 ### Security Policies
 
-| Article                       | Content                                                   |
-| ----------------------------- | --------------------------------------------------------- |
-| **NetworkPolicy in Practice** | CiliumNetworkPolicy introduction with 20+ common patterns |
+| Article                                                          | Content                                                   |
+| ---------------------------------------------------------------- | --------------------------------------------------------- |
+| **[NetworkPolicy in Practice](./networkpolicy.md)**              | CiliumNetworkPolicy introduction with 20+ common patterns |
 
 ### Observability
 
-| Article                                     | Content                                                  |
-| ------------------------------------------- | -------------------------------------------------------- |
-| **Enhanced Observability**                  | Enable Hubble Relay / Hubble UI / network flow log audit |
-| **Cilium + CLS for Network Flow Log Audit** | Ship Hubble flow logs to CLS for search and analysis     |
+| Article                                                                       | Content                                                  |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **[Enhanced Observability](./observability.md)**                              | Enable Hubble Relay / Hubble UI / network flow log audit |
+| **[Cilium + CLS for Network Flow Log Audit](./flow-logs.md)**                 | Ship Hubble flow logs to CLS for search and analysis     |
 
 ### Appendix
 
-| Article                                     | Content                                                           |
-| ------------------------------------------- | ----------------------------------------------------------------- |
-| **Cilium Tuning for Large Clusters**        | Parameter, resource, and BPF map tuning for 200+ node clusters    |
-| **Verified Node Operating Systems**         | Compatibility verification results for 8 OS types                 |
-| **sysctlfix and rp_filter Deep Dive**       | Why both modes disable sysctlfix, the udev override mechanism, and Overlay's DaemonSet compensation |
-| **VPC-CNI Native Routing Details**         | Configuration principles of local-router-ipv4, sysctlfix, and Host Routing |
-| **Why GR Native Routing Is Not Available**  | Complete trial-and-error record and 4 types of issues             |
-| **Cilium with NodeLocal DNSCache**          | Self-built NodeLocal DNS cache for DNS acceleration               |
-| **Configure IP Masquerading**               | Let Pods egress via node EIP without NAT gateway                  |
-| **Host Cilium Images via TCR**              | Use internal TCR instead of pulling from Docker Hub               |
+| Article                                                                     | Content                                                           |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **[Cilium Network Performance Benchmark](./appendix/network-benchmark.md)** | Cross-scheme stress test: throughput / RPS / Service scaling / policy overhead |
+| **[Cilium Tuning for Large Clusters](./appendix/large-scale-tuning.md)**    | Parameter, resource, and BPF map tuning for 200+ node clusters    |
+| **[Verified Node Operating Systems](./appendix/verified-os.md)**            | Compatibility verification results for 8 OS types                 |
+| **[sysctlfix and rp_filter Deep Dive](./appendix/sysctlfix.md)**            | Why both modes disable sysctlfix, the udev override mechanism, and Overlay's DaemonSet compensation |
+| **[VPC-CNI Native Routing Details](./appendix/native-routing.md)**          | Configuration principles of local-router-ipv4, sysctlfix, and Host Routing |
+| **[Why GR Native Routing Is Not Available](./appendix/gr-native-not-recommended.md)** | Complete trial-and-error record and 4 types of issues     |
+| **[Cilium with NodeLocal DNSCache](./appendix/with-node-local-dns.md)**     | Self-built NodeLocal DNS cache for DNS acceleration               |
+| **[Configure IP Masquerading](./appendix/masquerading.md)**                 | Let Pods egress via node EIP without NAT gateway                  |
+| **[Host Cilium Images via TCR](./appendix/tcr.md)**                         | Use internal TCR instead of pulling from Docker Hub               |
 
 ### Troubleshooting
 
-| Article                                                 | Content                                             |
-| ------------------------------------------------------- | --------------------------------------------------- |
-| **Apiserver Connection Error: operation not permitted** | Cilium bug investigation and root cause analysis    |
-| **Cilium Debugging Tips**                               | `cilium status`, monitor, and other common commands |
+| Article                                                                                 | Content                                             |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **[Apiserver Connection Error: operation not permitted](./appendix/troubleshooting/connect-apiserver-operation-not-permitted.md)** | Cilium bug investigation and root cause analysis |
+| **[Cilium Debugging Tips](./appendix/debug.md)**                                        | `cilium status`, monitor, and other common commands |
 
 ## Quick Decision Tree
 

@@ -132,7 +132,7 @@ Without finding the root cause, it was impossible to determine if other scenario
 
 To investigate further, the reproduction condition had to be found first.
 
-After various hypotheses and attempts (skipping ten thousand words here), **the reproduction condition was finally discovered: adjusting the TKE cluster规格 (spec/size).**
+After various hypotheses and attempts (skipping ten thousand words here), **the reproduction condition was finally discovered: adjusting the TKE cluster spec.**
 
 The TKE cluster spec can be adjusted automatically or manually. After manually adjusting the cluster spec, the issue was reproduced, though sometimes not on all nodes.
 

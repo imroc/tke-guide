@@ -193,7 +193,7 @@ kubectl delete pod dnstest
 | kube-proxy          | 需手动移除                                               | 不存在（创建时就不部署）               |
 | 配置方式            | helm values 或 cilium-config ConfigMap                   | 不可直接修改（由 eniipamd addon 管理） |
 
-自建 Cilium 集群的部署方式参考：[Cilium 与 Nodelocal DNSCache 共存（自建 Cilium 场景）](/networking/cilium/with-node-local-dns)。
+自建 Cilium 集群的部署方式参考：[Cilium 与 Nodelocal DNSCache 共存（自建 Cilium 场景）](/networking/cilium/appendix/with-node-local-dns)。
 
 ### 高级配置：按域名分流（对 DNS 切换敏感的高可用场景）
 
@@ -447,4 +447,4 @@ kubectl delete pod dnstest
 
 - [Local Redirect Policy Use Cases: Node-local DNS cache](https://docs.cilium.io/en/stable/network/kubernetes/local-redirect-policy/#node-local-dns-cache)
 - [在 Kubernetes 集群中使用 NodeLocal DNSCache](https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/nodelocaldns/)
-- [Cilium 与 Nodelocal DNSCache 共存（自建 Cilium 场景）](/networking/cilium/with-node-local-dns)
+- [Cilium 与 Nodelocal DNSCache 共存（自建 Cilium 场景）](/networking/cilium/appendix/with-node-local-dns)

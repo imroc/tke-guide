@@ -2,7 +2,7 @@
 
 This article describes how to perform connectivity functional testing for Cilium installed on a TKE cluster, and provides actual test results for each recommended installation method.
 
-Cilium provides the official [`cilium connectivity test`](https://docs.cilium.io/en/stable/contributing/testing/e2e/) end-to-end test suite, covering Pod-to-Pod, Pod-to-Service, Pod-to-Host same/cross-node connectivity, ClusterIP/NodePort/HostPort forwarding (kubeProxyReplacement), L3/L4/L7 NetworkPolicy (including deny/allow, ingress/egress, CIDR/Entity/ServiceAccount/L7 rules), CiliumLocalRedirectPolicy redirection, DNS resolution, and public network test cases like `pod-to-world` / `pod-to-cidr` / `to-fqdns`. Based on cilium-cli v0.19.4, it deploys approximately 132 test cases / ~600 actions (the count varies by version).
+Cilium provides the official [`cilium connectivity test`](https://docs.cilium.io/en/stable/contributing/testing/e2e/) end-to-end test suite, covering Pod-to-Pod, Pod-to-Service, Pod-to-Host same/cross-node connectivity, ClusterIP/NodePort/HostPort forwarding (kubeProxyReplacement), L3/L4/L7 NetworkPolicy (including deny/allow, ingress/egress, CIDR/Entity/ServiceAccount/L7 rules), CiliumLocalRedirectPolicy redirection, DNS resolution, and public network test cases like `pod-to-world` / `pod-to-cidr` / `to-fqdns`. Based on cilium-cli v0.19.4, it deploys approximately 132 test cases / ~800 actions (the count varies by version).
 
 ## Test Methods
 
@@ -25,7 +25,7 @@ Compared to running `cilium connectivity test` directly, the script does the fol
 - **Image replacement**: All test images are replaced with mirror addresses pullable from within the TKE intranet (`quay.io` → `quay.tencentcloudcr.com`, `registry.k8s.io` / `gcr.io` → `docker.io/k8smirror`), so nodes do not need public network access to pull images
 - **Mainland China region adaptation**: Automatically detects the node's region. For clusters in mainland China, external targets are replaced from `1.1.1.1` / `one.one.one.one.` / `k8s.io.` (blocked by GFW) to `npmmirror.com` / `mirrors.aliyun.com`, and dynamically resolves `npmmirror.com`'s current public IP to inject into `--external-ip` / `--external-other-ip` / `--external-cidr`, allowing `pod-to-cidr` type test cases to pass
 - **Environment probing with WARN only, no forced skip**: Conditions such as whether Pods can access the public internet from nodes, or whether Pods can ping the node's EIP when both Native mode and node EIP are enabled, are tested first. WARN messages are only printed if they fail, with skip suggestions (e.g., `--test '!/pod-to-host$'`), leaving the decision to the user
-- **Automatic cleanup of previous test artifacts**: Cleans up the `cilium-test-*` namespace left over from previous runs (cilium-cli preserves resources on test failure, and TKE Gatekeeper prevents namespace deletion while Pods are still running inside it; failing to clean up beforehand will cause subsequent perf tests to hang, see [Cilium Performance Testing → FAQ](./performance-test.md#why-clean-up-cilium-test--namespace-before-perf))
+- **Automatic cleanup of previous test artifacts**: Cleans up the `cilium-test-*` namespace left over from previous runs (cilium-cli preserves resources on test failure, and TKE Gatekeeper prevents namespace deletion while Pods are still running inside it; failing to clean up beforehand will cause subsequent perf tests to hang, see [Cilium Performance Testing → FAQ](./performance-test.md#why-clean-up-the-cilium-test--namespace-before-running-perf))
 - **Duration tracking**: Prints the total elapsed time at the end of the test
 
 ### Manual Testing
@@ -159,7 +159,7 @@ Intuitively, "ip-masq-agent is for SNAT in Native mode—just add the EIP range 
 
 NAT Gateway / Egress Gateway similarly cannot help—they only determine "which source IP to use after SNAT has been decided", not the "whether to SNAT" decision itself.
 
-Additionally, cilium-cli itself **automatically skips** approximately 74 test cases based on the following criteria (unrelated to the TKE environment, by design of the Cilium test suite):
+Additionally, cilium-cli itself **automatically skips** some test cases based on the following criteria (unrelated to the TKE environment, by design of the Cilium test suite). The actual number of skipped cases is shown in the run output (approximately 55 in this tutorial's tests):
 
 | Skip reason                                          | Example test cases                                                                                                                                     | Requires attention?                                |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
@@ -188,7 +188,7 @@ If nodes have no public network access, the relevant test cases will fail. This 
 | Node Public      | Nodes have EIP bound, VPC configured with NAT Gateway (see [FAQ](#faq) for "Why configure a NAT Gateway for nodes") |
 | Installation     | [One-click install script](../install.md#one-click-install-script) `cilium.sh install`, with Egress Gateway and ip-masq-agent enabled |
 
-> Enabling either Egress Gateway or ip-masq-agent causes Cilium to enable BPF masquerade. The script automatically sets `ipMasqAgent.config.nonMasqueradeCIDRs` to cover the three RFC 1918 ranges, preventing cross-node Pod-to-Pod traffic from being SNATed and breaking NetworkPolicy. See [Native + ip-masq-agent / Egress Gateway Compatibility Notes](#native--ip-masq-agent--egress-gateway-compatibility).
+> Enabling either Egress Gateway or ip-masq-agent causes Cilium to enable BPF masquerade. The script automatically sets `ipMasqAgent.config.nonMasqueradeCIDRs` to cover the three RFC 1918 ranges, preventing cross-node Pod-to-Pod traffic from being SNATed and breaking NetworkPolicy. See [Native + ip-masq-agent / Egress Gateway Compatibility Notes](#native--ip-masq-agent--egress-gateway-compatibility-notes).
 
 ### Test Results
 
@@ -206,6 +206,9 @@ Test [local-redirect-policy]:
 #### Full Test Case Details
 
 cilium connectivity test deploys a total of 132 test cases, grouped by function with each case's test objective and current run status:
+
+<details>
+<summary>Expand to view all 132 test case details (grouped by test group)</summary>
 
 ##### 1. No Policy Baseline (verifies Cilium datapath connectivity without NetworkPolicy interference)
 
@@ -423,6 +426,8 @@ cilium connectivity test deploys a total of 132 test cases, grouped by function 
 | 52  | `clustermesh-endpointslice-sync`       | ⏭️ Skipped  | Skipped by condition (requires cluster mesh)     |
 | 129 | `egress-to-specific-namespace-ccnp`    | ✅ Passed   | CiliumClusterwideNetworkPolicy egress            |
 | 130 | `ingress-from-specific-namespace-ccnp` | ✅ Passed   | CCNP ingress                                     |
+
+</details>
 
 #### Skipped Test Case Summary
 

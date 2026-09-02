@@ -22,7 +22,7 @@ The table below summarizes all tuning items, categorized by "recommended priorit
 | -------------- | -------------------------------------------------------------- | ------------------------------ | ------------------------------------------- |
 | ⭐ Strongly recommended | [1. Enable CiliumEndpointSlice](#1-enable-ciliumendpointslice) | Still Beta in 1.20, track GA status | Enable when node count ≥ 200          |
 | ⭐ Strongly recommended | [2. Enable APF Rate Limiting](#2-enable-apf-rate-limiting)     | Nearly zero                    | Should be enabled at any scale (default in install script) |
-| Recommended    | [3. Adjust K8s Client QPS/Burst](#3-adjust-k8s-client-qps-burst) | Over-configuring may overwhelm apiserver | Enable when cilium-agent sync latency is observed |
+| Recommended    | [3. Adjust K8s Client QPS/Burst](#3-adjust-k8s-client-qpsburst) | Over-configuring may overwhelm apiserver | Enable when cilium-agent sync latency is observed |
 | Recommended    | [4. Trim Security Identity](#4-trim-security-identity)         | Label exclusion policy must match business needs | Enable when identity count ≥ 1000 or identity bloat is observed |
 | Recommended    | [5. Increase Agent/Operator Resources](#5-increase-agentoperator-resources) | Consumes more node resources | Enable when default limits are insufficient, OOM or throttling occurs |
 | On demand      | [6. Adjust BPF Map Size](#6-adjust-bpf-map-size)               | Larger maps consume more kernel memory | Enable when BPF map writes fail or capacity warnings appear |

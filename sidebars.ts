@@ -61,7 +61,8 @@ const sidebars: SidebarsConfig = {
                   },
                   items: [
                     'networking/cilium/appendix/debug',
-                    'networking/cilium/appendix/troubleshooting/connect-apiserver-operation-not-permitted'
+                    'networking/cilium/appendix/troubleshooting/connect-apiserver-operation-not-permitted',
+                    'networking/cilium/appendix/troubleshooting/webhook-connection-timeout'
                   ]
                 }
               ]

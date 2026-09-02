@@ -2,7 +2,7 @@
 
 本文介绍如何对在 TKE 集群上安装的 cilium 做连通性功能测试，并给出各推荐安装方案的实测结果。
 
-cilium 官方提供了 [`cilium connectivity test`](https://docs.cilium.io/en/stable/contributing/testing/e2e/) 端到端测试套件，覆盖 Pod-to-Pod、Pod-to-Service、Pod-to-Host 同/跨节点连通性、ClusterIP/NodePort/HostPort 转发（kubeProxyReplacement）、L3/L4/L7 NetworkPolicy（含 deny/allow、ingress/egress、CIDR/Entity/ServiceAccount/L7 规则）、CiliumLocalRedirectPolicy 重定向、DNS 解析、`pod-to-world` / `pod-to-cidr` / `to-fqdns` 等公网用例。基于 cilium-cli v0.19.4 默认下发约 132 个测试用例 / ~600 个 action（数量随版本变化）。
+cilium 官方提供了 [`cilium connectivity test`](https://docs.cilium.io/en/stable/contributing/testing/e2e/) 端到端测试套件，覆盖 Pod-to-Pod、Pod-to-Service、Pod-to-Host 同/跨节点连通性、ClusterIP/NodePort/HostPort 转发（kubeProxyReplacement）、L3/L4/L7 NetworkPolicy（含 deny/allow、ingress/egress、CIDR/Entity/ServiceAccount/L7 规则）、CiliumLocalRedirectPolicy 重定向、DNS 解析、`pod-to-world` / `pod-to-cidr` / `to-fqdns` 等公网用例。基于 cilium-cli v0.19.4 默认下发约 132 个测试用例 / ~800 个 action（数量随版本变化）。
 
 ## 测试方法
 
@@ -159,7 +159,7 @@ D. **包以 Pod IP 出节点，但 Pod IP 没有公网出口**——结合 A，�
 
 NAT 网关 / Egress Gateway 同理无效——它们只决定"已经决定 SNAT 后用什么源 IP"，决定不了"是否 SNAT"这一步。
 
-此外，cilium-cli 自身会按以下条件**自动跳过**约 74 个用例（与 TKE 环境无关，是 cilium 测试套件设计如此）：
+此外，cilium-cli 自身会按以下条件**自动跳过**部分用例（与 TKE 环境无关，是 cilium 测试套件设计如此）。实际跳过数以运行输出为准（本教程实测约 55 个）：
 
 | 跳过原因                                              | 用例示例                                                                                                                  | 是否需要关注                                         |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
@@ -206,6 +206,9 @@ Test [local-redirect-policy]:
 #### 全量用例明细
 
 cilium connectivity test 共下发 132 个用例，按功能分组列出每个用例的测试目标和本次运行状态：
+
+<details>
+<summary>展开查看全部 132 条用例明细（按测试组分组）</summary>
 
 ##### 1. 无策略基线（Baseline，验证 cilium datapath 在无 NetworkPolicy 干扰下的连通性）
 
@@ -423,6 +426,8 @@ cilium connectivity test 共下发 132 个用例，按功能分组列出每个�
 | 52  | `clustermesh-endpointslice-sync`       | ⏭️ 跳过 | skipped by condition（依赖 cluster mesh） |
 | 129 | `egress-to-specific-namespace-ccnp`    | ✅ 通过 | CiliumClusterwideNetworkPolicy egress     |
 | 130 | `ingress-from-specific-namespace-ccnp` | ✅ 通过 | CCNP ingress                              |
+
+</details>
 
 #### 跳过用例分类汇总
 

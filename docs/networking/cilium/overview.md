@@ -6,53 +6,54 @@
 
 ### 入门篇
 
-| 文章                | 内容                              | 适合读者         |
-| ------------------- | --------------------------------- | ---------------- |
-| **安装 Cilium**     | 空集群创建、helm 安装、验证、回滚 | 首次上手         |
-| **Cilium 功能测试** | 功能测试方法与实测数据            | 所有安装后的用户 |
-| **Cilium 性能测试** | 网络基准性能与各方案横向对比      | 关注性能的用户   |
+| 文章                                                      | 内容                              | 适合读者         |
+| --------------------------------------------------------- | --------------------------------- | ---------------- |
+| **[安装 Cilium](./install.md)**                           | 空集群创建、helm 安装、验证、回滚 | 首次上手         |
+| **[Cilium 功能测试](./appendix/connectivity-test.md)**    | 功能测试方法与实测数据            | 所有安装后的用户 |
+| **[Cilium 性能测试](./appendix/performance-test.md)**     | 网络基准性能与各方案横向对比      | 关注性能的用户   |
 
 ### 网络增强
 
-| 文章                           | 内容                                  | 前置依赖      |
-| ------------------------------ | ------------------------------------- | ------------- |
-| **使用 Gateway API**           | Cilium 内置 Gateway API 实现流量路由  | 已安装 Cilium |
-| **Egress Gateway 应用实践**    | 按策略选择固定出口 IP 访问外部        | 已安装 Cilium |
-| **启用通信加密**               | WireGuard / IPsec 加密节点间 Pod 流量 | 已安装 Cilium |
-| **使用 Cilium 构建多集群网络** | Cluster Mesh 打通多集群服务互访       | 已安装 Cilium |
+| 文章                                                                   | 内容                                  | 前置依赖      |
+| ---------------------------------------------------------------------- | ------------------------------------- | ------------- |
+| **[使用 Gateway API](./gateway-api.md)**                               | Cilium 内置 Gateway API 实现流量路由  | 已安装 Cilium |
+| **[Egress Gateway 应用实践](./egress-gateway.md)**                     | 按策略选择固定出口 IP 访问外部        | 已安装 Cilium |
+| **[启用通信加密](./encryption.md)**                                    | WireGuard / IPsec 加密节点间 Pod 流量 | 已安装 Cilium |
+| **[使用 Cilium 构建多集群网络](./clustermesh.md)**                     | Cluster Mesh 打通多集群服务互访       | 已安装 Cilium |
 
 ### 安全策略
 
-| 文章                       | 内容                                      |
-| -------------------------- | ----------------------------------------- |
-| **NetworkPolicy 应用实践** | CiliumNetworkPolicy 入门与常见模式 20+ 例 |
+| 文章                                                 | 内容                                      |
+| ---------------------------------------------------- | ----------------------------------------- |
+| **[NetworkPolicy 应用实践](./networkpolicy.md)**     | CiliumNetworkPolicy 入门与常见模式 20+ 例 |
 
 ### 可观测性
 
-| 文章                                     | 内容                                           |
-| ---------------------------------------- | ---------------------------------------------- |
-| **增强可观测性**                         | 启用 Hubble Relay / Hubble UI / 网络流日志审计 |
-| **使用 Cilium + CLS 实现网络流日志审计** | 将 Hubble 流日志投递到 CLS 检索分析            |
+| 文章                                                              | 内容                                           |
+| ----------------------------------------------------------------- | ---------------------------------------------- |
+| **[增强可观测性](./observability.md)**                            | 启用 Hubble Relay / Hubble UI / 网络流日志审计 |
+| **[使用 Cilium + CLS 实现网络流日志审计](./flow-logs.md)**        | 将 Hubble 流日志投递到 CLS 检索分析            |
 
 ### 附录
 
-| 文章                                     | 内容                                                 |
-| ---------------------------------------- | ---------------------------------------------------- |
-| **大规模集群 Cilium 调优指南**           | 200+ 节点规模下的参数、资源、BPF map 调优            |
-| **已验证的节点操作系统**                 | 8 种 OS 的兼容性验证结果                             |
-| **sysctlfix 与 rp_filter 机制详解**     | 为什么两种模式都禁用 sysctlfix、udev 覆盖机制、Overlay 的 DaemonSet 补偿 |
-| **VPC-CNI Native Routing 模式详解**     | local-router-ipv4、sysctlfix 与 rp_filter 机制、Host Routing 配置原理 |
-| **为什么不提供 GR Native Routing**       | 完整试错记录与 4 类不可用问题                        |
-| **Cilium 与 Nodelocal DNSCache 共存**    | 自建 NodeLocal DNS 加速 DNS 解析                     |
-| **配置 IP 伪装**                         | 让 Pod 借节点 EIP 出公网，无需 NAT 网关              |
-| **使用 TCR 托管镜像**                    | 生产环境用内网 TCR 替代公网镜像拉取                  |
+| 文章                                                                  | 内容                                                       |
+| --------------------------------------------------------------------- | ---------------------------------------------------------- |
+| **[Cilium 网络性能 Benchmark](./appendix/network-benchmark.md)**      | 三方案横向压测：吞吐 / RPS / Service 规模化 / 策略开销     |
+| **[大规模集群 Cilium 调优指南](./appendix/large-scale-tuning.md)**    | 200+ 节点规模下的参数、资源、BPF map 调优                  |
+| **[已验证的节点操作系统](./appendix/verified-os.md)**                 | 8 种 OS 的兼容性验证结果                                   |
+| **[sysctlfix 与 rp_filter 机制详解](./appendix/sysctlfix.md)**       | 为什么两种模式都禁用 sysctlfix、udev 覆盖机制、Overlay 的 DaemonSet 补偿 |
+| **[VPC-CNI Native Routing 模式详解](./appendix/native-routing.md)**  | local-router-ipv4、sysctlfix 与 rp_filter 机制、Host Routing 配置原理 |
+| **[为什么不提供 GR Native Routing](./appendix/gr-native-not-recommended.md)** | 完整试错记录与 4 类不可用问题                        |
+| **[Cilium 与 Nodelocal DNSCache 共存](./appendix/with-node-local-dns.md)** | 自建 NodeLocal DNS 加速 DNS 解析                 |
+| **[配置 IP 伪装](./appendix/masquerading.md)**                       | 让 Pod 借节点 EIP 出公网，无需 NAT 网关              |
+| **[使用 TCR 托管镜像](./appendix/tcr.md)**                           | 生产环境用内网 TCR 替代公网镜像拉取                  |
 
 ### 故障排查
 
-| 文章                                            | 内容                                |
-| ----------------------------------------------- | ----------------------------------- |
-| **连接 apiserver 报错 operation not permitted** | Cilium bug 排查与根因分析           |
-| **Cilium 调试技巧**                             | `cilium status`、monitor 等常用命令 |
+| 文章                                                                    | 内容                                |
+| ----------------------------------------------------------------------- | ----------------------------------- |
+| **[连接 apiserver 报错 operation not permitted](./appendix/troubleshooting/connect-apiserver-operation-not-permitted.md)** | Cilium bug 排查与根因分析 |
+| **[Cilium 调试技巧](./appendix/debug.md)**                              | `cilium status`、monitor 等常用命令 |
 
 ## 快速决策树
 
