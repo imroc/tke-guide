@@ -30,38 +30,44 @@ for crd in gatewayclasses gateways httproutes grpcroutes referencegrants backend
   kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.6.1/config/crd/standard/gateway.networking.k8s.io_${crd}.yaml
 done
 
-# Experimental CRDs (TCPRoute, UDPRoute, TLSRoute) — TLSRoute ships experimental-only since v1.6
+# TLSRoute / TCPRoute / UDPRoute (optional CRDs for cilium; all GA since v1.6, also
+# available in the standard channel). We install the experimental channel uniformly:
+# it is a superset of standard and additionally keeps the deprecated v1alpha2 —
+# existing v1alpha2 TLSRoute objects can only be read with the experimental CRD
+# (see the warning below)
 for crd in tcproutes udproutes tlsroutes; do
   kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.6.1/config/crd/experimental/gateway.networking.k8s.io_${crd}.yaml
 done
 ```
 
-:::warning[TLSRoute must be installed from the Experimental channel]
+:::warning[Existing TLSRoute resources require the Experimental channel]
 
-Starting with Gateway API v1.6, the TLSRoute CRD is **only published in the experimental channel** (removed from standard). If you are upgrading and your existing TLSRoute resources were installed from the standard channel, the apiserver will no longer be able to read them after the CRD upgrade — back them up first and install the v1.6.1 experimental TLSRoute CRD (see the official cilium [Upgrade Guide](https://docs.cilium.io/en/stable/operations/upgrade/)).
+Since Gateway API v1.6, TLSRoute is GA (v1) and both the standard and experimental channels ship v1; the difference is that the **standard channel no longer serves the old v1alpha2** (served=false), while the experimental channel keeps it. If your cluster has existing v1alpha2 TLSRoute objects, installing the standard channel means the apiserver can no longer read them from etcd (they effectively disappear) — back them up first and install the v1.6.1 experimental TLSRoute CRD (see the official cilium [Upgrade Guide](https://docs.cilium.io/en/stable/operations/upgrade/)). For fresh clusters that only create v1 TLSRoutes, the standard channel also works.
 
 :::
 
 ## Enable Gateway API
 
-On top of an existing Cilium installation, enable Gateway API via helm (**Host Network mode must be enabled**):
+On top of an existing Cilium installation, enable Gateway API via helm (**Host Network mode must be enabled**), using `--reuse-values` like the other feature guides:
+
+```bash
+helm upgrade cilium cilium/cilium --version 1.20.1 \
+  --namespace kube-system \
+  --reuse-values \
+  --set gatewayAPI.enabled=true \
+  --set gatewayAPI.hostNetwork.enabled=true
+
+kubectl -n kube-system rollout restart deployment/cilium-operator
+kubectl -n kube-system rollout restart ds/cilium ds/cilium-envoy
+```
+
+If you manage parameters via `values.yaml` files, the equivalent is to append to your existing values:
 
 ```yaml title="gateway-api-values.yaml"
 gatewayAPI:
   enabled: true
   hostNetwork:
     enabled: true
-```
-
-```bash
-helm upgrade --install cilium cilium/cilium --version 1.20.1 \
-  --namespace=kube-system \
-  -f tke-values.yaml \
-  -f image-values.yaml \
-  -f gateway-api-values.yaml
-
-kubectl -n kube-system rollout restart deployment/cilium-operator
-kubectl -n kube-system rollout restart ds/cilium ds/cilium-envoy
 ```
 
 ### What Host Network Mode Does
@@ -75,7 +81,7 @@ Whether or not `gatewayAPI.hostNetwork.enabled` is set, the cilium-envoy Pod alw
 | Aspect | Non-Host Network Mode | Host Network Mode |
 | --- | --- | --- |
 | Envoy listener binding | Does not bind to an address; receives traffic via eBPF TPROXY | Binds directly to `0.0.0.0:<port>` |
-| Gateway Service type | LoadBalancer (automatically creates CLB) | ClusterIP (does not create CLB) |
+| Gateway Service type | LoadBalancer (automatically creates CLB) | NodePort (does not create CLB) |
 | TKE CLB backend registration | ❌ Endpoints are virtual addresses; CLB backends are empty | ✅ Can register via a standalone Service + `direct-access` annotation |
 | TKE usability | ❌ Not usable | ✅ Usable |
 
@@ -93,7 +99,7 @@ cilium   io.cilium/gateway-controller   True       1m
 
 ## Exposing the Gateway: LoadBalancer Service + direct-access
 
-In Host Network mode, the Gateway Service created by Cilium is of type ClusterIP and does not automatically create a CLB. You need to create a standalone LoadBalancer Service in the TKE environment to expose the Gateway. Key configurations:
+In Host Network mode, the Gateway Service created by Cilium is of type NodePort (cilium 1.20 behavior; previously ClusterIP) and does not automatically create a CLB. You need to create a standalone LoadBalancer Service in the TKE environment to expose the Gateway. Key configurations:
 
 1. **`service.kubernetes.io/tke-existed-lbid`**: Reuse an existing CLB (avoids creating a new CLB for each Gateway)
 2. **`service.cloud.tencent.com/direct-access: "true"`**: Tells service-controller to register the Pod IP (which is the node IP in hostNetwork mode) + targetPort directly to the CLB, bypassing NodePort
@@ -238,7 +244,7 @@ curl -s -H "Host: test.cilium.local" http://<clb-vip>/
 
 :::note[Empty Gateway ADDRESS is normal]
 
-In Host Network mode, the Gateway ADDRESS is empty (because the Gateway Service is of type ClusterIP and has no external IP). `Programmed=True` indicates that Envoy has been configured. The external IP is provided by the standalone LoadBalancer Service you created.
+Since cilium 1.20, the Gateway Service in Host Network mode is of type NodePort, and the Gateway ADDRESS is automatically populated with node IPs (up to 16, sorted). The output above is a 1.19.5 test record (when the Service was still ClusterIP and ADDRESS was empty). The node IPs in ADDRESS are informational — the actual external IP is provided by the standalone LoadBalancer Service, and `Programmed=True` indicates Envoy is fully configured.
 
 :::
 
@@ -322,7 +328,7 @@ spec:
       kinds:
       - kind: TLSRoute
 ---
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: TLSRoute
 metadata:
   name: my-tls-route
@@ -369,7 +375,7 @@ spec:
       kinds:
       - kind: TLSRoute
 ---
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: TLSRoute
 metadata:
   name: apiserver
@@ -406,9 +412,9 @@ spec:
 Traffic path:
 
 ```text
-Client → CLB:8443 → cilium-envoy (hostNetwork:8443)
-       → eBPF TPROXY → Envoy TLS Passthrough
-       → kubernetes Service → apiserver (169.254.x.x:60002)
+Client → CLB:8443 → cilium-envoy (hostNetwork, Envoy listens directly on 0.0.0.0:8443)
+       → Envoy TLS Passthrough
+       → eBPF Service forwarding (kubernetes ClusterIP) → apiserver (169.254.x.x:60002)
 ```
 
 Get the kubeconfig (use tccli to fetch it, then replace the server address with the CLB address):
@@ -456,7 +462,7 @@ print(yaml.dump(kc, default_flow_style=False, sort_keys=False))
 
 :::warning[TCP protocol unavailable]
 
-In cilium 1.19.5 testing, although TCPRoute was supported via the experimental CRD, creating a TCP protocol Gateway listener actually failed with the error `model source can't be empty, 0 listeners`. cilium 1.20 upgraded TCPRoute/UDPRoute to the v1 API (per the official release notes), which theoretically fixes this, but it has not been re-verified on TKE yet. For pure TCP proxying, the reliable option is still TLS Passthrough (TLS protocol + TLSRoute, omitting `hostnames` to match all SNIs), or a standalone TCP proxy.
+In cilium 1.19.5 testing, although TCPRoute was supported by the CRD at the time (v1alpha2 from the experimental channel), creating a TCP protocol Gateway listener actually failed with the error `model source can't be empty, 0 listeners`. cilium 1.20 upgraded TCPRoute/UDPRoute to the v1 API (per the official release notes), which theoretically fixes this, but it has not been re-verified on TKE yet. For pure TCP proxying, the reliable option is still TLS Passthrough (TLS protocol + TLSRoute, omitting `hostnames` to match all SNIs), or a standalone TCP proxy.
 
 :::
 
@@ -464,9 +470,9 @@ In cilium 1.19.5 testing, although TCPRoute was supported via the experimental C
 
 ```text
 Host Network mode (recommended for TKE):
-  Client → CLB → cilium-envoy (hostNetwork, 0.0.0.0:port)
-         → eBPF TPROXY → Envoy processing (HTTP routing / TLS termination / TLS passthrough)
-         → Backend Pod
+  Client → CLB → cilium-envoy (hostNetwork, Envoy listens directly on 0.0.0.0:port)
+         → Envoy processing (HTTP routing / TLS termination / TLS passthrough)
+         → eBPF Service forwarding → Backend Pod
 
   CLB backends are automatically managed by the LoadBalancer Service + direct-access:
   service-controller registers cilium-envoy Pod IP (= node IP) :targetPort to the CLB
@@ -495,9 +501,9 @@ Common causes:
 2. **CLB backends are empty**: Ensure the Service uses the `direct-access: "true"` annotation and the selector correctly matches cilium-envoy Pods
 3. **CLB returns 502**: Security groups are blocking traffic from CLB to backends. Set `LoadBalancerPassToTarget=true` on the CLB (see [CLB Security Group Passthrough](#clb-security-group-passthrough))
 
-### Gateway ADDRESS is empty?
+### What is in the Gateway ADDRESS?
 
-In Host Network mode, an empty Gateway ADDRESS is normal. The Gateway Service is of type ClusterIP (no external IP), and the external IP is provided by the standalone LoadBalancer Service you created. `Programmed=True` indicates that Envoy has been configured.
+Since cilium 1.20, the Gateway Service in Host Network mode is of type NodePort, and ADDRESS is automatically populated with node IPs (up to 16). These node IPs are informational — the actual external IP is provided by the standalone LoadBalancer Service. `Programmed=True` indicates Envoy is fully configured. (In 1.19.x the Service was ClusterIP and ADDRESS was empty, which was normal.)
 
 ### Port conflicts in Host Network mode?
 

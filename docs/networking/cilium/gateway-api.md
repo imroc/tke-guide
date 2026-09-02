@@ -30,38 +30,42 @@ for crd in gatewayclasses gateways httproutes grpcroutes referencegrants backend
   kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.6.1/config/crd/standard/gateway.networking.k8s.io_${crd}.yaml
 done
 
-# 实验 CRD（TCPRoute, UDPRoute, TLSRoute）——v1.6 起 TLSRoute 仅在 experimental channel 发布
+# TLSRoute / TCPRoute / UDPRoute（cilium 视为可选 CRD，v1.6 起均已 GA，standard channel 同样提供）
+# 此处统一安装 experimental 版：它是 standard 的超集，且额外保留 deprecated 的 v1alpha2
+# ——存量 v1alpha2 TLSRoute 对象只有 experimental 版能继续读取（见下方警告）
 for crd in tcproutes udproutes tlsroutes; do
   kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.6.1/config/crd/experimental/gateway.networking.k8s.io_${crd}.yaml
 done
 ```
 
-:::warning[TLSRoute 必须装 Experimental 版本]
+:::warning[存量 TLSRoute 必须装 Experimental 版本]
 
-Gateway API v1.6 起，TLSRoute CRD **只在 experimental channel 发布**（standard channel 已移除）。如果从旧版本升级且原 TLSRoute 资源是 standard channel 安装的，升级 CRD 后 apiserver 将无法读取存量 TLSRoute 对象——升级前先备份，再安装 v1.6.1 experimental 版 TLSRoute（参考 cilium 官方 [Upgrade Guide](https://docs.cilium.io/en/stable/operations/upgrade/)）。
+Gateway API v1.6 起 TLSRoute 已 GA（v1），standard 与 experimental channel 都提供 v1；两者的区别在于 **standard 版不再 serve 旧的 v1alpha2**（served=false），而 experimental 版仍保留。如果集群中存在存量 v1alpha2 TLSRoute 对象，安装 standard 版后 apiserver 将无法从 etcd 读取这些对象（等于从集群中消失）——升级前先备份，再安装 v1.6.1 experimental 版 TLSRoute（参考 cilium 官方 [Upgrade Guide](https://docs.cilium.io/en/stable/operations/upgrade/)）。全新集群且只创建 v1 版 TLSRoute 的，装 standard 版亦可。
 
 :::
 
 ## 启用 Gateway API
 
-在已有的 Cilium 安装基础上，通过 helm 启用 Gateway API（**必须启用 Host Network 模式**）：
+在已有的 Cilium 安装基础上，通过 helm 启用 Gateway API（**必须启用 Host Network 模式**），与其它功能篇一致使用 `--reuse-values` 增量启用：
+
+```bash
+helm upgrade cilium cilium/cilium --version 1.20.1 \
+  --namespace kube-system \
+  --reuse-values \
+  --set gatewayAPI.enabled=true \
+  --set gatewayAPI.hostNetwork.enabled=true
+
+kubectl -n kube-system rollout restart deployment/cilium-operator
+kubectl -n kube-system rollout restart ds/cilium ds/cilium-envoy
+```
+
+用 `values.yaml` 文件管理参数的，等价于在现有 values 中追加：
 
 ```yaml title="gateway-api-values.yaml"
 gatewayAPI:
   enabled: true
   hostNetwork:
     enabled: true
-```
-
-```bash
-helm upgrade --install cilium cilium/cilium --version 1.20.1 \
-  --namespace=kube-system \
-  -f tke-values.yaml \
-  -f image-values.yaml \
-  -f gateway-api-values.yaml
-
-kubectl -n kube-system rollout restart deployment/cilium-operator
-kubectl -n kube-system rollout restart ds/cilium ds/cilium-envoy
 ```
 
 ### Host Network 模式的作用
@@ -75,7 +79,7 @@ kubectl -n kube-system rollout restart ds/cilium ds/cilium-envoy
 | 对比项 | 非 Host Network 模式 | Host Network 模式 |
 | --- | --- | --- |
 | Envoy listener 绑定 | 不绑定地址，通过 eBPF TPROXY 接收流量 | 直接绑定 `0.0.0.0:<port>` |
-| Gateway Service 类型 | LoadBalancer（自动创建 CLB） | ClusterIP（不创建 CLB） |
+| Gateway Service 类型 | LoadBalancer（自动创建 CLB） | NodePort（不创建 CLB） |
 | TKE CLB 后端注册 | ❌ Endpoints 是虚拟地址，CLB 后端为空 | ✅ 可通过独立 Service + `direct-access` 注解注册 |
 | TKE 可用性 | ❌ 不可用 | ✅ 可用 |
 
@@ -93,7 +97,7 @@ cilium   io.cilium/gateway-controller   True       1m
 
 ## 暴露 Gateway：LoadBalancer Service + direct-access
 
-Host Network 模式下 Cilium 创建的 Gateway Service 是 ClusterIP 类型，不会自动创建 CLB。需要在 TKE 环境中创建一个独立的 LoadBalancer Service 来暴露 Gateway，关键配置：
+Host Network 模式下 Cilium 创建的 Gateway Service 是 NodePort 类型（cilium 1.20 起行为，此前为 ClusterIP），不会自动创建 CLB。需要在 TKE 环境中创建一个独立的 LoadBalancer Service 来暴露 Gateway，关键配置：
 
 1. **`service.kubernetes.io/tke-existed-lbid`**：复用已有 CLB（避免每个 Gateway 创建新 CLB）
 2. **`service.cloud.tencent.com/direct-access: "true"`**：让 service-controller 直接将 Pod IP（hostNetwork 下即节点 IP）+ targetPort 注册到 CLB，绕过 NodePort
@@ -236,9 +240,9 @@ my-gateway-lb    LoadBalancer   172.28.84.187   <clb-vip>     80:32676/TCP  30s
 curl -s -H "Host: test.cilium.local" http://<clb-vip>/
 ```
 
-:::note[Gateway ADDRESS 为空是正常的]
+:::note[Gateway 的 ADDRESS 说明]
 
-Host Network 模式下 Gateway 的 ADDRESS 为空（因为 Gateway Service 是 ClusterIP 类型，没有外部 IP）。Gateway 的 `Programmed=True` 表示 Envoy 已配置完成，外部 IP 由独立创建的 LoadBalancer Service 提供。
+cilium 1.20 起，Host Network 模式下 Gateway Service 是 NodePort 类型，Gateway 的 ADDRESS 会自动填充各节点的 IP（排序后最多 16 个）。上图输出为 1.19.5 实测记录（当时 Service 还是 ClusterIP 类型，ADDRESS 为空）。ADDRESS 中的节点 IP 仅供参考——实际对外服务的外部 IP 由独立创建的 LoadBalancer Service 提供，`Programmed=True` 表示 Envoy 已配置完成。
 
 :::
 
@@ -322,7 +326,7 @@ spec:
       kinds:
       - kind: TLSRoute
 ---
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: TLSRoute
 metadata:
   name: my-tls-route
@@ -369,7 +373,7 @@ spec:
       kinds:
       - kind: TLSRoute
 ---
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: TLSRoute
 metadata:
   name: apiserver
@@ -406,9 +410,9 @@ spec:
 流量路径：
 
 ```text
-Client → CLB:8443 → cilium-envoy (hostNetwork:8443)
-       → eBPF TPROXY → Envoy TLS Passthrough
-       → kubernetes Service → apiserver (169.254.x.x:60002)
+Client → CLB:8443 → cilium-envoy (hostNetwork, Envoy 直接监听 0.0.0.0:8443)
+       → Envoy TLS Passthrough
+       → eBPF Service 转发（kubernetes ClusterIP）→ apiserver (169.254.x.x:60002)
 ```
 
 获取 kubeconfig（通过 tccli 获取后替换 server 地址为 CLB 地址）：
@@ -456,7 +460,7 @@ print(yaml.dump(kc, default_flow_style=False, sort_keys=False))
 
 :::warning[TCP 协议不可用]
 
-Cilium 1.19.5 实测中，虽然实验性 CRD 支持 TCPRoute，但实际创建 TCP 协议的 Gateway listener 会报错 `model source can't be empty, 0 listeners`。cilium 1.20 已将 TCPRoute/UDPRoute 升级到 v1 API（官方 release note），该问题理论上已修复，但尚未在 TKE 上实测验证。如需纯 TCP 代理，稳妥方案仍是 TLS Passthrough（TLS 协议 + TLSRoute，不指定 `hostnames` 可匹配所有 SNI），或使用独立的 TCP 代理。
+Cilium 1.19.5 实测中，虽然当时（实验 channel 的 v1alpha2）CRD 支持 TCPRoute，但实际创建 TCP 协议的 Gateway listener 会报错 `model source can't be empty, 0 listeners`。cilium 1.20 已将 TCPRoute/UDPRoute 升级到 v1 API（官方 release note），该问题理论上已修复，但尚未在 TKE 上实测验证。如需纯 TCP 代理，稳妥方案仍是 TLS Passthrough（TLS 协议 + TLSRoute，不指定 `hostnames` 可匹配所有 SNI），或使用独立的 TCP 代理。
 
 :::
 
@@ -464,9 +468,9 @@ Cilium 1.19.5 实测中，虽然实验性 CRD 支持 TCPRoute，但实际创建 
 
 ```text
 Host Network 模式（TKE 推荐）：
-  Client → CLB → cilium-envoy (hostNetwork, 0.0.0.0:port)
-         → eBPF TPROXY → Envoy 处理（HTTP 路由 / TLS 终止 / TLS 透传）
-         → Backend Pod
+  Client → CLB → cilium-envoy (hostNetwork, Envoy 直接监听 0.0.0.0:port)
+         → Envoy 处理（HTTP 路由 / TLS 终止 / TLS 透传）
+         → eBPF Service 转发 → Backend Pod
 
   CLB 后端由 LoadBalancer Service + direct-access 自动管理：
   service-controller 将 cilium-envoy Pod IP（=节点 IP）:targetPort 注册到 CLB
@@ -495,9 +499,9 @@ kubectl -n kube-system logs deploy/cilium-operator | grep gateway
 2. **CLB 后端为空**：确认 Service 使用了 `direct-access: "true"` 注解，且 selector 正确匹配 cilium-envoy Pod
 3. **CLB 返回 502**：安全组拦截了 CLB 到后端的流量，在 CLB 上设置 `LoadBalancerPassToTarget=true`（参考[CLB 安全组放通](#clb-安全组放通)）
 
-### Gateway ADDRESS 为空？
+### Gateway ADDRESS 里是什么？
 
-Host Network 模式下 Gateway 的 ADDRESS 为空是正常的。Gateway Service 是 ClusterIP 类型（无外部 IP），外部 IP 由独立创建的 LoadBalancer Service 提供。`Programmed=True` 表示 Envoy 已配置完成。
+cilium 1.20 起，Host Network 模式下 Gateway Service 是 NodePort 类型，ADDRESS 会自动填充各节点 IP（最多 16 个），这些节点 IP 仅供参考——实际对外服务的外部 IP 由独立创建的 LoadBalancer Service 提供。`Programmed=True` 表示 Envoy 已配置完成。（1.19.x 中 Service 是 ClusterIP 类型、ADDRESS 为空，属正常现象。）
 
 ### Host Network 模式下端口冲突？
 

@@ -274,7 +274,7 @@ resource "tencentcloud_kubernetes_node_pool" "cilium" {
     # highlight-add-start
     # 按流量计费
     internet_charge_type       = "TRAFFIC_POSTPAID_BY_HOUR"
-    # 分配免费公网IP
+    # 最大出带宽 100Mbps
     internet_max_bandwidth_out = 100
     # 分配免费公网IP
     public_ip_assigned         = true
@@ -502,12 +502,20 @@ spec:
   destinationCIDRs:
   - "0.0.0.0/0"
   - "::/0"
-  egressGateway: # 该字段是必填的，如果要指定多个 egress 节点，这里还是必须要指定一个，不然会报错： spec.egressGateway: Required value
+  # egressGateway 是 CRD 校验的必填字段；但 egressGateways 列表非空时，
+  # egressGateway 的内容会被整体忽略（cilium 源码行为）。
+  # 多节点场景：egressGateway 任填一个节点占位，所有真正参与转发的
+  # egress 节点（含占位节点）都必须写进 egressGateways 列表。
+  egressGateway: # 必填占位字段（egressGateways 非空时内容被忽略）
     nodeSelector:
       matchLabels:
-        kubernetes.io/hostname: 172.22.49.20 # egress 节点名称
-    egressIP: 172.22.49.20 # egress 节点内网 IP
-  egressGateways: # 其余的 egress 节点追加到这个列表
+        kubernetes.io/hostname: 172.22.49.20
+    egressIP: 172.22.49.20
+  egressGateways: # 所有 egress 节点都写进这个列表，cilium 只认这里面的节点
+  - nodeSelector:
+      matchLabels:
+        kubernetes.io/hostname: 172.22.49.20
+    egressIP: 172.22.49.20
   - nodeSelector:
       matchLabels:
         kubernetes.io/hostname: 172.22.49.147
@@ -534,7 +542,7 @@ $ kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | 
 43.156.123.70:  nginx-54c98b4f84-xt8bs
 ```
 
-但都使用的当前定义的这组 egress 节点所绑定的公网 IP：
+上面是当时（配置修正前）的实测输出：只出现了两个出口 IP——`129.226.84.9`（`172.22.49.119`）和 `43.156.123.70`（`172.22.49.147`）。这正是 `egressGateways` 非空时 `egressGateway` 被忽略的表现：当时 `egressGateway` 误放了第一个节点（`172.22.49.20`，EIP `43.163.1.23`），该节点并未参与转发，实际出口 IP 只来自 `egressGateways` 列表中的两个节点。按上面修正后的示例（全部节点进 `egressGateways`），三个节点的 EIP 都可能出现在出口流量中。三个节点绑定的 EIP 对照：
 
 ```bash
 $ kubectl get nodes -o custom-columns="NAME:.metadata.name,EXTERNAL-IP:.status.addresses[?(@.type=='ExternalIP')].address" -l egress-node=true
@@ -561,12 +569,18 @@ spec:
   destinationCIDRs:
   - "0.0.0.0/0"
   - "::/0"
-  egressGateway: # 该字段是必填的，如果要指定多个 egress 节点，这里还是必须要指定一个，不然会报错： spec.egressGateway: Required value
+  # 多节点写法与上一节相同：egressGateway 必填占位（非空 egressGateways 时内容被忽略），
+  # 全部 egress 节点写进 egressGateways 列表
+  egressGateway:
     nodeSelector:
       matchLabels:
-        kubernetes.io/hostname: 172.22.49.20 # egress 节点名称
-    egressIP: 172.22.49.20 # egress 节点内网 IP
-  egressGateways: # 其余的 egress 节点追加到这个列表
+        kubernetes.io/hostname: 172.22.49.20
+    egressIP: 172.22.49.20
+  egressGateways:
+  - nodeSelector:
+      matchLabels:
+        kubernetes.io/hostname: 172.22.49.20
+    egressIP: 172.22.49.20
   - nodeSelector:
       matchLabels:
         kubernetes.io/hostname: 172.22.49.147
@@ -629,7 +643,7 @@ spec:
 
 ### 配置策略后网络不通
 
-首先确认 CiliumEgressGatewayPolicy 配置方法是否正确，在 TKE 环境下，确保每个 egressGateway(s) 条目的 nodeSelector 只选中一个节点，egressIP 必须配置该节点的内网 IP，否则可能就会出现不通的问题。
+首先确认 CiliumEgressGatewayPolicy 配置方法是否正确，在 TKE 环境下，确保每个 egressGateway(s) 条目的 nodeSelector 只选中一个节点（一个条目若匹配多个节点，cilium 只会按节点名字典序选取第一个），egressIP 必须配置该节点的内网 IP，否则可能就会出现不通的问题。多节点场景还需注意：`egressGateways` 列表非空时 `egressGateway` 字段被整体忽略，所有参与转发的节点必须写进 `egressGateways`。
 
 另外还可以登录 egress 节点所在的 cilium pod，执行 `cilium-dbg bpf egress list` 查看当前节点上的 egress bpf 规则：
 

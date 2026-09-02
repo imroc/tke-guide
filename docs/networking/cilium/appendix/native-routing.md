@@ -179,12 +179,12 @@ cilium_host 被绕过、Pod 流量走 per-endpoint veth 时，每个包多出的
 - conntrack 表 lookup 与 update（即使不写规则也会走 connection tracking 状态机）
 - 内核 routing table 查询（FIB lookup）
 
-实测（SA5.LARGE8 4C8G、TencentOS 4、kernel 6.6）：
+实测（cilium 1.19.5，SA5.LARGE8 4C8G、TencentOS 4、kernel 6.6；环境与完整数据见 [Cilium 网络性能 Benchmark](./network-benchmark.md)）：
 
 - 跨节点单流吞吐均达 10 Gbps 突发上限，**吞吐无差异**
-- 跨节点 keepalive RPS：Native 与 Overlay 几乎持平（差异 < 1%），均比 iptables 集群低 ~18%（Native 是 cni-chaining + per-endpoint 路由的代价，Overlay 是 VXLAN encap/decap 的代价，量级相当）
+- 跨节点 keepalive RPS：Native 与 Overlay 几乎持平，均比 iptables 集群低 ~13%（Native 是 cni-chaining + per-endpoint 路由的代价，Overlay 是 VXLAN encap/decap 的代价，量级相当）
 - 跨节点短连接 RPS：Native 与 Overlay 也几乎持平
-- TCP_RR p99：Native 136 µs vs Overlay 130 µs vs iptables 112 µs（Cilium 比 iptables 高 ~20 µs，Native 与 Overlay 差异 < 10 µs）
+- TCP_RR p99：Native 103 µs vs Overlay 118 µs vs iptables 107 µs（三者都在 ~100-120 µs 噪声带内、方向不稳定，亚毫秒级差异对应用层不可见，不构成方案优劣判断）
 - HTTP p99 @1000 QPS：三种集群均为 0.99 ms，**真实业务负载下三者完全等价**
 
 完整数据参考 [Cilium 网络性能 Benchmark](./network-benchmark.md) 与 [Cilium 性能测试](./performance-test.md)。

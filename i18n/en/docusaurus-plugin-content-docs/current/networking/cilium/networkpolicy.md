@@ -12,7 +12,7 @@ Kubernetes native NetworkPolicy and Cilium's CiliumNetworkPolicy both define net
 | **Basic Traffic Control** | ✅ Supports ingress/egress | ✅ Supports ingress/egress    |
 | **Pod Selector**   | ✅ Label-based selection  | ✅ Supports more complex expressions |
 | **L3/L4 Rules**    | ✅ IP/Port control        | ✅ IP/Port control                   |
-| **L7 Protocol Awareness** | ❌ Not supported        | ✅ Supports HTTP/gRPC/Kafka etc.     |
+| **L7 Protocol Awareness** | ❌ Not supported        | ✅ Supports HTTP/gRPC etc. (Kafka removed in 1.20) |
 | **FQDN Support**   | ❌ Not supported          | ✅ Supports domain matching          |
 | **Explicit Deny Rules** | ❌ Implicit deny only  | ✅ Supports `egressDeny`/`ingressDeny` |
 | **Entity Selector** | ❌ Not supported         | ✅ Supports `toEntities`/`fromEntities` |
@@ -64,7 +64,7 @@ The core difference between CiliumNetworkPolicy and CiliumClusterwideNetworkPoli
 | **Management Permission** | Namespace admin | Cluster admin                           |
 | **Selector Default Scope** | Same-namespace Pods | All Pods in cluster             |
 | **Cross-Namespace Selection** | Requires explicit specification | Naturally supported |
-| **Policy Priority** | Normal priority     | Higher priority                         |
+| **Policy Priority** | Normal priority     | Normal priority (additive merge with CCNP, no priority difference) |
 | **Node Firewall**   | ❌ Not supported    | ✅ Supported (via nodeSelector)         |
 | **Use Cases**       | Application-level policies | Cluster baseline policies             |
 
@@ -253,6 +253,12 @@ spec:
       - type: EchoRequest
         family: IPv4
 ```
+
+:::note[The three ingress rules are OR'ed]
+
+Multiple ingress rules within one policy take effect as a **union (OR)**: among the `cluster` entity, SSH 22/TCP, and ICMP Echo rules above, the last two allow traffic from **any source** (including outside the cluster) — SSH and ping are effectively reachable network-wide. To restrict SSH to in-cluster access only, merge the port restriction into the `fromEntities: cluster` rule (combining `fromEntities` + `toPorts`) instead of listing parallel rules.
+
+:::
 
 ### Multi-Tenant Isolation
 

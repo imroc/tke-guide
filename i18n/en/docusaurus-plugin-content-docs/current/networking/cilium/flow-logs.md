@@ -1,5 +1,7 @@
 # Network Flow Log Audit with Cilium + CLS
 
+**Applicable modes**: all three deployment modes (Native Routing (VPC-CNI), Overlay (VPC-CNI), Overlay (GR)) are supported, with no mode-specific limitations.
+
 ## Overview
 
 Cilium's cilium-agent can write network flow logs (Hubble Flows) to files, recording detailed metadata for every network connection in the cluster, including source/destination Pod, IP, port, protocol, and policy verdict (allowed/denied).
@@ -377,7 +379,12 @@ L7 rules not only enable observability but also restrict traffic — traffic tha
 | -------- | --------- | -------------------------------------------------------------- |
 | DNS      | `dns`     | Records DNS query domain, response IP, TTL, etc. Egress only  |
 | HTTP     | `http`    | Records HTTP method, URL, status code, response latency, etc.  |
-| Kafka    | `kafka`   | Deprecated                                                     |
+
+:::note[Kafka rules have been removed]
+
+Kafka L7 rules were deprecated in cilium 1.18 and **completely removed in 1.20** (policy L7 rules now support only HTTP/DNS). If you are upgrading from an older version and existing policies still contain kafka rules, they must be deleted before upgrading, otherwise policy validation fails on the new version.
+
+:::
 
 #### L7 Log Fields
 

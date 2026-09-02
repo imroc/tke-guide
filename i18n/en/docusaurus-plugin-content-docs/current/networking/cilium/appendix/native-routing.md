@@ -179,12 +179,12 @@ When `cilium_host` is bypassed and Pod traffic flows via per-endpoint veth, each
 - Conntrack table lookup and update (the state machine runs even without explicit rules)
 - Kernel routing table lookup (FIB lookup)
 
-Measured (SA5.LARGE8 4C8G, TencentOS 4, kernel 6.6):
+Measured (cilium 1.19.5, SA5.LARGE8 4C8G, TencentOS 4, kernel 6.6; environment and full data in the [Cilium Network Performance Benchmark](./network-benchmark.md)):
 
 - Cross-node single-stream throughput hits 10 Gbps burst ceiling for all three; **no throughput difference**
-- Cross-node keepalive RPS: Native and Overlay are nearly identical (&lt;1% difference); both are ~18% below iptables (Native pays for cni-chaining + per-endpoint routing; Overlay pays for VXLAN encap/decap; the magnitudes are comparable)
+- Cross-node keepalive RPS: Native and Overlay are nearly identical; both are ~13% below iptables (Native pays for cni-chaining + per-endpoint routing; Overlay pays for VXLAN encap/decap; the magnitudes are comparable)
 - Cross-node short-conn RPS: Native and Overlay are also nearly identical
-- TCP_RR p99: Native 136 µs vs Overlay 130 µs vs iptables 112 µs (Cilium ~20 µs above iptables; Native vs Overlay differs &lt;10 µs)
+- TCP_RR p99: Native 103 µs vs Overlay 118 µs vs iptables 107 µs (all three sit within the ~100-120 µs noise band with unstable ordering; sub-millisecond differences are invisible to applications and do not indicate which option is better)
 - HTTP p99 @1000 QPS: 0.99 ms across all three clusters — **under realistic application load all three are equivalent**
 
 Full data: [Cilium Network Performance Benchmark](./network-benchmark.md) and [Cilium Performance Test](./performance-test.md).

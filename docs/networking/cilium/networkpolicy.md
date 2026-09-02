@@ -12,7 +12,7 @@ Kubernetes 原生的 NetworkPolicy 和 Cilium 的 CiliumNetworkPolicy 都用于�
 | **基本流量控制** | ✅ 支持 ingress/egress | ✅ 支持 ingress/egress              |
 | **Pod 选择器**   | ✅ 基于 label 选择     | ✅ 支持更复杂的表达式               |
 | **L3/L4 规则**   | ✅ IP/端口控制         | ✅ IP/端口控制                      |
-| **L7 协议感知**  | ❌ 不支持              | ✅ 支持 HTTP/gRPC/Kafka 等          |
+| **L7 协议感知**  | ❌ 不支持              | ✅ 支持 HTTP/gRPC 等（Kafka 已于 1.20 移除） |
 | **FQDN 支持**    | ❌ 不支持              | ✅ 支持域名匹配                     |
 | **显式拒绝规则** | ❌ 只能隐式拒绝        | ✅ 支持 `egressDeny`/`ingressDeny`  |
 | **实体选择器**   | ❌ 不支持              | ✅ 支持 `toEntities`/`fromEntities` |
@@ -64,7 +64,7 @@ CiliumNetworkPolicy 和 CiliumClusterwideNetworkPolicy 的核心区别在于作�
 | **管理权限**       | 命名空间管理员      | 集群管理员                            |
 | **选择器默认范围** | 同命名空间 Pod      | 集群所有 Pod                          |
 | **跨命名空间选择** | 需要显式指定        | 天然支持                              |
-| **策略优先级**     | 普通优先级          | 较高优先级                            |
+| **策略优先级**     | 普通优先级          | 普通优先级（与 CCNP 可加性合并，无优先级差异） |
 | **节点防火墙**     | ❌ 不支持           | ✅ 支持（通过 nodeSelector 选中节点） |
 | **使用场景**       | 应用级策略          | 集群基线策略                          |
 
@@ -164,27 +164,27 @@ CiliumNetworkPolicy 和 CiliumClusterwideNetworkPolicy 的核心区别在于作�
 apiVersion: cilium.io/v2
 kind: CiliumClusterwideNetworkPolicy
 metadata:
- name: default-deny
+  name: default-deny
 spec:
- description: "Block all the traffic (except DNS) by default"
- egress:
- - toEndpoints: # 允许集群所有 Pod 通过 coredns 解析域名
-   - matchLabels:
-       io.kubernetes.pod.namespace: kube-system
-       k8s-app: kube-dns
-   toPorts:
-   - ports:
-     - port: "53"
-       protocol: ANY
-     rules:
-       dns:
-       - matchPattern: "*"
- endpointSelector:
-   matchExpressions: # 不限制 kube-system 命名空间中 Pod 的 egress 流量
-   - key: io.kubernetes.pod.namespace
-     operator: NotIn
-     values:
-     - kube-system
+  description: "Block all the traffic (except DNS) by default"
+  egress:
+  - toEndpoints: # Allow all Pods to resolve DNS via coredns
+    - matchLabels:
+        io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: ANY
+      rules:
+        dns:
+        - matchPattern: "*"
+  endpointSelector:
+    matchExpressions: # Do not restrict egress traffic for Pods in kube-system
+    - key: io.kubernetes.pod.namespace
+      operator: NotIn
+      values:
+      - kube-system
 ```
 
 ### 统一管控基础设施的网络策略
@@ -195,41 +195,41 @@ spec:
 apiVersion: cilium.io/v2
 kind: CiliumClusterwideNetworkPolicy
 metadata:
- name: default-infrastructure
+  name: default-infrastructure
 spec:
- endpointSelector: # 选中所有基础设施命名空间中的 Pod
-   matchLabels:
-     io.cilium.k8s.namespace.labels.role: infrastructure
- egress: # 配置 egress 策略
- - toEndpoints: # 允许访问所有基础设施命名空间中的 Pod
-   - matchLabels:
-       io.cilium.k8s.namespace.labels.role: infrastructure
- - toEndpoints: # 允许 访问 coredns 解析域名
-   - matchLabels:
-       io.kubernetes.pod.namespace: kube-system
-       k8s-app: kube-dns
-   toPorts:
-   - ports:
-     - port: "53"
-       protocol: ANY
-     rules:
-       dns:
-       - matchPattern: "*"
- - toFQDNs: # 允许调用腾讯云相关 API
-   - matchPattern: '**.tencent.com'
-   - matchPattern: '**.tencentcloudapi.com'
-   - matchPattern: '**.tencentyun.com'
- - toCIDR: # 允许访问腾讯云上的平台服务
-   - 169.254.0.0/16 # 169.254.0.0/16 是腾讯云上的保留网段，一些平台服务会使用这个 IP，如 TKE 集群 apiserver 的 VIP、COS 存储、镜像仓库等，一些 TKE 自带的组件也会调用该网段提供的接口（如 ipamd），且配置了 hostAlias，不会经过 dns 解析，通过 toFQDNs 去放通 egress 流量将不会生效（toFQDNs 依赖请求要经过 dns 解析）。
- - toEntities: # 允许访问 apiserver
-   - kube-apiserver
- - toEntities: # 允许访问集群中所有节点的 10250 端口，可用于监控指标采集
-   - host
-   - remote-node
-   toPorts:
-   - ports:
-     - port: "10250"
-       protocol: TCP
+  endpointSelector: # Select all Pods in infrastructure namespaces
+    matchLabels:
+      io.cilium.k8s.namespace.labels.role: infrastructure
+  egress: # Configure egress policy
+  - toEndpoints: # Allow access to all Pods in infrastructure namespaces
+    - matchLabels:
+        io.cilium.k8s.namespace.labels.role: infrastructure
+  - toEndpoints: # Allow DNS resolution via coredns
+    - matchLabels:
+        io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: ANY
+      rules:
+        dns:
+        - matchPattern: "*"
+  - toFQDNs: # Allow calling Tencent Cloud related APIs
+    - matchPattern: '**.tencent.com'
+    - matchPattern: '**.tencentcloudapi.com'
+    - matchPattern: '**.tencentyun.com'
+  - toCIDR: # Allow access to platform services on Tencent Cloud
+    - 169.254.0.0/16 # 169.254.0.0/16 is a reserved CIDR on Tencent Cloud used by some platform services, such as the VIP of the TKE cluster apiserver, COS storage, image registry, etc. Some TKE built-in components also call interfaces provided by this CIDR (e.g., ipamd) and use hostAlias, bypassing DNS resolution. Using toFQDNs to allow egress traffic will not work (toFQDNs relies on requests going through DNS resolution).
+  - toEntities: # Allow access to apiserver
+    - kube-apiserver
+  - toEntities: # Allow access to port 10250 on all nodes for metric collection
+    - host
+    - remote-node
+    toPorts:
+    - ports:
+      - port: "10250"
+        protocol: TCP
 ```
 
 ### 配置节点防火墙
@@ -253,6 +253,12 @@ spec:
       - type: EchoRequest
         family: IPv4
 ```
+
+:::note[ingress 三条规则之间是 OR 关系]
+
+同一策略内多条 ingress 规则是**并集（OR）**生效：上面的 `cluster` 实体、SSH 22/TCP、ICMP Echo 三条规则中，后两条对**任意来源**（含集群外）放行——SSH 和 ping 实际是全网可达的。如果希望 SSH 仅限集群内访问，需把端口限制合并进 `fromEntities: cluster` 那条规则（用 `fromEntities` + `toPorts` 组合），而不是并列多条规则。
+
+:::
 
 ### 多租户隔离
 
@@ -280,19 +286,19 @@ spec:
 apiVersion: cilium.io/v2
 kind: CiliumClusterwideNetworkPolicy
 metadata:
- name: tenant-001
+  name: tenant-001
 spec:
- endpointSelector: # 选中租户 001 所有命名空间下的 Pod
-   matchLabels:
-     io.cilium.k8s.namespace.labels.tenant-id: "001"
- egress: # 只允许租户 001 的 Pod 访问自己的业务 Pod
- - toEndpoints:
-   - matchLabels:
-       io.cilium.k8s.namespace.labels.tenant-id: "001"
- ingress: # 只允许租户 001 的 Pod 被自己的业务 Pod 访问
- - fromEndpoints:
-   - matchLabels:
-       io.cilium.k8s.namespace.labels.tenant-id: "001"
+  endpointSelector: # Select Pods in all namespaces of tenant 001
+    matchLabels:
+      io.cilium.k8s.namespace.labels.tenant-id: "001"
+  egress: # Only allow tenant 001 Pods to access their own business Pods
+  - toEndpoints:
+    - matchLabels:
+        io.cilium.k8s.namespace.labels.tenant-id: "001"
+  ingress: # Only allow tenant 001 Pods to be accessed by their own business Pods
+  - fromEndpoints:
+    - matchLabels:
+        io.cilium.k8s.namespace.labels.tenant-id: "001"
 ```
 
 ### 限制 apiserver 的访问
@@ -360,28 +366,28 @@ spec:
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
- name: from-b-to-a-api
+  name: from-b-to-a-api
 spec:
- description: "Allow HTTP API from b to a"
- endpointSelector:
-   matchLabels:
-     app: a
- ingress:
- - fromEndpoints:
-   - matchLabels:
-       app: b
-   toPorts:
-   - ports:
-     - port: "80"
-       protocol: TCP
-     rules:
-       http:
-       - method: "GET" # 允许 GET /public
-         path: "/public"
-       - method: "PUT" # 允许 PUT /avatar，但需要携带 X-My-Header: true 的 header
-         path: "/avatar$"
-         headers:
-         - 'X-My-Header: true'
+  description: "Allow HTTP API from b to a"
+  endpointSelector:
+    matchLabels:
+      app: a
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app: b
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+      rules:
+        http:
+        - method: "GET" # Allow GET /public
+          path: "/public"
+        - method: "PUT" # Allow PUT /avatar, requires X-My-Header: true header
+          path: "/avatar$"
+          headers:
+          - 'X-My-Header: true'
 ```
 
 #### 限制 A 只能被集群外部访问

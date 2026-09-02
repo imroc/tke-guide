@@ -19,7 +19,7 @@ The following conditions must be met to enable Egress Gateway:
 
 1. Enable cilium to replace kube-proxy.
 2. Enable IP masquerade using BPF implementation instead of the default iptables implementation.
-3. **VPC-CNI Native Routing mode only**: Must configure `ipMasqAgent.config.nonMasqueradeCIDRs` to cover all VPC CIDR blocks (primary + all Assistant CIDRs). Otherwise, cross-node Pod-to-Pod traffic will be incorrectly SNATed by BPF masquerade to node IPs or link-local addresses. The destination node will not be able to restore the SNATed source IP back to the original Pod's cilium identity, causing **cross-node NetworkPolicy to fail**.
+3. **VPC-CNI Native Routing mode only**: Must configure `ipMasqAgent.config.nonMasqueradeCIDRs` to cover all VPC CIDR blocks (primary + all secondary CIDRs). Otherwise, cross-node Pod-to-Pod traffic will be incorrectly SNATed by BPF masquerade to node IPs or link-local addresses. The destination node will not be able to restore the SNATed source IP back to the original Pod's cilium identity, causing **cross-node NetworkPolicy to fail**.
 
 :::tip[Overlay mode is not affected]
 
@@ -48,7 +48,7 @@ bash -c "$(curl -sfL https://imroc.cc/tke/scripts/cilium.sh)" -- enable-egress-g
 When running `enable-egress-gateway` on a VPC-CNI Native Routing cluster, the script automatically determines `nonMasqueradeCIDRs` with the following priority:
 
 1. Environment variable `NON_MASQ_CIDRS="10.0.0.0/8 172.16.0.0/12 ..."` (space-separated) — suitable for non-interactive scenarios (CI / Terraform)
-2. Automatically reuse the TKE cluster's built-in `kube-system/ip-masq-agent-config` ConfigMap (TKE writes the VPC primary + Assistant CIDRs into it when installing the plugin)
+2. Automatically reuse the TKE cluster's built-in `kube-system/ip-masq-agent-config` ConfigMap (TKE writes the VPC primary + secondary CIDRs into it when installing the plugin)
 3. Interactive prompt (defaults to all three RFC 1918 CIDRs `10.0.0.0/8 172.16.0.0/12 192.168.0.0/16`, can be overridden with any valid Tencent Cloud VPC configuration)
 
 On Overlay clusters, the script will not ask about or inject this configuration.
@@ -121,9 +121,9 @@ kubectl rollout restart deploy cilium-operator -n kube-system
 
 :::tip[About nonMasqueradeCIDRs values]
 
-`ipMasqAgent.config.nonMasqueradeCIDRs` must **cover all VPC CIDR blocks** (primary + all Assistant CIDRs, including node subnets and VPC-CNI Pod subnets). The example above uses all three [RFC 1918](https://datatracker.ietf.org/doc/html/rfc1918) CIDRs as a catch-all, which covers any valid Tencent Cloud VPC configuration — the simplest approach.
+`ipMasqAgent.config.nonMasqueradeCIDRs` must **cover all VPC CIDR blocks** (primary + all secondary CIDRs, including node subnets and VPC-CNI Pod subnets). The example above uses all three [RFC 1918](https://datatracker.ietf.org/doc/html/rfc1918) CIDRs as a catch-all, which covers any valid Tencent Cloud VPC configuration — the simplest approach.
 
-If you want to specify exactly, you can get the values directly from the TKE cluster's built-in `kube-system/ip-masq-agent-config` ConfigMap (TKE automatically writes VPC primary + Assistant CIDRs when installing the ip-masq-agent plugin):
+If you want to specify exactly, you can get the values directly from the TKE cluster's built-in `kube-system/ip-masq-agent-config` ConfigMap (TKE automatically writes VPC primary + secondary CIDRs when installing the ip-masq-agent plugin):
 
 ```bash
 kubectl -n kube-system get cm ip-masq-agent-config -o jsonpath='{.data.config}'
@@ -157,7 +157,7 @@ Cilium provides two ways to tell BPF masquerade which traffic should not be SNAT
 
 | Configuration                         | Type       | Sufficient?                                                                                           |
 | -------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
-| `ipv4NativeRoutingCIDR`                | Single CIDR | ❌ No. Tencent Cloud VPC supports "primary CIDR + multiple Assistant CIDRs". VPC-CNI Pods can be assigned IPs from any CIDR, and a single CIDR cannot express this. |
+| `ipv4NativeRoutingCIDR`                | Single CIDR | ❌ No. Tencent Cloud VPC supports "primary CIDR + multiple secondary CIDRs". VPC-CNI Pods can be assigned IPs from any CIDR, and a single CIDR cannot express this. |
 | `ipMasqAgent.config.nonMasqueradeCIDRs` | CIDR list  | ✅ Can list all VPC CIDR blocks. The TKE built-in ip-masq-agent plugin uses the same field, so the configuration can be reused directly. |
 
 Therefore, Native Routing + Egress Gateway must use `nonMasqueradeCIDRs`. This guide uses this as the standard for all Native + Egress scenarios.
@@ -503,12 +503,21 @@ spec:
   destinationCIDRs:
   - "0.0.0.0/0"
   - "::/0"
-  egressGateway: # This field is required. If specifying multiple egress nodes, you must still specify one here; otherwise, you'll get: spec.egressGateway: Required value
+  # egressGateway is required by CRD validation; however, when the egressGateways
+  # list is non-empty, the contents of egressGateway are ignored entirely
+  # (cilium source behavior). For multi-node setups: fill egressGateway with any
+  # one node as a placeholder, and put ALL egress nodes that actually forward
+  # traffic (including the placeholder) into the egressGateways list.
+  egressGateway: # required placeholder (ignored when egressGateways is non-empty)
     nodeSelector:
       matchLabels:
-        kubernetes.io/hostname: 172.22.49.20 # egress node name
-    egressIP: 172.22.49.20 # egress node internal IP
-  egressGateways: # Additional egress nodes appended to this list
+        kubernetes.io/hostname: 172.22.49.20
+    egressIP: 172.22.49.20
+  egressGateways: # ALL egress nodes go here — cilium only honors nodes in this list
+  - nodeSelector:
+      matchLabels:
+        kubernetes.io/hostname: 172.22.49.20
+    egressIP: 172.22.49.20
   - nodeSelector:
       matchLabels:
         kubernetes.io/hostname: 172.22.49.147
@@ -535,7 +544,7 @@ $ kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | 
 43.156.123.70:  nginx-54c98b4f84-xt8bs
 ```
 
-All egress IPs belong to the defined group of egress nodes:
+The output above is from the original test (before the config was corrected): only two egress IPs appear — `129.226.84.9` (`172.22.49.119`) and `43.156.123.70` (`172.22.49.147`). This is exactly the behavior of `egressGateway` being ignored when `egressGateways` is non-empty: at that time `egressGateway` mistakenly held the first node (`172.22.49.20`, EIP `43.163.1.23`), which never forwarded traffic — the actual egress IPs only came from the two nodes in the `egressGateways` list. With the corrected example above (all nodes in `egressGateways`), EIPs of all three nodes may appear in egress traffic. The EIPs bound to the three nodes:
 
 ```bash
 $ kubectl get nodes -o custom-columns="NAME:.metadata.name,EXTERNAL-IP:.status.addresses[?(@.type=='ExternalIP')].address" -l egress-node=true
@@ -562,12 +571,19 @@ spec:
   destinationCIDRs:
   - "0.0.0.0/0"
   - "::/0"
-  egressGateway: # This field is required. If specifying multiple egress nodes, you must still specify one here; otherwise, you'll get: spec.egressGateway: Required value
+  # Same multi-node pattern as the previous section: egressGateway is a required
+  # placeholder (ignored when egressGateways is non-empty), and ALL egress nodes
+  # go into the egressGateways list
+  egressGateway:
     nodeSelector:
       matchLabels:
-        kubernetes.io/hostname: 172.22.49.20 # egress node name
-    egressIP: 172.22.49.20 # egress node internal IP
-  egressGateways: # Additional egress nodes appended to this list
+        kubernetes.io/hostname: 172.22.49.20
+    egressIP: 172.22.49.20
+  egressGateways:
+  - nodeSelector:
+      matchLabels:
+        kubernetes.io/hostname: 172.22.49.20
+    egressIP: 172.22.49.20
   - nodeSelector:
       matchLabels:
         kubernetes.io/hostname: 172.22.49.147
@@ -630,7 +646,7 @@ spec:
 
 ### Network Unreachable After Configuring Policy
 
-First, verify the CiliumEgressGatewayPolicy configuration. In TKE environments, ensure that each `egressGateway`/`egressGateways` entry's `nodeSelector` selects exactly one node, and `egressIP` must be set to that node's internal IP. Otherwise, connectivity issues may occur.
+First, verify the CiliumEgressGatewayPolicy configuration. In TKE environments, ensure that each `egressGateway`/`egressGateways` entry's `nodeSelector` selects exactly one node (if an entry matches multiple nodes, cilium only picks the first one in lexical order of node names), and `egressIP` must be set to that node's internal IP. Otherwise, connectivity issues may occur. For multi-node setups, also note: when the `egressGateways` list is non-empty, the `egressGateway` field is ignored entirely — all forwarding nodes must be listed in `egressGateways`.
 
 You can also log into the cilium pod on the egress node and run `cilium-dbg bpf egress list` to check the egress BPF rules on the current node:
 
